@@ -399,20 +399,31 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
+  width: calc(100% - 56px);
   margin: 20px 28px 0;
   padding: 14px;
   background: var(--y);
   color: var(--ink);
+  border: none;
   border-radius: var(--r-sm);
   font-size: .97rem;
   font-weight: 700;
+  font-family: inherit;
   text-decoration: none;
+  cursor: pointer;
   transition: background var(--t) var(--ease), transform var(--t) var(--ease), box-shadow var(--t) var(--ease);
 }
 .downloadBtn:hover {
   background: #FFD600;
   transform: translateY(-1px);
   box-shadow: 0 6px 24px rgba(245,200,0,.30);
+}
+.downloadNota {
+  margin: 8px 28px 0;
+  font-size: .74rem;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.5;
 }
 
 /* ─── Volver al inicio ─── */

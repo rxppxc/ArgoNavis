@@ -60,6 +60,26 @@ export default function PaginaTransferencia() {
     return () => window.removeEventListener("keydown", onKey);
   }, [modalAbierto, cerrarModal]);
 
+  // Dispara la descarga de todos los archivos, uno por uno (con un pequeño
+  // desfase entre cada uno para que el navegador no las bloquee como si
+  // fueran pop-ups). Van a la carpeta de descargas por defecto — para elegir
+  // dónde guardar cada uno hay que activar en el navegador "Preguntar dónde
+  // guardar cada archivo", el selector de carpeta nativo no está disponible
+  // porque el sitio corre en HTTP sin certificado.
+  function descargarTodos() {
+    if (!transferencia || !token) return;
+    transferencia.files.forEach((f, i) => {
+      programar(() => {
+        const a = document.createElement("a");
+        a.href = apiTransferencias.urlDescarga(token, f.id);
+        a.download = f.original_name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }, i * 350);
+    });
+  }
+
   async function copiarEnlace() {
     const url = new URL(window.location.href);
     url.search = "";
@@ -215,16 +235,15 @@ export default function PaginaTransferencia() {
               )}
             </div>
 
-            {transferencia!.files.length === 1 && (
-              <a
-                href={apiTransferencias.urlDescarga(token!, transferencia!.files[0].id)}
-                className={styles.downloadBtn}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <IconoDescargar />
-                Descargar archivo
-              </a>
+            <button type="button" className={styles.downloadBtn} onClick={descargarTodos}>
+              <IconoDescargar />
+              Descargar {transferencia!.files.length > 1 ? `archivos (${transferencia!.files.length})` : "archivo"}
+            </button>
+            {transferencia!.files.length > 1 && (
+              <p className={styles.downloadNota}>
+                Se descargan a la carpeta de descargas del navegador. El navegador puede pedir
+                permiso la primera vez para bajar varios archivos a la vez.
+              </p>
             )}
 
             <div className={styles.shareSection}>
