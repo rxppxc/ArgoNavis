@@ -20,6 +20,7 @@ import { useAutenticacion } from "../../hooks/useAutenticacion";
 import { usePermisos } from "../../hooks/usePermisos";
 import type { Transferencia } from "../../types";
 import { formatBytes, formatDate } from "../../utils/format";
+import { copiarAlPortapapeles } from "../../utils/portapapeles";
 import { useConfirmar } from "../../components/ModalConfirmacion";
 import { ModalDevolucion } from "../../components/ModalDevolucion";
 import { useNotificacion } from "../../components/Notificaciones";
@@ -358,7 +359,11 @@ export default function PaginaPanel() {
 
   // ── Acciones ──────────────────────────────────────────────────────────────
   async function copiarEnlace(token: string) {
-    await navigator.clipboard.writeText(`${window.location.origin}/t/${token}`);
+    const ok = await copiarAlPortapapeles(`${window.location.origin}/t/${token}`);
+    if (!ok) {
+      mostrarToast("No se pudo copiar el enlace. Copiálo manualmente.", "error");
+      return;
+    }
     setCopiado(token);
     setTimeout(() => setCopiado(null), 2200);
   }

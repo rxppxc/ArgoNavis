@@ -6,6 +6,8 @@ import { usePermisos } from "../../hooks/usePermisos";
 import type { TransferenciaPublica } from "../../types";
 import { formatBytes, formatDate } from "../../utils/format";
 import { infoTipo } from "../../utils/tipoArchivo";
+import { copiarAlPortapapeles } from "../../utils/portapapeles";
+import { useNotificacion } from "../../components/Notificaciones";
 import { BotonVolver } from "../../components/BotonVolver";
 import {
   IconoCarpeta, IconoArchivo, IconoDescargar, IconoEnlace,
@@ -22,6 +24,7 @@ export default function PaginaTransferencia() {
   const { estaAutenticado } = useAutenticacion();
   const { tiene } = usePermisos();
   const puedeEditar = estaAutenticado && tiene("T-PROCESAR-PACIFICO");
+  const { mostrar: mostrarToast } = useNotificacion();
 
   const [transferencia, setTransferencia] = useState<TransferenciaPublica | null>(null);
   const [cargando,      setCargando]      = useState(true);
@@ -64,7 +67,11 @@ export default function PaginaTransferencia() {
   async function copiarEnlace() {
     const url = new URL(window.location.href);
     url.search = "";
-    await navigator.clipboard.writeText(url.toString());
+    const ok = await copiarAlPortapapeles(url.toString());
+    if (!ok) {
+      mostrarToast("No se pudo copiar el enlace. Copiálo manualmente.", "error");
+      return;
+    }
     setCopiado(true);
     programar(() => setCopiado(false), 2200);
   }
