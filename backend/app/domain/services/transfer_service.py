@@ -14,8 +14,7 @@ from app.core.config import obtener_configuracion
 from app.domain.models.transfer import Transferencia, ArchivoTransferencia, EstadoTransferencia
 from app.domain.repositories.transfer_repository import RepositorioTransferencia
 from app.domain.schemas.transfer import (
-    DatosCrearTransferencia, DatosCrearBorrador, DatosProcesarTransferencia, DatosReenviar,
-    DatosDevolver, SalidaTransferencia, RespuestaTransferenciaPublica,
+    DatosCrearTransferencia, SalidaTransferencia, RespuestaTransferenciaPublica,
 )
 
 try:
@@ -180,22 +179,6 @@ class ServicioTransferencia:
     def __init__(self, repo: RepositorioTransferencia):
         self.repo = repo
 
-    async def _validar_referencias(
-        self, puerto_id: int | None,
-    ) -> None:
-        """Valida que las FKs existan antes de cualquier insert/update.
-        Lanza HTTPException 400 con un mensaje claro en lugar de dejar que el
-        driver de BD devuelva un IntegrityError críptico."""
-        from app.domain.models.puerto import Puerto
-        from sqlalchemy import select as _select
-
-        if puerto_id is not None:
-            existe = await self.repo.sesion.execute(
-                _select(Puerto.id).where(Puerto.id == puerto_id).limit(1)
-            )
-            if not existe.scalar_one_or_none():
-                raise HTTPException(status_code=400, detail="El puerto seleccionado no existe.")
-
     async def _guardar_archivos(
         self, destino: Path, archivos_subidos: list[UploadFile],
         user_id: int, es_original: bool,
@@ -249,13 +232,13 @@ class ServicioTransferencia:
         return guardados
 
     async def crear(self, user_id: int, datos: DatosCrearTransferencia, archivos_subidos: list[UploadFile]) -> SalidaTransferencia:
+        """Sube archivos y quedan disponibles de inmediato (storage simple:
+        sin borrador ni revisión previa)."""
         if not archivos_subidos:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Debes adjuntar al menos un archivo.",
             )
-
-        await self._validar_referencias(datos.puerto_id)
 
         token   = secrets.token_urlsafe(36)
         destino = Path(configuracion.STORAGE_PATH) / token
@@ -270,12 +253,6 @@ class ServicioTransferencia:
             expires_at    = _expira_a_medianoche(configuracion.TRANSFER_EXPIRY_DAYS),
             max_downloads = datos.max_downloads,
             status        = EstadoTransferencia.ACTIVA.value,
-            puerto_id     = datos.puerto_id,
-            marino        = datos.marino,
-            naviera       = datos.naviera,
-            titulo_original       = datos.title,
-            mensaje_original      = datos.message,
-            destinatario_original = datos.recipient,
         )
 
         archivos = await self._guardar_archivos(destino, archivos_subidos, user_id, es_original=True)
@@ -284,285 +261,11 @@ class ServicioTransferencia:
 
         guardado = await self.repo.crear(transferencia)
         return SalidaTransferencia.model_validate(guardado)
-
-    async def crear_borrador(
-        self, user_id: int, datos: DatosCrearBorrador, archivos_subidos: list[UploadFile],
-    ) -> SalidaTransferencia:
-        """Crea una transferencia en estado BORRADOR (flujo Naviera).
-        Captura el snapshot original (título/mensaje/destinatario)."""
-        if not archivos_subidos:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Debes adjuntar al menos un archivo.",
-            )
-
-        token   = secrets.token_urlsafe(36)
-        destino = Path(configuracion.STORAGE_PATH) / token
-        destino.mkdir(parents=True, exist_ok=True)
-
-        transferencia = Transferencia(
-            user_id    = user_id,
-            token      = token,
-            title      = datos.title,
-            message    = datos.message,
-            recipient  = datos.recipient,
-            expires_at = _expira_a_medianoche(configuracion.TRANSFER_EXPIRY_DAYS),
-            status     = EstadoTransferencia.BORRADOR.value,
-            titulo_original       = datos.title,
-            mensaje_original      = datos.message,
-            destinatario_original = datos.recipient,
-        )
-
-        archivos = await self._guardar_archivos(destino, archivos_subidos, user_id, es_original=True)
-        for a in archivos:
-            transferencia.archivos.append(a)
-
-        guardado = await self.repo.crear(transferencia)
-        return SalidaTransferencia.model_validate(guardado)
-
-    async def procesar(
-        self, transfer_id: int, datos: DatosProcesarTransferencia,
-    ) -> SalidaTransferencia:
-        """Actualiza un borrador/devuelto con datos del Sector Pacífico."""
-        transferencia = await self.repo.buscar_por_id(transfer_id)
-        if not transferencia:
-            raise HTTPException(status_code=404, detail="Transferencia no encontrada.")
-        estados_editables = (EstadoTransferencia.BORRADOR, EstadoTransferencia.ACTIVA, EstadoTransferencia.DEVUELTO)
-        if transferencia.status not in estados_editables:
-            raise HTTPException(status_code=400, detail="No se puede editar una transferencia en este estado.")
-
-        await self._validar_referencias(datos.puerto_id)
-
-        if datos.title         is not None: transferencia.title         = datos.title
-        if datos.message       is not None: transferencia.message       = datos.message
-        if datos.recipient     is not None: transferencia.recipient     = datos.recipient
-        if datos.max_downloads is not None: transferencia.max_downloads = datos.max_downloads
-        if datos.puerto_id     is not None: transferencia.puerto_id     = datos.puerto_id
-        if datos.marino        is not None: transferencia.marino        = datos.marino
-        if datos.naviera       is not None: transferencia.naviera       = datos.naviera
-        if datos.observaciones is not None: transferencia.observaciones = datos.observaciones
-
-        await self.repo.guardar(transferencia)
-        return SalidaTransferencia.model_validate(transferencia)
-
-    async def devolver(
-        self, transfer_id: int, datos: DatosDevolver,
-    ) -> SalidaTransferencia:
-        """Sector Pacífico devuelve la transferencia a la Naviera con un motivo.
-
-        Estados de entrada aceptados: BORRADOR o DEVUELTO. También aceptamos
-        REVISION_SP para poder devolver a la Naviera algo que ya había
-        rebotado del Muelle si SP concluye que el error fue de la Naviera.
-        """
-        transferencia = await self.repo.buscar_por_id(transfer_id)
-        if not transferencia:
-            raise HTTPException(status_code=404, detail="Transferencia no encontrada.")
-        estados_ok = (
-            EstadoTransferencia.BORRADOR,
-            EstadoTransferencia.DEVUELTO,
-            EstadoTransferencia.REVISION_SP,
-        )
-        if transferencia.status not in estados_ok:
-            raise HTTPException(status_code=400, detail="Solo se pueden devolver transferencias en borrador o revisión.")
-
-        transferencia.observaciones = datos.motivo
-        transferencia.status        = EstadoTransferencia.DEVUELTO.value
-        await self.repo.guardar(transferencia)
-        return SalidaTransferencia.model_validate(transferencia)
-
-    async def devolver_desde_muelle(
-        self, transfer_id: int, datos: DatosDevolver, user_id: int, puertos_usuario: list[int],
-    ) -> SalidaTransferencia:
-        """Un Muelle/Operador devuelve la transferencia a la cola del Sector
-        Pacífico con un motivo (ej: puerto equivocado). Cambia el estado a
-        REVISION_SP para que SP la distinga en su cola con badge propio.
-        """
-        transferencia = await self.repo.buscar_por_id(transfer_id)
-        if not transferencia:
-            raise HTTPException(status_code=404, detail="Transferencia no encontrada.")
-        if transferencia.status != EstadoTransferencia.ACTIVA:
-            raise HTTPException(status_code=400, detail="Solo se pueden devolver transferencias activas.")
-        if transferencia.puerto_id not in puertos_usuario:
-            raise HTTPException(
-                status_code=403,
-                detail="No tienes asignado el puerto de esta transferencia.",
-            )
-        transferencia.observaciones = datos.motivo
-        transferencia.status        = EstadoTransferencia.REVISION_SP.value
-        await self.repo.guardar(transferencia)
-        return SalidaTransferencia.model_validate(transferencia)
-
-    async def marcar_procesada(
-        self, transfer_id: int, user_id: int, puertos_usuario: list[int],
-    ) -> SalidaTransferencia:
-        """El Muelle/Operador marca la transferencia como procesada — estado
-        final del flujo. Deja de aparecer en su bandeja."""
-        transferencia = await self.repo.buscar_por_id(transfer_id)
-        if not transferencia:
-            raise HTTPException(status_code=404, detail="Transferencia no encontrada.")
-        if transferencia.status != EstadoTransferencia.ACTIVA:
-            raise HTTPException(
-                status_code=400,
-                detail="Solo se pueden marcar como procesadas transferencias activas.",
-            )
-        if transferencia.puerto_id not in puertos_usuario:
-            raise HTTPException(
-                status_code=403,
-                detail="No tienes asignado el puerto de esta transferencia.",
-            )
-        transferencia.status = EstadoTransferencia.PROCESADA.value
-        await self.repo.guardar(transferencia)
-        return SalidaTransferencia.model_validate(transferencia)
-
-    async def listar_cola_muelle(
-        self, puertos_usuario: list[int],
-    ) -> list[SalidaTransferencia]:
-        """Transferencias activas de los puertos que este operador atiende."""
-        transferencias = await self.repo.listar_activas_por_puertos(puertos_usuario)
-        return [SalidaTransferencia.model_validate(t) for t in transferencias]
-
-    async def resubmit(
-        self, transfer_id: int, user_id: int,
-    ) -> SalidaTransferencia:
-        """Naviera re-envía una transferencia devuelta — vuelve a estado borrador."""
-        transferencia = await self.repo.buscar_por_id(transfer_id)
-        if not transferencia:
-            raise HTTPException(status_code=404, detail="Transferencia no encontrada.")
-        if transferencia.user_id != user_id:
-            raise HTTPException(status_code=403, detail="No puedes re-enviar una transferencia que no es tuya.")
-        if transferencia.status != EstadoTransferencia.DEVUELTO:
-            raise HTTPException(status_code=400, detail="La transferencia no está en estado 'Devuelto'.")
-        if not transferencia.archivos:
-            raise HTTPException(status_code=400, detail="Debes adjuntar al menos un archivo antes de re-enviar.")
-
-        transferencia.status = EstadoTransferencia.BORRADOR.value
-        await self.repo.guardar(transferencia)
-        return SalidaTransferencia.model_validate(transferencia)
-
-    async def corregir_agregar_archivos(
-        self, transfer_id: int, archivos_subidos: list[UploadFile], user_id: int,
-    ) -> SalidaTransferencia:
-        """Naviera agrega archivos a una transferencia devuelta."""
-        transferencia = await self.repo.buscar_por_id(transfer_id)
-        if not transferencia:
-            raise HTTPException(status_code=404, detail="Transferencia no encontrada.")
-        if transferencia.user_id != user_id:
-            raise HTTPException(status_code=403, detail="No puedes modificar una transferencia que no es tuya.")
-        if transferencia.status != EstadoTransferencia.DEVUELTO:
-            raise HTTPException(status_code=400, detail="Solo puedes agregar archivos a una transferencia devuelta.")
-
-        destino = Path(configuracion.STORAGE_PATH) / transferencia.token
-        destino.mkdir(parents=True, exist_ok=True)
-        nuevos = await self._guardar_archivos(destino, archivos_subidos, user_id, es_original=True)
-        for a in nuevos:
-            transferencia.archivos.append(a)
-        await self.repo.guardar(transferencia)
-        return SalidaTransferencia.model_validate(transferencia)
-
-    async def corregir_eliminar_archivo(
-        self, transfer_id: int, archivo_id: int, user_id: int,
-    ) -> SalidaTransferencia:
-        """Naviera elimina un archivo de una transferencia devuelta."""
-        transferencia = await self.repo.buscar_por_id(transfer_id)
-        if not transferencia:
-            raise HTTPException(status_code=404, detail="Transferencia no encontrada.")
-        if transferencia.user_id != user_id:
-            raise HTTPException(status_code=403, detail="No puedes modificar una transferencia que no es tuya.")
-        if transferencia.status != EstadoTransferencia.DEVUELTO:
-            raise HTTPException(status_code=400, detail="Solo puedes eliminar archivos de una transferencia devuelta.")
-
-        archivo = next((f for f in transferencia.archivos if f.id == archivo_id), None)
-        if not archivo:
-            raise HTTPException(status_code=404, detail="Archivo no encontrado.")
-        ruta = Path(archivo.path)
-        if ruta.exists():
-            try:
-                ruta.unlink()
-            except OSError as exc:
-                logger.warning("[storage] No se pudo eliminar %s: %s", ruta, exc)
-        await self.repo.eliminar_archivo(archivo)
-        await self.repo.refrescar(transferencia)
-        return SalidaTransferencia.model_validate(transferencia)
-
-    async def agregar_archivos(
-        self, transfer_id: int, archivos_subidos: list[UploadFile], user_id: int,
-    ) -> SalidaTransferencia:
-        transferencia = await self.repo.buscar_por_id(transfer_id)
-        if not transferencia:
-            raise HTTPException(status_code=404, detail="Transferencia no encontrada.")
-        if transferencia.status not in (EstadoTransferencia.BORRADOR, EstadoTransferencia.ACTIVA, EstadoTransferencia.DEVUELTO):
-            raise HTTPException(status_code=400, detail="No se pueden añadir archivos a esta transferencia.")
-        if not archivos_subidos:
-            return SalidaTransferencia.model_validate(transferencia)
-
-        destino = Path(configuracion.STORAGE_PATH) / transferencia.token
-        destino.mkdir(parents=True, exist_ok=True)
-        nuevos = await self._guardar_archivos(destino, archivos_subidos, user_id, es_original=False)
-        for a in nuevos:
-            transferencia.archivos.append(a)
-        await self.repo.guardar(transferencia)
-        return SalidaTransferencia.model_validate(transferencia)
-
-    async def eliminar_archivo(self, transfer_id: int, archivo_id: int) -> SalidaTransferencia:
-        transferencia = await self.repo.buscar_por_id(transfer_id)
-        if not transferencia:
-            raise HTTPException(status_code=404, detail="Transferencia no encontrada.")
-        archivo = next((f for f in transferencia.archivos if f.id == archivo_id), None)
-        if not archivo:
-            raise HTTPException(status_code=404, detail="Archivo no encontrado.")
-        ruta = Path(archivo.path)
-        if ruta.exists():
-            try:
-                ruta.unlink()
-            except OSError as exc:
-                logger.warning("[storage] No se pudo eliminar %s: %s", ruta, exc)
-        await self.repo.eliminar_archivo(archivo)
-        await self.repo.refrescar(transferencia)
-        return SalidaTransferencia.model_validate(transferencia)
-
-    async def reenviar(
-        self, transfer_id: int, datos: DatosReenviar,
-    ) -> SalidaTransferencia:
-        """Cambia un borrador a ACTIVA. Renueva expiración y permite anexar mensaje."""
-        transferencia = await self.repo.buscar_por_id(transfer_id)
-        if not transferencia:
-            raise HTTPException(status_code=404, detail="Transferencia no encontrada.")
-        if transferencia.status not in (EstadoTransferencia.BORRADOR, EstadoTransferencia.ACTIVA):
-            raise HTTPException(status_code=400, detail="No se puede reenviar una transferencia en este estado.")
-        if not transferencia.recipient:
-            raise HTTPException(status_code=400, detail="Falta definir el destinatario antes de reenviar.")
-        if not transferencia.archivos:
-            raise HTTPException(status_code=400, detail="No hay archivos en la transferencia.")
-
-        if datos.message is not None:
-            transferencia.message = datos.message
-        # Renueva siempre a partir de este momento — no configurable por el
-        # cliente (ver DatosReenviar).
-        transferencia.expires_at = _expira_a_medianoche(configuracion.TRANSFER_EXPIRY_DAYS)
-
-        transferencia.status = EstadoTransferencia.ACTIVA.value
-        await self.repo.guardar(transferencia)
-        return SalidaTransferencia.model_validate(transferencia)
-
-    async def listar_borradores(self) -> list[SalidaTransferencia]:
-        """Cola de revisión del Sector Pacífico: borradores de la Naviera +
-        transferencias devueltas por el Muelle (para reasignar puerto)."""
-        transferencias = await self.repo.listar_por_estados([
-            EstadoTransferencia.BORRADOR,
-            EstadoTransferencia.REVISION_SP,
-        ])
-        return [SalidaTransferencia.model_validate(t) for t in transferencias]
 
     async def listar_todas_activas(self) -> list[SalidaTransferencia]:
         """Todas las transferencias activas (para Sector Pacífico y Admin)."""
         transferencias = await self.repo.listar_activas()
         return [SalidaTransferencia.model_validate(t) for t in transferencias]
-
-    async def obtener_por_id(self, transfer_id: int) -> SalidaTransferencia:
-        transferencia = await self.repo.buscar_por_id(transfer_id)
-        if not transferencia:
-            raise HTTPException(status_code=404, detail="Transferencia no encontrada.")
-        return SalidaTransferencia.model_validate(transferencia)
 
     async def listar_por_usuario(self, user_id: int, limite: int = 50) -> list[SalidaTransferencia]:
         limite = min(limite, 100)

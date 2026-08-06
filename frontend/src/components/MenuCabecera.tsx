@@ -4,7 +4,7 @@ import { useAutenticacion } from "../hooks/useAutenticacion";
 import { usePermisos } from "../hooks/usePermisos";
 import { useTema } from "../context/ContextoTema";
 import {
-  IconoUsuarios, IconoEstadisticas, IconoEscudo, IconoAncla,
+  IconoUsuarios, IconoEstadisticas, IconoEscudo,
   IconoSol, IconoLuna, IconoSalir, IconoChevronAbajo,
 } from "./Iconos";
 import styles from "./MenuCabecera.module.css";
@@ -57,9 +57,6 @@ export function MenuCabecera() {
                 </Link>
                 <Link to="/admin/roles" className={styles.item} onClick={() => setAbierto(false)}>
                   <IconoEscudo />Roles y permisos
-                </Link>
-                <Link to="/admin/puertos-navieras" className={styles.item} onClick={() => setAbierto(false)}>
-                  <IconoAncla />Puertos y navieras
                 </Link>
                 <Link to="/admin/stats" className={styles.item} onClick={() => setAbierto(false)}>
                   <IconoEstadisticas />Estadísticas

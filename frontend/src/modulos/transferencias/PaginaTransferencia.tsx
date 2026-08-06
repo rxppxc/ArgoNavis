@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useParams, useSearchParams, Link } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { apiTransferencias } from "../../api/transfers";
 import { useAutenticacion } from "../../hooks/useAutenticacion";
-import { usePermisos } from "../../hooks/usePermisos";
 import type { TransferenciaPublica } from "../../types";
 import { formatBytes, formatDate } from "../../utils/format";
 import { infoTipo } from "../../utils/tipoArchivo";
@@ -12,7 +11,7 @@ import { BotonVolver } from "../../components/BotonVolver";
 import {
   IconoCarpeta, IconoArchivo, IconoDescargar, IconoEnlace,
   IconoCheck, IconoReloj, IconoXCirculo, IconoExito, IconoOjo,
-  IconoX, IconoImagen, IconoEditar, IconoPdf,
+  IconoX, IconoImagen, IconoPdf,
 } from "../../components/Iconos";
 import styles from "./PaginaTransferencia.module.css";
 
@@ -22,8 +21,6 @@ export default function PaginaTransferencia() {
   const [params] = useSearchParams();
   const esNuevo = params.get("new") === "1";
   const { estaAutenticado } = useAutenticacion();
-  const { tiene } = usePermisos();
-  const puedeEditar = estaAutenticado && tiene("T-PROCESAR-PACIFICO");
   const { mostrar: mostrarToast } = useNotificacion();
 
   const [transferencia, setTransferencia] = useState<TransferenciaPublica | null>(null);
@@ -221,16 +218,6 @@ export default function PaginaTransferencia() {
               <IconoDescargar />
               Descargar {transferencia!.files.length > 1 ? "todos (.zip)" : "archivo"}
             </a>
-
-            {puedeEditar && (
-              <Link
-                to={`/transfers/${transferencia!.id}/procesar`}
-                className={styles.editarBtn}
-              >
-                <IconoEditar />
-                Editar transferencia
-              </Link>
-            )}
 
             <div className={styles.shareSection}>
               <div className={styles.shareLabel}><IconoEnlace tamano={12} />Enlace para compartir</div>

@@ -1,7 +1,6 @@
 from pydantic import BaseModel, field_validator
 from app.domain.models.user import TipoUsuario, EstadoUsuario
 from app.domain.schemas.rol import RolMini
-from app.domain.schemas.puerto import SalidaPuertoMini
 
 
 class SalidaUsuario(BaseModel):
@@ -15,7 +14,6 @@ class SalidaUsuario(BaseModel):
     rol_id:    int | None = None
     rol_personalizado: RolMini | None = None
     full_name: str
-    puertos_asignados: list[SalidaPuertoMini] = []
 
     model_config = {"from_attributes": True}
 

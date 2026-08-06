@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import type * as React from "react";
 import { useNavigate } from "react-router-dom";
 import { apiTransferencias } from "../../api/transfers";
@@ -8,42 +8,24 @@ import { MenuCabecera } from "../../components/MenuCabecera";
 import { BotonVolver } from "../../components/BotonVolver";
 import { usePermisos } from "../../hooks/usePermisos";
 import {
-  IconoSubir, IconoArchivo, IconoX, IconoAlerta, IconoEnviar,
-  IconoAjustes, IconoBarco, IconoAncla, IconoUsuario, IconoReloj,
+  IconoSubir, IconoArchivo, IconoX, IconoAlerta, IconoEnviar, IconoAjustes,
 } from "../../components/Iconos";
 import styles from "./PaginaSubida.module.css";
-
-const DIAS_EXPIRACION_DEFECTO = 7;
 
 
 export default function PaginaSubida() {
   const navegar = useNavigate();
-  const inputRef                  = useRef<HTMLInputElement>(null);
-  const { tiene } = usePermisos();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const { tiene, esAdmin } = usePermisos();
+  const puedeSubir = esAdmin || tiene("T-CREAR-BASICA");
 
-  // Flujo: Si tiene T-CREAR-COMPLETA usa el form completo. Si no tiene completa
-  // pero sí T-CREAR-BASICA, usa el form simplificado (queda en borrador).
-  // Admin legacy entra al modo completo automáticamente.
-  const modoCompleto = tiene("T-CREAR-COMPLETA");
-  const modoBasico   = !modoCompleto && tiene("T-CREAR-BASICA");
-
-  const [archivos,       setArchivos]       = useState<File[]>([]);
-  const [arrastrando,    setArrastrando]    = useState(false);
-  const [titulo,         setTitulo]         = useState("");
-  const [mensaje,        setMensaje]        = useState("");
-  const [destinatario,   setDestinatario]   = useState("");
-  const [enviando,       setEnviando]       = useState(false);
-  const [error,          setError]          = useState<string | null>(null);
-
-  const [puertos,       setPuertos]       = useState<{ id: number; nombre: string }[]>([]);
-  const [puertoId,      setPuertoId]      = useState<number | "">("");
-  const [naviera,       setNaviera]       = useState("");
-  const [marino,        setMarino]        = useState("");
-
-  useEffect(() => {
-    if (!modoCompleto) return;
-    apiTransferencias.listarPuertos().then(setPuertos).catch(() => {});
-  }, [modoCompleto]);
+  const [archivos,     setArchivos]     = useState<File[]>([]);
+  const [arrastrando,  setArrastrando]  = useState(false);
+  const [titulo,       setTitulo]       = useState("");
+  const [mensaje,      setMensaje]      = useState("");
+  const [destinatario, setDestinatario] = useState("");
+  const [enviando,     setEnviando]     = useState(false);
+  const [error,        setError]        = useState<string | null>(null);
 
   function agregarArchivos(lista: FileList | null) {
     if (!lista) return;
@@ -73,16 +55,6 @@ export default function PaginaSubida() {
   async function alEnviar(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!archivos.length) return;
-    if (modoCompleto) {
-      if (!naviera.trim()) {
-        setError("Debes ingresar el nombre de la naviera.");
-        return;
-      }
-      if (!marino.trim()) {
-        setError("Debes ingresar el nombre del marino.");
-        return;
-      }
-    }
     if (!mensaje.trim()) {
       setError("Debes ingresar un mensaje.");
       return;
@@ -94,22 +66,9 @@ export default function PaginaSubida() {
       archivos.forEach((a) => fd.append("files", a));
       fd.append("title", titulo);
       fd.append("message", mensaje);
-      // La expiración ya no es configurable: el backend siempre usa
-      // TRANSFER_EXPIRY_DAYS (7 días) para toda transferencia nueva.
-
-      if (modoCompleto) {
-        fd.append("recipient", destinatario);
-        if (puertoId !== "") fd.append("puerto_id", String(puertoId));
-        fd.append("marino", marino.trim());
-        fd.append("naviera", naviera.trim());
-        const transferencia = await apiTransferencias.crear(fd);
-        navegar(`/t/${transferencia.token}?new=1`);
-      } else {
-        // Modo básico: destinatario opcional, queda en borrador
-        if (destinatario.trim()) fd.append("recipient", destinatario.trim());
-        await apiTransferencias.crearBorrador(fd);
-        navegar(`/dashboard?borrador=1`);
-      }
+      if (destinatario.trim()) fd.append("recipient", destinatario.trim());
+      const transferencia = await apiTransferencias.crear(fd);
+      navegar(`/t/${transferencia.token}?new=1`);
     } catch (err: any) {
       const detalle = err?.response?.data?.detail;
       setError(
@@ -125,7 +84,7 @@ export default function PaginaSubida() {
   }
 
   // Sin permiso: bloquea acceso
-  if (!modoCompleto && !modoBasico) {
+  if (!puedeSubir) {
     return (
       <div className={styles.page}>
         <header className={styles.header}>
@@ -146,7 +105,7 @@ export default function PaginaSubida() {
         <main className={styles.main}>
           <div className={styles.error}>
             <IconoAlerta />
-            No tienes permiso para crear transferencias. Contacta al administrador.
+            No tienes permiso para subir archivos. Contacta al administrador.
           </div>
         </main>
       </div>
@@ -173,13 +132,10 @@ export default function PaginaSubida() {
 
       <main className={styles.main}>
         <div className={styles.pageHead}>
-          <h1 className={styles.pageTitle}>
-            {modoBasico ? "Envío de documentación" : "Nueva Transferencia"}
-          </h1>
+          <h1 className={styles.pageTitle}>Subir archivos</h1>
           <p className={styles.pageSub}>
-            {modoBasico
-              ? "Adjunte los documentos de la Nave / Marinos y complete los datos del envío. El personal del Servicio Nacional de Migración validará la información antes de procesarla."
-              : "Sube tus archivos y obtén un enlace seguro para compartir"}
+            Adjunte los documentos y complete los datos del envío. Quedarán disponibles de
+            inmediato con un enlace para que el Sector Pacífico los descargue.
           </p>
         </div>
 
@@ -199,9 +155,7 @@ export default function PaginaSubida() {
                 <h2>Archivos {archivos.length > 0 && `(${archivos.length})`}</h2>
                 <span className={styles.reqBadge}>Obligatorio</span>
               </div>
-              {modoBasico && (
-                <p className={styles.panelHint}><strong>Obligatorio.</strong> Adjunte los documentos en PDF, Word, Excel o imágenes. Máximo 50 MB por archivo.</p>
-              )}
+              <p className={styles.panelHint}><strong>Obligatorio.</strong> Adjunte los documentos en PDF, Word, Excel o imágenes. Máximo 50 MB por archivo.</p>
               <div className={styles.panelBody}>
                 <div
                   className={`${styles.dropZone} ${arrastrando ? styles.dragging : ""}`}
@@ -252,9 +206,7 @@ export default function PaginaSubida() {
                 <div className={styles.optBody}>
                   <div className={styles.field}>
                     <label className={styles.label}>Título <span className={styles.req}>*</span></label>
-                    {modoBasico && (
-                      <p className={styles.fieldHint}><strong>Obligatorio.</strong> Nombre que identifica este envío, por ejemplo: nombre de la motonave, tipo de documento o fecha de arribo.</p>
-                    )}
+                    <p className={styles.fieldHint}><strong>Obligatorio.</strong> Nombre que identifica este envío, por ejemplo: nombre de la motonave, tipo de documento o fecha de arribo.</p>
                     <input
                       className={styles.input}
                       type="text"
@@ -267,9 +219,7 @@ export default function PaginaSubida() {
                   </div>
                   <div className={styles.field}>
                     <label className={styles.label}>Mensaje <span className={styles.req}>*</span></label>
-                    {modoBasico && (
-                      <p className={styles.fieldHint}><strong>Obligatorio.</strong> Describa brevemente el contenido del envío e indique cualquier observación relevante.</p>
-                    )}
+                    <p className={styles.fieldHint}><strong>Obligatorio.</strong> Describa brevemente el contenido del envío e indique cualquier observación relevante.</p>
                     <textarea
                       className={styles.textarea}
                       value={mensaje}
@@ -282,92 +232,25 @@ export default function PaginaSubida() {
                   </div>
                   <div className={styles.field}>
                     <label className={styles.label}>
-                      Destinatario {modoCompleto
-                        ? <span className={styles.req}>*</span>
-                        : <span className={styles.opt}>(opcional)</span>}
+                      Destinatario <span className={styles.opt}>(opcional)</span>
                     </label>
-                    {modoBasico && (
-                      <p className={styles.fieldHint}><strong>Opcional.</strong> Si conoce el correo del receptor puede ingresarlo. De lo contrario, déjelo vacío — el personal de Migración lo completará.</p>
-                    )}
+                    <p className={styles.fieldHint}><strong>Opcional.</strong> Si conoce el correo de alguien a quien avisar puede ingresarlo — se le enviará un correo con el enlace. De lo contrario, déjelo vacío.</p>
                     <input
                       className={styles.input}
                       type="email"
                       value={destinatario}
                       onChange={(e) => setDestinatario(e.target.value)}
                       placeholder="correo@ejemplo.com"
-                      required={modoCompleto}
                     />
                   </div>
-
-                  {/* Puerto */}
-                  {modoCompleto && puertos.length > 0 && (
-                    <div className={styles.field}>
-                      <label className={styles.label}><IconoAncla tamano={14} /> Puerto / Muelle <span className={styles.req}>*</span></label>
-                      <select
-                        className={styles.select}
-                        value={puertoId}
-                        onChange={e => setPuertoId(e.target.value === "" ? "" : Number(e.target.value))}
-                        required
-                      >
-                        <option value="">— Selecciona un puerto / muelle —</option>
-                        {puertos.map(p => (
-                          <option key={p.id} value={p.id}>{p.nombre}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Naviera */}
-                  {modoCompleto && (
-                    <div className={styles.field}>
-                      <label className={styles.label}><IconoBarco /> Naviera <span className={styles.req}>*</span></label>
-                      <input
-                        className={styles.input}
-                        type="text"
-                        value={naviera}
-                        onChange={(e) => setNaviera(e.target.value)}
-                        placeholder="Ej: Naviera del Pacífico S.A."
-                        maxLength={255}
-                        required
-                      />
-                    </div>
-                  )}
-
-                  {/* Marino */}
-                  {modoCompleto && (
-                    <div className={styles.field}>
-                      <label className={styles.label}><IconoUsuario tamano={14} /> Marino <span className={styles.req}>*</span></label>
-                      <input
-                        className={styles.input}
-                        type="text"
-                        value={marino}
-                        onChange={(e) => setMarino(e.target.value)}
-                        placeholder="Ej: Víctor Pérez"
-                        maxLength={255}
-                        required
-                      />
-                    </div>
-                  )}
                 </div>
               </div>
-
-              {modoCompleto && (
-                <div className={styles.optPanel}>
-                  <div className={styles.optHead}>Expiración</div>
-                  <div className={styles.optBody}>
-                    <p className={styles.expiryNota}>
-                      <IconoReloj tamano={15} />
-                      Esta transferencia expirará automáticamente a los <strong>{DIAS_EXPIRACION_DEFECTO} días</strong> de su creación.
-                    </p>
-                  </div>
-                </div>
-              )}
 
               <button type="submit" className={styles.submitBtn} disabled={enviando || archivos.length === 0}>
                 {enviando ? (
                   <><span className={styles.spinner} />Subiendo archivos…</>
                 ) : (
-                  <><IconoEnviar tamano={16} />{modoBasico ? "Enviar documentación" : "Crear transferencia"}</>
+                  <><IconoEnviar tamano={16} />Subir archivos</>
                 )}
               </button>
             </div>

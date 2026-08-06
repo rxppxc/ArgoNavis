@@ -19,12 +19,6 @@ class SalidaArchivoTransferencia(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class SalidaPuertoBasico(BaseModel):
-    id:     int
-    nombre: str
-    model_config = {"from_attributes": True}
-
-
 class SalidaTransferencia(BaseModel):
     id:            int
     token:         str
@@ -39,87 +33,19 @@ class SalidaTransferencia(BaseModel):
     files:         list[SalidaArchivoTransferencia] = []
     total_size:    int
     is_expired:    bool
-    puerto_id:     int | None = None
-    puerto:        SalidaPuertoBasico | None = None
-    marino:        str | None = None
-    naviera:       str | None = None
     user_id:       int
-    titulo_original:       str | None = None
-    mensaje_original:      str | None = None
-    destinatario_original: str | None = None
-    observaciones:         str | None = None
 
     model_config = {"from_attributes": True}
 
 
 class DatosCrearTransferencia(BaseModel):
+    """Sube archivos y quedan disponibles de inmediato. El destinatario es
+    opcional: si se indica, se envía un correo de aviso; si no, la
+    transferencia queda igual visible para Sector Pacífico."""
     title:         str
-    recipient:     str
     message:       str | None = None
+    recipient:     str | None = None
     max_downloads: int | None = None
-    puerto_id:     int | None = None
-    marino:        str | None = None
-    naviera:       str | None = None
-
-    @field_validator("title")
-    @classmethod
-    def validar_titulo(cls, v: str) -> str:
-        v = v.strip()
-        if not v:
-            raise ValueError("El título es obligatorio.")
-        if len(v) > TITULO_MAX:
-            raise ValueError(f"El título no puede superar {TITULO_MAX} caracteres.")
-        return v
-
-    @field_validator("recipient")
-    @classmethod
-    def validar_destinatario(cls, v: str) -> str:
-        v = v.strip()
-        if not v:
-            raise ValueError("El destinatario es obligatorio.")
-        if not _EMAIL_RE.match(v):
-            raise ValueError("El correo del destinatario no tiene un formato válido.")
-        return v
-
-    @field_validator("message")
-    @classmethod
-    def validar_mensaje(cls, v: str | None) -> str | None:
-        if v is not None and len(v) > MENSAJE_MAX:
-            raise ValueError(f"El mensaje no puede superar {MENSAJE_MAX} caracteres.")
-        return v or None
-
-    @field_validator("max_downloads")
-    @classmethod
-    def validar_max_descargas(cls, v: int | None) -> int | None:
-        if v is not None and v < 1:
-            raise ValueError("El límite de descargas debe ser al menos 1.")
-        return v
-
-    @field_validator("marino")
-    @classmethod
-    def validar_marino(cls, v: str | None) -> str | None:
-        if v is not None:
-            v = v.strip()
-            if len(v) > 255:
-                raise ValueError("El nombre del marino no puede superar 255 caracteres.")
-        return v or None
-
-    @field_validator("naviera")
-    @classmethod
-    def validar_naviera(cls, v: str | None) -> str | None:
-        if v is not None:
-            v = v.strip()
-            if len(v) > 255:
-                raise ValueError("El nombre de la naviera no puede superar 255 caracteres.")
-        return v or None
-
-
-class DatosCrearBorrador(BaseModel):
-    """Datos para crear un borrador (flujo Naviera). Destinatario opcional;
-    el Sector Pacífico puede completarlo / corregirlo después."""
-    title:       str
-    message:     str | None = None
-    recipient:   str | None = None
 
     @field_validator("title")
     @classmethod
@@ -150,71 +76,11 @@ class DatosCrearBorrador(BaseModel):
             raise ValueError(f"El mensaje no puede superar {MENSAJE_MAX} caracteres.")
         return v or None
 
-
-class DatosProcesarTransferencia(BaseModel):
-    """Patch parcial para Sector Pacífico mientras procesa el borrador."""
-    title:         str | None = None
-    message:       str | None = None
-    recipient:     str | None = None
-    max_downloads: int | None = None
-    puerto_id:     int | None = None
-    marino:        str | None = None
-    naviera:       str | None = None
-    observaciones: str | None = None
-
-    @field_validator("title")
+    @field_validator("max_downloads")
     @classmethod
-    def _v_title(cls, v):
-        if v is None: return None
-        v = v.strip()
-        if not v: raise ValueError("El título no puede estar vacío.")
-        if len(v) > TITULO_MAX: raise ValueError(f"Máximo {TITULO_MAX} caracteres.")
-        return v
-
-    @field_validator("recipient")
-    @classmethod
-    def _v_recipient(cls, v):
-        if v is None: return None
-        v = v.strip()
-        if not v: return None
-        if not _EMAIL_RE.match(v):
-            raise ValueError("El correo del destinatario no tiene un formato válido.")
-        return v
-
-    @field_validator("message")
-    @classmethod
-    def _v_message(cls, v):
-        if v is None: return None
-        if len(v) > MENSAJE_MAX: raise ValueError(f"Máximo {MENSAJE_MAX} caracteres.")
-        return v or None
-
-
-class DatosReenviar(BaseModel):
-    """Reenvía un borrador: cambia a ACTIVA y dispara correo. Permite anexar
-    un nuevo mensaje. La expiración se renueva siempre a partir de este
-    momento usando TRANSFER_EXPIRY_DAYS (no es configurable por el cliente)."""
-    message: str | None = None
-
-    @field_validator("message")
-    @classmethod
-    def _v_message(cls, v):
-        if v is None: return None
-        if len(v) > MENSAJE_MAX: raise ValueError(f"Máximo {MENSAJE_MAX} caracteres.")
-        return v or None
-
-
-class DatosDevolver(BaseModel):
-    """Devuelve una transferencia a la Naviera con un motivo obligatorio."""
-    motivo: str
-
-    @field_validator("motivo")
-    @classmethod
-    def _v_motivo(cls, v: str) -> str:
-        v = v.strip()
-        if not v:
-            raise ValueError("El motivo es obligatorio para devolver la transferencia.")
-        if len(v) > MENSAJE_MAX:
-            raise ValueError(f"El motivo no puede superar {MENSAJE_MAX} caracteres.")
+    def validar_max_descargas(cls, v: int | None) -> int | None:
+        if v is not None and v < 1:
+            raise ValueError("El límite de descargas debe ser al menos 1.")
         return v
 
 

@@ -1,4 +1,4 @@
-from sqlalchemy import String, Integer, Enum as SAEnum, ForeignKey, Table, Column
+from sqlalchemy import String, Integer, Enum as SAEnum, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.infrastructure.database import Base
 import enum
@@ -6,17 +6,6 @@ import typing
 
 if typing.TYPE_CHECKING:
     from app.domain.models.rol import Rol
-    from app.domain.models.puerto import Puerto
-
-
-# ── Tabla puente: puertos asignados a un usuario Muelle/Operador ─────────────
-# Un operador solo ve las transferencias cuyo puerto está en esta lista.
-usuarios_puertos = Table(
-    "usuarios_puertos",
-    Base.metadata,
-    Column("usuario_id", ForeignKey("users.id",    ondelete="CASCADE"), primary_key=True),
-    Column("puerto_id",  ForeignKey("puertos.id", ondelete="CASCADE"), primary_key=True),
-)
 
 
 class TipoUsuario(str, enum.Enum):
@@ -50,14 +39,6 @@ class Usuario(Base):
 
     transferencias: Mapped[list["Transferencia"]] = relationship(back_populates="usuario", cascade="all, delete-orphan")
     rol_personalizado: Mapped["Rol | None"] = relationship("Rol", lazy="selectin")
-
-    # Puertos que este usuario opera (solo aplica cuando el rol tiene T-PROCESAR-MUELLE)
-    puertos_asignados: Mapped[list["Puerto"]] = relationship(
-        "Puerto",
-        secondary=usuarios_puertos,
-        back_populates="operadores",
-        lazy="selectin",
-    )
 
     @property
     def full_name(self) -> str:

@@ -11,8 +11,6 @@ import PaginaLogin                from "./modulos/autenticacion/PaginaLogin";
 import PaginaPanel                from "./modulos/transferencias/PaginaPanel";
 import PaginaSubida               from "./modulos/transferencias/PaginaSubida";
 import PaginaTransferencia        from "./modulos/transferencias/PaginaTransferencia";
-import PaginaEditarTransferencia  from "./modulos/transferencias/PaginaEditarTransferencia";
-import PaginaCorreccion           from "./modulos/transferencias/PaginaCorreccion";
 import {
   AVISO_INACTIVIDAD_MS as AVISO_MS,
   LOGOUT_INACTIVIDAD_MS as LOGOUT_MS,
@@ -21,11 +19,10 @@ import {
 import "./styles/globals.css";
 
 // Solo admin visita estas — se cargan en un chunk aparte para no pesarle
-// el bundle inicial a Naviera/Sector Pacífico/Muelle, que nunca las ven.
+// el bundle inicial a Naviera/Sector Pacífico, que nunca las ven.
 const PaginaUsuarios        = lazy(() => import("./modulos/administracion/PaginaUsuarios"));
 const PaginaRoles           = lazy(() => import("./modulos/administracion/PaginaRoles"));
 const PaginaEstadisticas    = lazy(() => import("./modulos/administracion/PaginaEstadisticas"));
-const PaginaPuertosNavieras = lazy(() => import("./modulos/administracion/PaginaPuertosNavieras"));
 
 function CargandoRuta() {
   return (
@@ -163,11 +160,8 @@ export default function App() {
               <Route path="/t/:token"   element={<PaginaTransferencia />} />
               <Route path="/dashboard"  element={<RutaPrivada><PaginaPanel /></RutaPrivada>} />
               <Route path="/new"        element={<RutaPrivada><PaginaSubida /></RutaPrivada>} />
-              <Route path="/transfers/:id/procesar" element={<RutaPrivada><PaginaEditarTransferencia /></RutaPrivada>} />
-              <Route path="/transfers/:id/corregir" element={<RutaPrivada><PaginaCorreccion /></RutaPrivada>} />
               <Route path="/admin"        element={<RutaAdmin><Suspense fallback={<CargandoRuta />}><PaginaUsuarios /></Suspense></RutaAdmin>} />
               <Route path="/admin/roles"  element={<RutaAdmin><Suspense fallback={<CargandoRuta />}><PaginaRoles /></Suspense></RutaAdmin>} />
-              <Route path="/admin/puertos-navieras" element={<RutaAdmin><Suspense fallback={<CargandoRuta />}><PaginaPuertosNavieras /></Suspense></RutaAdmin>} />
               <Route path="/admin/stats"  element={<RutaStats><Suspense fallback={<CargandoRuta />}><PaginaEstadisticas /></Suspense></RutaStats>} />
               <Route path="*"           element={<Navigate to="/dashboard" replace />} />
               </Routes>

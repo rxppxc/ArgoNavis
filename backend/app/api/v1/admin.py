@@ -12,16 +12,13 @@ from app.core.permisos import es_admin_efectivo, requerir_algun_permiso
 from app.core.ldap import servicio_ldap
 from app.domain.models.user import Usuario, EstadoUsuario
 from app.domain.models.transfer import Transferencia, ArchivoTransferencia, EstadoTransferencia
-from app.domain.models.puerto import Puerto
 from app.domain.models.rol import Rol, Permiso, RolPermiso
 from app.domain.repositories.user_repository import RepositorioUsuario
 from app.domain.schemas.user import SalidaUsuario, DatosCrearUsuario, DatosCambiarEstado, DatosCrearUsuarioLocal
-from app.domain.schemas.puerto import SalidaPuerto, DatosCrearPuerto
 from app.domain.schemas.rol import (
     SalidaPermiso, DatosCrearPermiso, DatosActualizarPermiso,
     SalidaRol, RolMini, DatosCrearRol, DatosActualizarRol, DatosAsignarPermisos, DatosAsignarRol,
 )
-from app.domain.schemas.puerto import DatosAsignarPuertos, SalidaPuertoMini
 
 logger        = logging.getLogger(__name__)
 configuracion = obtener_configuracion()
@@ -171,62 +168,6 @@ async def eliminar_usuario(
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
     await sesion.delete(usuario)
-
-
-# ── Puertos ───────────────────────────────────────────────────────────────────
-
-@enrutador.get("/puertos", response_model=list[SalidaPuerto])
-async def listar_puertos(
-    _: int = Depends(requerir_admin),
-    sesion: AsyncSession = Depends(obtener_sesion_bd),
-):
-    resultado = await sesion.execute(select(Puerto).order_by(Puerto.nombre))
-    puertos = resultado.scalars().all()
-
-    conteo_q = await sesion.execute(
-        select(Transferencia.puerto_id, func.count(Transferencia.id))
-        .where(Transferencia.status != EstadoTransferencia.ELIMINADA)
-        .group_by(Transferencia.puerto_id)
-    )
-    conteos = dict(conteo_q.all())
-
-    salida = []
-    for p in puertos:
-        sp = SalidaPuerto.model_validate(p)
-        sp.total = conteos.get(p.id, 0)
-        salida.append(sp)
-    return salida
-
-
-@enrutador.post("/puertos", response_model=SalidaPuerto, status_code=201)
-async def crear_puerto(
-    datos: DatosCrearPuerto,
-    _: int = Depends(requerir_admin),
-    sesion: AsyncSession = Depends(obtener_sesion_bd),
-):
-    existente = await sesion.execute(select(Puerto).where(Puerto.nombre == datos.nombre))
-    if existente.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="Ya existe un puerto con ese nombre.")
-    puerto = Puerto(nombre=datos.nombre, descripcion=datos.descripcion)
-    sesion.add(puerto)
-    await sesion.flush()
-    await sesion.refresh(puerto)
-    sp = SalidaPuerto.model_validate(puerto)
-    sp.total = 0
-    return sp
-
-
-@enrutador.delete("/puertos/{puerto_id}", status_code=204)
-async def eliminar_puerto(
-    puerto_id: int,
-    _: int = Depends(requerir_admin),
-    sesion: AsyncSession = Depends(obtener_sesion_bd),
-):
-    resultado = await sesion.execute(select(Puerto).where(Puerto.id == puerto_id))
-    puerto = resultado.scalar_one_or_none()
-    if not puerto:
-        raise HTTPException(status_code=404, detail="Puerto no encontrado.")
-    await sesion.delete(puerto)
 
 
 # ── Permisos ──────────────────────────────────────────────────────────────────
@@ -445,48 +386,6 @@ async def asignar_rol_a_usuario(
     return salida
 
 
-# ── Asignación de puertos a operadores del muelle ────────────────────────────
-
-@enrutador.get("/usuarios/{user_id}/puertos", response_model=list[SalidaPuertoMini])
-async def listar_puertos_de_usuario(
-    user_id: int,
-    _: int  = Depends(requerir_admin),
-    sesion: AsyncSession = Depends(obtener_sesion_bd),
-):
-    """Devuelve los puertos actualmente asignados a un usuario."""
-    usuario = await RepositorioUsuario(sesion).buscar_por_id(user_id)
-    if not usuario:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
-    return [SalidaPuertoMini.model_validate(p) for p in usuario.puertos_asignados]
-
-
-@enrutador.put("/usuarios/{user_id}/puertos", response_model=list[SalidaPuertoMini])
-async def asignar_puertos_a_usuario(
-    user_id: int,
-    datos:   DatosAsignarPuertos,
-    _: int  = Depends(requerir_admin),
-    sesion: AsyncSession = Depends(obtener_sesion_bd),
-):
-    """Reemplaza por completo la lista de puertos asignados al usuario.
-    Recibe `{"puerto_ids": [1, 2]}`. Pasar `[]` desasigna todos."""
-    usuario = await RepositorioUsuario(sesion).buscar_por_id(user_id)
-    if not usuario:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
-
-    if datos.puerto_ids:
-        puertos_q = await sesion.execute(select(Puerto).where(Puerto.id.in_(datos.puerto_ids)))
-        puertos   = list(puertos_q.scalars().all())
-        if len(puertos) != len(datos.puerto_ids):
-            raise HTTPException(status_code=400, detail="Uno o más puertos no existen.")
-    else:
-        puertos = []
-
-    usuario.puertos_asignados = puertos
-    await sesion.flush()
-    await sesion.refresh(usuario, ["puertos_asignados"])
-    return [SalidaPuertoMini.model_validate(p) for p in usuario.puertos_asignados]
-
-
 # ── Estadísticas globales ─────────────────────────────────────────────────────
 
 @enrutador.get("/stats")
@@ -548,22 +447,6 @@ async def obtener_estadisticas(
         for row in uploader_q.all()
     ]
 
-    # Puertos con conteo de transferencias
-    puerto_q = await sesion.execute(select(Puerto).order_by(Puerto.nombre))
-    puertos = list(puerto_q.scalars().all())
-
-    conteo_q = await sesion.execute(
-        select(Transferencia.puerto_id, func.count(Transferencia.id))
-        .where(no_eliminada)
-        .group_by(Transferencia.puerto_id)
-    )
-    conteos = dict(conteo_q.all())
-
-    puertos_stats = [
-        {"id": p.id, "nombre": p.nombre, "total": conteos.get(p.id, 0)}
-        for p in puertos
-    ]
-
     return {
         "usuarios":             total_usuarios,
         "transferencias":       total_transferencias,
@@ -571,6 +454,5 @@ async def obtener_estadisticas(
         "expiradas":            expiradas,
         "total_descargas":      total_descargas,
         "storage_bytes":        total_storage,
-        "puertos":              puertos_stats,
         "top_uploaders":        top_uploaders,
     }

@@ -4,10 +4,9 @@ import { formatBytes } from "../../utils/format";
 import { MenuCabecera } from "../../components/MenuCabecera";
 import { BotonVolver } from "../../components/BotonVolver";
 import BarraProgreso from "../../components/BarraProgreso";
-import RankingBarras from "../../components/RankingBarras";
 import {
   IconoUsuario, IconoGrafico, IconoActividad, IconoDescargar,
-  IconoDisco, IconoAncla, IconoReloj, IconoTrofeo,
+  IconoDisco, IconoReloj, IconoTrofeo,
 } from "../../components/Iconos";
 import styles from "./PaginaEstadisticas.module.css";
 
@@ -63,9 +62,6 @@ export default function PaginaEstadisticas() {
             <div className={styles.loading}><span className={styles.spinner} /> Cargando estadísticas…</div>
           ) : stats && (() => {
             const maxSubidores = Math.max(...stats.top_uploaders.map(u => u.total), 1);
-            const puertosActivos = stats.puertos
-              .map(p => ({ id: p.id, nombre: p.nombre, valor: p.total }))
-              .sort((a, b) => b.valor - a.valor);
 
             return (
               <>
@@ -95,11 +91,6 @@ export default function PaginaEstadisticas() {
                     <div className={`${styles.statIcon} ${styles.purple}`}><IconoDisco /></div>
                     <div className={styles.statNum}>{formatBytes(stats.storage_bytes)}</div>
                     <div className={styles.statLabel}>Almacenamiento usado</div>
-                  </div>
-                  <div className={styles.statCard}>
-                    <div className={`${styles.statIcon} ${styles.orange}`}><IconoAncla tamano={16} /></div>
-                    <div className={styles.statNum}>{stats.puertos.length}</div>
-                    <div className={styles.statLabel}>Puertos</div>
                   </div>
                   <div className={styles.statCard}>
                     <div className={`${styles.statIcon} ${styles.gray}`}><IconoUsuario /></div>
@@ -141,21 +132,6 @@ export default function PaginaEstadisticas() {
                             </div>
                           ))}
                         </div>
-                      )}
-                    </div>
-                  </section>
-
-                  {/* ── Puertos más activos ── */}
-                  <section className={styles.panel}>
-                    <div className={styles.panelHeader}>
-                      <IconoAncla />
-                      Puertos más activos
-                    </div>
-                    <div className={styles.panelBody}>
-                      {puertosActivos.length === 0 ? (
-                        <p className={styles.empty}>Sin datos aún.</p>
-                      ) : (
-                        <RankingBarras items={puertosActivos} color="blue" sufijo="" />
                       )}
                     </div>
                   </section>

@@ -1,11 +1,7 @@
 export type EstadoTransferencia =
-  | "draft"      // creada por Naviera, esperando revisión de SP
-  | "active"     // SP ya la procesó y asignó puerto → visible por Muelle
+  | "active"     // disponible de inmediato, con enlace de descarga
   | "expired"    // venció por fecha o descargas
-  | "deleted"    // borrada
-  | "returned"   // SP la devolvió a la Naviera con motivo
-  | "review"     // Muelle la devolvió a SP con motivo (queda en cola SP con badge)
-  | "processed"; // Muelle marcó como procesada — fin del flujo
+  | "deleted";   // borrada
 export type EstadoUsuario       = "active" | "inactive";
 export type TipoUsuario         = "ad" | "local";
 
@@ -26,7 +22,6 @@ export interface Usuario {
   rol_id:    number | null;
   rol_personalizado: RolPersonalizadoMini | null;
   full_name: string;
-  puertos_asignados?: { id: number; nombre: string }[];
 }
 
 export interface ArchivoTransferencia {
@@ -36,14 +31,6 @@ export interface ArchivoTransferencia {
   size:          number;
   es_original?:  boolean;
   subido_por_id?: number | null;
-}
-
-export interface Puerto {
-  id:          number;
-  nombre:      string;
-  descripcion: string | null;
-  created_at:  string;
-  total:       number;
 }
 
 export interface Transferencia {
@@ -60,15 +47,7 @@ export interface Transferencia {
   files:         ArchivoTransferencia[];
   total_size:    number;
   is_expired:    boolean;
-  puerto_id:     number | null;
-  puerto:        { id: number; nombre: string } | null;
-  marino:        string | null;
-  naviera:       string | null;
   user_id?:      number;
-  titulo_original?:       string | null;
-  mensaje_original?:      string | null;
-  destinatario_original?: string | null;
-  observaciones?:         string | null;
 }
 
 export interface TransferenciaPublica {

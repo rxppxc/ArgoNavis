@@ -9,7 +9,6 @@ from app.infrastructure.database import Base
 from app.domain.models.user import Usuario
 from app.domain.models.transfer import Transferencia, ArchivoTransferencia
 from app.domain.models.audit_log import RegistroAuditoria  # noqa: F401
-from app.domain.models.puerto import Puerto
 from app.domain.models.rol import Rol, Permiso, RolPermiso
 from app.core.config import obtener_configuracion
 

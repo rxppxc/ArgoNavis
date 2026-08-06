@@ -1,5 +1,4 @@
 import { clienteApi } from "./client";
-import type { Puerto } from "../types";
 
 export interface UsuarioAD {
   dn: string;
@@ -28,7 +27,6 @@ export interface UsuarioSistema {
   rol_id: number | null;
   rol_personalizado: RolMini | null;
   full_name: string;
-  puertos_asignados?: { id: number; nombre: string }[];
 }
 
 export interface Permiso {
@@ -65,7 +63,6 @@ export interface StatsAdmin {
   expiradas:       number;
   total_descargas: number;
   storage_bytes:   number;
-  puertos:         { id: number; nombre: string; total: number }[];
   top_uploaders:   { id: number; full_name: string; total: number }[];
 }
 
@@ -88,16 +85,6 @@ export const apiAdmin = {
 
   eliminarUsuario: (id: number) =>
     clienteApi.delete(`/admin/usuarios/${id}`),
-
-  // Puertos
-  listarPuertos: () =>
-    clienteApi.get<Puerto[]>("/admin/puertos"),
-
-  crearPuerto: (nombre: string, descripcion?: string) =>
-    clienteApi.post<Puerto>("/admin/puertos", { nombre, descripcion }),
-
-  eliminarPuerto: (id: number) =>
-    clienteApi.delete(`/admin/puertos/${id}`),
 
   // Stats
   obtenerStats: () =>
@@ -134,14 +121,4 @@ export const apiAdmin = {
 
   asignarRolAUsuario: (user_id: number, rol_id: number | null) =>
     clienteApi.patch<UsuarioSistema>(`/admin/usuarios/${user_id}/rol-personalizado`, { rol_id }),
-
-  // ── Asignación de puertos a operadores del muelle ──
-  obtenerPuertosUsuario: (user_id: number) =>
-    clienteApi.get<{ id: number; nombre: string }[]>(`/admin/usuarios/${user_id}/puertos`),
-
-  asignarPuertosAUsuario: (user_id: number, puerto_ids: number[]) =>
-    clienteApi.put<{ id: number; nombre: string }[]>(
-      `/admin/usuarios/${user_id}/puertos`,
-      { puerto_ids },
-    ),
 };

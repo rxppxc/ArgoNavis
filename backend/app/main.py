@@ -15,7 +15,6 @@ from app.core.config import obtener_configuracion
 from app.core.rate_limit import limiter
 from app.infrastructure.database import SesionLocal
 from app.api.v1 import auth, transfers, admin
-from app.domain.models import puerto as _puerto_model    # noqa: registrar en ORM registry
 from app.domain.models import rol as _rol_model          # noqa: registrar en ORM registry
 from app.domain.models.transfer import Transferencia
 

@@ -1,6 +1,6 @@
 /**
- * Clasificación de archivos por su tipo, compartida entre la vista pública de
- * descarga y la pantalla de procesar de Sector Pacífico.
+ * Clasificación de archivos por su tipo, usada en la vista pública de descarga
+ * y en el modal de previsualización.
  */
 export type CategoriaArchivo =
   | "imagen" | "pdf" | "word" | "excel" | "ppt"
