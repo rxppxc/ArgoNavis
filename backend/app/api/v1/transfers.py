@@ -132,15 +132,16 @@ async def obtener_transferencia_publica(
     return await svc.obtener_publica(token)
 
 
-@enrutador.get("/download/{token}")
+@enrutador.get("/download/{token}/{file_id}")
 @limiter.limit(limite_descarga)
-async def descargar_transferencia(
+async def descargar_archivo(
     token:   str,
+    file_id: int,
     request: Request,
     svc:     ServicioTransferencia = Depends(_obtener_servicio),
     sesion:  AsyncSession = Depends(obtener_sesion_bd),
 ):
-    ruta, nombre_archivo = await svc.obtener_ruta_descarga(token)
+    ruta, nombre_archivo = await svc.obtener_ruta_descarga(token, file_id)
 
     transferencia = await RepositorioTransferencia(sesion).buscar_por_token(token)
     if transferencia:

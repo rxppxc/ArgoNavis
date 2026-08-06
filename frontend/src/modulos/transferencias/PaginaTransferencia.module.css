@@ -237,6 +237,24 @@
 .fileItemIcon { color: var(--muted); flex-shrink: 0; }
 .fileName { flex: 1; font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
 .fileSize { font-size: .76rem; color: var(--quiet); white-space: nowrap; }
+.fileDownloadBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  background: var(--y-soft);
+  border: 1.5px solid var(--y-border);
+  border-radius: var(--r-xs);
+  color: var(--acc-gold);
+  transition: background var(--t), box-shadow var(--t), border-color var(--t);
+}
+.fileDownloadBtn:hover {
+  background: var(--overlay);
+  border-color: var(--y);
+  box-shadow: 0 0 10px rgba(245,200,0,.30);
+}
 
 /* ─── Type badge ─── */
 .typeBadge {
@@ -397,26 +415,29 @@
   box-shadow: 0 6px 24px rgba(245,200,0,.30);
 }
 
-/* ─── Editar ─── */
-.editarBtn {
+/* ─── Volver al inicio ─── */
+.volverBtn {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  margin: 10px 28px 0;
+  margin: 10px 28px 24px;
   padding: 11px;
   background: transparent;
-  border: 1.5px solid var(--y);
+  border: 1.5px solid var(--border-2);
   border-radius: var(--r-sm);
-  color: var(--acc-gold);
+  color: var(--text-2);
   font-size: .86rem;
   font-weight: 700;
   text-decoration: none;
-  transition: background var(--t), box-shadow var(--t);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background var(--t), border-color var(--t), color var(--t);
 }
-.editarBtn:hover {
-  background: rgba(245,200,0,.10);
-  box-shadow: 0 0 0 3px rgba(245,200,0,.10);
+.volverBtn:hover {
+  background: var(--hover);
+  border-color: var(--y);
+  color: var(--acc-gold);
 }
 
 /* ─── Share ─── */

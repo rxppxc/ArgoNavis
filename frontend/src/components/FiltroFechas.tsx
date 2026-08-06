@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { IconoReloj } from "./Iconos";
 import styles from "./FiltroFechas.module.css";
 
@@ -8,14 +7,12 @@ export interface RangoFechas {
   hasta: string | null;
 }
 
-type Preset = "todas" | "hoy" | "7d" | "30d" | "rango";
+type Preset = "todas" | "hoy" | "7d";
 
 const PRESETS: { id: Preset; etiqueta: string }[] = [
   { id: "todas", etiqueta: "Todas" },
   { id: "hoy",   etiqueta: "Hoy" },
   { id: "7d",    etiqueta: "7 días" },
-  { id: "30d",   etiqueta: "30 días" },
-  { id: "rango", etiqueta: "Rango…" },
 ];
 
 /** Fecha local (no UTC) en formato YYYY-MM-DD — evita el desfase de zona horaria de toISOString. */
@@ -38,72 +35,36 @@ interface Props {
 }
 
 export default function FiltroFechas({ valor, onCambio }: Props) {
-  const [preset, setPreset] = useState<Preset>("todas");
-  const [desde,  setDesde]  = useState("");
-  const [hasta,  setHasta]  = useState("");
+  const hoy = fechaLocalISO(new Date());
 
-  function aplicarPreset(p: Preset) {
-    setPreset(p);
-    const hoy = fechaLocalISO(new Date());
-    if (p === "todas")      onCambio({ desde: null, hasta: null });
-    else if (p === "hoy")   onCambio({ desde: hoy,          hasta: hoy });
-    else if (p === "7d")    onCambio({ desde: haceDias(6),  hasta: hoy });
-    else if (p === "30d")   onCambio({ desde: haceDias(29), hasta: hoy });
-    else if (p === "rango") onCambio({ desde: desde || null, hasta: hasta || null });
+  // El preset activo se deriva directamente del valor — sin estado propio,
+  // así el filtro nunca puede desincronizarse de lo que ve el padre.
+  const preset: Preset =
+    valor.desde === hoy && valor.hasta === hoy ? "hoy"
+    : valor.desde === haceDias(6) && valor.hasta === hoy ? "7d"
+    : "todas";
+
+  function aplicar(p: Preset) {
+    if (p === "todas") onCambio({ desde: null, hasta: null });
+    else if (p === "hoy") onCambio({ desde: hoy, hasta: hoy });
+    else onCambio({ desde: haceDias(6), hasta: hoy });
   }
-
-  function cambiarRango(nuevoDesde: string, nuevaHasta: string) {
-    setDesde(nuevoDesde);
-    setHasta(nuevaHasta);
-    onCambio({ desde: nuevoDesde || null, hasta: nuevaHasta || null });
-  }
-
-  const hayFiltro = valor.desde !== null || valor.hasta !== null;
 
   return (
     <div className={styles.barra}>
       <span className={styles.icono}><IconoReloj tamano={15} /></span>
-      <span className={styles.rotulo}>Fecha</span>
       <div className={styles.chips}>
         {PRESETS.map((p) => (
           <button
             key={p.id}
             type="button"
             className={`${styles.chip} ${preset === p.id ? styles.chipActivo : ""}`}
-            onClick={() => aplicarPreset(p.id)}
+            onClick={() => aplicar(p.id)}
           >
             {p.etiqueta}
           </button>
         ))}
       </div>
-
-      {preset === "rango" && (
-        <div className={styles.rango}>
-          <input
-            type="date"
-            className={styles.dateInput}
-            value={desde}
-            max={hasta || undefined}
-            onChange={(e) => cambiarRango(e.target.value, hasta)}
-            aria-label="Fecha desde"
-          />
-          <span className={styles.sep}>—</span>
-          <input
-            type="date"
-            className={styles.dateInput}
-            value={hasta}
-            min={desde || undefined}
-            onChange={(e) => cambiarRango(desde, e.target.value)}
-            aria-label="Fecha hasta"
-          />
-        </div>
-      )}
-
-      {hayFiltro && (
-        <button type="button" className={styles.limpiar} onClick={() => aplicarPreset("todas")}>
-          Limpiar
-        </button>
-      )}
     </div>
   );
 }

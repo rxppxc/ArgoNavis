@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import { apiTransferencias } from "../../api/transfers";
 import { useAutenticacion } from "../../hooks/useAutenticacion";
 import type { TransferenciaPublica } from "../../types";
@@ -7,11 +7,10 @@ import { formatBytes, formatDate } from "../../utils/format";
 import { infoTipo } from "../../utils/tipoArchivo";
 import { copiarAlPortapapeles } from "../../utils/portapapeles";
 import { useNotificacion } from "../../components/Notificaciones";
-import { BotonVolver } from "../../components/BotonVolver";
 import {
   IconoCarpeta, IconoArchivo, IconoDescargar, IconoEnlace,
   IconoCheck, IconoReloj, IconoXCirculo, IconoExito, IconoOjo,
-  IconoX, IconoImagen, IconoPdf,
+  IconoX, IconoImagen, IconoPdf, IconoAtras,
 } from "../../components/Iconos";
 import styles from "./PaginaTransferencia.module.css";
 
@@ -115,10 +114,7 @@ export default function PaginaTransferencia() {
     <div className={styles.page}>
       <header className={styles.header}>
         <div className={styles.headerInner}>
-          {estaAutenticado
-            ? <BotonVolver to="/dashboard" />
-            : <BotonVolver onClick={intentarVolver} />
-          }
+          <div />
           <div className={styles.headerCenter}>
             <img src="/images/logo-snm.png" alt="SNM" className={styles.logo} />
             <div className={styles.headerText}>
@@ -196,6 +192,16 @@ export default function PaginaTransferencia() {
                         {tipo.etiqueta}
                       </span>
                       <span className={styles.fileSize}>{formatBytes(f.size)}</span>
+                      <a
+                        href={apiTransferencias.urlDescarga(token!, f.id)}
+                        className={styles.fileDownloadBtn}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={`Descargar ${f.original_name}`}
+                        aria-label={`Descargar ${f.original_name}`}
+                      >
+                        <IconoDescargar tamano={14} />
+                      </a>
                     </li>
                   );
                 })}
@@ -209,15 +215,17 @@ export default function PaginaTransferencia() {
               )}
             </div>
 
-            <a
-              href={apiTransferencias.urlDescarga(token!)}
-              className={styles.downloadBtn}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <IconoDescargar />
-              Descargar {transferencia!.files.length > 1 ? "todos (.zip)" : "archivo"}
-            </a>
+            {transferencia!.files.length === 1 && (
+              <a
+                href={apiTransferencias.urlDescarga(token!, transferencia!.files[0].id)}
+                className={styles.downloadBtn}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <IconoDescargar />
+                Descargar archivo
+              </a>
+            )}
 
             <div className={styles.shareSection}>
               <div className={styles.shareLabel}><IconoEnlace tamano={12} />Enlace para compartir</div>
@@ -228,6 +236,18 @@ export default function PaginaTransferencia() {
                 </button>
               </div>
             </div>
+
+            {estaAutenticado ? (
+              <Link to="/dashboard" className={styles.volverBtn}>
+                <IconoAtras />
+                Volver al inicio
+              </Link>
+            ) : (
+              <button type="button" className={styles.volverBtn} onClick={intentarVolver}>
+                <IconoAtras />
+                Volver al inicio
+              </button>
+            )}
 
           </div>
         )}

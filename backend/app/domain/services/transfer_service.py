@@ -3,7 +3,6 @@ import re
 import secrets
 import shutil
 import unicodedata
-import zipfile
 import asyncio
 import aiofiles
 from datetime import datetime, timedelta
@@ -155,26 +154,6 @@ def _validar_extension(nombre_archivo: str) -> str:
     return ext
 
 
-def _crear_zip_sincrono(ruta_zip: Path, archivos: list[ArchivoTransferencia]) -> None:
-    """Construye el ZIP en un hilo worker para no bloquear el event loop.
-
-    Nota: por simplicidad usamos `ZIP_STORED` (sin compresión). La mayoría de
-    los archivos cargados ya están comprimidos (PDF, JPG, ZIP, docx) y la
-    compresión adicional gasta CPU sin ahorrar bytes. Esto también acelera
-    drásticamente la creación del archivo en transferencias grandes.
-
-    Para ZIP streaming verdadero (chunks al cliente mientras se construye) se
-    podría usar `zipstream-ng`, pero requiere otra dependencia. Como el ZIP se
-    construye en un thread (no bloquea el event loop) y FileResponse lo
-    envía en chunks, el comportamiento actual es aceptable.
-    """
-    with zipfile.ZipFile(ruta_zip, "w", zipfile.ZIP_STORED, allowZip64=True) as zf:
-        for archivo in archivos:
-            ruta = Path(archivo.path)
-            if ruta.exists():
-                zf.write(ruta, archivo.original_name)
-
-
 class ServicioTransferencia:
     def __init__(self, repo: RepositorioTransferencia):
         self.repo = repo
@@ -290,23 +269,20 @@ class ServicioTransferencia:
             sender        = transferencia.usuario.full_name,
         )
 
-    async def obtener_ruta_descarga(self, token: str) -> tuple[str, str]:
+    async def obtener_ruta_descarga(self, token: str, file_id: int) -> tuple[str, str]:
+        """Descarga directa de un archivo puntual de la transferencia — nunca
+        arma un ZIP, cada archivo se baja individualmente."""
         transferencia = await self.repo.buscar_por_token(token)
         if not transferencia:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transferencia no encontrada.")
-
         if transferencia.is_expired:
             raise HTTPException(status_code=status.HTTP_410_GONE, detail="Este enlace ya no está disponible.")
+        archivo = next((f for f in transferencia.archivos if f.id == file_id), None)
+        if not archivo:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Archivo no encontrado.")
 
         await self.repo.incrementar_descargas(token)
-
-        if len(transferencia.archivos) == 1:
-            archivo = transferencia.archivos[0]
-            return archivo.path, archivo.original_name
-
-        ruta_zip = Path(configuracion.STORAGE_PATH) / f"{token}.zip"
-        await asyncio.to_thread(_crear_zip_sincrono, ruta_zip, transferencia.archivos)
-        return str(ruta_zip), f"filetransfer-snm_{token[:8]}.zip"
+        return archivo.path, archivo.original_name
 
     async def obtener_ruta_preview(self, token: str, file_id: int) -> tuple[str, str | None, str]:
         transferencia = await self.repo.buscar_por_token(token)
@@ -335,9 +311,5 @@ class ServicioTransferencia:
         carpeta = Path(configuracion.STORAGE_PATH) / token
         if carpeta.exists():
             shutil.rmtree(carpeta)
-
-        ruta_zip = Path(configuracion.STORAGE_PATH) / f"{token}.zip"
-        if ruta_zip.exists():
-            ruta_zip.unlink()
 
         await self.repo.eliminar(transferencia)

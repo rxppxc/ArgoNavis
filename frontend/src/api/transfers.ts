@@ -16,8 +16,8 @@ export const apiTransferencias = {
   obtenerPublica: (token: string) =>
     clienteApi.get<TransferenciaPublica>(`/transfers/public/${token}`).then((r) => r.data),
 
-  urlDescarga: (token: string) =>
-    `${URL_BASE_API}/transfers/download/${token}`,
+  urlDescarga: (token: string, fileId: number) =>
+    `${URL_BASE_API}/transfers/download/${token}/${fileId}`,
 
   urlPreview: (token: string, fileId: number) =>
     `${URL_BASE_API}/transfers/preview/${token}/${fileId}`,

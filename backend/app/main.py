@@ -51,9 +51,6 @@ async def _purgar_expiradas() -> int:
                 carpeta_archivos = Path(configuracion.STORAGE_PATH) / t.token
                 if carpeta_archivos.exists():
                     shutil.rmtree(carpeta_archivos, ignore_errors=True)
-                ruta_zip = Path(configuracion.STORAGE_PATH) / f"{t.token}.zip"
-                if ruta_zip.exists():
-                    ruta_zip.unlink(missing_ok=True)
                 await sesion.delete(t)
                 purgadas += 1
             if purgadas:
