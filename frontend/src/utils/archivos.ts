@@ -25,17 +25,12 @@ function extensionDe(nombre: string): string {
 /**
  * Valida una lista de archivos contra las reglas del sistema.
  * Devuelve un mensaje de error listo para mostrar, o `null` si todo está bien.
- * Con `soloPdf` restringe además a PDF (flujo básico de la Naviera).
  */
-export function validarArchivos(archivos: File[], opciones?: { soloPdf?: boolean }): string | null {
-  const invalidos = opciones?.soloPdf
-    ? archivos.filter(a => extensionDe(a.name) !== ".pdf")
-    : archivos.filter(a => !EXTENSIONES_PERMITIDAS.includes(extensionDe(a.name)));
+export function validarArchivos(archivos: File[]): string | null {
+  const invalidos = archivos.filter(a => !EXTENSIONES_PERMITIDAS.includes(extensionDe(a.name)));
   if (invalidos.length) {
     const detalle = invalidos.map(a => a.name).join(", ");
-    return opciones?.soloPdf
-      ? `Solo se permiten archivos PDF. Los siguientes archivos no son válidos: ${detalle}`
-      : `Tipo de archivo no permitido: ${detalle}. Se aceptan PDF, Word, Excel e imágenes.`;
+    return `Tipo de archivo no permitido: ${detalle}. Se aceptan PDF, Word, Excel e imágenes.`;
   }
 
   const grandes = archivos.filter(a => a.size > TAMANO_MAX_BYTES);

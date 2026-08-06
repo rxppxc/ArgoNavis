@@ -15,8 +15,6 @@ import styles from "./PaginaSubida.module.css";
 
 const DIAS_EXPIRACION_DEFECTO = 7;
 
-const TIPOS_PDF = ".pdf";
-
 
 export default function PaginaSubida() {
   const navegar = useNavigate();
@@ -53,7 +51,7 @@ export default function PaginaSubida() {
 
     // Se valida en ambos modos: el atributo `accept` del input no cubre el
     // arrastrar-y-soltar, y el tamaño nunca lo filtra el navegador.
-    const errorValidacion = validarArchivos(nuevos, { soloPdf: modoBasico });
+    const errorValidacion = validarArchivos(nuevos);
     if (errorValidacion) {
       setError(errorValidacion);
       return;
@@ -202,7 +200,7 @@ export default function PaginaSubida() {
                 <span className={styles.reqBadge}>Obligatorio</span>
               </div>
               {modoBasico && (
-                <p className={styles.panelHint}><strong>Obligatorio.</strong> Adjunte los documentos en formato PDF. Máximo 50 MB por archivo.</p>
+                <p className={styles.panelHint}><strong>Obligatorio.</strong> Adjunte los documentos en PDF, Word, Excel o imágenes. Máximo 50 MB por archivo.</p>
               )}
               <div className={styles.panelBody}>
                 <div
@@ -214,13 +212,13 @@ export default function PaginaSubida() {
                 >
                   <div className={styles.dropIconWrap}><IconoSubir tamano={22} /></div>
                   <p className={styles.dropTitle}>Arrastra archivos aquí o <strong>haz clic</strong></p>
-                  <p className={styles.dropHint}>{modoBasico ? "Solo PDF · Máx. 50 MB por archivo" : "Máx. 50 MB por archivo"}</p>
+                  <p className={styles.dropHint}>Máx. 50 MB por archivo</p>
                   <input
                     ref={inputRef}
                     type="file"
                     multiple
                     hidden
-                    accept={modoBasico ? TIPOS_PDF : TIPOS_ACEPTADOS}
+                    accept={TIPOS_ACEPTADOS}
                     onChange={(e) => agregarArchivos(e.target.files)}
                   />
                 </div>
