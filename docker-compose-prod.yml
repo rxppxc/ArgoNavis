@@ -33,7 +33,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - APP_NAME=FileTransfer - SNM
+      - APP_NAME=FileDrop - SNM
       - APP_ENV=production
       - SECRET_KEY=${SECRET_KEY}
       - ACCESS_TOKEN_EXPIRE_MINUTES=60
@@ -52,7 +52,7 @@ services:
       - MAIL_HOST=${MAIL_HOST}
       - MAIL_PORT=25
       - MAIL_FROM=${MAIL_FROM}
-      - MAIL_FROM_NAME=FileTransfer - SNM
+      - MAIL_FROM_NAME=FileDrop - SNM
       - LIMPIEZA_INTERVALO_HORAS=6
       - LIMPIEZA_RETENER_DIAS=0
       - FRONTEND_URL=${APP_URL}

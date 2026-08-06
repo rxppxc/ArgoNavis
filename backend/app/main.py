@@ -93,7 +93,7 @@ async def ciclo_vida(app: FastAPI):
 
 
 aplicacion = FastAPI(
-    title="FileTransfer - SNM API",
+    title="FileDrop - SNM API",
     version="2.0.0",
     description="Sistema de transferencia de archivos — Servicio Nacional de Migración",
     docs_url="/api/docs" if configuracion.APP_ENV == "development" else None,

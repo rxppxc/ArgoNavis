@@ -5,7 +5,7 @@ from functools import lru_cache
 class Configuracion(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
-    APP_NAME: str = "FileTransfer - SNM"
+    APP_NAME: str = "FileDrop - SNM"
     APP_ENV:  str = "development"
 
     SECRET_KEY:                   str
@@ -35,7 +35,7 @@ class Configuracion(BaseSettings):
     MAIL_USERNAME:  str = ""
     MAIL_PASSWORD:  str = ""
     MAIL_FROM:      str = ""
-    MAIL_FROM_NAME: str = "FileTransfer - SNM"
+    MAIL_FROM_NAME: str = "FileDrop - SNM"
 
     # Limpieza automática de transferencias expiradas
     LIMPIEZA_INTERVALO_HORAS: int = 6   # cada cuántas horas corre el proceso

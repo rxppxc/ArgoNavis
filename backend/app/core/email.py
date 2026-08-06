@@ -87,7 +87,7 @@ def _construir_html(nombre_remitente: str, titulo: str | None, mensaje: str | No
         </div>
         <div style="color:#999999;font-size:11px;font-weight:500;
                     letter-spacing:2px;text-transform:uppercase;">
-          FileTransfer &nbsp;|&nbsp; SNM
+          FileDrop &nbsp;|&nbsp; SNM
         </div>
       </td>
     </tr>
@@ -217,7 +217,7 @@ def _construir_html_devolucion(
         </div>
         <div style="color:#999999;font-size:11px;font-weight:500;
                     letter-spacing:2px;text-transform:uppercase;">
-          FileTransfer &nbsp;|&nbsp; SNM
+          FileDrop &nbsp;|&nbsp; SNM
         </div>
       </td>
     </tr>
@@ -304,7 +304,7 @@ async def enviar_notificacion_devolucion(
     titulo_subject = _sanear_subject(titulo_transferencia or "Transferencia devuelta")
 
     raiz = MIMEMultipart("alternative")
-    raiz["Subject"] = f"[SNM FileTransfer] Correcciones requeridas — {titulo_subject}"
+    raiz["Subject"] = f"[SNM FileDrop] Correcciones requeridas — {titulo_subject}"
     raiz["From"]    = f"{configuracion.MAIL_FROM_NAME} <{configuracion.MAIL_FROM}>"
     raiz["To"]      = email_destinatario
 
@@ -349,7 +349,7 @@ async def enviar_notificacion_transferencia(
     titulo_subject = _sanear_subject(title or "Transferencia de archivos")
 
     raiz = MIMEMultipart("alternative")
-    raiz["Subject"] = f"[SNM FileTransfer] {titulo_subject} — de {_sanear_subject(sender_name)}"
+    raiz["Subject"] = f"[SNM FileDrop] {titulo_subject} — de {_sanear_subject(sender_name)}"
     raiz["From"]    = f"{configuracion.MAIL_FROM_NAME} <{configuracion.MAIL_FROM}>"
     raiz["To"]      = recipient_email
 

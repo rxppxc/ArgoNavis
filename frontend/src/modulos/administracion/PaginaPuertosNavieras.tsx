@@ -173,7 +173,7 @@ export default function PaginaPuertosNavieras() {
             <img src="/images/logo-snm.png" alt="SNM" className={styles.logo} />
             <div className={styles.headerText}>
               <div className={styles.org}>Servicio Nacional de Migración</div>
-              <div className={styles.app}>FileTransfer - SNM</div>
+              <div className={styles.app}>FileDrop - SNM</div>
             </div>
           </div>
           <div className={styles.headerRight}>

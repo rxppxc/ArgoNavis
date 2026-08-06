@@ -16,7 +16,7 @@ export class CapturadorErrores extends Component<Props, Estado> {
   }
 
   componentDidCatch(error: Error) {
-    console.error("[FileTransfer-SNM] Error no capturado:", error);
+    console.error("[FileDrop-SNM] Error no capturado:", error);
   }
 
   render() {

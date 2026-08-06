@@ -137,7 +137,7 @@ export default function PaginaSubida() {
               <img src="/images/logo-snm.png" alt="SNM" />
               <div className={styles.brandText}>
                 <div className={styles.org}>Servicio Nacional de Migración</div>
-                <div className={styles.app}>FileTransfer - SNM</div>
+                <div className={styles.app}>FileDrop - SNM</div>
               </div>
             </div>
             <div className={styles.headerRight}>
@@ -164,7 +164,7 @@ export default function PaginaSubida() {
             <img src="/images/logo-snm.png" alt="SNM" />
             <div className={styles.brandText}>
               <div className={styles.org}>Servicio Nacional de Migración</div>
-              <div className={styles.app}>FileTransfer - SNM</div>
+              <div className={styles.app}>FileDrop - SNM</div>
             </div>
           </div>
           <div className={styles.headerRight}>

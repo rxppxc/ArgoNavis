@@ -38,7 +38,7 @@ export default function PaginaEstadisticas() {
             <img src="/images/logo-snm.png" alt="SNM" className={styles.logo} />
             <div className={styles.headerText}>
               <div className={styles.org}>Servicio Nacional de Migración</div>
-              <div className={styles.app}>FileTransfer - SNM</div>
+              <div className={styles.app}>FileDrop - SNM</div>
             </div>
           </div>
           <div className={styles.headerRight}>
@@ -53,7 +53,7 @@ export default function PaginaEstadisticas() {
             <span className={styles.titleIcon}><IconoGrafico tamano={22} /></span>
             <div>
               <h1>Estadísticas</h1>
-              <p>Métricas globales de uso de FileTransfer.</p>
+              <p>Métricas globales de uso de FileDrop.</p>
             </div>
           </div>
 
