@@ -83,6 +83,47 @@
   display: block;
 }
 
+/* ─── Word / Excel inline ───
+   docx-preview arma su propio wrapper (fondo gris + "hojas" blancas con
+   sombra) e inyecta su propio <style> dentro de docxWrap — no hace falta
+   pisarle los estilos, solo darle un fondo neutro alrededor. */
+.officeWrap {
+  width: 100%;
+  height: 84vh;
+  overflow: auto;
+  background: #e8e8e8;
+  padding: 20px;
+}
+.cargando {
+  padding: 56px 32px;
+  text-align: center;
+  color: var(--text-2);
+  font-size: .9rem;
+}
+.docxWrap {
+  display: flex;
+  justify-content: center;
+}
+
+.tablaExcel {
+  border-collapse: collapse;
+  font-size: .82rem;
+  color: #1a1a1a;
+  background: #fff;
+  box-shadow: 0 0 10px rgba(0,0,0,.15);
+}
+.tablaExcel td {
+  border: 1px solid #d8d8d8;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+.notaTruncado {
+  margin-top: 14px;
+  font-size: .78rem;
+  color: #555;
+  text-align: center;
+}
+
 /* Fallback para tipos no previsualizables (Word/Excel) */
 .fallback {
   display: flex;
