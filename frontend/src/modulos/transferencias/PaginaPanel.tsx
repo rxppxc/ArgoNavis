@@ -19,6 +19,7 @@ import { copiarAlPortapapeles } from "../../utils/portapapeles";
 import { useConfirmar } from "../../components/ModalConfirmacion";
 import { useNotificacion } from "../../components/Notificaciones";
 import { MenuCabecera } from "../../components/MenuCabecera";
+import { ModalPreview } from "../../components/ModalPreview";
 import FiltroFechas, { type RangoFechas } from "../../components/FiltroFechas";
 import FranjaKPI from "../../components/FranjaKPI";
 import {
@@ -28,8 +29,10 @@ import {
 } from "../../components/Iconos";
 import styles from "./PaginaPanel.module.css";
 
+type ArchivoPreview = { id: number; original_name: string; mime_type: string | null };
+
 function TransferCard({
-  t, esPropia, copiado, eliminando, copiarEnlace, eliminarTransferencia, expanded, onToggle,
+  t, esPropia, copiado, eliminando, copiarEnlace, eliminarTransferencia, expanded, onToggle, onPreview,
 }: {
   t: Transferencia;
   esPropia: boolean;
@@ -39,6 +42,7 @@ function TransferCard({
   eliminarTransferencia: (token: string) => void;
   expanded: boolean;
   onToggle: () => void;
+  onPreview: (token: string, archivo: ArchivoPreview) => void;
 }) {
   return (
     <div className={`${styles.card} ${expanded ? styles.cardOpen : ""}`}>
@@ -80,6 +84,15 @@ function TransferCard({
                   <IconoArchivo tamano={13} />
                   <span className={styles.fileExpandName}>{f.original_name}</span>
                   <span className={styles.fileExpandSize}>{formatBytes(f.size)}</span>
+                  <button
+                    type="button"
+                    className={styles.btnPreviewFile}
+                    onClick={(e) => { e.stopPropagation(); onPreview(t.token, f); }}
+                    title="Previsualizar archivo"
+                    aria-label={`Previsualizar ${f.original_name}`}
+                  >
+                    <IconoOjo tamano={13} />
+                  </button>
                 </div>
               ))}
             </div>
@@ -129,6 +142,7 @@ export default function PaginaPanel() {
   const [mostrarExpiradas, setMostrarExpiradas] = useState(false);
   const [expandidos,       setExpandidos]       = useState<Set<string>>(new Set());
   const [rangoFecha,       setRangoFecha]       = useState<RangoFechas>({ desde: null, hasta: null });
+  const [archivoPreview,   setArchivoPreview]   = useState<{ token: string; archivo: ArchivoPreview } | null>(null);
 
   // ── Carga inicial de transferencias según rol ─────────────────────────────
   useEffect(() => {
@@ -298,6 +312,7 @@ export default function PaginaPanel() {
                     eliminarTransferencia={eliminarTransferencia}
                     expanded={expandidos.has(t.token)}
                     onToggle={() => toggleCard(t.token)}
+                    onPreview={(token, archivo) => setArchivoPreview({ token, archivo })}
                   />
                 ))}
               </div>
@@ -370,6 +385,14 @@ export default function PaginaPanel() {
       <footer className={styles.footer}>
         Servicio Nacional de Migración &copy; {new Date().getFullYear()} &mdash; Todos los derechos reservados
       </footer>
+
+      {archivoPreview && (
+        <ModalPreview
+          token={archivoPreview.token}
+          archivo={archivoPreview.archivo}
+          onCerrar={() => setArchivoPreview(null)}
+        />
+      )}
     </div>
   );
 }
