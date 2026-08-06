@@ -25,17 +25,18 @@ import FranjaKPI from "../../components/FranjaKPI";
 import {
   IconoMas, IconoCarpeta, IconoArchivo, IconoPeso, IconoDescargar,
   IconoReloj, IconoEnlace, IconoCheck, IconoBasura, IconoOjo,
-  IconoNube, IconoGrafico, IconoActividad,
+  IconoNube, IconoGrafico, IconoActividad, IconoBuscar, IconoUsuario, IconoX,
 } from "../../components/Iconos";
 import styles from "./PaginaPanel.module.css";
 
 type ArchivoPreview = { id: number; original_name: string; mime_type: string | null };
 
 function TransferCard({
-  t, esPropia, copiado, eliminando, copiarEnlace, eliminarTransferencia, expanded, onToggle, onPreview,
+  t, esPropia, mostrarRemitente, copiado, eliminando, copiarEnlace, eliminarTransferencia, expanded, onToggle, onPreview,
 }: {
   t: Transferencia;
   esPropia: boolean;
+  mostrarRemitente: boolean;
   copiado: string | null;
   eliminando: Set<string>;
   copiarEnlace: (token: string) => void;
@@ -51,6 +52,9 @@ function TransferCard({
           <div className={styles.fileIcon}><IconoCarpeta tamano={18} /></div>
           <div className={styles.cardInfo}>
             <div className={styles.cardTitle}>{t.title || "Sin título"}</div>
+            {mostrarRemitente && t.sender && (
+              <div className={styles.cardSender}><IconoUsuario tamano={12} />Enviado por {t.sender}</div>
+            )}
             {t.message && (
               <div className={styles.cardMessagePreview}>
                 &ldquo;{t.message}&rdquo;
@@ -143,6 +147,7 @@ export default function PaginaPanel() {
   const [expandidos,       setExpandidos]       = useState<Set<string>>(new Set());
   const [rangoFecha,       setRangoFecha]       = useState<RangoFechas>({ desde: null, hasta: null });
   const [archivoPreview,   setArchivoPreview]   = useState<{ token: string; archivo: ArchivoPreview } | null>(null);
+  const [busqueda,         setBusqueda]         = useState("");
 
   // ── Carga inicial de transferencias según rol ─────────────────────────────
   useEffect(() => {
@@ -200,8 +205,17 @@ export default function PaginaPanel() {
           return true;
         });
 
-  const activas   = transferenciasFecha.filter((t) => !t.is_expired);
-  const expiradas = transferenciasFecha.filter((t) =>  t.is_expired);
+  const busquedaNorm = busqueda.trim().toLowerCase();
+  const transferenciasFiltradas = busquedaNorm
+    ? transferenciasFecha.filter((t) =>
+        (t.title   || "").toLowerCase().includes(busquedaNorm) ||
+        (t.message || "").toLowerCase().includes(busquedaNorm) ||
+        (t.sender  || "").toLowerCase().includes(busquedaNorm)
+      )
+    : transferenciasFecha;
+
+  const activas   = transferenciasFiltradas.filter((t) => !t.is_expired);
+  const expiradas = transferenciasFiltradas.filter((t) =>  t.is_expired);
 
   const estadisticas = {
     total:          transferencias.length,
@@ -209,9 +223,10 @@ export default function PaginaPanel() {
     totalDescargas: transferencias.reduce((s, t) => s + t.downloads, 0),
   };
 
-  const hayFiltroFecha     = rangoFecha.desde !== null || rangoFecha.hasta !== null;
-  const mostrarFiltroFecha = vistaTodas && transferencias.length > 0;
-  const sinResultadosFecha = hayFiltroFecha && activas.length === 0 && expiradas.length === 0;
+  const hayFiltroFecha  = rangoFecha.desde !== null || rangoFecha.hasta !== null;
+  const hayBusqueda     = busquedaNorm.length > 0;
+  const mostrarToolbar  = transferencias.length > 0;
+  const sinResultados   = (hayFiltroFecha || hayBusqueda) && activas.length === 0 && expiradas.length === 0;
 
   return (
     <div className={styles.page}>
@@ -287,15 +302,37 @@ export default function PaginaPanel() {
           </div>
         ) : (
           <>
-            {mostrarFiltroFecha && (
-              <FiltroFechas valor={rangoFecha} onCambio={setRangoFecha} />
+            {mostrarToolbar && (
+              <div className={styles.toolbar}>
+                <div className={styles.searchWrap}>
+                  <span className={styles.searchIcon}><IconoBuscar tamano={15} /></span>
+                  <input
+                    type="text"
+                    className={styles.searchInput}
+                    placeholder="Buscar por título, mensaje o remitente…"
+                    value={busqueda}
+                    onChange={(e) => setBusqueda(e.target.value)}
+                  />
+                  {hayBusqueda && (
+                    <button
+                      type="button"
+                      className={styles.searchLimpiar}
+                      onClick={() => setBusqueda("")}
+                      aria-label="Limpiar búsqueda"
+                    >
+                      <IconoX tamano={13} />
+                    </button>
+                  )}
+                </div>
+                <FiltroFechas valor={rangoFecha} onCambio={setRangoFecha} />
+              </div>
             )}
 
-            {sinResultadosFecha && (
+            {sinResultados && (
               <div className={styles.empty}>
                 <div className={styles.emptyIllustration}><IconoReloj tamano={34} /></div>
-                <h3>Sin transferencias en el rango</h3>
-                <p>No hay transferencias creadas en las fechas seleccionadas. Ajusta o limpia el filtro de fecha.</p>
+                <h3>Sin resultados</h3>
+                <p>Nada coincide con la búsqueda o el rango de fechas. Ajustá o limpiá los filtros.</p>
               </div>
             )}
 
@@ -306,6 +343,7 @@ export default function PaginaPanel() {
                     key={t.token}
                     t={t}
                     esPropia={t.user_id === usuario?.id}
+                    mostrarRemitente={vistaTodas}
                     copiado={copiado}
                     eliminando={eliminando}
                     copiarEnlace={copiarEnlace}

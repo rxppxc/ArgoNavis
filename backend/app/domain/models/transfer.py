@@ -53,6 +53,10 @@ class Transferencia(Base):
     def total_size(self) -> int:
         return sum(archivo.size for archivo in self.archivos)
 
+    @property
+    def sender(self) -> str | None:
+        return self.usuario.full_name if self.usuario else None
+
 
 class ArchivoTransferencia(Base):
     __tablename__ = "transfer_files"

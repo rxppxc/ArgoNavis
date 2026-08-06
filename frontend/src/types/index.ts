@@ -48,6 +48,7 @@ export interface Transferencia {
   total_size:    number;
   is_expired:    boolean;
   user_id?:      number;
+  sender?:       string | null;
 }
 
 export interface TransferenciaPublica {

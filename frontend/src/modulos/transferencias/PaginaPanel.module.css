@@ -408,10 +408,18 @@
   box-shadow: 0 0 10px rgba(245,200,0,.30);
 }
 
-/* ─── Buscador rápido ─── */
+/* ─── Toolbar: búsqueda + filtro de fecha ─── */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
 .searchWrap {
   position: relative;
-  margin-bottom: 20px;
+  flex: 1 1 260px;
+  min-width: 220px;
   z-index: 1;
 }
 .searchIcon {
@@ -425,7 +433,7 @@
 }
 .searchInput {
   width: 100%;
-  padding: 10px 14px 10px 38px;
+  padding: 10px 36px 10px 38px;
   background: var(--input-bg);
   border: 1.5px solid var(--input-border);
   border-radius: var(--r-sm);
@@ -438,9 +446,29 @@
 }
 .searchInput::placeholder { color: var(--muted); }
 .searchInput:focus {
-  border-color: #3B82F6;
-  box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+  border-color: var(--y);
+  box-shadow: 0 0 0 3px rgba(245,200,0,.14);
 }
+.searchLimpiar {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-xs);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background var(--t), color var(--t);
+}
+.searchLimpiar:hover { background: var(--overlay); color: var(--text); }
+
 .sinResultados {
   text-align: center;
   padding: 40px 20px;
@@ -728,6 +756,15 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   margin-bottom: 3px;
   transition: color var(--t);
+}
+.cardSender {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: .76rem;
+  color: var(--acc-gold);
+  font-weight: 600;
+  margin-bottom: 3px;
 }
 .cardMessagePreview {
   font-size: .78rem;

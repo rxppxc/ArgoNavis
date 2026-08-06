@@ -34,6 +34,7 @@ class SalidaTransferencia(BaseModel):
     total_size:    int
     is_expired:    bool
     user_id:       int
+    sender:        str | None = None
 
     model_config = {"from_attributes": True}
 

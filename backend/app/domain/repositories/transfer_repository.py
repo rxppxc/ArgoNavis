@@ -30,7 +30,10 @@ class RepositorioTransferencia:
     async def listar_por_usuario(self, user_id: int, limit: int = 50, offset: int = 0) -> list[Transferencia]:
         resultado = await self.sesion.execute(
             select(Transferencia)
-            .options(selectinload(Transferencia.archivos))
+            .options(
+                selectinload(Transferencia.archivos),
+                selectinload(Transferencia.usuario),
+            )
             .where(Transferencia.user_id == user_id)
             .order_by(Transferencia.created_at.desc())
             .limit(limit)
