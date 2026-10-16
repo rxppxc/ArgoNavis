@@ -4,7 +4,9 @@ Este archivo se carga automáticamente al iniciar un asistente Claude Code en es
 
 ## Resumen en una frase
 
-**ARGO NAVIS** (antes "NAVIS" y, al principio, "FileDrop - SNM", en un repositorio llamado FileTransfer) es la app interna del Servicio Nacional de Migración (Panamá) para las Autorizaciones Marítimas de UCVMM: las agencias navieras envían solicitudes con el expediente de los tripulantes, UCVMM las revisa y aprueba, y el puesto de control las finaliza. Nació como storage de archivos con enlace público; se adaptó y ese storage es ahora la capa documental del expediente (sin enlaces públicos).
+**ARGO NAVIS** (antes "NAVIS" y, al principio, "FileDrop - SNM", con el repositorio FileTransfer, renombrado a ArgoNavis el 2026-10-16) es el Sistema Interno Marítimo del Servicio Nacional de Migración (Panamá). Hoy cubre las Autorizaciones Marítimas de UCVMM: las agencias navieras envían solicitudes con el expediente de los tripulantes, UCVMM las revisa y aprueba, y el puesto de control las finaliza. Nació como storage de archivos con enlace público; se adaptó y ese storage es ahora la capa documental del expediente (sin enlaces públicos).
+
+El nombre del sistema es «ARGO NAVIS · Sistema Interno Marítimo» (logo, pestaña del navegador, README), pensando en módulos futuros (decisión del usuario del 2026-10-16). «Autorizaciones Marítimas» es el módulo de hoy: así se llaman el trámite, el asunto de los correos y el PDF.
 
 ## Stack
 - Backend: FastAPI + SQLAlchemy 2 async + PostgreSQL + LDAP/AD + JWT (`python-jose`)
@@ -102,7 +104,7 @@ constants/          → números mágicos.
 - TS quita `noUnusedLocals` y `noUnusedParameters`. Si una variable sale, eliminarla.
 - `eslint-plugin-react-hooks` en exhaustive deps. Si quitas una dep, deja `// eslint-disable-next-line` con el porqué.
 
-## Estado actual (snapshot 2026-10-15)
+## Estado actual (snapshot 2026-10-16)
 
 ### Lo que se hizo en la adaptación storage → sistema (revisión `d4f1a8c27e90`)
 - `transfers` / `transfer_files` se reemplazaron por `solicitudes`, `solicitud_tripulantes`, `solicitud_documentos` y `solicitud_eventos`. Las transferencias sueltas se eliminan al migrar (con sus carpetas). Se retiraron el enlace público `/t/{token}`, la subida suelta y la purga de 7 días.

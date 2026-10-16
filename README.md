@@ -1,8 +1,8 @@
-# ARGO NAVIS · Autorizaciones Marítimas (SNM)
+# ARGO NAVIS · Sistema Interno Marítimo (SNM)
 
-**ARGO NAVIS** (*Sistema Interno Marítimo*; el nombre viene de la constelación *Argo Navis*, «la nave Argo») es el sistema del **Servicio Nacional de Migración (SNM) de Panamá** para las **Autorizaciones Marítimas** de la UCVMM: las agencias navieras envían solicitudes con el expediente de los tripulantes, UCVMM las revisa y aprueba (o devuelve o deniega), y el puesto de control migratorio registra la operación y la finaliza. La autorización aprobada se descarga en PDF con un código QR verificable.
+**ARGO NAVIS** es el Sistema Interno Marítimo del **Servicio Nacional de Migración (SNM) de Panamá**; el nombre viene de la constelación *Argo Navis*, «la nave Argo». Hoy cubre las **Autorizaciones Marítimas** de la UCVMM: las agencias navieras envían solicitudes con el expediente de los tripulantes, UCVMM las revisa y aprueba (o devuelve o deniega), y el puesto de control migratorio registra la operación y la finaliza. La autorización aprobada se descarga en PDF con un código QR verificable.
 
-Nació como una herramienta de *storage* (transferencias de archivos con enlace público) y se adaptó: el almacenamiento pasó a ser la capa documental del expediente de cada solicitud. Ya no hay enlaces públicos de descarga. Antes se llamaba "FileDrop - SNM"; el repositorio conserva el nombre FileTransfer.
+Nació como una herramienta de *storage* (transferencias de archivos con enlace público) y se adaptó: el almacenamiento pasó a ser la capa documental del expediente de cada solicitud. Ya no hay enlaces públicos de descarga. Antes se llamaba "FileDrop - SNM" y el repositorio, FileTransfer.
 
 ---
 
@@ -31,7 +31,8 @@ copy backend\.env.example backend\.env
 :: Backend
 cd backend
 python -m venv venv
-venv\Scripts\pip install -r requirements-dev.txt
+:: Siempre "venv\Scripts\python -m ...": los .exe del venv (pip, uvicorn...) guardan la ruta de la carpeta y fallan si se mueve.
+venv\Scripts\python -m pip install -r requirements-dev.txt
 venv\Scripts\python -I -m alembic upgrade head
 
 :: Frontend
@@ -118,7 +119,8 @@ ArgoNavis/
 │  │  └─ infrastructure/
 │  │     ├─ database.py        # motor async y sesión por request
 │  │     ├─ almacenamiento.py  # validación y guardado de documentos (carpeta por solicitud)
-│  │     └─ tareas.py          # vencimientos, con un solo ejecutor entre workers
+│  │     ├─ tareas.py          # vencimientos, con un solo ejecutor entre workers
+│  │     └─ asignar_rol.py     # nombra el primer SysAdmin desde la consola
 │  ├─ alembic/versions/        # el esquema completo vive aquí
 │  ├─ tests/                   # pytest sobre BD temporal
 │  └─ storage/documentos/      # documentos de los expedientes (NO versionar)
