@@ -1,75 +1,4 @@
-/* ─── Shell ─── */
-.page {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background-image:
-    linear-gradient(150deg, rgba(26,32,64,.92) 0%, rgba(13,17,40,.94) 100%),
-    url('/images/bg-migracion.jpg');
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
-}
-
-/* ─── Header ─── */
-.header {
-  background: var(--ink);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  border-bottom: 2px solid var(--y);
-}
-.headerInner {
-  max-width: 1160px;
-  margin: 0 auto;
-  padding: 0 28px;
-  height: 62px;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 16px;
-}
-.headerCenter { display: flex; align-items: center; gap: 12px; }
-.headerRight  { display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
-.logo { height: 34px; }
-.headerText .org { color: rgba(255,255,255,.85); font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.8px; }
-.headerText .app { color: var(--y); font-size: .96rem; font-weight: 800; letter-spacing: .8px; }
-
-/* ─── Toast ─── */
-.toast {
-  position: fixed;
-  top: 76px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 9999;
-  padding: 10px 18px;
-  border-radius: var(--r-sm);
-  font-size: .85rem;
-  font-weight: 600;
-  animation: fadeInDown .2s ease;
-}
-.toastOk {
-  background: #0F2418;
-  border: 1px solid #22C55E;
-  border-left: 4px solid #22C55E;
-  color: #86EFAC;
-}
-.toastErr {
-  background: #1A1010;
-  border: 1px solid #EF4444;
-  border-left: 4px solid #EF4444;
-  color: #FCA5A5;
-}
-@keyframes fadeInDown {
-  from { opacity: 0; transform: translate(-50%, -10px); }
-  to   { opacity: 1; transform: translate(-50%, 0); }
-}
-
 /* ─── Body ─── */
-.body {
-  flex: 1;
-  padding: 36px 20px;
-}
 .container {
   max-width: 1000px;
   margin: 0 auto;
@@ -140,11 +69,12 @@
   border: 1px solid var(--y-border);
 }
 .panelBody { padding: 20px; }
+.nota { font-size: .8rem; color: var(--text-2); margin: 0 0 12px; }
 
 /* ─── Form de creación ─── */
 .formRow {
   display: grid;
-  grid-template-columns: 130px 1fr 1fr auto;
+  grid-template-columns: 1fr 1fr auto;
   gap: 10px;
   margin-bottom: 18px;
 }
@@ -158,14 +88,9 @@
   outline: none;
   transition: border-color var(--t), box-shadow var(--t);
 }
-.inputCodigo {
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  letter-spacing: .5px;
-  text-transform: uppercase;
-}
 .input::placeholder { color: var(--muted); }
 .input:focus {
-  border-color: var(--y);
+  border-color: var(--foco);
   box-shadow: 0 0 0 3px rgba(245,200,0,.12);
 }
 .btnCrear {
@@ -250,8 +175,17 @@
   box-shadow: 0 4px 18px rgba(0,0,0,.15);
 }
 
+/* Cabecera del rol: el botón que lo despliega y el de eliminar van lado a lado
+   (un botón no puede ir dentro de otro). */
 .rolHeader {
-  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 14px;
+}
+.rolToggle {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -439,20 +373,6 @@
   color: var(--acc-red);
 }
 .btnEliminar:hover { background: rgba(239,68,68,.20); border-color: rgba(239,68,68,.55); }
-.btnEliminarConfirm {
-  background: rgba(239,68,68,.18);
-  border: 1.5px solid rgba(239,68,68,.55);
-  color: var(--acc-red);
-}
-.btnCancelar {
-  background: var(--surface-2);
-  border: 1.5px solid var(--border);
-  color: var(--text-2);
-}
-.btnCancelar:hover { border-color: var(--border-2); }
-
-.confirmRow { display: flex; align-items: center; gap: 5px; }
-.confirmText { font-size: .74rem; color: var(--muted); margin-right: 2px; }
 
 /* ─── Estados ─── */
 .loading {
@@ -488,30 +408,6 @@
   display: inline-block;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-
-/* ─── Footer ─── */
-.footer {
-  background: rgba(0,0,0,.45);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-top: 1px solid rgba(255,255,255,.07);
-  color: rgba(255,255,255,.48);
-  font-size: .78rem;
-  text-align: center;
-  padding: 13px 20px;
-}
-
-/* ─── Light mode ─── */
-:global([data-theme="light"]) .page {
-  background-image:
-    linear-gradient(rgba(228,234,252,0.92), rgba(228,234,252,0.92)),
-    url('/images/bg-migracion.jpg');
-}
-:global([data-theme="light"]) .footer {
-  background: rgba(15,20,50,.95);
-  border-top-color: rgba(255,255,255,.06);
-  color: rgba(255,255,255,.60);
-}
 
 /* ─── Responsive ─── */
 @media (max-width: 720px) {

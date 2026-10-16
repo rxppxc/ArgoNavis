@@ -24,7 +24,7 @@ export async function copiarAlPortapapeles(texto: string): Promise<boolean> {
   document.body.appendChild(textarea);
   textarea.focus();
   textarea.select();
-  let ok = false;
+  let ok: boolean;
   try {
     ok = document.execCommand("copy");
   } catch {

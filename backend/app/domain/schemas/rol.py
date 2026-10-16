@@ -12,37 +12,6 @@ class SalidaPermiso(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class DatosCrearPermiso(BaseModel):
-    codigo:      str
-    nombre:      str
-    descripcion: str | None = None
-
-    @field_validator("codigo")
-    @classmethod
-    def validar_codigo(cls, v: str) -> str:
-        v = v.strip().upper()
-        if not v:
-            raise ValueError("El código no puede estar vacío.")
-        if len(v) > 50:
-            raise ValueError("El código no puede superar 50 caracteres.")
-        return v
-
-    @field_validator("nombre")
-    @classmethod
-    def validar_nombre(cls, v: str) -> str:
-        v = v.strip()
-        if not v:
-            raise ValueError("El nombre no puede estar vacío.")
-        if len(v) > 150:
-            raise ValueError("El nombre no puede superar 150 caracteres.")
-        return v
-
-
-class DatosActualizarPermiso(BaseModel):
-    nombre:      str | None = None
-    descripcion: str | None = None
-
-
 class RolMini(BaseModel):
     id:         int
     nombre:     str

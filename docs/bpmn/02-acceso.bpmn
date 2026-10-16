@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definiciones_Acceso" targetNamespace="https://argonavis.migracion.gob.pa/bpmn" exporter="ARGO NAVIS" exporterVersion="1.0">
+  <bpmn:collaboration id="Colaboracion_Acceso">
+    <bpmn:participant id="Pool_Acceso" name="Acceso a ARGO NAVIS" processRef="Proceso_Acceso" />
+    <bpmn:participant id="Pool_AD" name="Active Directory del SNM" />
+    <bpmn:messageFlow id="Mensaje_ConsultaAD" name="Usuario y contraseña" sourceRef="ValidarAD" targetRef="Pool_AD" />
+    <bpmn:messageFlow id="Mensaje_RespuestaAD" name="Acepta o rechaza" sourceRef="Pool_AD" targetRef="ValidarAD" />
+  </bpmn:collaboration>
+  <bpmn:process id="Proceso_Acceso" name="Acceso a ARGO NAVIS" isExecutable="false">
+    <bpmn:laneSet id="Carriles_Proceso_Acceso">
+      <bpmn:lane id="Carril_Usuario" name="Usuario (agencia o funcionario)">
+        <bpmn:flowNodeRef>AbreNAVIS</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>IngresarCredenciales</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>CambiarContrasena</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Carril_Sistema" name="ARGO NAVIS (sistema)">
+        <bpmn:flowNodeRef>BuscarCuenta</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>TipoCuenta</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>NoRegistrada</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bloqueada</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>CuentaBloqueada</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>VerificarLocal</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>CorrectaLocal</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>FalloLocal</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>IncorrectaLocal</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Frenada</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Freno</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ValidarAD</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>CorrectaAD</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>FalloAD</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>IncorrectaAD</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ContrasenaCorrecta</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activas</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Desactivada</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>DebeCambiar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>SesionIniciada</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="AbreNAVIS" name="Abre ARGO NAVIS">
+      <bpmn:outgoing>Flujo_AbreNAVIS_IngresarCredenciales</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="IngresarCredenciales" name="Ingresar usuario y contraseña">
+      <bpmn:incoming>Flujo_AbreNAVIS_IngresarCredenciales</bpmn:incoming>
+      <bpmn:outgoing>Flujo_IngresarCredenciales_BuscarCuenta</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="BuscarCuenta" name="Buscar la cuenta (sin distinguir mayúsculas)">
+      <bpmn:documentation>La fila queda bloqueada durante el login: los intentos con una misma cuenta van de a uno.</bpmn:documentation>
+      <bpmn:incoming>Flujo_IngresarCredenciales_BuscarCuenta</bpmn:incoming>
+      <bpmn:outgoing>Flujo_BuscarCuenta_TipoCuenta</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="TipoCuenta" name="¿Qué cuenta es?">
+      <bpmn:documentation>Una cuenta local con PERMITIR_LOGIN_LOCAL=false tampoco entra, y tampoco se consulta al AD.</bpmn:documentation>
+      <bpmn:incoming>Flujo_BuscarCuenta_TipoCuenta</bpmn:incoming>
+      <bpmn:outgoing>Flujo_TipoCuenta_NoRegistrada</bpmn:outgoing>
+      <bpmn:outgoing>Flujo_TipoCuenta_Bloqueada</bpmn:outgoing>
+      <bpmn:outgoing>Flujo_TipoCuenta_Frenada</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="NoRegistrada" name="Usuario o contraseña incorrectos">
+      <bpmn:documentation>Sin consultar al AD. El motivo real queda en la bitácora.</bpmn:documentation>
+      <bpmn:incoming>Flujo_TipoCuenta_NoRegistrada</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:exclusiveGateway id="Bloqueada" name="¿Bloqueada?">
+      <bpmn:incoming>Flujo_TipoCuenta_Bloqueada</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Bloqueada_CuentaBloqueada</bpmn:outgoing>
+      <bpmn:outgoing>Flujo_Bloqueada_VerificarLocal</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="CuentaBloqueada" name="Cuenta bloqueada 15 min">
+      <bpmn:incoming>Flujo_Bloqueada_CuentaBloqueada</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="VerificarLocal" name="Verificar la contraseña (cuenta local)">
+      <bpmn:incoming>Flujo_Bloqueada_VerificarLocal</bpmn:incoming>
+      <bpmn:outgoing>Flujo_VerificarLocal_CorrectaLocal</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="CorrectaLocal" name="¿Correcta?">
+      <bpmn:incoming>Flujo_VerificarLocal_CorrectaLocal</bpmn:incoming>
+      <bpmn:outgoing>Flujo_CorrectaLocal_FalloLocal</bpmn:outgoing>
+      <bpmn:outgoing>Flujo_CorrectaLocal_ContrasenaCorrecta</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="FalloLocal" name="Sumar el fallo (al 5.º: bloqueo de 15 min)">
+      <bpmn:incoming>Flujo_CorrectaLocal_FalloLocal</bpmn:incoming>
+      <bpmn:outgoing>Flujo_FalloLocal_IncorrectaLocal</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="IncorrectaLocal" name="Usuario o contraseña incorrectos">
+      <bpmn:incoming>Flujo_FalloLocal_IncorrectaLocal</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:exclusiveGateway id="Frenada" name="¿Frenada?">
+      <bpmn:incoming>Flujo_TipoCuenta_Frenada</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Frenada_Freno</bpmn:outgoing>
+      <bpmn:outgoing>Flujo_Frenada_ValidarAD</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="Freno" name="Freno: espera 30 min">
+      <bpmn:incoming>Flujo_Frenada_Freno</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="ValidarAD" name="Validar la contraseña en el Active Directory">
+      <bpmn:incoming>Flujo_Frenada_ValidarAD</bpmn:incoming>
+      <bpmn:outgoing>Flujo_ValidarAD_CorrectaAD</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="CorrectaAD" name="¿Correcta?">
+      <bpmn:incoming>Flujo_ValidarAD_CorrectaAD</bpmn:incoming>
+      <bpmn:outgoing>Flujo_CorrectaAD_FalloAD</bpmn:outgoing>
+      <bpmn:outgoing>Flujo_CorrectaAD_ContrasenaCorrecta</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="FalloAD" name="Sumar el fallo (al 3.º: freno de 30 min)">
+      <bpmn:incoming>Flujo_CorrectaAD_FalloAD</bpmn:incoming>
+      <bpmn:outgoing>Flujo_FalloAD_IncorrectaAD</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="IncorrectaAD" name="Usuario o contraseña incorrectos">
+      <bpmn:incoming>Flujo_FalloAD_IncorrectaAD</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:exclusiveGateway id="ContrasenaCorrecta">
+      <bpmn:incoming>Flujo_CorrectaLocal_ContrasenaCorrecta</bpmn:incoming>
+      <bpmn:incoming>Flujo_CorrectaAD_ContrasenaCorrecta</bpmn:incoming>
+      <bpmn:outgoing>Flujo_ContrasenaCorrecta_Activas</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="Activas" name="¿Cuenta y agencia activas?">
+      <bpmn:incoming>Flujo_ContrasenaCorrecta_Activas</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Activas_Desactivada</bpmn:outgoing>
+      <bpmn:outgoing>Flujo_Activas_DebeCambiar</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="Desactivada" name="Cuenta o agencia desactivada">
+      <bpmn:incoming>Flujo_Activas_Desactivada</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:exclusiveGateway id="DebeCambiar" name="¿Debe cambiar la contraseña?">
+      <bpmn:incoming>Flujo_Activas_DebeCambiar</bpmn:incoming>
+      <bpmn:outgoing>Flujo_DebeCambiar_CambiarContrasena</bpmn:outgoing>
+      <bpmn:outgoing>Flujo_DebeCambiar_SesionIniciada</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="CambiarContrasena" name="Cambiar la contraseña">
+      <bpmn:incoming>Flujo_DebeCambiar_CambiarContrasena</bpmn:incoming>
+      <bpmn:outgoing>Flujo_CambiarContrasena_SesionIniciada</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="SesionIniciada" name="Sesión iniciada">
+      <bpmn:incoming>Flujo_DebeCambiar_SesionIniciada</bpmn:incoming>
+      <bpmn:incoming>Flujo_CambiarContrasena_SesionIniciada</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flujo_AbreNAVIS_IngresarCredenciales" sourceRef="AbreNAVIS" targetRef="IngresarCredenciales" />
+    <bpmn:sequenceFlow id="Flujo_IngresarCredenciales_BuscarCuenta" sourceRef="IngresarCredenciales" targetRef="BuscarCuenta" />
+    <bpmn:sequenceFlow id="Flujo_BuscarCuenta_TipoCuenta" sourceRef="BuscarCuenta" targetRef="TipoCuenta" />
+    <bpmn:sequenceFlow id="Flujo_VerificarLocal_CorrectaLocal" sourceRef="VerificarLocal" targetRef="CorrectaLocal" />
+    <bpmn:sequenceFlow id="Flujo_FalloLocal_IncorrectaLocal" sourceRef="FalloLocal" targetRef="IncorrectaLocal" />
+    <bpmn:sequenceFlow id="Flujo_ValidarAD_CorrectaAD" sourceRef="ValidarAD" targetRef="CorrectaAD" />
+    <bpmn:sequenceFlow id="Flujo_FalloAD_IncorrectaAD" sourceRef="FalloAD" targetRef="IncorrectaAD" />
+    <bpmn:sequenceFlow id="Flujo_TipoCuenta_NoRegistrada" name="No registrada o del AD desactivada" sourceRef="TipoCuenta" targetRef="NoRegistrada" />
+    <bpmn:sequenceFlow id="Flujo_TipoCuenta_Bloqueada" name="Local" sourceRef="TipoCuenta" targetRef="Bloqueada" />
+    <bpmn:sequenceFlow id="Flujo_TipoCuenta_Frenada" name="Del AD" sourceRef="TipoCuenta" targetRef="Frenada" />
+    <bpmn:sequenceFlow id="Flujo_Bloqueada_CuentaBloqueada" name="Sí" sourceRef="Bloqueada" targetRef="CuentaBloqueada" />
+    <bpmn:sequenceFlow id="Flujo_Bloqueada_VerificarLocal" name="No" sourceRef="Bloqueada" targetRef="VerificarLocal" />
+    <bpmn:sequenceFlow id="Flujo_CorrectaLocal_FalloLocal" name="No" sourceRef="CorrectaLocal" targetRef="FalloLocal" />
+    <bpmn:sequenceFlow id="Flujo_CorrectaLocal_ContrasenaCorrecta" name="Sí" sourceRef="CorrectaLocal" targetRef="ContrasenaCorrecta" />
+    <bpmn:sequenceFlow id="Flujo_Frenada_Freno" name="Sí" sourceRef="Frenada" targetRef="Freno" />
+    <bpmn:sequenceFlow id="Flujo_Frenada_ValidarAD" name="No" sourceRef="Frenada" targetRef="ValidarAD" />
+    <bpmn:sequenceFlow id="Flujo_CorrectaAD_FalloAD" name="No" sourceRef="CorrectaAD" targetRef="FalloAD" />
+    <bpmn:sequenceFlow id="Flujo_CorrectaAD_ContrasenaCorrecta" name="Sí" sourceRef="CorrectaAD" targetRef="ContrasenaCorrecta" />
+    <bpmn:sequenceFlow id="Flujo_ContrasenaCorrecta_Activas" sourceRef="ContrasenaCorrecta" targetRef="Activas" />
+    <bpmn:sequenceFlow id="Flujo_Activas_Desactivada" name="No" sourceRef="Activas" targetRef="Desactivada" />
+    <bpmn:sequenceFlow id="Flujo_Activas_DebeCambiar" name="Sí" sourceRef="Activas" targetRef="DebeCambiar" />
+    <bpmn:sequenceFlow id="Flujo_DebeCambiar_CambiarContrasena" name="Sí" sourceRef="DebeCambiar" targetRef="CambiarContrasena" />
+    <bpmn:sequenceFlow id="Flujo_DebeCambiar_SesionIniciada" name="No" sourceRef="DebeCambiar" targetRef="SesionIniciada" />
+    <bpmn:sequenceFlow id="Flujo_CambiarContrasena_SesionIniciada" sourceRef="CambiarContrasena" targetRef="SesionIniciada" />
+    <bpmn:textAnnotation id="Nota_IP"><bpmn:text>Máximo 10 intentos por minuto por IP.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_Nota_IP" associationDirection="None" sourceRef="Nota_IP" targetRef="IngresarCredenciales" />
+    <bpmn:textAnnotation id="Nota_AD"><bpmn:text>Al AD solo se le pregunta por cuentas del AD registradas y activas en ARGO NAVIS: desde ARGO NAVIS no se pueden probar contraseñas del dominio ni bloquear cuentas.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_Nota_AD" associationDirection="None" sourceRef="Nota_AD" targetRef="NoRegistrada" />
+    <bpmn:textAnnotation id="Nota_Politica"><bpmn:text>Al crearla, al restablecerla o si ya no cumple la política: 12 a 64 caracteres con mayúscula, minúscula, número y carácter especial.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_Nota_Politica" associationDirection="None" sourceRef="Nota_Politica" targetRef="CambiarContrasena" />
+    <bpmn:textAnnotation id="Nota_Sesion"><bpmn:text>Con la sesión abierta, cada pedido revisa que la cuenta y la agencia sigan activas y que la sesión no se haya cerrado. Dura hasta 12 h y se renueva con la actividad.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_Nota_Sesion" associationDirection="None" sourceRef="Nota_Sesion" targetRef="SesionIniciada" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagrama_Acceso" name="Acceso a ARGO NAVIS">
+    <bpmndi:BPMNPlane id="Plano_Acceso" bpmnElement="Colaboracion_Acceso">
+      <bpmndi:BPMNShape id="Pool_Acceso_di" bpmnElement="Pool_Acceso" isHorizontal="true"><dc:Bounds x="100" y="40" width="2000" height="700" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Carril_Usuario_di" bpmnElement="Carril_Usuario" isHorizontal="true"><dc:Bounds x="130" y="40" width="1970" height="200" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Carril_Sistema_di" bpmnElement="Carril_Sistema" isHorizontal="true"><dc:Bounds x="130" y="240" width="1970" height="500" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Pool_AD_di" bpmnElement="Pool_AD" isHorizontal="true"><dc:Bounds x="560" y="800" width="500" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AbreNAVIS_di" bpmnElement="AbreNAVIS"><dc:Bounds x="182" y="122" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="145" y="162" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="IngresarCredenciales_di" bpmnElement="IngresarCredenciales"><dc:Bounds x="260" y="95" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BuscarCuenta_di" bpmnElement="BuscarCuenta"><dc:Bounds x="260" y="435" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="TipoCuenta_di" bpmnElement="TipoCuenta" isMarkerVisible="true"><dc:Bounds x="475" y="455" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="407" y="507" width="90" height="16" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="NoRegistrada_di" bpmnElement="NoRegistrada"><dc:Bounds x="602" y="312" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="642" y="318" width="150" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bloqueada_di" bpmnElement="Bloqueada" isMarkerVisible="true"><dc:Bounds x="615" y="455" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="590" y="508" width="100" height="18" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CuentaBloqueada_di" bpmnElement="CuentaBloqueada"><dc:Bounds x="622" y="387" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="662" y="393" width="140" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="VerificarLocal_di" bpmnElement="VerificarLocal"><dc:Bounds x="720" y="435" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CorrectaLocal_di" bpmnElement="CorrectaLocal" isMarkerVisible="true"><dc:Bounds x="915" y="455" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="890" y="508" width="100" height="18" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="FalloLocal_di" bpmnElement="FalloLocal"><dc:Bounds x="990" y="285" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="IncorrectaLocal_di" bpmnElement="IncorrectaLocal"><dc:Bounds x="1182" y="312" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1222" y="318" width="150" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Frenada_di" bpmnElement="Frenada" isMarkerVisible="true"><dc:Bounds x="615" y="625" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="590" y="678" width="100" height="18" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Freno_di" bpmnElement="Freno"><dc:Bounds x="622" y="557" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="662" y="563" width="130" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ValidarAD_di" bpmnElement="ValidarAD"><dc:Bounds x="720" y="605" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CorrectaAD_di" bpmnElement="CorrectaAD" isMarkerVisible="true"><dc:Bounds x="915" y="625" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="890" y="678" width="100" height="18" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="FalloAD_di" bpmnElement="FalloAD"><dc:Bounds x="1020" y="605" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="IncorrectaAD_di" bpmnElement="IncorrectaAD"><dc:Bounds x="1212" y="632" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1175" y="672" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ContrasenaCorrecta_di" bpmnElement="ContrasenaCorrecta" isMarkerVisible="true"><dc:Bounds x="1075" y="455" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activas_di" bpmnElement="Activas" isMarkerVisible="true"><dc:Bounds x="1215" y="455" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="1185" y="508" width="110" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Desactivada_di" bpmnElement="Desactivada"><dc:Bounds x="1222" y="387" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1262" y="393" width="150" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DebeCambiar_di" bpmnElement="DebeCambiar" isMarkerVisible="true"><dc:Bounds x="1415" y="455" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="1385" y="508" width="110" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CambiarContrasena_di" bpmnElement="CambiarContrasena"><dc:Bounds x="1370" y="95" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SesionIniciada_di" bpmnElement="SesionIniciada"><dc:Bounds x="1602" y="462" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1565" y="502" width="110" height="20" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Nota_IP_di" bpmnElement="Nota_IP"><dc:Bounds x="450" y="70" width="210" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Nota_AD_di" bpmnElement="Nota_AD"><dc:Bounds x="560" y="250" width="400" height="48" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Nota_Politica_di" bpmnElement="Nota_Politica"><dc:Bounds x="1540" y="60" width="360" height="48" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Nota_Sesion_di" bpmnElement="Nota_Sesion"><dc:Bounds x="1680" y="380" width="370" height="62" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flujo_AbreNAVIS_IngresarCredenciales_di" bpmnElement="Flujo_AbreNAVIS_IngresarCredenciales"><di:waypoint x="218" y="140" /><di:waypoint x="260" y="140" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_IngresarCredenciales_BuscarCuenta_di" bpmnElement="Flujo_IngresarCredenciales_BuscarCuenta"><di:waypoint x="330" y="185" /><di:waypoint x="330" y="435" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_BuscarCuenta_TipoCuenta_di" bpmnElement="Flujo_BuscarCuenta_TipoCuenta"><di:waypoint x="400" y="480" /><di:waypoint x="475" y="480" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_VerificarLocal_CorrectaLocal_di" bpmnElement="Flujo_VerificarLocal_CorrectaLocal"><di:waypoint x="860" y="480" /><di:waypoint x="915" y="480" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_FalloLocal_IncorrectaLocal_di" bpmnElement="Flujo_FalloLocal_IncorrectaLocal"><di:waypoint x="1130" y="330" /><di:waypoint x="1182" y="330" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_ValidarAD_CorrectaAD_di" bpmnElement="Flujo_ValidarAD_CorrectaAD"><di:waypoint x="860" y="650" /><di:waypoint x="915" y="650" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_FalloAD_IncorrectaAD_di" bpmnElement="Flujo_FalloAD_IncorrectaAD"><di:waypoint x="1160" y="650" /><di:waypoint x="1212" y="650" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_TipoCuenta_NoRegistrada_di" bpmnElement="Flujo_TipoCuenta_NoRegistrada"><di:waypoint x="500" y="455" /><di:waypoint x="500" y="330" /><di:waypoint x="602" y="330" /><bpmndi:BPMNLabel><dc:Bounds x="400" y="350" width="90" height="42" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_TipoCuenta_Bloqueada_di" bpmnElement="Flujo_TipoCuenta_Bloqueada"><di:waypoint x="525" y="480" /><di:waypoint x="615" y="480" /><bpmndi:BPMNLabel><dc:Bounds x="540" y="462" width="40" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_TipoCuenta_Frenada_di" bpmnElement="Flujo_TipoCuenta_Frenada"><di:waypoint x="500" y="505" /><di:waypoint x="500" y="650" /><di:waypoint x="615" y="650" /><bpmndi:BPMNLabel><dc:Bounds x="508" y="590" width="50" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Bloqueada_CuentaBloqueada_di" bpmnElement="Flujo_Bloqueada_CuentaBloqueada"><di:waypoint x="640" y="455" /><di:waypoint x="640" y="423" /><bpmndi:BPMNLabel><dc:Bounds x="648" y="428" width="20" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Bloqueada_VerificarLocal_di" bpmnElement="Flujo_Bloqueada_VerificarLocal"><di:waypoint x="665" y="480" /><di:waypoint x="720" y="480" /><bpmndi:BPMNLabel><dc:Bounds x="678" y="462" width="20" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_CorrectaLocal_FalloLocal_di" bpmnElement="Flujo_CorrectaLocal_FalloLocal"><di:waypoint x="940" y="455" /><di:waypoint x="940" y="330" /><di:waypoint x="990" y="330" /><bpmndi:BPMNLabel><dc:Bounds x="946" y="400" width="20" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_CorrectaLocal_ContrasenaCorrecta_di" bpmnElement="Flujo_CorrectaLocal_ContrasenaCorrecta"><di:waypoint x="965" y="480" /><di:waypoint x="1075" y="480" /><bpmndi:BPMNLabel><dc:Bounds x="1010" y="462" width="20" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Frenada_Freno_di" bpmnElement="Flujo_Frenada_Freno"><di:waypoint x="640" y="625" /><di:waypoint x="640" y="593" /><bpmndi:BPMNLabel><dc:Bounds x="648" y="598" width="20" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Frenada_ValidarAD_di" bpmnElement="Flujo_Frenada_ValidarAD"><di:waypoint x="665" y="650" /><di:waypoint x="720" y="650" /><bpmndi:BPMNLabel><dc:Bounds x="678" y="632" width="20" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_CorrectaAD_FalloAD_di" bpmnElement="Flujo_CorrectaAD_FalloAD"><di:waypoint x="965" y="650" /><di:waypoint x="1020" y="650" /><bpmndi:BPMNLabel><dc:Bounds x="985" y="632" width="20" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_CorrectaAD_ContrasenaCorrecta_di" bpmnElement="Flujo_CorrectaAD_ContrasenaCorrecta"><di:waypoint x="940" y="625" /><di:waypoint x="940" y="565" /><di:waypoint x="1100" y="565" /><di:waypoint x="1100" y="505" /><bpmndi:BPMNLabel><dc:Bounds x="1010" y="547" width="20" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_ContrasenaCorrecta_Activas_di" bpmnElement="Flujo_ContrasenaCorrecta_Activas"><di:waypoint x="1125" y="480" /><di:waypoint x="1215" y="480" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Activas_Desactivada_di" bpmnElement="Flujo_Activas_Desactivada"><di:waypoint x="1240" y="455" /><di:waypoint x="1240" y="423" /><bpmndi:BPMNLabel><dc:Bounds x="1248" y="428" width="20" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Activas_DebeCambiar_di" bpmnElement="Flujo_Activas_DebeCambiar"><di:waypoint x="1265" y="480" /><di:waypoint x="1415" y="480" /><bpmndi:BPMNLabel><dc:Bounds x="1320" y="462" width="20" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_DebeCambiar_CambiarContrasena_di" bpmnElement="Flujo_DebeCambiar_CambiarContrasena"><di:waypoint x="1440" y="455" /><di:waypoint x="1440" y="185" /><bpmndi:BPMNLabel><dc:Bounds x="1448" y="300" width="20" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_DebeCambiar_SesionIniciada_di" bpmnElement="Flujo_DebeCambiar_SesionIniciada"><di:waypoint x="1465" y="480" /><di:waypoint x="1602" y="480" /><bpmndi:BPMNLabel><dc:Bounds x="1510" y="462" width="20" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_CambiarContrasena_SesionIniciada_di" bpmnElement="Flujo_CambiarContrasena_SesionIniciada"><di:waypoint x="1510" y="140" /><di:waypoint x="1620" y="140" /><di:waypoint x="1620" y="462" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Mensaje_ConsultaAD_di" bpmnElement="Mensaje_ConsultaAD"><di:waypoint x="770" y="695" /><di:waypoint x="770" y="800" /><bpmndi:BPMNLabel><dc:Bounds x="665" y="752" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Mensaje_RespuestaAD_di" bpmnElement="Mensaje_RespuestaAD"><di:waypoint x="810" y="800" /><di:waypoint x="810" y="695" /><bpmndi:BPMNLabel><dc:Bounds x="825" y="752" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_Nota_IP_di" bpmnElement="Asoc_Nota_IP"><di:waypoint x="450" y="88" /><di:waypoint x="400" y="140" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_Nota_AD_di" bpmnElement="Asoc_Nota_AD"><di:waypoint x="620" y="298" /><di:waypoint x="620" y="312" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_Nota_Politica_di" bpmnElement="Asoc_Nota_Politica"><di:waypoint x="1540" y="84" /><di:waypoint x="1510" y="140" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_Nota_Sesion_di" bpmnElement="Asoc_Nota_Sesion"><di:waypoint x="1690" y="442" /><di:waypoint x="1620" y="462" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

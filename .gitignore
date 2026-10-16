@@ -44,9 +44,9 @@ frontend/build/
 .yarn-debug.log*
 .yarn-error.log*
 
-# ───── Almacenamiento de archivos (datos de usuario) ─────
-backend/storage/transfers/
-storage/transfers/
+# ───── Documentos de los expedientes (datos de usuario) ─────
+backend/storage/
+/storage/
 
 # ───── SQLite local ─────
 *.sqlite

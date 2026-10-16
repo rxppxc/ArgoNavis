@@ -3,10 +3,9 @@ from fastapi import Request
 
 
 def obtener_ip(request: Request) -> str | None:
-    """IP del cliente. Prioriza X-Forwarded-For si la app va detrás de proxy."""
-    fwd = request.headers.get("X-Forwarded-For")
-    if fwd:
-        return fwd.split(",")[0].strip()
+    """IP del cliente. Detrás de un proxy, uvicorn la resuelve con
+    --proxy-headers solo si el proxy es de confianza (--forwarded-allow-ips);
+    leer X-Forwarded-For aquí directamente permitiría falsearla."""
     return request.client.host if request.client else None
 
 

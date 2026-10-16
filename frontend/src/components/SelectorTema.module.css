@@ -1,0 +1,30 @@
+.grupo {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 3px;
+  background: var(--overlay);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.compacto { display: inline-grid; grid-template-columns: repeat(3, auto); }
+
+.opcion {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--text-2);
+  transition: background var(--t), color var(--t), border-color var(--t);
+}
+.opcion:hover { color: var(--text); background: var(--hover); }
+.opcion[aria-checked="true"] {
+  background: var(--y-soft);
+  border-color: var(--y-border);
+  color: var(--acc-gold);
+}

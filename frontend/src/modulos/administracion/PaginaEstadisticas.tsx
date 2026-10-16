@@ -1,150 +1,120 @@
-import { useState, useEffect, useCallback } from "react";
-import { apiAdmin, type StatsAdmin } from "../../api/admin";
+import { useState, useEffect } from "react";
+import { apiAdmin, type UsoSistema } from "../../api/admin";
 import { formatBytes } from "../../utils/format";
-import { MenuCabecera } from "../../components/MenuCabecera";
-import { BotonVolver } from "../../components/BotonVolver";
+import { mensajeDeError } from "../../utils/errores";
+import { MarcoPagina } from "../../components/MarcoPagina";
 import BarraProgreso from "../../components/BarraProgreso";
+import SeccionAutorizaciones from "./SeccionAutorizaciones";
 import {
-  IconoUsuario, IconoGrafico, IconoActividad, IconoDescargar,
-  IconoDisco, IconoReloj, IconoTrofeo,
+  IconoUsuario, IconoUsuarios, IconoGrafico, IconoArchivo, IconoDisco, IconoBarco, IconoTrofeo,
 } from "../../components/Iconos";
 import styles from "./PaginaEstadisticas.module.css";
 
 export default function PaginaEstadisticas() {
-  const [stats,    setStats]    = useState<StatsAdmin | null>(null);
-  const [cargando, setCargando] = useState(true);
-  const [error,    setError]    = useState<string | null>(null);
+  // Resultado único: "cargando" se deriva de que aún no hay respuesta.
+  const [resultado, setResultado] = useState<{ uso: UsoSistema | null; error: string | null } | null>(null);
 
-  const cargar = useCallback(async () => {
-    try {
-      const { data } = await apiAdmin.obtenerStats();
-      setStats(data);
-    } catch {
-      setError("No se pudieron cargar las estadísticas.");
-    } finally {
-      setCargando(false);
-    }
+  useEffect(() => {
+    let cancelado = false;
+    apiAdmin.obtenerUso()
+      .then((uso) => { if (!cancelado) setResultado({ uso, error: null }); })
+      .catch((e) => {
+        if (!cancelado) setResultado({ uso: null, error: mensajeDeError(e, "No se pudieron cargar las estadísticas.") });
+      });
+    return () => { cancelado = true; };
   }, []);
 
-  useEffect(() => { cargar(); }, [cargar]);
+  const uso = resultado?.uso ?? null;
+  const maxAgencia = uso ? Math.max(...uso.top_agencias.map(a => a.total), 1) : 1;
+  // "2.50 KB" → cifra en grande y la unidad en la etiqueta (como las otras tarjetas).
+  const [espacio, unidad] = uso ? formatBytes(uso.almacenamiento_bytes).split(" ") : ["0", "B"];
 
   return (
-    <div className={styles.page}>
-      <header className={styles.header}>
-        <div className={styles.headerInner}>
-          <BotonVolver to="/dashboard" />
-          <div className={styles.headerCenter}>
-            <img src="/images/logo-snm.png" alt="SNM" className={styles.logo} />
-            <div className={styles.headerText}>
-              <div className={styles.org}>Servicio Nacional de Migración</div>
-              <div className={styles.app}>FileDrop - SNM</div>
-            </div>
-          </div>
-          <div className={styles.headerRight}>
-            <MenuCabecera />
+    <MarcoPagina volverA="/dashboard">
+      <div className={styles.container}>
+        <div className={styles.pageTitle}>
+          <span className={styles.titleIcon}><IconoGrafico tamano={22} /></span>
+          <div>
+            <h1>Estadísticas</h1>
+            <p>Autorizaciones marítimas y uso general del sistema.</p>
           </div>
         </div>
-      </header>
 
-      <main className={styles.body}>
-        <div className={styles.container}>
-          <div className={styles.pageTitle}>
-            <span className={styles.titleIcon}><IconoGrafico tamano={22} /></span>
-            <div>
-              <h1>Estadísticas</h1>
-              <p>Métricas globales de uso de FileDrop.</p>
+        <SeccionAutorizaciones />
+
+        <h2 className={styles.subtituloSeccion}>Uso del sistema</h2>
+
+        {resultado?.error && <div className={styles.errorMsg}>{resultado.error}</div>}
+
+        {!resultado ? (
+          <div className={styles.loading}><span className={styles.spinner} /> Cargando estadísticas…</div>
+        ) : uso && (
+          <>
+            <div className={styles.statGrid}>
+              <div className={styles.statCard}>
+                <div className={`${styles.statIcon} ${styles.gray}`}><IconoUsuarios /></div>
+                <div className={styles.statNum}>{uso.usuarios}</div>
+                <div className={styles.statLabel}>Usuarios registrados</div>
+              </div>
+              <div className={styles.statCard}>
+                <div className={`${styles.statIcon} ${styles.green}`}><IconoUsuario /></div>
+                <div className={styles.statNum}>{uso.usuarios_activos}</div>
+                <div className={styles.statLabel}>Usuarios activos</div>
+              </div>
+              <div className={styles.statCard}>
+                <div className={`${styles.statIcon} ${styles.blue}`}><IconoBarco tamano={22} /></div>
+                <div className={styles.statNum}>{uso.agencias}</div>
+                <div className={styles.statLabel}>Agencias navieras</div>
+              </div>
+              <div className={styles.statCard}>
+                <div className={`${styles.statIcon} ${styles.yellow}`}><IconoArchivo /></div>
+                <div className={styles.statNum}>{uso.documentos}</div>
+                <div className={styles.statLabel}>Documentos en expedientes</div>
+              </div>
+              <div className={styles.statCard}>
+                <div className={`${styles.statIcon} ${styles.purple}`}><IconoDisco /></div>
+                <div className={styles.statNum}>{espacio}</div>
+                <div className={styles.statLabel}>{unidad} almacenados</div>
+              </div>
             </div>
-          </div>
 
-          {error && <div className={styles.errorMsg}>{error}</div>}
-
-          {cargando ? (
-            <div className={styles.loading}><span className={styles.spinner} /> Cargando estadísticas…</div>
-          ) : stats && (() => {
-            const maxSubidores = Math.max(...stats.top_uploaders.map(u => u.total), 1);
-
-            return (
-              <>
-                {/* ── Métricas ── */}
-                <div className={styles.statGrid}>
-                  <div className={styles.statCard}>
-                    <div className={`${styles.statIcon} ${styles.yellow}`}><IconoGrafico /></div>
-                    <div className={styles.statNum}>{stats.transferencias}</div>
-                    <div className={styles.statLabel}>Transferencias totales</div>
-                  </div>
-                  <div className={styles.statCard}>
-                    <div className={`${styles.statIcon} ${styles.green}`}><IconoActividad tamano={22} /></div>
-                    <div className={styles.statNum}>{stats.activas}</div>
-                    <div className={styles.statLabel}>Activas</div>
-                  </div>
-                  <div className={styles.statCard}>
-                    <div className={`${styles.statIcon} ${styles.gray}`}><IconoReloj tamano={22} /></div>
-                    <div className={styles.statNum}>{stats.expiradas}</div>
-                    <div className={styles.statLabel}>Transferencias expiradas</div>
-                  </div>
-                  <div className={styles.statCard}>
-                    <div className={`${styles.statIcon} ${styles.blue}`}><IconoDescargar tamano={22} /></div>
-                    <div className={styles.statNum}>{stats.total_descargas}</div>
-                    <div className={styles.statLabel}>Descargas totales</div>
-                  </div>
-                  <div className={styles.statCard}>
-                    <div className={`${styles.statIcon} ${styles.purple}`}><IconoDisco /></div>
-                    <div className={styles.statNum}>{formatBytes(stats.storage_bytes)}</div>
-                    <div className={styles.statLabel}>Almacenamiento usado</div>
-                  </div>
-                  <div className={styles.statCard}>
-                    <div className={`${styles.statIcon} ${styles.gray}`}><IconoUsuario /></div>
-                    <div className={styles.statNum}>{stats.usuarios}</div>
-                    <div className={styles.statLabel}>Usuarios registrados</div>
-                  </div>
+            <div className={styles.panelesStack}>
+              <section className={styles.panel}>
+                <div className={styles.panelHeader}>
+                  <IconoTrofeo />
+                  Agencias con más solicitudes
                 </div>
-
-                <div className={styles.panelesStack}>
-                  {/* ── Top subidores ── */}
-                  <section className={styles.panel}>
-                    <div className={styles.panelHeader}>
-                      <IconoTrofeo />
-                      Top subidores
-                    </div>
-                    <div className={styles.panelBody}>
-                      {stats.top_uploaders.length === 0 ? (
-                        <p className={styles.empty}>Sin datos aún.</p>
-                      ) : (
-                        <div className={styles.uploaderList}>
-                          {stats.top_uploaders.map((u, i) => (
-                            <div key={u.id} className={styles.uploaderRow}>
-                              <div className={`${styles.rankBadge} ${i === 0 ? styles.rankGold : i === 1 ? styles.rankSilver : i === 2 ? styles.rankBronze : ""}`}>
-                                {i + 1}
-                              </div>
-                              <div className={styles.uploaderAvatar}>
-                                {(u.full_name?.[0] ?? "?").toUpperCase()}
-                              </div>
-                              <div className={styles.uploaderInfo}>
-                                <div className={styles.uploaderName}>{u.full_name}</div>
-                                <div className={styles.uploaderBarWrap}>
-                                  <BarraProgreso valor={u.total} max={maxSubidores} color="gold" />
-                                </div>
-                              </div>
-                              <div className={styles.uploaderCount}>
-                                <span className={styles.uploaderNum}>{u.total}</span>
-                                <span className={styles.uploaderLabel}>transfer{u.total !== 1 ? "encias" : "encia"}</span>
-                              </div>
+                <div className={styles.panelBody}>
+                  {uso.top_agencias.length === 0 ? (
+                    <p className={styles.empty}>Sin solicitudes aún.</p>
+                  ) : (
+                    <div className={styles.uploaderList}>
+                      {uso.top_agencias.map((a, i) => (
+                        <div key={a.agencia_id} className={styles.uploaderRow}>
+                          <div className={`${styles.rankBadge} ${i === 0 ? styles.rankGold : i === 1 ? styles.rankSilver : i === 2 ? styles.rankBronze : ""}`}>
+                            {i + 1}
+                          </div>
+                          <div className={styles.uploaderAvatar}>{(a.nombre[0] ?? "?").toUpperCase()}</div>
+                          <div className={styles.uploaderInfo}>
+                            <div className={styles.uploaderName}>{a.nombre}</div>
+                            <div className={styles.uploaderBarWrap}>
+                              <BarraProgreso valor={a.total} max={maxAgencia} color="gold" />
                             </div>
-                          ))}
+                          </div>
+                          <div className={styles.uploaderCount}>
+                            <span className={styles.uploaderNum}>{a.total}</span>
+                            <span className={styles.uploaderLabel}>solicitud{a.total === 1 ? "" : "es"}</span>
+                          </div>
                         </div>
-                      )}
+                      ))}
                     </div>
-                  </section>
+                  )}
                 </div>
-              </>
-            );
-          })()}
-        </div>
-      </main>
-
-      <footer className={styles.footer}>
-        Servicio Nacional de Migración &copy; {new Date().getFullYear()} &mdash; Todos los derechos reservados
-      </footer>
-    </div>
+              </section>
+            </div>
+          </>
+        )}
+      </div>
+    </MarcoPagina>
   );
 }

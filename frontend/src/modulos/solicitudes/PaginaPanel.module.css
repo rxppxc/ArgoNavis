@@ -1,0 +1,128 @@
+/* ─── Encabezado ─── */
+.encabezado {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.saludo { color: var(--text); font-size: 1.55rem; font-weight: 800; letter-spacing: -.3px; }
+.subtitulo { color: var(--acc-gold); font-size: 1rem; font-weight: 700; margin-top: 4px; }
+
+.btnNuevo {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: linear-gradient(135deg, #FFD84D 0%, var(--y) 55%, var(--y-dark) 100%);
+  color: var(--on-accent);
+  border-radius: var(--r-sm);
+  padding: 11px 22px;
+  font-weight: 800; font-size: .86rem;
+  text-decoration: none; white-space: nowrap;
+  box-shadow: 0 2px 10px rgba(245,200,0,.22);
+  transition: transform var(--t) var(--ease), box-shadow var(--t) var(--ease), filter var(--t) var(--ease);
+}
+.btnNuevo:hover { filter: brightness(1.05); transform: translateY(-2px); box-shadow: 0 8px 22px rgba(245,200,0,.42); }
+
+/* ─── Selector de bandeja (rol) ─── */
+.vistas {
+  display: inline-flex; gap: 4px; padding: 4px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 11px;
+  margin-bottom: 14px;
+}
+.vista {
+  padding: 8px 16px; border-radius: 8px;
+  color: var(--text-2); font-weight: 700; font-size: .85rem;
+}
+.vista:hover { color: var(--text); background: var(--hover); }
+.vistaActiva, .vistaActiva:hover { background: var(--y); color: var(--on-accent); }
+
+/* ─── Pestañas de estado ─── */
+.pestanas {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.pestana {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 12px; border-radius: 100px;
+  border: 1px solid var(--border); background: var(--card);
+  color: var(--text-2); font-size: .8rem; font-weight: 600;
+}
+.pestana:hover { border-color: var(--border-2); color: var(--text); }
+.pestanaActiva, .pestanaActiva:hover { border-color: var(--y); color: var(--text); background: var(--y-soft); }
+.pestanaConteo {
+  min-width: 20px; padding: 0 6px; border-radius: 100px;
+  background: var(--overlay-2); color: var(--text);
+  font-size: .72rem; font-weight: 800; text-align: center;
+}
+
+/* ─── Búsqueda + fechas ─── */
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 18px; }
+.searchWrap { position: relative; flex: 1 1 280px; min-width: 220px; }
+.searchIcon {
+  position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+  color: var(--muted); pointer-events: none; display: flex;
+}
+.searchInput {
+  width: 100%;
+  padding: 10px 36px 10px 38px;
+  background: var(--input-bg);
+  border: 1.5px solid var(--input-border);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  font-size: .88rem;
+  outline: none;
+  transition: border-color var(--t), box-shadow var(--t);
+}
+.searchInput::placeholder { color: var(--muted); }
+.searchInput:focus { border-color: var(--foco); box-shadow: 0 0 0 3px rgba(245,200,0,.14); }
+.searchLimpiar {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: var(--r-xs);
+  color: var(--muted);
+}
+.searchLimpiar:hover { background: var(--overlay); color: var(--text); }
+
+/* ─── Lista y estados ─── */
+.lista { display: flex; flex-direction: column; gap: 10px; }
+
+.error {
+  background: rgba(239,68,68,.13); border: 1px solid rgba(239,68,68,.30);
+  border-radius: 8px; color: var(--acc-red);
+  padding: 11px 14px; margin-bottom: 16px; font-size: .87rem;
+}
+.cargando {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  padding: 64px; color: var(--muted); font-size: .9rem;
+}
+.spinner {
+  width: 20px; height: 20px;
+  border: 2px solid var(--border); border-top-color: var(--y);
+  border-radius: 50%;
+  animation: girar .7s linear infinite;
+}
+@keyframes girar { to { transform: rotate(360deg); } }
+
+.vacio {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--r-lg); padding: 56px 28px; text-align: center;
+}
+.vacioIcono {
+  width: 66px; height: 66px; margin: 0 auto 16px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-xl); background: var(--y-soft); border: 1px solid var(--y-border);
+  color: var(--acc-gold);
+}
+.vacio h3 { color: var(--text); font-size: 1.05rem; font-weight: 700; margin-bottom: 6px; }
+.vacio p { color: var(--text-2); font-size: .88rem; margin: 0 auto 20px; max-width: 360px; }
+
+/* ─── Paginación ─── */
+.listaActualizando { opacity: .55; transition: opacity var(--t) var(--ease); }
+.paginacion {
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  margin-top: 20px; flex-wrap: wrap;
+}
+.paginaInfo { color: var(--text-2); font-size: .82rem; font-weight: 600; }
+.btnPagina {
+  padding: 8px 16px; border-radius: var(--r-sm);
+  border: 1px solid var(--border); background: var(--card);
+  color: var(--text); font-size: .82rem; font-weight: 700; cursor: pointer;
+}
+.btnPagina:hover:not(:disabled) { border-color: var(--y); }
+.btnPagina:disabled { opacity: .45; cursor: not-allowed; }

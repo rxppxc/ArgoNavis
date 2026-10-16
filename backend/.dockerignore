@@ -1,0 +1,26 @@
+# Lo que NO entra en la imagen del backend (COPY . . en el Dockerfile).
+# Sin esto, una imagen construida desde una copia de trabajo llevaría los
+# secretos del .env, el venv de Windows y los documentos de los expedientes.
+
+# Secretos: en Docker la configuración llega por variables de entorno (docker-compose-prod.yml)
+.env
+.env.*
+!.env.example
+
+# Entorno local de Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Documentos de los expedientes (en Docker viven en el volumen documentos)
+storage/
+
+# Pruebas y registros locales
+tests/
+pytest.ini
+requirements-dev.txt
+*.log

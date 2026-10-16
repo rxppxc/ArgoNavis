@@ -1,23 +1,29 @@
+/* ─── Tema oscuro (por defecto) — paleta neutra "pizarra" ─────────────────
+   El amarillo de marca (--y) es solo acento: botón principal, línea de la
+   cabecera y estados activos. Todos los pares texto/fondo cumplen WCAG AA
+   (4.5:1 en texto, 3:1 en bordes de campos): si cambias un valor, recalcula.
+   El tema se fija en <html data-theme> antes de pintar (public/tema-inicial.js). */
 :root {
+  color-scheme: dark;   /* calendario, desplegables y scroll nativos en oscuro */
+
   --y:         #F5C800;
   --y-dark:    #C9A400;
   --y-soft:    rgba(245,200,0,.12);
-  --y-border:  rgba(245,200,0,.25);
-  --ink:       #0F0F0F;
-  --ink-2:     #1C1C1C;
-  --ink-3:     #2D2D2D;
-  --bg:        #111421;
-  --surface:   #1C1F36;
-  --surface-2: #23263E;
-  /* Tarjetas a nivel de página (más oscuras que --surface, que es nivel modal). */
-  --card:      #0E1020;
-  --card-2:    #141830;
-  --border:    rgba(255,255,255,.11);
-  --border-2:  rgba(255,255,255,.19);
-  --text:      #E4E6F0;
-  --text-2:    #9A9DC0;
-  --muted:     #6B6E85;
-  --quiet:     #4D506A;
+  --y-border:  rgba(245,200,0,.30);
+  --ink:       #0F0F0F;   /* texto sobre el amarillo de marca */
+  --ink-2:     #1B2029;
+  --ink-3:     #2A3140;
+  --bg:        #0B0D12;
+  --surface:   #161A22;   /* nivel modal / panel flotante */
+  --surface-2: #1C212B;
+  --card:      #12151C;   /* tarjetas a nivel de página */
+  --card-2:    #171B24;
+  --border:    #252B36;
+  --border-2:  #323A48;
+  --text:      #E6E8EE;
+  --text-2:    #A8B0BF;
+  --muted:     #858E9F;
+  --quiet:     #5A6273;   /* solo decorativo: no alcanza contraste de texto */
   --green:     #22C55E;
   --green-soft:rgba(34,197,94,.13);
   --red:       #EF4444;
@@ -25,84 +31,96 @@
 
   /* Tokens que se voltean con el tema — usar SIEMPRE estos en vez de
      rgba(255,255,255,...) hardcodeado, para que el modo claro funcione solo. */
-  --hover:        rgba(255,255,255,.06);  /* relleno sutil en :hover */
-  --overlay:      rgba(255,255,255,.08);  /* chips, badges, pills, divisores suaves */
-  --overlay-2:    rgba(255,255,255,.12);  /* variante un poco más marcada */
-  --input-bg:     rgba(255,255,255,.06);  /* fondo de campos de formulario */
-  --input-border: rgba(255,255,255,.16);  /* borde de campos de formulario */
+  --hover:        rgba(255,255,255,.04);  /* relleno sutil en :hover */
+  --overlay:      rgba(255,255,255,.06);  /* chips, badges, pills, divisores suaves */
+  --overlay-2:    rgba(255,255,255,.10);  /* variante un poco más marcada */
+  --input-bg:     #0F1218;                /* fondo de campos de formulario */
+  --input-border: #5B6477;                /* borde de campos (3.1:1) */
   --on-accent:    #0F0F0F;                /* texto sobre el amarillo de marca */
+  --foco:         #F5C800;                /* anillo de foco de teclado */
+  --velo:         rgba(0,0,0,.60);        /* fondo detrás de un modal */
+
+  /* Cabecera institucional */
+  --cabecera:       #0F1218;
 
   /* Texto de acento sobre tintes suaves (badges, botones outline). Brillante en
-     oscuro; el modo claro los reemplaza por mid-tones legibles sobre blanco. */
-  --acc-green:  #4ADE80;
-  --acc-red:    #FCA5A5;
-  --acc-amber:  #FBB924;
+     oscuro; el modo claro los reemplaza por tonos legibles sobre blanco. */
+  --acc-green:  #34D399;
+  --acc-red:    #F87171;
+  --acc-amber:  #FBBF24;
   --acc-blue:   #60A5FA;
   --acc-gray:   #94A3B8;
   --acc-purple: #C084FC;
   --acc-gold:   #F5C800;
   --acc-teal:   #2DD4BF;
-  --acc-orange: #FDBA74;
+  --acc-orange: #FB923C;
   --acc-cyan:   #22D3EE;
 
   --r-xs: 5px;
   --r-sm: 8px;
   --r-md: 12px;
-  --r-lg: 16px;
-  --r-xl: 24px;
+  --r-lg: 12px;
+  --r-xl: 16px;
 
-  --sh-xs: 0 1px 4px rgba(0,0,0,.40);
-  --sh-sm: 0 2px 8px rgba(0,0,0,.45);
-  --sh-md: 0 8px 24px rgba(0,0,0,.55);
-  --sh-lg: 0 24px 64px rgba(0,0,0,.65);
+  --sh-xs: 0 1px 2px rgba(0,0,0,.40);
+  --sh-sm: 0 1px 3px rgba(0,0,0,.45);
+  --sh-md: 0 6px 16px rgba(0,0,0,.45);
+  --sh-lg: 0 16px 40px rgba(0,0,0,.55);
 
   --ease: cubic-bezier(.4,0,.2,1);
   --t:    .18s;
 }
 
-/* ─── Modo claro ─── */
+/* ─── Tema claro ──────────────────────────────────────────────────────────
+   Regla clave: en claro el amarillo de marca (--y) SOLO sirve como relleno
+   con texto oscuro encima (11:1). Como texto sobre blanco da 1.6:1 y es
+   ilegible — para eso existe --acc-gold. */
 [data-theme="light"] {
-  --bg:        #E6EAF8;
-  --surface:   #FFFFFF;
-  --surface-2: #F1F4FF;
-  --card:      #FFFFFF;
-  --card-2:    #F4F6FD;
-  --border:    rgba(0,0,0,.09);
-  --border-2:  rgba(0,0,0,.17);
-  --text:      #1A1C2E;
-  --text-2:    #3D4070;
-  --muted:     #6A6E9E;
-  --quiet:     #9698C0;
-  --ink:       #1A2040;
-  --ink-2:     #222A52;
-  --ink-3:     #2E3762;
-  --sh-xs: 0 1px 4px rgba(0,0,0,.08);
-  --sh-sm: 0 2px 8px rgba(0,0,0,.10);
-  --sh-md: 0 8px 24px rgba(0,0,0,.12);
-  --sh-lg: 0 24px 64px rgba(0,0,0,.18);
+  color-scheme: light;
 
-  /* Contrapartes claras de los tokens que se voltean */
-  --hover:        rgba(0,0,0,.05);
-  --overlay:      rgba(0,0,0,.05);
-  --overlay-2:    rgba(0,0,0,.08);
+  --y-soft:    #FEF9C3;
+  --y-border:  #E3C766;
+  --ink:       #0F172A;
+  --ink-2:     #F1F5F9;
+  --ink-3:     #CBD5E1;
+  --bg:        #F4F6F9;
+  --surface:   #FFFFFF;
+  --surface-2: #F8FAFC;
+  --card:      #FFFFFF;
+  --card-2:    #F8FAFC;
+  --border:    #E2E8F0;
+  --border-2:  #CBD5E1;
+  --text:      #0F172A;
+  --text-2:    #475569;
+  --muted:     #5E6B80;
+  --quiet:     #94A3B8;
+
+  --hover:        rgba(15,23,42,.04);
+  --overlay:      rgba(15,23,42,.05);
+  --overlay-2:    rgba(15,23,42,.08);
   --input-bg:     #FFFFFF;
-  --input-border: rgba(0,0,0,.18);
-  --on-accent:    #0F0F0F;
+  --input-border: #7C8BA1;   /* 3.5:1 sobre blanco */
+  --on-accent:    #0F172A;
+  --foco:         #1D4ED8;
+  --velo:         rgba(15,23,42,.45);
+
+  --cabecera:       #FFFFFF;
 
   --acc-green:  #15803D;
-  --acc-red:    #DC2626;
+  --acc-red:    #B91C1C;
   --acc-amber:  #B45309;
   --acc-blue:   #2563EB;
   --acc-gray:   #5B6178;
   --acc-purple: #7E22CE;
-  --acc-gold:   #9A7B00;
+  --acc-gold:   #8A6D00;
   --acc-teal:   #0F766E;
   --acc-orange: #C2410C;
   --acc-cyan:   #0E7490;
-}
 
-[data-theme="light"] body::before {
-  background: rgba(228, 234, 252, 0.93);
+  --sh-xs: 0 1px 2px rgba(15,23,42,.06);
+  --sh-sm: 0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.04);
+  --sh-md: 0 4px 12px rgba(15,23,42,.08);
+  --sh-lg: 0 12px 32px rgba(15,23,42,.12);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -111,32 +129,39 @@ html { scroll-behavior: smooth; height: 100%; }
 
 body {
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  background-color: #0D1018;
-  background-image: url('/images/bg-migracion.jpg');
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
+  background: var(--bg);
   color: var(--text);
   line-height: 1.55;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background: linear-gradient(150deg, rgba(26,32,64,.92) 0%, rgba(13,17,40,.94) 100%);
-  z-index: 0;
-  pointer-events: none;
-}
-
-#root { position: relative; z-index: 1; }
 
 a { color: inherit; text-decoration: none; }
 button { cursor: pointer; font-family: inherit; border: none; background: none; }
 input, textarea, select { font-family: inherit; }
 img { display: block; }
+
+/* Foco de teclado visible en todo el sistema (con mouse no aparece). */
+:focus-visible {
+  outline: 2px solid var(--foco);
+  outline-offset: 2px;
+}
+
+/* ContextoTema la pone durante un cuadro al cambiar de tema: así los colores
+   cambian de golpe en vez de animarse componente por componente. */
+html.sin-transiciones *,
+html.sin-transiciones *::before,
+html.sin-transiciones *::after { transition: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 .sr-only {
   position: absolute; width: 1px; height: 1px;

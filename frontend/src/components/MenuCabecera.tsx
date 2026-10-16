@@ -2,22 +2,21 @@ import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAutenticacion } from "../hooks/useAutenticacion";
 import { usePermisos } from "../hooks/usePermisos";
-import { useTema } from "../context/ContextoTema";
+import { RUTA_CAMBIAR_CONTRASENA } from "../api/client";
 import {
-  IconoUsuarios, IconoEstadisticas, IconoEscudo,
-  IconoSol, IconoLuna, IconoSalir, IconoChevronAbajo,
+  IconoUsuarios, IconoEstadisticas, IconoEscudo, IconoArchivo, IconoAncla, IconoActividad,
+  IconoSalir, IconoChevronAbajo, IconoLlave,
 } from "./Iconos";
+import { SelectorTema } from "./SelectorTema";
 import styles from "./MenuCabecera.module.css";
 
 export function MenuCabecera() {
-  const { cerrarSesion } = useAutenticacion();
-  const { tiene, esAdmin } = usePermisos();
-  const { tema, alternar } = useTema();
+  const { usuario, cerrarSesion } = useAutenticacion();
+  const { tiene, esAdmin, esSysAdmin } = usePermisos();
   const navegar = useNavigate();
   const [abierto, setAbierto] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const esPacifico = !esAdmin && tiene("T-PROCESAR-PACIFICO");
-  const esOscuro   = tema === "dark";
 
   useEffect(() => {
     function clickFuera(e: MouseEvent) {
@@ -50,7 +49,7 @@ export function MenuCabecera() {
 
         {abierto && (
           <div className={styles.panel}>
-            {esAdmin && (
+            {esSysAdmin && (
               <>
                 <Link to="/admin" className={styles.item} onClick={() => setAbierto(false)}>
                   <IconoUsuarios />Usuarios
@@ -58,8 +57,25 @@ export function MenuCabecera() {
                 <Link to="/admin/roles" className={styles.item} onClick={() => setAbierto(false)}>
                   <IconoEscudo />Roles y permisos
                 </Link>
+                <Link to="/admin/bitacora" className={styles.item} onClick={() => setAbierto(false)}>
+                  <IconoActividad />Bitácora
+                </Link>
+                <div className={styles.sep} />
+              </>
+            )}
+            {esAdmin && (
+              <>
+                <Link to="/admin/tramites" className={styles.item} onClick={() => setAbierto(false)}>
+                  <IconoArchivo />Catálogo de trámites
+                </Link>
+                <Link to="/admin/catalogos" className={styles.item} onClick={() => setAbierto(false)}>
+                  <IconoAncla />Agencias, puestos y países
+                </Link>
                 <Link to="/admin/stats" className={styles.item} onClick={() => setAbierto(false)}>
                   <IconoEstadisticas />Estadísticas
+                </Link>
+                <Link to="/admin/bitacora" className={styles.item} onClick={() => setAbierto(false)}>
+                  <IconoActividad />Bitácora
                 </Link>
                 <div className={styles.sep} />
               </>
@@ -72,10 +88,18 @@ export function MenuCabecera() {
                 <div className={styles.sep} />
               </>
             )}
-            <button className={styles.item} onClick={() => { alternar(); setAbierto(false); }}>
-              {esOscuro ? <IconoSol /> : <IconoLuna />}
-              {esOscuro ? "Modo claro" : "Modo oscuro"}
-            </button>
+            {usuario?.user_type === "local" && (
+              <>
+                <Link to={RUTA_CAMBIAR_CONTRASENA} className={styles.item} onClick={() => setAbierto(false)}>
+                  <IconoLlave />Cambiar contraseña
+                </Link>
+                <div className={styles.sep} />
+              </>
+            )}
+            <div className={styles.tema}>
+              <span className={styles.temaTitulo} aria-hidden="true">Tema</span>
+              <SelectorTema />
+            </div>
             <div className={styles.sep} />
             <button className={`${styles.item} ${styles.itemSalir}`} onClick={salir}>
               <IconoSalir />Salir

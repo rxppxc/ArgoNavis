@@ -1,23 +1,21 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { apiAdmin, type Permiso, type Rol } from "../../api/admin";
-import { MenuCabecera } from "../../components/MenuCabecera";
-import { BotonVolver } from "../../components/BotonVolver";
+import { MarcoPagina } from "../../components/MarcoPagina";
+import { useNotificacion } from "../../components/Notificaciones";
+import { useConfirmar } from "../../components/ModalConfirmacion";
+import { mensajeDeError } from "../../utils/errores";
 import {
   IconoLlave, IconoEscudo, IconoMas, IconoBasura,
-  IconoCheck, IconoX, IconoCandado, IconoChevronDerecha,
+  IconoCheck, IconoCandado, IconoChevronDerecha,
 } from "../../components/Iconos";
 import styles from "./PaginaRoles.module.css";
 
+/** Roles y permisos (SysAdmin). Los permisos los define el sistema: el código
+ *  revisa esos códigos, así que aquí solo se listan y se asignan a los roles. */
 export default function PaginaRoles() {
-  /* ── Permisos ── */
+  /* ── Permisos (solo lectura) ── */
   const [permisos, setPermisos] = useState<Permiso[]>([]);
   const [cargandoPermisos, setCargandoPermisos] = useState(true);
-  const [creandoPermiso, setCreandoPermiso] = useState(false);
-  const [nuevoPCodigo, setNuevoPCodigo] = useState("");
-  const [nuevoPNombre, setNuevoPNombre] = useState("");
-  const [nuevoPDesc, setNuevoPDesc] = useState("");
-  const [eliminandoP, setEliminandoP] = useState<number | null>(null);
-  const [confirmarP, setConfirmarP] = useState<number | null>(null);
 
   /* ── Roles ── */
   const [roles, setRoles] = useState<Rol[]>([]);
@@ -26,79 +24,31 @@ export default function PaginaRoles() {
   const [nuevoRNombre, setNuevoRNombre] = useState("");
   const [nuevoRDesc, setNuevoRDesc] = useState("");
   const [eliminandoR, setEliminandoR] = useState<number | null>(null);
-  const [confirmarR, setConfirmarR] = useState<number | null>(null);
 
   /* ── Rol expandido (vista de permisos asignados) ── */
   const [rolAbierto, setRolAbierto] = useState<number | null>(null);
   const [guardandoPermisosRol, setGuardandoPermisosRol] = useState<number | null>(null);
   const [seleccionPermisos, setSeleccionPermisos] = useState<Set<number>>(new Set());
 
-  /* ── Mensaje global ── */
-  const [aviso, setAviso] = useState<{ texto: string; tipo: "ok" | "err" } | null>(null);
+  const { mostrar } = useNotificacion();
+  const confirmar = useConfirmar();
 
   function mostrarAviso(texto: string, tipo: "ok" | "err" = "ok") {
-    setAviso({ texto, tipo });
-    setTimeout(() => setAviso(null), 3000);
+    mostrar(texto, tipo === "ok" ? "exito" : "error");
   }
 
-  const cargarPermisos = useCallback(async () => {
-    try {
-      const { data } = await apiAdmin.listarPermisos();
-      setPermisos(data);
-    } catch {
-      // silencio
-    } finally {
-      setCargandoPermisos(false);
-    }
-  }, []);
-
-  const cargarRoles = useCallback(async () => {
-    try {
-      const { data } = await apiAdmin.listarRoles();
-      setRoles(data);
-    } catch {
-      // silencio
-    } finally {
-      setCargandoRoles(false);
-    }
-  }, []);
-
-  useEffect(() => { cargarPermisos(); cargarRoles(); }, [cargarPermisos, cargarRoles]);
-
-  /* ── Permisos ── */
-  async function alCrearPermiso(e: React.FormEvent) {
-    e.preventDefault();
-    const codigo = nuevoPCodigo.trim().toUpperCase();
-    const nombre = nuevoPNombre.trim();
-    if (!codigo || !nombre) return;
-    setCreandoPermiso(true);
-    try {
-      const { data } = await apiAdmin.crearPermiso(codigo, nombre, nuevoPDesc.trim() || undefined);
-      setPermisos(prev => [...prev, data].sort((a, b) => a.codigo.localeCompare(b.codigo)));
-      setNuevoPCodigo(""); setNuevoPNombre(""); setNuevoPDesc("");
-      mostrarAviso("Permiso creado correctamente.");
-    } catch (err: any) {
-      mostrarAviso(err?.response?.data?.detail ?? "Error al crear el permiso.", "err");
-    } finally {
-      setCreandoPermiso(false);
-    }
-  }
-
-  async function alEliminarPermiso(id: number) {
-    setEliminandoP(id);
-    try {
-      await apiAdmin.eliminarPermiso(id);
-      setPermisos(prev => prev.filter(p => p.id !== id));
-      // refrescar roles que pudieran tenerlo
-      cargarRoles();
-      mostrarAviso("Permiso eliminado.");
-    } catch (err: any) {
-      mostrarAviso(err?.response?.data?.detail ?? "Error al eliminar el permiso.", "err");
-    } finally {
-      setEliminandoP(null);
-      setConfirmarP(null);
-    }
-  }
+  useEffect(() => {
+    let cancelado = false;
+    apiAdmin.listarPermisos()
+      .then(({ data }) => { if (!cancelado) setPermisos(data); })
+      .catch((e) => { if (!cancelado) mostrar(mensajeDeError(e, "No se pudieron cargar los permisos."), "error"); })
+      .finally(() => { if (!cancelado) setCargandoPermisos(false); });
+    apiAdmin.listarRoles()
+      .then(({ data }) => { if (!cancelado) setRoles(data); })
+      .catch((e) => { if (!cancelado) mostrar(mensajeDeError(e, "No se pudieron cargar los roles."), "error"); })
+      .finally(() => { if (!cancelado) setCargandoRoles(false); });
+    return () => { cancelado = true; };
+  }, [mostrar]);
 
   /* ── Roles ── */
   async function alCrearRol(e: React.FormEvent) {
@@ -111,25 +61,33 @@ export default function PaginaRoles() {
       setRoles(prev => [...prev, data].sort((a, b) => a.nombre.localeCompare(b.nombre)));
       setNuevoRNombre(""); setNuevoRDesc("");
       mostrarAviso("Rol creado correctamente.");
-    } catch (err: any) {
-      mostrarAviso(err?.response?.data?.detail ?? "Error al crear el rol.", "err");
+    } catch (err) {
+      mostrarAviso(mensajeDeError(err, "Error al crear el rol."), "err");
     } finally {
       setCreandoRol(false);
     }
   }
 
-  async function alEliminarRol(id: number) {
-    setEliminandoR(id);
+  async function alEliminarRol(rol: Rol) {
+    const ok = await confirmar({
+      titulo: "Eliminar rol",
+      mensaje: rol.total_usuarios > 0
+        ? `El rol "${rol.nombre}" tiene ${rol.total_usuarios} usuario(s): quedarán sin rol y sin acceso hasta que les asignes otro.`
+        : `Se eliminará el rol "${rol.nombre}".`,
+      textoOk: "Eliminar",
+      peligroso: true,
+    });
+    if (!ok) return;
+    setEliminandoR(rol.id);
     try {
-      await apiAdmin.eliminarRol(id);
-      setRoles(prev => prev.filter(r => r.id !== id));
-      if (rolAbierto === id) setRolAbierto(null);
+      await apiAdmin.eliminarRol(rol.id);
+      setRoles(prev => prev.filter(r => r.id !== rol.id));
+      if (rolAbierto === rol.id) setRolAbierto(null);
       mostrarAviso("Rol eliminado.");
-    } catch (err: any) {
-      mostrarAviso(err?.response?.data?.detail ?? "Error al eliminar el rol.", "err");
+    } catch (err) {
+      mostrarAviso(mensajeDeError(err, "Error al eliminar el rol."), "err");
     } finally {
       setEliminandoR(null);
-      setConfirmarR(null);
     }
   }
 
@@ -157,8 +115,8 @@ export default function PaginaRoles() {
       const { data } = await apiAdmin.asignarPermisosARol(rolId, Array.from(seleccionPermisos));
       setRoles(prev => prev.map(r => r.id === rolId ? data : r));
       mostrarAviso("Permisos del rol actualizados.");
-    } catch (err: any) {
-      mostrarAviso(err?.response?.data?.detail ?? "Error al guardar los permisos.", "err");
+    } catch (err) {
+      mostrarAviso(mensajeDeError(err, "Error al guardar los permisos."), "err");
     } finally {
       setGuardandoPermisosRol(null);
     }
@@ -170,34 +128,7 @@ export default function PaginaRoles() {
   );
 
   return (
-    <div className={styles.page}>
-
-      {/* Header */}
-      <header className={styles.header}>
-        <div className={styles.headerInner}>
-          <BotonVolver to="/dashboard" />
-          <div className={styles.headerCenter}>
-            <img src="/images/logo-snm.png" alt="SNM" className={styles.logo} />
-            <div className={styles.headerText}>
-              <div className={styles.org}>Servicio Nacional de Migración</div>
-              <div className={styles.app}>FileDrop - SNM</div>
-            </div>
-          </div>
-          <div className={styles.headerRight}>
-            <MenuCabecera />
-          </div>
-        </div>
-      </header>
-
-      {/* Aviso flotante */}
-      {aviso && (
-        <div className={`${styles.toast} ${aviso.tipo === "err" ? styles.toastErr : styles.toastOk}`}>
-          {aviso.texto}
-        </div>
-      )}
-
-      {/* Body */}
-      <main className={styles.body}>
+    <MarcoPagina volverA="/dashboard">
         <div className={styles.container}>
 
           {/* Page title */}
@@ -205,7 +136,7 @@ export default function PaginaRoles() {
             <span className={styles.titleIcon}><IconoEscudo /></span>
             <div>
               <h1>Roles y permisos</h1>
-              <p>Crea permisos, agrúpalos en roles y asigna roles a los usuarios.</p>
+              <p>Agrupa los permisos del sistema en roles; los roles se asignan en Usuarios.</p>
             </div>
           </div>
 
@@ -217,44 +148,11 @@ export default function PaginaRoles() {
               <span className={styles.count}>{permisos.length}</span>
             </div>
             <div className={styles.panelBody}>
-              <form onSubmit={alCrearPermiso} className={styles.formRow}>
-                <input
-                  className={`${styles.input} ${styles.inputCodigo}`}
-                  type="text"
-                  placeholder="Código (ej: A-01)"
-                  value={nuevoPCodigo}
-                  onChange={e => setNuevoPCodigo(e.target.value.toUpperCase())}
-                  maxLength={50}
-                />
-                <input
-                  className={styles.input}
-                  type="text"
-                  placeholder="Nombre del permiso"
-                  value={nuevoPNombre}
-                  onChange={e => setNuevoPNombre(e.target.value)}
-                  maxLength={150}
-                />
-                <input
-                  className={styles.input}
-                  type="text"
-                  placeholder="Descripción (opcional)"
-                  value={nuevoPDesc}
-                  onChange={e => setNuevoPDesc(e.target.value)}
-                />
-                <button
-                  type="submit"
-                  className={styles.btnCrear}
-                  disabled={creandoPermiso || !nuevoPCodigo.trim() || !nuevoPNombre.trim()}
-                >
-                  {creandoPermiso ? <span className={styles.spinner} /> : <IconoMas />}
-                  Crear
-                </button>
-              </form>
-
+              <p className={styles.nota}>
+                Los define el sistema: cada uno habilita una parte del flujo. Para dar acceso, asígnalos a un rol.
+              </p>
               {cargandoPermisos ? (
                 <div className={styles.loading}><span className={styles.spinner} /> Cargando permisos…</div>
-              ) : permisos.length === 0 ? (
-                <p className={styles.empty}>Aún no hay permisos. Crea el primero arriba (por ejemplo A-01).</p>
               ) : (
                 <div className={styles.permisoList}>
                   {permisosOrdenados.map(p => (
@@ -264,33 +162,6 @@ export default function PaginaRoles() {
                         <div className={styles.permisoNombre}>{p.nombre}</div>
                         {p.descripcion && <div className={styles.permisoDesc}>{p.descripcion}</div>}
                       </div>
-                      {confirmarP === p.id ? (
-                        <div className={styles.confirmRow}>
-                          <span className={styles.confirmText}>¿Eliminar?</span>
-                          <button
-                            className={`${styles.actionBtn} ${styles.btnEliminarConfirm}`}
-                            onClick={() => alEliminarPermiso(p.id)}
-                            disabled={eliminandoP === p.id}
-                          >
-                            {eliminandoP === p.id ? <span className={styles.spinnerSm} /> : <IconoCheck />}
-                            Sí
-                          </button>
-                          <button
-                            className={`${styles.actionBtn} ${styles.btnCancelar}`}
-                            onClick={() => setConfirmarP(null)}
-                          >
-                            <IconoX tamano={13} /> No
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          className={`${styles.actionBtn} ${styles.btnEliminar}`}
-                          onClick={() => setConfirmarP(p.id)}
-                          title="Eliminar permiso"
-                        >
-                          <IconoBasura /> Eliminar
-                        </button>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -342,63 +213,44 @@ export default function PaginaRoles() {
                     const abierto = rolAbierto === r.id;
                     return (
                       <div key={r.id} className={`${styles.rolCard} ${abierto ? styles.rolCardOpen : ""}`}>
-                        <button
-                          className={styles.rolHeader}
-                          onClick={() => abrirRol(r)}
-                        >
-                          <span className={`${styles.rolChevron} ${abierto ? styles.rolChevronOpen : ""}`}>
-                            <IconoChevronDerecha />
-                          </span>
-                          <div className={styles.rolInfo}>
-                            <div className={styles.rolNombre}>
-                              {r.nombre}
-                              {r.es_sistema && (
-                                <span className={styles.badgeSistema}>
-                                  <IconoCandado tamano={11} /> Sistema
-                                </span>
-                              )}
+                        <div className={styles.rolHeader}>
+                          <button
+                            type="button"
+                            className={styles.rolToggle}
+                            onClick={() => abrirRol(r)}
+                            aria-expanded={abierto}
+                          >
+                            <span className={`${styles.rolChevron} ${abierto ? styles.rolChevronOpen : ""}`}>
+                              <IconoChevronDerecha />
+                            </span>
+                            <div className={styles.rolInfo}>
+                              <div className={styles.rolNombre}>
+                                {r.nombre}
+                                {r.es_sistema && (
+                                  <span className={styles.badgeSistema}>
+                                    <IconoCandado tamano={11} /> Sistema
+                                  </span>
+                                )}
+                              </div>
+                              {r.descripcion && <div className={styles.rolDesc}>{r.descripcion}</div>}
                             </div>
-                            {r.descripcion && <div className={styles.rolDesc}>{r.descripcion}</div>}
-                          </div>
-                          <div className={styles.rolStats}>
-                            <span className={styles.statChip}><IconoLlave /> {r.permisos.length} permisos</span>
-                            <span className={styles.statChip}>{r.total_usuarios} usuarios</span>
-                          </div>
+                            <div className={styles.rolStats}>
+                              <span className={styles.statChip}><IconoLlave /> {r.permisos.length} permisos</span>
+                              <span className={styles.statChip}>{r.total_usuarios} usuarios</span>
+                            </div>
+                          </button>
                           {!r.es_sistema && (
-                            <>
-                              {confirmarR === r.id ? (
-                                <div
-                                  className={styles.confirmRow}
-                                  onClick={e => e.stopPropagation()}
-                                >
-                                  <span className={styles.confirmText}>¿Eliminar?</span>
-                                  <button
-                                    className={`${styles.actionBtn} ${styles.btnEliminarConfirm}`}
-                                    onClick={() => alEliminarRol(r.id)}
-                                    disabled={eliminandoR === r.id}
-                                  >
-                                    {eliminandoR === r.id ? <span className={styles.spinnerSm} /> : <IconoCheck />}
-                                    Sí
-                                  </button>
-                                  <button
-                                    className={`${styles.actionBtn} ${styles.btnCancelar}`}
-                                    onClick={() => setConfirmarR(null)}
-                                  >
-                                    <IconoX tamano={13} /> No
-                                  </button>
-                                </div>
-                              ) : (
-                                <button
-                                  className={`${styles.actionBtn} ${styles.btnEliminar}`}
-                                  onClick={e => { e.stopPropagation(); setConfirmarR(r.id); }}
-                                  title="Eliminar rol"
-                                >
-                                  <IconoBasura /> Eliminar
-                                </button>
-                              )}
-                            </>
+                            <button
+                              type="button"
+                              className={`${styles.actionBtn} ${styles.btnEliminar}`}
+                              onClick={() => alEliminarRol(r)}
+                              disabled={eliminandoR === r.id}
+                              title="Eliminar rol"
+                            >
+                              {eliminandoR === r.id ? <span className={styles.spinnerSm} /> : <IconoBasura />} Eliminar
+                            </button>
                           )}
-                        </button>
+                        </div>
 
                         {abierto && (
                           <div className={styles.rolBody}>
@@ -410,7 +262,7 @@ export default function PaginaRoles() {
                             </div>
 
                             {permisos.length === 0 ? (
-                              <p className={styles.empty}>Crea permisos arriba para poder asignarlos a este rol.</p>
+                              <p className={styles.empty}>No hay permisos para asignar.</p>
                             ) : (
                               <div className={styles.permisoGrid}>
                                 {permisosOrdenados.map(p => {
@@ -456,12 +308,6 @@ export default function PaginaRoles() {
           </section>
 
         </div>
-      </main>
-
-      {/* Footer */}
-      <footer className={styles.footer}>
-        Servicio Nacional de Migración &copy; {new Date().getFullYear()} &mdash; Todos los derechos reservados
-      </footer>
-    </div>
+    </MarcoPagina>
   );
 }

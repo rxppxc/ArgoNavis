@@ -19,4 +19,9 @@ export const apiAutenticacion = {
 
   misPermisos: () =>
     clienteApi.get<string[]>("/auth/me/permisos").then((r) => r.data),
+
+  /** Cambio de la propia contraseña (solo cuentas locales). Cierra las demás
+   *  sesiones de la cuenta y devuelve un token nuevo para esta. */
+  cambiarContrasena: (actual: string, nueva: string) =>
+    clienteApi.post<RespuestaToken>("/auth/cambiar-contrasena", { actual, nueva }).then((r) => r.data),
 };

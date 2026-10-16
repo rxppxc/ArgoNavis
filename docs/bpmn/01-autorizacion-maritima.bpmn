@@ -1,0 +1,341 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definiciones_Autorizacion" targetNamespace="https://argonavis.migracion.gob.pa/bpmn" exporter="ARGO NAVIS" exporterVersion="1.0">
+  <bpmn:collaboration id="Colaboracion_Autorizacion">
+    <bpmn:participant id="Pool_NAVIS" name="ARGO NAVIS · Autorizaciones Marítimas (SNM)" processRef="Proceso_Autorizacion" />
+    <bpmn:participant id="Pool_Verificador" name="Autoridad o tercero que verifica" processRef="Proceso_Verificacion" />
+    <bpmn:messageFlow id="Mensaje_ConsultaQR" sourceRef="EscanearQR" targetRef="ConsultaQR" />
+    <bpmn:messageFlow id="Mensaje_RespuestaQR" sourceRef="RespuestaQR" targetRef="ConfirmarValidez" />
+  </bpmn:collaboration>
+  <bpmn:process id="Proceso_Autorizacion" name="Autorización marítima (UCVMM)" isExecutable="false">
+    <bpmn:documentation>Agencia naviera → UCVMM → puesto de control, según el documento de UCVMM «Documentación requerida para las autorizaciones marítimas» y el Formulario No. 3.</bpmn:documentation>
+    <bpmn:laneSet id="Carriles_Proceso_Autorizacion">
+      <bpmn:lane id="Carril_Agencia" name="Agencia naviera">
+        <bpmn:flowNodeRef>Inicio</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>IniciarSesion</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>LlenarSolicitud</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AdjuntarDocumentos</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>UnirEnvio</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Enviar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Corregir</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>VencePlazoCorreccion</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ExpiradaSinCorregir</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Descargar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AgenciaConAutorizacion</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Carril_NAVIS" name="ARGO NAVIS (sistema)">
+        <bpmn:flowNodeRef>Validar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>CumpleTodo</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Registrar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AvisarUCVMM</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AvisoDevolucion</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GenerarAutorizacion</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AvisoAprobacion</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EnParalelo</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ConsultaQR</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>MostrarEstado</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>RespuestaQR</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Carril_UCVMM" name="UCVMM · Sector Pacífico">
+        <bpmn:flowNodeRef>Revisar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Impedimentos</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Decision</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Denegada</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Carril_Puesto" name="Puesto de control">
+        <bpmn:flowNodeRef>Finalizar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>VenceFinalizacion</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Finalizada</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ExpiradaSinFinalizar</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Inicio" name="Se necesita una autorización marítima">
+      <bpmn:outgoing>Flujo_Inicio_IniciarSesion</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:callActivity id="IniciarSesion" name="Iniciar sesión" calledElement="Proceso_Acceso">
+      <bpmn:documentation>Ver el diagrama «Acceso a ARGO NAVIS».</bpmn:documentation>
+      <bpmn:incoming>Flujo_Inicio_IniciarSesion</bpmn:incoming>
+      <bpmn:outgoing>Flujo_IniciarSesion_LlenarSolicitud</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:userTask id="LlenarSolicitud" name="Llenar o corregir la solicitud (Form. 3)">
+      <bpmn:documentation>Trámite, buque (IMO), puesto de control, fecha de la operación y tripulantes.</bpmn:documentation>
+      <bpmn:incoming>Flujo_IniciarSesion_LlenarSolicitud</bpmn:incoming>
+      <bpmn:incoming>Flujo_CumpleTodo_LlenarSolicitud</bpmn:incoming>
+      <bpmn:outgoing>Flujo_LlenarSolicitud_AdjuntarDocumentos</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="AdjuntarDocumentos" name="Adjuntar los documentos del checklist">
+      <bpmn:documentation>PDF, Word o Excel. Por tripulante o por solicitud según el trámite; hasta 20 adicionales.</bpmn:documentation>
+      <bpmn:incoming>Flujo_LlenarSolicitud_AdjuntarDocumentos</bpmn:incoming>
+      <bpmn:outgoing>Flujo_AdjuntarDocumentos_UnirEnvio</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="UnirEnvio">
+      <bpmn:incoming>Flujo_AdjuntarDocumentos_UnirEnvio</bpmn:incoming>
+      <bpmn:incoming>Flujo_Corregir_UnirEnvio</bpmn:incoming>
+      <bpmn:outgoing>Flujo_UnirEnvio_Enviar</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Enviar" name="Enviar la solicitud">
+      <bpmn:incoming>Flujo_UnirEnvio_Enviar</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Enviar_Validar</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="Validar" name="Validar datos, fechas, vigencias y archivos">
+      <bpmn:incoming>Flujo_Enviar_Validar</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Validar_CumpleTodo</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="CumpleTodo" name="¿Cumple todo?">
+      <bpmn:incoming>Flujo_Validar_CumpleTodo</bpmn:incoming>
+      <bpmn:outgoing>Flujo_CumpleTodo_Registrar</bpmn:outgoing>
+      <bpmn:outgoing>Flujo_CumpleTodo_LlenarSolicitud</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Registrar" name="Registrar en revisión (número y foto del checklist)">
+      <bpmn:documentation>Estado «En revisión». Guarda el checklist con el que se envió: un cambio posterior del catálogo no altera la solicitud.</bpmn:documentation>
+      <bpmn:incoming>Flujo_CumpleTodo_Registrar</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Registrar_AvisarUCVMM</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sendTask id="AvisarUCVMM" name="Avisar a UCVMM por correo">
+      <bpmn:incoming>Flujo_Registrar_AvisarUCVMM</bpmn:incoming>
+      <bpmn:outgoing>Flujo_AvisarUCVMM_Revisar</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:userTask id="Revisar" name="Revisar el expediente y los documentos">
+      <bpmn:incoming>Flujo_AvisarUCVMM_Revisar</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Revisar_Impedimentos</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="Impedimentos" name="Verificar impedimentos de cada tripulante">
+      <bpmn:documentation>Registrada, solo se cambia con una corrección que exige motivo.</bpmn:documentation>
+      <bpmn:incoming>Flujo_Revisar_Impedimentos</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Impedimentos_Decision</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Decision" name="¿Qué decide?">
+      <bpmn:incoming>Flujo_Impedimentos_Decision</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Decision_AvisoDevolucion</bpmn:outgoing>
+      <bpmn:outgoing>Flujo_Decision_GenerarAutorizacion</bpmn:outgoing>
+      <bpmn:outgoing>Flujo_Decision_Denegada</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateThrowEvent id="AvisoDevolucion" name="Aviso a la agencia: motivo y plazo">
+      <bpmn:incoming>Flujo_Decision_AvisoDevolucion</bpmn:incoming>
+      <bpmn:outgoing>Flujo_AvisoDevolucion_Corregir</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="Def_AvisoDevolucion" />
+    </bpmn:intermediateThrowEvent>
+    <bpmn:userTask id="Corregir" name="Corregir datos y documentos">
+      <bpmn:incoming>Flujo_AvisoDevolucion_Corregir</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Corregir_UnirEnvio</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:boundaryEvent id="VencePlazoCorreccion" name="Vence el plazo de corrección (2 días)" attachedToRef="Corregir" cancelActivity="true">
+      <bpmn:documentation>PLAZO_CORRECCION_DIAS.</bpmn:documentation>
+      <bpmn:outgoing>Flujo_VencePlazoCorreccion_ExpiradaSinCorregir</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Def_VencePlazoCorreccion"><bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P2D</bpmn:timeDuration></bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="ExpiradaSinCorregir" name="Expirada: aviso a la agencia">
+      <bpmn:incoming>Flujo_VencePlazoCorreccion_ExpiradaSinCorregir</bpmn:incoming>
+      <bpmn:messageEventDefinition id="Def_ExpiradaSinCorregir" />
+    </bpmn:endEvent>
+    <bpmn:endEvent id="Denegada" name="Denegada: aviso a la agencia con el motivo">
+      <bpmn:incoming>Flujo_Decision_Denegada</bpmn:incoming>
+      <bpmn:messageEventDefinition id="Def_Denegada" />
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="GenerarAutorizacion" name="Generar la autorización (PDF con QR)">
+      <bpmn:documentation>Estado «Aprobada», vigente hasta la fecha de la operación + DIAS_GRACIA_FINALIZACION (si ya pasó, no se aprueba: se devuelve a corrección). El PDF dice «Aprobada por: UCVMM». La observación de aprobación es interna.</bpmn:documentation>
+      <bpmn:incoming>Flujo_Decision_GenerarAutorizacion</bpmn:incoming>
+      <bpmn:outgoing>Flujo_GenerarAutorizacion_AvisoAprobacion</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:intermediateThrowEvent id="AvisoAprobacion" name="Aviso a la agencia y al puesto de control">
+      <bpmn:incoming>Flujo_GenerarAutorizacion_AvisoAprobacion</bpmn:incoming>
+      <bpmn:outgoing>Flujo_AvisoAprobacion_EnParalelo</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="Def_AvisoAprobacion" />
+    </bpmn:intermediateThrowEvent>
+    <bpmn:parallelGateway id="EnParalelo">
+      <bpmn:incoming>Flujo_AvisoAprobacion_EnParalelo</bpmn:incoming>
+      <bpmn:outgoing>Flujo_EnParalelo_Descargar</bpmn:outgoing>
+      <bpmn:outgoing>Flujo_EnParalelo_Finalizar</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:userTask id="Descargar" name="Descargar la autorización (PDF)">
+      <bpmn:incoming>Flujo_EnParalelo_Descargar</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Descargar_AgenciaConAutorizacion</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="AgenciaConAutorizacion" name="Agencia con la autorización">
+      <bpmn:incoming>Flujo_Descargar_AgenciaConAutorizacion</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:userTask id="Finalizar" name="Atender la operación y finalizar">
+      <bpmn:documentation>Comentario obligatorio y puesto donde terminó la operación (por defecto, el autorizado).</bpmn:documentation>
+      <bpmn:incoming>Flujo_EnParalelo_Finalizar</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Finalizar_Finalizada</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:boundaryEvent id="VenceFinalizacion" name="Vence: fecha de operación + 1 día" attachedToRef="Finalizar" cancelActivity="true">
+      <bpmn:documentation>DIAS_GRACIA_FINALIZACION. Lo revisa la tarea de vencimientos cada 15 minutos.</bpmn:documentation>
+      <bpmn:outgoing>Flujo_VenceFinalizacion_ExpiradaSinFinalizar</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Def_VenceFinalizacion" />
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="Finalizada" name="Autorización finalizada">
+      <bpmn:incoming>Flujo_Finalizar_Finalizada</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="ExpiradaSinFinalizar" name="Expirada: aviso a la agencia">
+      <bpmn:incoming>Flujo_VenceFinalizacion_ExpiradaSinFinalizar</bpmn:incoming>
+      <bpmn:messageEventDefinition id="Def_ExpiradaSinFinalizar" />
+    </bpmn:endEvent>
+    <bpmn:startEvent id="ConsultaQR" name="Se consulta el código QR">
+      <bpmn:outgoing>Flujo_ConsultaQR_MostrarEstado</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="Def_ConsultaQR" />
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="MostrarEstado" name="Mostrar estado y vigencia (sin el expediente)">
+      <bpmn:documentation>Endpoint público /verificacion/{código}, con rate limit. No abre el expediente.</bpmn:documentation>
+      <bpmn:incoming>Flujo_ConsultaQR_MostrarEstado</bpmn:incoming>
+      <bpmn:outgoing>Flujo_MostrarEstado_RespuestaQR</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="RespuestaQR" name="Respuesta al verificador">
+      <bpmn:incoming>Flujo_MostrarEstado_RespuestaQR</bpmn:incoming>
+      <bpmn:messageEventDefinition id="Def_RespuestaQR" />
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flujo_Inicio_IniciarSesion" sourceRef="Inicio" targetRef="IniciarSesion" />
+    <bpmn:sequenceFlow id="Flujo_IniciarSesion_LlenarSolicitud" sourceRef="IniciarSesion" targetRef="LlenarSolicitud" />
+    <bpmn:sequenceFlow id="Flujo_LlenarSolicitud_AdjuntarDocumentos" sourceRef="LlenarSolicitud" targetRef="AdjuntarDocumentos" />
+    <bpmn:sequenceFlow id="Flujo_AdjuntarDocumentos_UnirEnvio" sourceRef="AdjuntarDocumentos" targetRef="UnirEnvio" />
+    <bpmn:sequenceFlow id="Flujo_UnirEnvio_Enviar" sourceRef="UnirEnvio" targetRef="Enviar" />
+    <bpmn:sequenceFlow id="Flujo_Enviar_Validar" sourceRef="Enviar" targetRef="Validar" />
+    <bpmn:sequenceFlow id="Flujo_Validar_CumpleTodo" sourceRef="Validar" targetRef="CumpleTodo" />
+    <bpmn:sequenceFlow id="Flujo_Registrar_AvisarUCVMM" sourceRef="Registrar" targetRef="AvisarUCVMM" />
+    <bpmn:sequenceFlow id="Flujo_AvisarUCVMM_Revisar" sourceRef="AvisarUCVMM" targetRef="Revisar" />
+    <bpmn:sequenceFlow id="Flujo_Revisar_Impedimentos" sourceRef="Revisar" targetRef="Impedimentos" />
+    <bpmn:sequenceFlow id="Flujo_Impedimentos_Decision" sourceRef="Impedimentos" targetRef="Decision" />
+    <bpmn:sequenceFlow id="Flujo_GenerarAutorizacion_AvisoAprobacion" sourceRef="GenerarAutorizacion" targetRef="AvisoAprobacion" />
+    <bpmn:sequenceFlow id="Flujo_AvisoAprobacion_EnParalelo" sourceRef="AvisoAprobacion" targetRef="EnParalelo" />
+    <bpmn:sequenceFlow id="Flujo_Descargar_AgenciaConAutorizacion" sourceRef="Descargar" targetRef="AgenciaConAutorizacion" />
+    <bpmn:sequenceFlow id="Flujo_Finalizar_Finalizada" sourceRef="Finalizar" targetRef="Finalizada" />
+    <bpmn:sequenceFlow id="Flujo_ConsultaQR_MostrarEstado" sourceRef="ConsultaQR" targetRef="MostrarEstado" />
+    <bpmn:sequenceFlow id="Flujo_MostrarEstado_RespuestaQR" sourceRef="MostrarEstado" targetRef="RespuestaQR" />
+    <bpmn:sequenceFlow id="Flujo_CumpleTodo_Registrar" name="Sí" sourceRef="CumpleTodo" targetRef="Registrar" />
+    <bpmn:sequenceFlow id="Flujo_CumpleTodo_LlenarSolicitud" name="No: muestra qué corregir" sourceRef="CumpleTodo" targetRef="LlenarSolicitud" />
+    <bpmn:sequenceFlow id="Flujo_Decision_AvisoDevolucion" name="Devolver a corrección" sourceRef="Decision" targetRef="AvisoDevolucion" />
+    <bpmn:sequenceFlow id="Flujo_AvisoDevolucion_Corregir" sourceRef="AvisoDevolucion" targetRef="Corregir" />
+    <bpmn:sequenceFlow id="Flujo_Corregir_UnirEnvio" sourceRef="Corregir" targetRef="UnirEnvio" />
+    <bpmn:sequenceFlow id="Flujo_VencePlazoCorreccion_ExpiradaSinCorregir" sourceRef="VencePlazoCorreccion" targetRef="ExpiradaSinCorregir" />
+    <bpmn:sequenceFlow id="Flujo_Decision_GenerarAutorizacion" name="Aprobar" sourceRef="Decision" targetRef="GenerarAutorizacion" />
+    <bpmn:sequenceFlow id="Flujo_Decision_Denegada" name="Denegar" sourceRef="Decision" targetRef="Denegada" />
+    <bpmn:sequenceFlow id="Flujo_EnParalelo_Descargar" sourceRef="EnParalelo" targetRef="Descargar" />
+    <bpmn:sequenceFlow id="Flujo_EnParalelo_Finalizar" sourceRef="EnParalelo" targetRef="Finalizar" />
+    <bpmn:sequenceFlow id="Flujo_VenceFinalizacion_ExpiradaSinFinalizar" sourceRef="VenceFinalizacion" targetRef="ExpiradaSinFinalizar" />
+    <bpmn:textAnnotation id="Nota_Acceso"><bpmn:text>Ver el diagrama «Acceso a ARGO NAVIS».</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_Nota_Acceso" associationDirection="None" sourceRef="Nota_Acceso" targetRef="IniciarSesion" />
+    <bpmn:textAnnotation id="Nota_Checklist"><bpmn:text>El checklist depende del trámite, del rango y de la nacionalidad de cada tripulante.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_Nota_Checklist" associationDirection="None" sourceRef="Nota_Checklist" targetRef="LlenarSolicitud" />
+    <bpmn:textAnnotation id="Nota_Validaciones"><bpmn:text>Operación entre hoy y 365 días · tripulantes mayores de 18 · pasaporte y seamanbook vigentes · PDF, Word o Excel revisados por su contenido y sin macros.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_Nota_Validaciones" associationDirection="None" sourceRef="Nota_Validaciones" targetRef="Validar" />
+    <bpmn:textAnnotation id="Nota_Separacion"><bpmn:text>Separación de funciones: nadie revisa lo de su propia agencia ni lo que creó.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_Nota_Separacion" associationDirection="None" sourceRef="Nota_Separacion" targetRef="Revisar" />
+    <bpmn:textAnnotation id="Nota_Impedimentos"><bpmn:text>Obligatoria para aprobar. Con impedimento igual se puede aprobar.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_Nota_Impedimentos" associationDirection="None" sourceRef="Nota_Impedimentos" targetRef="Impedimentos" />
+    <bpmn:textAnnotation id="Nota_Custodia"><bpmn:text>Desembarque, Urgencias, Renovación y Shore Pass: si hay nacionalidad restringida, el aviso pide tramitar la custodia.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_Nota_Custodia" associationDirection="None" sourceRef="Nota_Custodia" targetRef="AvisoAprobacion" />
+    <bpmn:textAnnotation id="Nota_OtroPuesto"><bpmn:text>Puede terminar en otro puesto: queda en el expediente, el PDF y la verificación.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_Nota_OtroPuesto" associationDirection="None" sourceRef="Nota_OtroPuesto" targetRef="Finalizar" />
+    <bpmn:textAnnotation id="Nota_Bitacora"><bpmn:text>Cada paso queda en el historial y en la bitácora. Lo interno (impedimentos, observaciones, nombres de funcionarios) no le llega a la agencia.</bpmn:text></bpmn:textAnnotation>
+  </bpmn:process>
+  <bpmn:process id="Proceso_Verificacion" name="Verificación de una autorización por QR" isExecutable="false">
+    <bpmn:startEvent id="RecibeAutorizacion" name="Recibe la autorización impresa">
+      <bpmn:outgoing>Flujo_RecibeAutorizacion_EscanearQR</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="EscanearQR" name="Escanear el código QR">
+      <bpmn:incoming>Flujo_RecibeAutorizacion_EscanearQR</bpmn:incoming>
+      <bpmn:outgoing>Flujo_EscanearQR_ConfirmarValidez</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="ConfirmarValidez" name="Confirmar que la autorización es válida">
+      <bpmn:incoming>Flujo_EscanearQR_ConfirmarValidez</bpmn:incoming>
+      <bpmn:outgoing>Flujo_ConfirmarValidez_VerificacionHecha</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="VerificacionHecha" name="Verificación hecha">
+      <bpmn:incoming>Flujo_ConfirmarValidez_VerificacionHecha</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flujo_RecibeAutorizacion_EscanearQR" sourceRef="RecibeAutorizacion" targetRef="EscanearQR" />
+    <bpmn:sequenceFlow id="Flujo_EscanearQR_ConfirmarValidez" sourceRef="EscanearQR" targetRef="ConfirmarValidez" />
+    <bpmn:sequenceFlow id="Flujo_ConfirmarValidez_VerificacionHecha" sourceRef="ConfirmarValidez" targetRef="VerificacionHecha" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagrama_Autorizacion" name="Flujo de una autorización marítima">
+    <bpmndi:BPMNPlane id="Plano_Autorizacion" bpmnElement="Colaboracion_Autorizacion">
+      <bpmndi:BPMNShape id="Pool_NAVIS_di" bpmnElement="Pool_NAVIS" isHorizontal="true"><dc:Bounds x="100" y="40" width="2620" height="1040" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Carril_Agencia_di" bpmnElement="Carril_Agencia" isHorizontal="true"><dc:Bounds x="130" y="40" width="2590" height="280" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Carril_NAVIS_di" bpmnElement="Carril_NAVIS" isHorizontal="true"><dc:Bounds x="130" y="320" width="2590" height="300" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Carril_UCVMM_di" bpmnElement="Carril_UCVMM" isHorizontal="true"><dc:Bounds x="130" y="620" width="2590" height="240" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Carril_Puesto_di" bpmnElement="Carril_Puesto" isHorizontal="true"><dc:Bounds x="130" y="860" width="2590" height="220" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Pool_Verificador_di" bpmnElement="Pool_Verificador" isHorizontal="true"><dc:Bounds x="100" y="1130" width="860" height="180" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Inicio_di" bpmnElement="Inicio"><dc:Bounds x="212" y="182" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="175" y="222" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="IniciarSesion_di" bpmnElement="IniciarSesion"><dc:Bounds x="280" y="155" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="LlenarSolicitud_di" bpmnElement="LlenarSolicitud"><dc:Bounds x="440" y="155" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AdjuntarDocumentos_di" bpmnElement="AdjuntarDocumentos"><dc:Bounds x="600" y="155" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="UnirEnvio_di" bpmnElement="UnirEnvio" isMarkerVisible="true"><dc:Bounds x="775" y="175" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Enviar_di" bpmnElement="Enviar"><dc:Bounds x="860" y="155" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Validar_di" bpmnElement="Validar"><dc:Bounds x="860" y="365" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CumpleTodo_di" bpmnElement="CumpleTodo" isMarkerVisible="true"><dc:Bounds x="1045" y="385" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="1015" y="440" width="110" height="20" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Registrar_di" bpmnElement="Registrar"><dc:Bounds x="1140" y="365" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AvisarUCVMM_di" bpmnElement="AvisarUCVMM"><dc:Bounds x="1300" y="365" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Revisar_di" bpmnElement="Revisar"><dc:Bounds x="1300" y="695" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Impedimentos_di" bpmnElement="Impedimentos"><dc:Bounds x="1460" y="695" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Decision_di" bpmnElement="Decision" isMarkerVisible="true"><dc:Bounds x="1665" y="715" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="1595" y="688" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AvisoDevolucion_di" bpmnElement="AvisoDevolucion"><dc:Bounds x="1672" y="512" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1712" y="515" width="130" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Corregir_di" bpmnElement="Corregir"><dc:Bounds x="1620" y="155" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="VencePlazoCorreccion_di" bpmnElement="VencePlazoCorreccion"><dc:Bounds x="1742" y="207" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1765" y="150" width="105" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ExpiradaSinCorregir_di" bpmnElement="ExpiradaSinCorregir"><dc:Bounds x="1832" y="207" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1795" y="247" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Denegada_di" bpmnElement="Denegada"><dc:Bounds x="1672" y="802" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1712" y="805" width="140" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GenerarAutorizacion_di" bpmnElement="GenerarAutorizacion"><dc:Bounds x="1780" y="365" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AvisoAprobacion_di" bpmnElement="AvisoAprobacion"><dc:Bounds x="1972" y="392" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1945" y="338" width="90" height="42" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EnParalelo_di" bpmnElement="EnParalelo"><dc:Bounds x="2085" y="385" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Descargar_di" bpmnElement="Descargar"><dc:Bounds x="2180" y="155" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AgenciaConAutorizacion_di" bpmnElement="AgenciaConAutorizacion"><dc:Bounds x="2382" y="182" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="2345" y="222" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Finalizar_di" bpmnElement="Finalizar"><dc:Bounds x="2180" y="915" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="VenceFinalizacion_di" bpmnElement="VenceFinalizacion"><dc:Bounds x="2262" y="987" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="2150" y="1012" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Finalizada_di" bpmnElement="Finalizada"><dc:Bounds x="2382" y="942" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="2345" y="982" width="110" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ExpiradaSinFinalizar_di" bpmnElement="ExpiradaSinFinalizar"><dc:Bounds x="2382" y="1027" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="2425" y="1030" width="130" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ConsultaQR_di" bpmnElement="ConsultaQR"><dc:Bounds x="362" y="512" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="265" y="515" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="MostrarEstado_di" bpmnElement="MostrarEstado"><dc:Bounds x="460" y="485" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="RespuestaQR_di" bpmnElement="RespuestaQR"><dc:Bounds x="662" y="512" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="697" y="515" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="RecibeAutorizacion_di" bpmnElement="RecibeAutorizacion"><dc:Bounds x="212" y="1202" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="175" y="1242" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EscanearQR_di" bpmnElement="EscanearQR"><dc:Bounds x="310" y="1175" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ConfirmarValidez_di" bpmnElement="ConfirmarValidez"><dc:Bounds x="610" y="1175" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="VerificacionHecha_di" bpmnElement="VerificacionHecha"><dc:Bounds x="812" y="1202" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="775" y="1242" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Nota_Acceso_di" bpmnElement="Nota_Acceso"><dc:Bounds x="285" y="262" width="155" height="48" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Nota_Checklist_di" bpmnElement="Nota_Checklist"><dc:Bounds x="450" y="262" width="280" height="48" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Nota_Validaciones_di" bpmnElement="Nota_Validaciones"><dc:Bounds x="860" y="480" width="310" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Nota_Separacion_di" bpmnElement="Nota_Separacion"><dc:Bounds x="1000" y="650" width="260" height="48" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Nota_Impedimentos_di" bpmnElement="Nota_Impedimentos"><dc:Bounds x="1430" y="800" width="230" height="48" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Nota_Custodia_di" bpmnElement="Nota_Custodia"><dc:Bounds x="1880" y="480" width="215" height="85" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Nota_OtroPuesto_di" bpmnElement="Nota_OtroPuesto"><dc:Bounds x="2190" y="866" width="280" height="42" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Nota_Bitacora_di" bpmnElement="Nota_Bitacora"><dc:Bounds x="760" y="900" width="340" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flujo_Inicio_IniciarSesion_di" bpmnElement="Flujo_Inicio_IniciarSesion"><di:waypoint x="248" y="200" /><di:waypoint x="280" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_IniciarSesion_LlenarSolicitud_di" bpmnElement="Flujo_IniciarSesion_LlenarSolicitud"><di:waypoint x="420" y="200" /><di:waypoint x="440" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_LlenarSolicitud_AdjuntarDocumentos_di" bpmnElement="Flujo_LlenarSolicitud_AdjuntarDocumentos"><di:waypoint x="580" y="200" /><di:waypoint x="600" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_AdjuntarDocumentos_UnirEnvio_di" bpmnElement="Flujo_AdjuntarDocumentos_UnirEnvio"><di:waypoint x="740" y="200" /><di:waypoint x="775" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_UnirEnvio_Enviar_di" bpmnElement="Flujo_UnirEnvio_Enviar"><di:waypoint x="825" y="200" /><di:waypoint x="860" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Enviar_Validar_di" bpmnElement="Flujo_Enviar_Validar"><di:waypoint x="930" y="245" /><di:waypoint x="930" y="365" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Validar_CumpleTodo_di" bpmnElement="Flujo_Validar_CumpleTodo"><di:waypoint x="1000" y="410" /><di:waypoint x="1045" y="410" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Registrar_AvisarUCVMM_di" bpmnElement="Flujo_Registrar_AvisarUCVMM"><di:waypoint x="1280" y="410" /><di:waypoint x="1300" y="410" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_AvisarUCVMM_Revisar_di" bpmnElement="Flujo_AvisarUCVMM_Revisar"><di:waypoint x="1370" y="455" /><di:waypoint x="1370" y="695" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Revisar_Impedimentos_di" bpmnElement="Flujo_Revisar_Impedimentos"><di:waypoint x="1440" y="740" /><di:waypoint x="1460" y="740" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Impedimentos_Decision_di" bpmnElement="Flujo_Impedimentos_Decision"><di:waypoint x="1600" y="740" /><di:waypoint x="1665" y="740" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_GenerarAutorizacion_AvisoAprobacion_di" bpmnElement="Flujo_GenerarAutorizacion_AvisoAprobacion"><di:waypoint x="1920" y="410" /><di:waypoint x="1972" y="410" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_AvisoAprobacion_EnParalelo_di" bpmnElement="Flujo_AvisoAprobacion_EnParalelo"><di:waypoint x="2008" y="410" /><di:waypoint x="2085" y="410" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Descargar_AgenciaConAutorizacion_di" bpmnElement="Flujo_Descargar_AgenciaConAutorizacion"><di:waypoint x="2320" y="200" /><di:waypoint x="2382" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Finalizar_Finalizada_di" bpmnElement="Flujo_Finalizar_Finalizada"><di:waypoint x="2320" y="960" /><di:waypoint x="2382" y="960" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_ConsultaQR_MostrarEstado_di" bpmnElement="Flujo_ConsultaQR_MostrarEstado"><di:waypoint x="398" y="530" /><di:waypoint x="460" y="530" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_MostrarEstado_RespuestaQR_di" bpmnElement="Flujo_MostrarEstado_RespuestaQR"><di:waypoint x="600" y="530" /><di:waypoint x="662" y="530" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_RecibeAutorizacion_EscanearQR_di" bpmnElement="Flujo_RecibeAutorizacion_EscanearQR"><di:waypoint x="248" y="1220" /><di:waypoint x="310" y="1220" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_EscanearQR_ConfirmarValidez_di" bpmnElement="Flujo_EscanearQR_ConfirmarValidez"><di:waypoint x="450" y="1220" /><di:waypoint x="610" y="1220" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_ConfirmarValidez_VerificacionHecha_di" bpmnElement="Flujo_ConfirmarValidez_VerificacionHecha"><di:waypoint x="750" y="1220" /><di:waypoint x="812" y="1220" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_CumpleTodo_Registrar_di" bpmnElement="Flujo_CumpleTodo_Registrar"><di:waypoint x="1095" y="410" /><di:waypoint x="1140" y="410" /><bpmndi:BPMNLabel><dc:Bounds x="1100" y="392" width="20" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_CumpleTodo_LlenarSolicitud_di" bpmnElement="Flujo_CumpleTodo_LlenarSolicitud"><di:waypoint x="1070" y="385" /><di:waypoint x="1070" y="78" /><di:waypoint x="510" y="78" /><di:waypoint x="510" y="155" /><bpmndi:BPMNLabel><dc:Bounds x="595" y="48" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Decision_AvisoDevolucion_di" bpmnElement="Flujo_Decision_AvisoDevolucion"><di:waypoint x="1690" y="715" /><di:waypoint x="1690" y="548" /><bpmndi:BPMNLabel><dc:Bounds x="1700" y="572" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_AvisoDevolucion_Corregir_di" bpmnElement="Flujo_AvisoDevolucion_Corregir"><di:waypoint x="1690" y="512" /><di:waypoint x="1690" y="245" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Corregir_UnirEnvio_di" bpmnElement="Flujo_Corregir_UnirEnvio"><di:waypoint x="1690" y="155" /><di:waypoint x="1690" y="105" /><di:waypoint x="800" y="105" /><di:waypoint x="800" y="175" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_VencePlazoCorreccion_ExpiradaSinCorregir_di" bpmnElement="Flujo_VencePlazoCorreccion_ExpiradaSinCorregir"><di:waypoint x="1778" y="225" /><di:waypoint x="1832" y="225" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Decision_GenerarAutorizacion_di" bpmnElement="Flujo_Decision_GenerarAutorizacion"><di:waypoint x="1715" y="740" /><di:waypoint x="1850" y="740" /><di:waypoint x="1850" y="455" /><bpmndi:BPMNLabel><dc:Bounds x="1740" y="722" width="60" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Decision_Denegada_di" bpmnElement="Flujo_Decision_Denegada"><di:waypoint x="1690" y="765" /><di:waypoint x="1690" y="802" /><bpmndi:BPMNLabel><dc:Bounds x="1700" y="772" width="60" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_EnParalelo_Descargar_di" bpmnElement="Flujo_EnParalelo_Descargar"><di:waypoint x="2110" y="385" /><di:waypoint x="2110" y="200" /><di:waypoint x="2180" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_EnParalelo_Finalizar_di" bpmnElement="Flujo_EnParalelo_Finalizar"><di:waypoint x="2110" y="435" /><di:waypoint x="2110" y="960" /><di:waypoint x="2180" y="960" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_VenceFinalizacion_ExpiradaSinFinalizar_di" bpmnElement="Flujo_VenceFinalizacion_ExpiradaSinFinalizar"><di:waypoint x="2280" y="1023" /><di:waypoint x="2280" y="1045" /><di:waypoint x="2382" y="1045" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Mensaje_ConsultaQR_di" bpmnElement="Mensaje_ConsultaQR"><di:waypoint x="380" y="1175" /><di:waypoint x="380" y="548" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Mensaje_RespuestaQR_di" bpmnElement="Mensaje_RespuestaQR"><di:waypoint x="680" y="548" /><di:waypoint x="680" y="1175" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_Nota_Acceso_di" bpmnElement="Asoc_Nota_Acceso"><di:waypoint x="350" y="262" /><di:waypoint x="350" y="245" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_Nota_Checklist_di" bpmnElement="Asoc_Nota_Checklist"><di:waypoint x="510" y="262" /><di:waypoint x="510" y="245" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_Nota_Validaciones_di" bpmnElement="Asoc_Nota_Validaciones"><di:waypoint x="930" y="480" /><di:waypoint x="930" y="455" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_Nota_Separacion_di" bpmnElement="Asoc_Nota_Separacion"><di:waypoint x="1260" y="674" /><di:waypoint x="1300" y="740" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_Nota_Impedimentos_di" bpmnElement="Asoc_Nota_Impedimentos"><di:waypoint x="1530" y="800" /><di:waypoint x="1530" y="785" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_Nota_Custodia_di" bpmnElement="Asoc_Nota_Custodia"><di:waypoint x="1990" y="480" /><di:waypoint x="1990" y="428" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_Nota_OtroPuesto_di" bpmnElement="Asoc_Nota_OtroPuesto"><di:waypoint x="2250" y="908" /><di:waypoint x="2250" y="915" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

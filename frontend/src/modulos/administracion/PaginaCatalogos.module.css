@@ -1,0 +1,125 @@
+.titulo { text-align: center; margin-bottom: 20px; }
+.titulo h1 { color: var(--text); font-size: 1.55rem; font-weight: 800; }
+.titulo p { color: var(--text-2); font-size: .9rem; margin-top: 6px; }
+
+.pestanas { display: flex; gap: 6px; border-bottom: 1px solid var(--border); margin-bottom: 16px; flex-wrap: wrap; }
+.pestana {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 16px; margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  color: var(--text-2); font-weight: 700; font-size: .88rem;
+}
+.pestana:hover { color: var(--text); }
+.pestanaActiva { color: var(--text); border-bottom-color: var(--y); }
+.conteo {
+  min-width: 22px; padding: 1px 7px; border-radius: 100px;
+  background: var(--overlay-2); font-size: .72rem; text-align: center;
+}
+
+.descripcion { color: var(--text-2); font-size: .85rem; line-height: 1.55; margin-bottom: 14px; }
+
+.input {
+  padding: 9px 11px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--card-2); color: var(--text);
+  font-size: .86rem; min-width: 0;
+}
+.input:focus { outline: 2px solid var(--foco); border-color: transparent; }
+
+.formNuevo {
+  display: grid; grid-template-columns: 2fr 2fr auto; gap: 8px;
+  padding: 14px; margin-bottom: 14px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+}
+
+.lista { display: flex; flex-direction: column; gap: 10px; }
+.tarjeta {
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px 16px;
+}
+.inactivo { opacity: .65; }
+.tarjetaCabecera { display: flex; align-items: center; gap: 10px; }
+.tarjetaInfo { flex: 1; min-width: 0; }
+.tarjetaNombre { color: var(--text); font-weight: 800; font-size: .95rem; }
+.tarjetaMeta { color: var(--text-2); font-size: .78rem; margin-top: 2px; }
+.formEnLinea { display: grid; grid-template-columns: 2fr 2fr auto auto; gap: 8px; width: 100%; }
+
+.interruptor { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); font-size: .8rem; cursor: pointer; }
+.interruptor input { width: 16px; height: 16px; accent-color: var(--y); }
+
+.asignados {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
+  color: var(--text-2);
+}
+.chip {
+  padding: 2px 10px; border-radius: 100px;
+  background: var(--overlay-2); color: var(--text); font-size: .76rem; font-weight: 600;
+}
+.asignados .btnSecundario { margin-left: auto; }
+
+.selector { margin-top: 10px; padding: 12px; border-radius: 10px; background: var(--card-2); border: 1px solid var(--border); }
+.ayuda { color: var(--text-2); font-size: .78rem; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.checkTodos { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); font-size: .8rem; cursor: pointer; }
+.checkTodos input { accent-color: var(--y); }
+.listaUsuarios { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px; max-height: 260px; overflow-y: auto; }
+.opcionUsuario {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 6px 9px; border-radius: 7px; background: var(--card);
+  color: var(--text); font-size: .82rem; cursor: pointer;
+}
+.opcionUsuario input { accent-color: var(--y); }
+.opcionUsuario em { color: var(--muted); font-style: normal; font-size: .72rem; width: 100%; padding-left: 22px; }
+.filaBotones { display: flex; justify-content: flex-end; margin-top: 10px; }
+
+.vacio { color: var(--muted); font-size: .82rem; font-style: italic; }
+.vacioGrande {
+  text-align: center; color: var(--muted); padding: 40px 20px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+}
+
+.btnPrimario {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px 14px; border-radius: 8px; border: 0;
+  background: var(--y); color: var(--on-accent); font-weight: 800; font-size: .82rem; white-space: nowrap;
+}
+.btnPrimario:disabled { opacity: .5; cursor: not-allowed; }
+.btnSecundario {
+  padding: 6px 12px; border-radius: 8px;
+  border: 1.5px solid var(--y-border); background: var(--y-soft);
+  color: var(--acc-gold); font-weight: 700; font-size: .78rem;
+}
+.btnTexto { padding: 8px 10px; color: var(--text-2); font-size: .82rem; font-weight: 600; }
+.btnIcono {
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 7px;
+  border: 1px solid var(--border-2); color: var(--text-2);
+}
+.btnIcono:hover:not(:disabled) { color: var(--text); border-color: var(--y-border); }
+.btnIcono:disabled { opacity: .35; cursor: not-allowed; }
+.peligro:hover:not(:disabled) { color: var(--acc-red); border-color: var(--acc-red); }
+
+/* ─── Países ─── */
+.barraPaises { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
+.buscador {
+  display: flex; align-items: center; gap: 8px; flex: 1 1 260px;
+  padding: 8px 11px; border-radius: 8px;
+  border: 1.5px solid var(--input-border); background: var(--input-bg); color: var(--muted);
+}
+.buscador input { flex: 1; border: 0; background: transparent; color: var(--text); font-size: .86rem; outline: none; }
+.buscador:focus-within { border-color: var(--foco); }
+.paises { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px; }
+.pais {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 11px; border-radius: 8px;
+  background: var(--card); border: 1px solid var(--border);
+  cursor: pointer; font-size: .84rem;
+}
+.pais input { width: 16px; height: 16px; accent-color: var(--acc-orange); }
+.paisRestringido { border-color: var(--acc-orange); }
+.paisNombre { flex: 1; color: var(--text); }
+.paisCodigo { color: var(--muted); font-size: .72rem; font-weight: 700; }
+
+@media (max-width: 720px) {
+  .formNuevo, .formEnLinea { grid-template-columns: 1fr; }
+  .tarjetaCabecera { flex-wrap: wrap; }
+}

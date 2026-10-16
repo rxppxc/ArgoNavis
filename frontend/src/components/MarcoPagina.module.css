@@ -1,0 +1,24 @@
+.pagina {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+/* La cabecera y el pie son los del login (CabeceraInstitucional y PieInstitucional). */
+
+.contenido {
+  flex: 1;
+  width: 100%;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 30px 28px 64px;
+}
+
+.amplio { max-width: 1240px; }
+
+.volver { margin-bottom: 18px; }
+
+@media (max-width: 720px) {
+  .contenido { padding: 20px 16px 48px; }
+}

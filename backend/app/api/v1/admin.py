@@ -1,22 +1,29 @@
 import asyncio
 import logging
-from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func
 from ldap3.core.exceptions import LDAPException
 from app.infrastructure.database import obtener_sesion_bd
 from app.core.config import obtener_configuracion
-from app.core.security import obtener_id_usuario_actual, hashear_password
-from app.core.permisos import es_admin_efectivo, requerir_algun_permiso
+from app.core.security import cerrar_sesiones, generar_contrasena_temporal, hashear_password
+from app.core.permisos import (
+    ROL_ADMIN, ROL_SYSADMIN, requerir_admin_o_sysadmin, requerir_algun_permiso, requerir_sysadmin,
+)
+from app.api.v1.dependencias import auditar_admin
+from app.domain.models.audit_log import AccionAuditoria
 from app.core.ldap import servicio_ldap
-from app.domain.models.user import Usuario, EstadoUsuario
-from app.domain.models.transfer import Transferencia, ArchivoTransferencia, EstadoTransferencia
+from app.domain.models.user import Usuario, EstadoUsuario, TipoUsuario
 from app.domain.models.rol import Rol, Permiso, RolPermiso
+from app.domain.repositories.catalogo_repository import RepositorioCatalogo
+from app.domain.repositories.solicitud_repository import RepositorioSolicitud
 from app.domain.repositories.user_repository import RepositorioUsuario
-from app.domain.schemas.user import SalidaUsuario, DatosCrearUsuario, DatosCambiarEstado, DatosCrearUsuarioLocal
+from app.domain.schemas.solicitud import FilaTopAgencia, SalidaUsoSistema
+from app.domain.schemas.user import (
+    SalidaUsuario, DatosCrearUsuario, DatosCambiarEstado, DatosCrearUsuarioLocal, RespuestaContrasenaTemporal,
+)
 from app.domain.schemas.rol import (
-    SalidaPermiso, DatosCrearPermiso, DatosActualizarPermiso,
+    SalidaPermiso,
     SalidaRol, RolMini, DatosCrearRol, DatosActualizarRol, DatosAsignarPermisos, DatosAsignarRol,
 )
 
@@ -25,20 +32,23 @@ configuracion = obtener_configuracion()
 enrutador     = APIRouter(prefix="/admin", tags=["admin"])
 
 
-# ── Dependencia: solo administradores ────────────────────────────────────────
+# ── Protección del último SysAdmin ───────────────────────────────────────────
 
-async def requerir_admin(
-    user_id: int = Depends(obtener_id_usuario_actual),
-    sesion: AsyncSession = Depends(obtener_sesion_bd),
-) -> int:
-    resultado = await sesion.execute(select(Usuario).where(Usuario.id == user_id))
-    usuario = resultado.scalar_one_or_none()
-    if not usuario or not es_admin_efectivo(usuario):
+async def _impedir_quedar_sin_sysadmin(sesion: AsyncSession, usuario: Usuario) -> None:
+    """409 si `usuario` es el último SysAdmin activo: nadie podría administrar
+    usuarios ni roles (el primero se asigna con app.infrastructure.asignar_rol)."""
+    if not (usuario.rol_personalizado and usuario.rol_personalizado.nombre == ROL_SYSADMIN
+            and usuario.status == EstadoUsuario.ACTIVO):
+        return
+    activos = (await sesion.execute(
+        select(func.count()).select_from(Usuario).join(Rol, Rol.id == Usuario.rol_id)
+        .where(Rol.nombre == ROL_SYSADMIN, Usuario.status == EstadoUsuario.ACTIVO)
+    )).scalar() or 0
+    if activos <= 1:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Se requiere rol de administrador para acceder a esta función.",
+            status_code=409,
+            detail="Es el único SysAdmin activo: asigna el rol SysAdmin a otra persona antes de quitárselo.",
         )
-    return user_id
 
 
 # ── Búsqueda en Active Directory ──────────────────────────────────────────────
@@ -46,7 +56,7 @@ async def requerir_admin(
 @enrutador.get("/usuarios/buscar-ad")
 async def buscar_en_ad(
     q: str = Query(..., min_length=2, description="Nombre, usuario o email a buscar"),
-    _: int = Depends(requerir_admin),
+    _: int = Depends(requerir_sysadmin),
 ):
     try:
         resultados = await asyncio.to_thread(servicio_ldap.buscar_usuarios_ad, q)
@@ -60,8 +70,8 @@ async def buscar_en_ad(
 
 @enrutador.get("/usuarios", response_model=list[SalidaUsuario])
 async def listar_usuarios(
-    _: int = Depends(requerir_admin),
-    sesion: AsyncSession = Depends(obtener_sesion_bd),
+    _: int = Depends(requerir_admin_o_sysadmin),
+    sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     repo = RepositorioUsuario(sesion)
     return await repo.listar_todos()
@@ -72,8 +82,9 @@ async def listar_usuarios(
 @enrutador.post("/usuarios", response_model=SalidaUsuario, status_code=201)
 async def crear_usuario(
     datos: DatosCrearUsuario,
-    _: int = Depends(requerir_admin),
-    sesion: AsyncSession = Depends(obtener_sesion_bd),
+    request: Request,
+    admin_id: int = Depends(requerir_sysadmin),
+    sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     try:
         ldap_usuario = await asyncio.to_thread(servicio_ldap.buscar_usuario, datos.username)
@@ -89,21 +100,26 @@ async def crear_usuario(
     if existente:
         raise HTTPException(status_code=409, detail="El usuario ya existe en el sistema.")
 
-    return await repo.crear_desde_ldap(ldap_usuario)
+    usuario = await repo.crear_desde_ldap(ldap_usuario)
+    await auditar_admin(sesion, request, admin_id, AccionAuditoria.USUARIO_CREADO,
+                        {"usuario_id": usuario.id, "usuario": usuario.username, "origen": "ad"})
+    return usuario
 
 
-# ── Usuario local de prueba (sin AD, solo fuera de producción) ───────────────
-# Atajo temporal para probar roles/permisos sin depender de Active Directory.
-# Se elimina junto con la rama de login local antes de pasar a producción.
+# ── Cuentas locales (sin AD) ──────────────────────────────────────────────────
+# Para usuarios externos, como los de las agencias navieras. Requieren
+# PERMITIR_LOGIN_LOCAL. Entran con la contraseña que les da el admin y el
+# sistema les pide cambiarla.
 
 @enrutador.post("/usuarios/local", response_model=SalidaUsuario, status_code=201)
 async def crear_usuario_local(
     datos: DatosCrearUsuarioLocal,
-    _: int = Depends(requerir_admin),
-    sesion: AsyncSession = Depends(obtener_sesion_bd),
+    request: Request,
+    admin_id: int = Depends(requerir_sysadmin),
+    sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     if not configuracion.PERMITIR_LOGIN_LOCAL:
-        raise HTTPException(status_code=403, detail="No disponible en producción.")
+        raise HTTPException(status_code=403, detail="Las cuentas locales están deshabilitadas (PERMITIR_LOGIN_LOCAL).")
 
     repo = RepositorioUsuario(sesion)
     existente = await repo.buscar_por_nombre_usuario(datos.username)
@@ -121,6 +137,9 @@ async def crear_usuario_local(
         name=datos.name, last_name=datos.last_name, email=datos.email,
         rol_id=datos.rol_id,
     )
+    await auditar_admin(sesion, request, admin_id, AccionAuditoria.USUARIO_CREADO,
+                        {"usuario_id": usuario.id, "usuario": usuario.username, "origen": "local",
+                         "rol_id": usuario.rol_id})
     salida = SalidaUsuario.model_validate(usuario)
     if usuario.rol_id is not None:
         rol = (await sesion.execute(select(Rol).where(Rol.id == usuario.rol_id))).scalar_one_or_none()
@@ -129,14 +148,43 @@ async def crear_usuario_local(
     return salida
 
 
+@enrutador.post("/usuarios/{user_id}/restablecer-contrasena", response_model=RespuestaContrasenaTemporal)
+async def restablecer_contrasena(
+    user_id: int,
+    request: Request,
+    admin_id: int = Depends(requerir_sysadmin),
+    sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
+):
+    """Genera una contraseña temporal para una cuenta local (y la desbloquea).
+    Se muestra una sola vez; el usuario debe cambiarla al entrar."""
+    if not configuracion.PERMITIR_LOGIN_LOCAL:
+        raise HTTPException(status_code=403, detail="Las cuentas locales están deshabilitadas (PERMITIR_LOGIN_LOCAL).")
+    usuario = await RepositorioUsuario(sesion).buscar_por_id(user_id)
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    if usuario.user_type != TipoUsuario.LOCAL:
+        raise HTTPException(status_code=400, detail="Es una cuenta del Active Directory: su contraseña la gestiona TI.")
+
+    temporal = generar_contrasena_temporal()
+    usuario.password_hash = hashear_password(temporal)
+    usuario.debe_cambiar_password = True
+    usuario.intentos_fallidos = 0
+    usuario.bloqueado_hasta = None
+    cerrar_sesiones(usuario)   # quien tuviera la sesión abierta vuelve a entrar con la temporal
+    await auditar_admin(sesion, request, admin_id, AccionAuditoria.CONTRASENA_RESTABLECIDA,
+                        {"usuario_id": usuario.id, "usuario": usuario.username})
+    return RespuestaContrasenaTemporal(contrasena_temporal=temporal)
+
+
 # ── Cambiar estado (activo / inactivo) ────────────────────────────────────────
 
 @enrutador.patch("/usuarios/{user_id}/estado", response_model=SalidaUsuario)
 async def cambiar_estado(
     user_id: int,
     datos: DatosCambiarEstado,
-    admin_id: int = Depends(requerir_admin),
-    sesion: AsyncSession = Depends(obtener_sesion_bd),
+    request: Request,
+    admin_id: int = Depends(requerir_sysadmin),
+    sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     if user_id == admin_id and datos.status != EstadoUsuario.ACTIVO:
         raise HTTPException(status_code=400, detail="No puedes desactivar tu propia cuenta.")
@@ -145,10 +193,15 @@ async def cambiar_estado(
     usuario = resultado.scalar_one_or_none()
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    if datos.status != EstadoUsuario.ACTIVO:
+        await _impedir_quedar_sin_sysadmin(sesion, usuario)
+        cerrar_sesiones(usuario)   # al reactivarla, los tokens de antes ya no valen
 
     usuario.status = datos.status
     await sesion.flush()
     await sesion.refresh(usuario)
+    await auditar_admin(sesion, request, admin_id, AccionAuditoria.USUARIO_ACTUALIZADO,
+                        {"usuario_id": usuario.id, "usuario": usuario.username, "estado": datos.status.value})
     return SalidaUsuario.model_validate(usuario)
 
 
@@ -157,8 +210,9 @@ async def cambiar_estado(
 @enrutador.delete("/usuarios/{user_id}", status_code=204)
 async def eliminar_usuario(
     user_id: int,
-    admin_id: int = Depends(requerir_admin),
-    sesion: AsyncSession = Depends(obtener_sesion_bd),
+    request: Request,
+    admin_id: int = Depends(requerir_sysadmin),
+    sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     if user_id == admin_id:
         raise HTTPException(status_code=400, detail="No puedes eliminar tu propia cuenta.")
@@ -167,67 +221,32 @@ async def eliminar_usuario(
     usuario = resultado.scalar_one_or_none()
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    await _impedir_quedar_sin_sysadmin(sesion, usuario)
+    # Las solicitudes que creó son registros del flujo: la BD impide borrar
+    # al usuario (FK RESTRICT). Se desactiva en su lugar.
+    if await RepositorioSolicitud(sesion).contar_creadas_por(user_id):
+        raise HTTPException(
+            status_code=409,
+            detail="El usuario tiene solicitudes de autorización registradas: desactívalo en lugar de eliminarlo.",
+        )
+    nombre_usuario = usuario.username
     await sesion.delete(usuario)
+    await auditar_admin(sesion, request, admin_id, AccionAuditoria.USUARIO_ELIMINADO,
+                        {"usuario_id": user_id, "usuario": nombre_usuario})
 
 
 # ── Permisos ──────────────────────────────────────────────────────────────────
+# Solo lectura: los siembran las migraciones y el código revisa esos códigos
+# (T-CREAR-BASICA, T-PROCESAR-PACIFICO, T-FINALIZAR-PUERTO). Crearlos desde la
+# UI no servía de nada y borrar uno dejaba el flujo sin acceso.
 
 @enrutador.get("/permisos", response_model=list[SalidaPermiso])
 async def listar_permisos(
-    _: int = Depends(requerir_admin),
-    sesion: AsyncSession = Depends(obtener_sesion_bd),
+    _: int = Depends(requerir_sysadmin),
+    sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     resultado = await sesion.execute(select(Permiso).order_by(Permiso.codigo))
     return list(resultado.scalars().all())
-
-
-@enrutador.post("/permisos", response_model=SalidaPermiso, status_code=201)
-async def crear_permiso(
-    datos: DatosCrearPermiso,
-    _: int = Depends(requerir_admin),
-    sesion: AsyncSession = Depends(obtener_sesion_bd),
-):
-    existente = await sesion.execute(select(Permiso).where(Permiso.codigo == datos.codigo))
-    if existente.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="Ya existe un permiso con ese código.")
-    permiso = Permiso(codigo=datos.codigo, nombre=datos.nombre, descripcion=datos.descripcion)
-    sesion.add(permiso)
-    await sesion.flush()
-    await sesion.refresh(permiso)
-    return SalidaPermiso.model_validate(permiso)
-
-
-@enrutador.patch("/permisos/{permiso_id}", response_model=SalidaPermiso)
-async def actualizar_permiso(
-    permiso_id: int,
-    datos: DatosActualizarPermiso,
-    _: int = Depends(requerir_admin),
-    sesion: AsyncSession = Depends(obtener_sesion_bd),
-):
-    resultado = await sesion.execute(select(Permiso).where(Permiso.id == permiso_id))
-    permiso = resultado.scalar_one_or_none()
-    if not permiso:
-        raise HTTPException(status_code=404, detail="Permiso no encontrado.")
-    if datos.nombre is not None:
-        permiso.nombre = datos.nombre.strip()
-    if datos.descripcion is not None:
-        permiso.descripcion = datos.descripcion
-    await sesion.flush()
-    await sesion.refresh(permiso)
-    return SalidaPermiso.model_validate(permiso)
-
-
-@enrutador.delete("/permisos/{permiso_id}", status_code=204)
-async def eliminar_permiso(
-    permiso_id: int,
-    _: int = Depends(requerir_admin),
-    sesion: AsyncSession = Depends(obtener_sesion_bd),
-):
-    resultado = await sesion.execute(select(Permiso).where(Permiso.id == permiso_id))
-    permiso = resultado.scalar_one_or_none()
-    if not permiso:
-        raise HTTPException(status_code=404, detail="Permiso no encontrado.")
-    await sesion.delete(permiso)
 
 
 # ── Roles ─────────────────────────────────────────────────────────────────────
@@ -258,8 +277,8 @@ async def _construir_salida_rol(sesion: AsyncSession, rol: Rol) -> SalidaRol:
 
 @enrutador.get("/roles", response_model=list[SalidaRol])
 async def listar_roles(
-    _: int = Depends(requerir_admin),
-    sesion: AsyncSession = Depends(obtener_sesion_bd),
+    _: int = Depends(requerir_admin_o_sysadmin),
+    sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     resultado = await sesion.execute(select(Rol).order_by(Rol.nombre))
     roles = list(resultado.scalars().all())
@@ -272,8 +291,9 @@ async def listar_roles(
 @enrutador.post("/roles", response_model=SalidaRol, status_code=201)
 async def crear_rol(
     datos: DatosCrearRol,
-    _: int = Depends(requerir_admin),
-    sesion: AsyncSession = Depends(obtener_sesion_bd),
+    request: Request,
+    admin_id: int = Depends(requerir_sysadmin),
+    sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     existente = await sesion.execute(select(Rol).where(Rol.nombre == datos.nombre))
     if existente.scalar_one_or_none():
@@ -282,6 +302,8 @@ async def crear_rol(
     sesion.add(rol)
     await sesion.flush()
     await sesion.refresh(rol)
+    await auditar_admin(sesion, request, admin_id, AccionAuditoria.ROL_CREADO,
+                        {"rol_id": rol.id, "nombre": rol.nombre})
     return await _construir_salida_rol(sesion, rol)
 
 
@@ -289,8 +311,9 @@ async def crear_rol(
 async def actualizar_rol(
     rol_id: int,
     datos: DatosActualizarRol,
-    _: int = Depends(requerir_admin),
-    sesion: AsyncSession = Depends(obtener_sesion_bd),
+    request: Request,
+    admin_id: int = Depends(requerir_sysadmin),
+    sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     resultado = await sesion.execute(select(Rol).where(Rol.id == rol_id))
     rol = resultado.scalar_one_or_none()
@@ -300,6 +323,9 @@ async def actualizar_rol(
         nuevo_nombre = datos.nombre.strip()
         if not nuevo_nombre:
             raise HTTPException(status_code=400, detail="El nombre no puede estar vacío.")
+        if nuevo_nombre != rol.nombre and rol.nombre in (ROL_ADMIN, ROL_SYSADMIN):
+            # Los permisos de administración se resuelven por estos nombres.
+            raise HTTPException(status_code=400, detail=f"El rol {rol.nombre} no se puede renombrar.")
         if nuevo_nombre != rol.nombre:
             dup = await sesion.execute(select(Rol).where(Rol.nombre == nuevo_nombre, Rol.id != rol_id))
             if dup.scalar_one_or_none():
@@ -309,14 +335,17 @@ async def actualizar_rol(
         rol.descripcion = datos.descripcion
     await sesion.flush()
     await sesion.refresh(rol)
+    await auditar_admin(sesion, request, admin_id, AccionAuditoria.ROL_ACTUALIZADO,
+                        {"rol_id": rol.id, "nombre": rol.nombre})
     return await _construir_salida_rol(sesion, rol)
 
 
 @enrutador.delete("/roles/{rol_id}", status_code=204)
 async def eliminar_rol(
     rol_id: int,
-    _: int = Depends(requerir_admin),
-    sesion: AsyncSession = Depends(obtener_sesion_bd),
+    request: Request,
+    admin_id: int = Depends(requerir_sysadmin),
+    sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     resultado = await sesion.execute(select(Rol).where(Rol.id == rol_id))
     rol = resultado.scalar_one_or_none()
@@ -324,15 +353,19 @@ async def eliminar_rol(
         raise HTTPException(status_code=404, detail="Rol no encontrado.")
     if rol.es_sistema:
         raise HTTPException(status_code=400, detail="No se puede eliminar un rol del sistema.")
+    nombre = rol.nombre
     await sesion.delete(rol)
+    await auditar_admin(sesion, request, admin_id, AccionAuditoria.ROL_ELIMINADO,
+                        {"rol_id": rol_id, "nombre": nombre})
 
 
 @enrutador.put("/roles/{rol_id}/permisos", response_model=SalidaRol)
 async def asignar_permisos_a_rol(
     rol_id: int,
     datos: DatosAsignarPermisos,
-    _: int = Depends(requerir_admin),
-    sesion: AsyncSession = Depends(obtener_sesion_bd),
+    request: Request,
+    admin_id: int = Depends(requerir_sysadmin),
+    sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     resultado = await sesion.execute(select(Rol).where(Rol.id == rol_id))
     rol = resultado.scalar_one_or_none()
@@ -355,7 +388,11 @@ async def asignar_permisos_a_rol(
     for pid in ids_unicos:
         sesion.add(RolPermiso(rol_id=rol_id, permiso_id=pid))
     await sesion.flush()
-    return await _construir_salida_rol(sesion, rol)
+    salida = await _construir_salida_rol(sesion, rol)
+    await auditar_admin(sesion, request, admin_id, AccionAuditoria.ROL_ACTUALIZADO,
+                        {"rol_id": rol.id, "nombre": rol.nombre,
+                         "permisos": [p.codigo for p in salida.permisos]})
+    return salida
 
 
 # ── Asignar rol personalizado a un usuario ────────────────────────────────────
@@ -364,8 +401,9 @@ async def asignar_permisos_a_rol(
 async def asignar_rol_a_usuario(
     user_id: int,
     datos: DatosAsignarRol,
-    _: int = Depends(requerir_admin),
-    sesion: AsyncSession = Depends(obtener_sesion_bd),
+    request: Request,
+    admin_id: int = Depends(requerir_sysadmin),
+    sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     resultado = await sesion.execute(select(Usuario).where(Usuario.id == user_id))
     usuario = resultado.scalar_one_or_none()
@@ -375,9 +413,13 @@ async def asignar_rol_a_usuario(
         rol_q = await sesion.execute(select(Rol).where(Rol.id == datos.rol_id))
         if not rol_q.scalar_one_or_none():
             raise HTTPException(status_code=404, detail="Rol no encontrado.")
+    if datos.rol_id != usuario.rol_id:
+        await _impedir_quedar_sin_sysadmin(sesion, usuario)
     usuario.rol_id = datos.rol_id
     await sesion.flush()
     await sesion.refresh(usuario)
+    await auditar_admin(sesion, request, admin_id, AccionAuditoria.USUARIO_ACTUALIZADO,
+                        {"usuario_id": usuario.id, "usuario": usuario.username, "rol_id": datos.rol_id})
     salida = SalidaUsuario.model_validate(usuario)
     if usuario.rol_id is not None:
         rol = (await sesion.execute(select(Rol).where(Rol.id == usuario.rol_id))).scalar_one_or_none()
@@ -386,73 +428,27 @@ async def asignar_rol_a_usuario(
     return salida
 
 
-# ── Estadísticas globales ─────────────────────────────────────────────────────
+# ── Uso del sistema ───────────────────────────────────────────────────────────
 
-@enrutador.get("/stats")
+@enrutador.get("/stats", response_model=SalidaUsoSistema)
 async def obtener_estadisticas(
-    # Admin ve todo por el shortcut interno de usuario_tiene_permiso(); Sector
-    # Pacífico entra por tener el permiso T-PROCESAR-PACIFICO. Antes esto era
-    # admin-only aunque el frontend ya le mostraba el link a SP (quedaba roto).
+    # Admin entra por el atajo de usuario_tiene_permiso(); UCVMM por su permiso.
     _: int = Depends(requerir_algun_permiso("T-PROCESAR-PACIFICO")),
-    sesion: AsyncSession = Depends(obtener_sesion_bd),
+    sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
-    # Conteos a nivel de BD — evita cargar filas completas a memoria.
-    total_usuarios = (await sesion.execute(select(func.count()).select_from(Usuario))).scalar() or 0
-
-    no_eliminada = Transferencia.status != EstadoTransferencia.ELIMINADA
-    ahora        = datetime.now(timezone.utc)
-
-    total_transferencias = (await sesion.execute(
-        select(func.count()).select_from(Transferencia).where(no_eliminada)
-    )).scalar() or 0
-
-    activas = (await sesion.execute(
-        select(func.count()).select_from(Transferencia).where(
-            and_(no_eliminada, or_(Transferencia.expires_at.is_(None), Transferencia.expires_at > ahora))
-        )
-    )).scalar() or 0
-
-    expiradas = (await sesion.execute(
-        select(func.count()).select_from(Transferencia).where(
-            and_(no_eliminada, Transferencia.expires_at.isnot(None), Transferencia.expires_at <= ahora)
-        )
-    )).scalar() or 0
-
-    total_descargas = (await sesion.execute(
-        select(func.coalesce(func.sum(Transferencia.downloads), 0)).where(no_eliminada)
-    )).scalar() or 0
-
-    # Storage agregado vía JOIN — evita el O(N*M) de cargar archivos por transferencia
-    total_storage = (await sesion.execute(
-        select(func.coalesce(func.sum(ArchivoTransferencia.size), 0))
-        .join(Transferencia, Transferencia.id == ArchivoTransferencia.transfer_id)
-        .where(no_eliminada)
-    )).scalar() or 0
-
-    # Top 5 subidores
-    uploader_q = await sesion.execute(
-        select(Usuario.id, Usuario.name, Usuario.last_name, Usuario.username, func.count(Transferencia.id).label("total"))
-        .join(Transferencia, Transferencia.user_id == Usuario.id)
-        .where(Transferencia.status != EstadoTransferencia.ELIMINADA)
-        .group_by(Usuario.id, Usuario.name, Usuario.last_name, Usuario.username)
-        .order_by(func.count(Transferencia.id).desc())
-        .limit(5)
+    """Cuentas, agencias y documentos almacenados (el flujo tiene sus propias
+    estadísticas en /solicitudes/estadisticas)."""
+    repo_solicitudes = RepositorioSolicitud(sesion)
+    usuarios, activos = await RepositorioUsuario(sesion).contar()
+    documentos, almacenamiento_bytes = await repo_solicitudes.totales_documentos()
+    return SalidaUsoSistema(
+        usuarios=usuarios,
+        usuarios_activos=activos,
+        agencias=await RepositorioCatalogo(sesion).contar_agencias(),
+        documentos=documentos,
+        almacenamiento_bytes=almacenamiento_bytes,
+        top_agencias=[
+            FilaTopAgencia(agencia_id=f.agencia_id, nombre=f.agencia_nombre, total=f.total)
+            for f in await repo_solicitudes.top_agencias()
+        ],
     )
-    top_uploaders = [
-        {
-            "id": row.id,
-            "full_name": " ".join(filter(None, [row.name, row.last_name])) or row.username,
-            "total": row.total,
-        }
-        for row in uploader_q.all()
-    ]
-
-    return {
-        "usuarios":             total_usuarios,
-        "transferencias":       total_transferencias,
-        "activas":              activas,
-        "expiradas":            expiradas,
-        "total_descargas":      total_descargas,
-        "storage_bytes":        total_storage,
-        "top_uploaders":        top_uploaders,
-    }

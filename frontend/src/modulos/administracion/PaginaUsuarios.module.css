@@ -1,105 +1,4 @@
-/* ─── Shell ─── */
-.page {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background-image:
-    linear-gradient(150deg, rgba(26,32,64,.92) 0%, rgba(13,17,40,.94) 100%),
-    url('/images/bg-migracion.jpg');
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
-}
-
-/* ─── Top stripe ─── */
-/* ─── Header ─── */
-.header {
-  background: var(--ink);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  border-bottom: 2px solid var(--y);
-}
-.headerInner {
-  max-width: 1160px;
-  margin: 0 auto;
-  padding: 0 28px;
-  height: 62px;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 16px;
-}
-.headerCenter {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.headerRight {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  justify-content: flex-end;
-}
-.logo { height: 34px; }
-.headerText .org { color: rgba(255,255,255,.85); font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.8px; }
-.headerText .app { color: var(--y); font-size: .96rem; font-weight: 800; letter-spacing: .8px; }
-
-.userChip {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 5px 11px;
-  border-radius: var(--r-sm);
-  border: 1.5px solid rgba(255,255,255,.18);
-  background: rgba(255,255,255,.05);
-  color: rgba(255,255,255,.88);
-  font-size: .78rem;
-  font-weight: 500;
-}
-.btnStats {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 11px;
-  border-radius: var(--r-sm);
-  background: rgba(245,200,0,.12);
-  border: 1.5px solid rgba(245,200,0,.3);
-  color: var(--y);
-  font-size: .78rem;
-  font-weight: 600;
-  transition: background var(--t), box-shadow var(--t);
-}
-.btnStats:hover {
-  background: rgba(245,200,0,.2);
-  box-shadow: 0 0 12px rgba(245,200,0,.15);
-}
-
-.btnLogout {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: var(--r-sm);
-  border: 1.5px solid rgba(239,68,68,.40);
-  background: rgba(239,68,68,.10);
-  color: var(--acc-red);
-  font-size: .80rem;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background var(--t), border-color var(--t);
-}
-.btnLogout:hover {
-  background: rgba(239,68,68,.20);
-  border-color: rgba(239,68,68,.65);
-}
-
 /* ─── Body ─── */
-.body {
-  flex: 1;
-  padding: 36px 20px;
-}
 .container {
   max-width: 1000px;
   margin: 0 auto;
@@ -189,7 +88,7 @@
 }
 .searchInput::placeholder { color: var(--muted); }
 .searchInput:focus {
-  border-color: var(--y);
+  border-color: var(--foco);
   box-shadow: 0 0 0 3px rgba(245,200,0,.12);
 }
 .searchBtn {
@@ -385,8 +284,6 @@
   font-size: .72rem;
   font-weight: 700;
 }
-.badgeAdmin    { background: rgba(245,200,0,.14); color: var(--acc-gold); border: 1px solid rgba(245,200,0,.30); }
-.badgeUsuario  { background: rgba(148,163,184,.12); color: var(--acc-gray); border: 1px solid rgba(148,163,184,.22); }
 
 .rolSelect {
   padding: 5px 10px;
@@ -403,7 +300,7 @@
 .rolSelect:hover:not(:disabled) { border-color: rgba(245,200,0,.40); }
 .rolSelect:focus {
   outline: none;
-  border-color: var(--y);
+  border-color: var(--foco);
   box-shadow: 0 0 0 3px rgba(245,200,0,.12);
 }
 .rolSelect:disabled { opacity: .55; cursor: not-allowed; }
@@ -432,25 +329,6 @@
 }
 .actionBtn:disabled { opacity: .5; cursor: not-allowed; }
 
-.btnHacerAdmin {
-  background: rgba(245,200,0,.10);
-  border: 1.5px solid rgba(245,200,0,.35);
-  color: var(--acc-gold);
-}
-.btnHacerAdmin:hover:not(:disabled) {
-  background: rgba(245,200,0,.20);
-  border-color: rgba(245,200,0,.60);
-}
-.btnQuitarAdmin {
-  background: rgba(148,163,184,.10);
-  border: 1.5px solid rgba(148,163,184,.30);
-  color: var(--acc-gray);
-}
-.btnQuitarAdmin:hover:not(:disabled) {
-  background: rgba(148,163,184,.20);
-  border-color: rgba(148,163,184,.55);
-}
-
 .btnDesactivar {
   background: rgba(245,158,11,.12);
   border: 1.5px solid rgba(245,158,11,.35);
@@ -475,28 +353,13 @@
   color: var(--acc-red);
 }
 .btnEliminar:hover { background: rgba(239,68,68,.20); border-color: rgba(239,68,68,.55); }
-.btnEliminarConfirm {
-  background: rgba(239,68,68,.18);
-  border: 1.5px solid rgba(239,68,68,.55);
-  color: var(--acc-red);
-}
+
 .btnCancelar {
   background: var(--surface-2);
   border: 1.5px solid var(--border);
   color: var(--text-2);
 }
 .btnCancelar:hover { border-color: var(--border-2); }
-
-.confirmRow {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.confirmText {
-  font-size: .74rem;
-  color: var(--muted);
-  margin-right: 2px;
-}
 
 /* ─── Spinner ─── */
 .spinner {
@@ -517,140 +380,32 @@
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ─── Footer ─── */
-.footer {
-  background: rgba(0,0,0,.45);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-top: 1px solid rgba(255,255,255,.07);
-  color: rgba(255,255,255,.48);
-  font-size: .78rem;
-  text-align: center;
-  padding: 13px 20px;
-}
-
 /* ─── Light mode ─── */
-:global([data-theme="light"]) .page {
-  background-image:
-    linear-gradient(rgba(228,234,252,0.92), rgba(228,234,252,0.92)),
-    url('/images/bg-migracion.jpg');
-}
 :global([data-theme="light"]) .searchInput {
   background: #fff;
   border-color: rgba(0,0,0,.18);
   color: var(--text);
 }
-:global([data-theme="light"]) .footer {
-  background: rgba(15,20,50,.95);
-  border-top-color: rgba(255,255,255,.06);
-  color: rgba(255,255,255,.60);
-}
 
-/* ─── Puertos asignados a operadores del muelle ─── */
-.btnPuertos {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border-radius: 8px;
-  background: rgba(59,130,246,.12);
-  color: var(--acc-blue);
-  border: 1px solid rgba(59,130,246,.34);
-  font-size: .78rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: filter .12s, background .12s;
+/* ─── Cuentas locales ─── */
+.btnPanel { margin-left: auto; padding: 6px 14px; }
+.formLocal { flex-wrap: wrap; }
+.formLocal .searchInput { min-width: 140px; }
+.ayudaLocal { margin: 0 0 14px; color: var(--text-2); font-size: .82rem; line-height: 1.5; }
+.badgeTipo {
+  display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 99px;
+  border: 1px solid var(--border); color: var(--text-2); font-size: .66rem; font-weight: 700;
 }
-.btnPuertos:hover {
-  background: rgba(59,130,246,.20);
-  filter: brightness(1.1);
+.btnRestablecer {
+  background: rgba(245,200,0,.10);
+  border: 1.5px solid rgba(245,200,0,.35);
+  color: var(--acc-gold);
 }
-.puertosNoAplica {
-  color: var(--muted);
-  font-size: .82rem;
+.btnRestablecer:hover { background: rgba(245,200,0,.18); }
+.claveTemporal { border-color: var(--y-border); }
+.claveTemporal .panelBody { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; color: var(--text); }
+.claveTemporal code {
+  padding: 6px 12px; border-radius: var(--r-sm); background: var(--y-soft);
+  color: var(--acc-gold); font-size: 1rem; font-weight: 800; letter-spacing: 1px;
 }
-.puertosRow {
-  background: rgba(59,130,246,.04);
-}
-.puertosRow td {
-  padding: 0;
-}
-.puertosPanel {
-  padding: 16px 20px;
-  border-top: 2px solid rgba(59,130,246,.25);
-  background: var(--surface-2);
-}
-.puertosHeader {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--acc-blue);
-  font-size: .74rem;
-  font-weight: 800;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  margin-bottom: 12px;
-}
-.puertosGrid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-.puertoChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 12px;
-  border-radius: 20px;
-  background: var(--overlay);
-  border: 1.5px solid var(--border-2);
-  color: var(--text-2);
-  font-size: .82rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background .12s, border-color .12s, color .12s;
-}
-.puertoChip input[type="checkbox"] {
-  accent-color: #3B82F6;
-  cursor: pointer;
-}
-.puertoChip:hover {
-  background: rgba(59,130,246,.12);
-  border-color: rgba(59,130,246,.40);
-}
-.puertoChipOn {
-  background: rgba(59,130,246,.20);
-  color: var(--acc-blue);
-  border-color: rgba(59,130,246,.55);
-}
-.puertosActions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-.btnGuardarPuertos,
-.btnCancelarPuertos {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  border-radius: 8px;
-  font-size: .82rem;
-  font-weight: 700;
-  cursor: pointer;
-  border: 1.5px solid transparent;
-  transition: filter .12s, background .12s, border-color .12s;
-}
-.btnGuardarPuertos {
-  background: linear-gradient(135deg, #16a34a, #15803d);
-  color: #fff;
-}
-.btnGuardarPuertos:hover { filter: brightness(1.08); }
-.btnGuardarPuertos:disabled { opacity: .6; cursor: not-allowed; }
-.btnCancelarPuertos {
-  background: transparent;
-  border-color: var(--border-2);
-  color: var(--text);
-}
-.btnCancelarPuertos:hover { background: var(--hover); }
+.claveTemporal p { flex-basis: 100%; margin: 0; color: var(--text-2); font-size: .8rem; }

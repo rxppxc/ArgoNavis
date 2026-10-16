@@ -2,19 +2,27 @@
  * Validación de archivos en el cliente — única fuente de verdad del frontend.
  *
  * Mantener alineado con el backend (`EXTENSIONES_PERMITIDAS` y
- * `MAX_FILE_SIZE_MB` en transfer_service.py / config.py). El backend siempre
- * revalida; esto solo evita subir 50 MB para recibir un rechazo.
+ * `TAMANO_MAXIMO_MB` en infrastructure/almacenamiento.py). El backend siempre
+ * revalida; esto solo evita subir un archivo para recibir un rechazo.
  */
+import { formatBytes } from "./format";
 
-export const EXTENSIONES_PERMITIDAS = [
-  ".pdf", ".doc", ".docx", ".xls", ".xlsx",
-  ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".heic", ".heif", ".avif",
-];
+/** Formatos del expediente: PDF, Word y Excel. El backend además verifica que
+ *  el contenido corresponda al formato y que los de Office no traigan macros. */
+export const EXTENSIONES_PERMITIDAS = [".pdf", ".doc", ".docx", ".xls", ".xlsx"];
 
 /** Valor para el atributo `accept` de un <input type="file">. */
-export const TIPOS_ACEPTADOS = EXTENSIONES_PERMITIDAS.join(",");
+export const TIPOS_ACEPTADOS = [
+  ...EXTENSIONES_PERMITIDAS,
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+].join(",");
 
-export const TAMANO_MAX_MB    = 50;
+/** Tope por archivo, para cualquier formato (decisión del usuario, 2026-10-16). */
+export const TAMANO_MAX_MB    = 2;
 export const TAMANO_MAX_BYTES = TAMANO_MAX_MB * 1024 * 1024;
 
 function extensionDe(nombre: string): string {
@@ -30,12 +38,13 @@ export function validarArchivos(archivos: File[]): string | null {
   const invalidos = archivos.filter(a => !EXTENSIONES_PERMITIDAS.includes(extensionDe(a.name)));
   if (invalidos.length) {
     const detalle = invalidos.map(a => a.name).join(", ");
-    return `Tipo de archivo no permitido: ${detalle}. Se aceptan PDF, Word, Excel e imágenes.`;
+    return `Solo se aceptan archivos PDF, Word o Excel: ${detalle}.`;
   }
 
   const grandes = archivos.filter(a => a.size > TAMANO_MAX_BYTES);
   if (grandes.length) {
-    return `Los siguientes archivos superan el límite de ${TAMANO_MAX_MB} MB: ${grandes.map(a => a.name).join(", ")}`;
+    const detalle = grandes.map(a => `${a.name} (${formatBytes(a.size)})`).join(", ");
+    return `Cada archivo puede pesar hasta ${TAMANO_MAX_MB} MB. Pesan más: ${detalle}.`;
   }
 
   return null;

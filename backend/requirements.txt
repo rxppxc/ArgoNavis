@@ -1,5 +1,5 @@
 # ════════════════════════════════════════════════════════════════════════════
-# FileTransfer SNM — Dependencias del backend
+# ARGO NAVIS (SNM) — Dependencias del backend
 # Versiones fijas (==) para reproducibilidad. Actualizar con revisión manual.
 # Regenerar con: pip freeze > requirements.txt (revisando previamente)
 # ════════════════════════════════════════════════════════════════════════════
@@ -34,10 +34,19 @@ slowapi==0.1.10
 python-magic-bin==0.4.14; sys_platform == "win32"
 python-magic==0.4.27; sys_platform != "win32"
 
-# ── Detección de macros VBA en .doc/.xls (anti-malware) ─────────────────────
+# ── Detección de macros VBA en Word/Excel (anti-malware) ─────────────────────
 oletools==0.60.2
+
+# ── PDF de la Autorización Marítima (incluye el generador de QR) ──────────────
+reportlab==5.0.1
 
 # ── Otros ───────────────────────────────────────────────────────────────────
 aiofiles==25.1.0
 aiosmtplib==5.1.2
-httpx==0.28.1
+
+# ── Transitivas con parche de seguridad (pip-audit, 2026-10) ────────────────
+# No se usan directo: el mínimo hace que `pip install -r requirements.txt`
+# actualice también una instalación existente.
+pyasn1>=0.6.4          # ldap3: decodifica las respuestas del Active Directory
+cryptography>=50.0.0   # python-jose
+anyio>=4.14.2          # starlette

@@ -1,0 +1,8 @@
+# Lo que NO entra al contexto de construcción del frontend (COPY . . en el
+# Dockerfile). Sobre todo node_modules: el de Windows reemplazaría al que
+# instala `npm ci` dentro de la imagen (Linux) y el build fallaría o usaría
+# binarios equivocados. Los .env del frontend sí entran: solo traen variables
+# VITE_* (públicas, quedan en el bundle) y el build puede necesitarlas.
+node_modules/
+dist/
+*.log

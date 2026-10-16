@@ -1,0 +1,268 @@
+.titulo { text-align: center; margin-bottom: 24px; }
+.titulo h1 { color: var(--text); font-size: 1.6rem; font-weight: 800; }
+.titulo p { color: var(--text-2); font-size: .9rem; margin-top: 8px; }
+
+.estadoCarga { text-align: center; color: var(--muted); padding: 60px 0; }
+.errorCarga {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 16px 18px; border-radius: 10px;
+  background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.35);
+  color: var(--acc-red); font-size: .9rem;
+}
+.enlace { color: var(--acc-gold); font-weight: 700; text-decoration: underline; }
+
+/* ─── Banner de devolución (modo corrección) ─── */
+.bannerDevolucion {
+  margin-bottom: 16px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: rgba(180,83,9,.12);
+  border: 1px solid rgba(180,83,9,.45);
+  border-left: 4px solid var(--acc-amber);
+}
+.bannerTitulo { display: flex; align-items: center; gap: 8px; color: var(--acc-amber); font-weight: 800; font-size: .88rem; }
+.bannerTexto { color: var(--text); font-size: .9rem; margin: 6px 0; white-space: pre-wrap; }
+.bannerPlazo { color: var(--text-2); font-size: .8rem; }
+
+/* ─── Bloques ─── */
+.form { display: flex; flex-direction: column; gap: 14px; }
+
+.bloque {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  padding: 20px 22px;
+}
+
+.bloqueTitulo {
+  display: flex; align-items: center; gap: 11px;
+  color: var(--text); font-size: 1rem; font-weight: 700;
+  margin-bottom: 16px;
+}
+.paso {
+  width: 25px; height: 25px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: var(--y); color: var(--on-accent);
+  font-size: .78rem; font-weight: 800;
+}
+.contador, .contadorOk, .contadorFalta {
+  margin-left: auto;
+  font-size: .78rem; font-weight: 700;
+  padding: 3px 11px; border-radius: 100px;
+}
+.contador      { background: var(--overlay); color: var(--text-2); }
+.contadorOk    { background: rgba(21,128,61,.2);  color: var(--acc-green); border: 1px solid rgba(21,128,61,.45); }
+.contadorFalta { background: rgba(180,83,9,.2);   color: var(--acc-amber); border: 1px solid rgba(180,83,9,.45); }
+
+/* ─── Campos ─── */
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 13px; }
+
+.campo { display: flex; flex-direction: column; gap: 6px; margin-bottom: 13px; min-width: 0; }
+.campo > span { color: var(--text-2); font-size: .78rem; font-weight: 600; }
+.campo > span em { color: var(--muted); font-style: normal; font-weight: 400; }
+
+.campo input, .campo textarea, .campo select, .select {
+  width: 100%;
+  padding: 9px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card-2);
+  color: var(--text);
+  font: inherit;
+  font-size: .86rem;
+}
+.campo input:focus, .campo textarea:focus, .campo select:focus, .select:focus {
+  outline: 2px solid var(--foco); border-color: transparent;
+}
+.campo textarea { resize: vertical; }
+.select, .campo select { cursor: pointer; }
+.select:disabled { opacity: .75; cursor: not-allowed; }
+.select option, .select optgroup, .campo select option { background: var(--surface); color: var(--text); }
+
+.nota {
+  margin-top: 12px; padding: 10px 13px;
+  border-radius: 8px;
+  background: rgba(245,200,0,.08);
+  border: 1px solid var(--y-border);
+  color: var(--text);
+  font-size: .82rem; line-height: 1.5;
+}
+
+/* ─── Tripulantes ─── */
+.marino {
+  padding: 14px 16px 4px;
+  margin-bottom: 12px;
+  border-radius: 11px;
+  background: var(--card-2);
+  border: 1px solid var(--border);
+}
+.marinoCabecera { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.marinoNum {
+  width: 24px; height: 24px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: var(--overlay-2); color: var(--text-2);
+  font-size: .75rem; font-weight: 700;
+}
+.marinoTitulo { color: var(--text); font-weight: 700; font-size: .9rem; flex: 1; min-width: 0; }
+.chipRestringida {
+  font-size: .7rem; font-weight: 700;
+  padding: 2px 9px; border-radius: 100px;
+  color: var(--acc-orange); border: 1px solid currentColor;
+}
+.marinoGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0 11px; }
+.marinoGrid .campo input, .marinoGrid .campo select { background: var(--card); }
+.sinLibreta {
+  grid-column: span 2;
+  align-self: center;
+  margin-bottom: 13px;
+  color: var(--muted); font-size: .78rem; font-style: italic;
+}
+.marinoAlertas { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.alertaInfo, .alertaAviso, .alertaError {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 11px; border-radius: 7px;
+  font-size: .78rem;
+}
+.alertaInfo  { color: var(--acc-orange); background: rgba(194,65,12,.10); border: 1px solid rgba(194,65,12,.35); }
+.alertaAviso { color: var(--acc-amber);  background: rgba(180,83,9,.10);  border: 1px solid rgba(180,83,9,.35); }
+.alertaError { color: var(--acc-red);    background: rgba(220,38,38,.10); border: 1px solid rgba(220,38,38,.40); }
+
+.marinoContraido { padding-bottom: 12px; }
+.marinoContraido .marinoCabecera { margin-bottom: 6px; }
+.marinoResumen { margin-left: 34px; color: var(--text-2); font-size: .8rem; }
+.resumenAlerta { color: var(--acc-red); font-weight: 600; }
+.chipDocsOk, .chipDocsFalta {
+  font-size: .7rem; font-weight: 700; white-space: nowrap;
+  padding: 2px 9px; border-radius: 100px; border: 1px solid currentColor;
+}
+.chipDocsOk    { color: var(--acc-green); }
+.chipDocsFalta { color: var(--acc-amber); }
+.btnContraer {
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 7px;
+  border: 1px solid var(--border); background: transparent; color: var(--text-2); cursor: pointer;
+}
+.btnContraer:hover { color: var(--text); border-color: var(--y-border); }
+.chevronAbierto, .chevronCerrado { display: flex; transition: transform .18s; }
+.chevronCerrado { transform: rotate(-90deg); }
+
+/* Documentos del tripulante, dentro de su tarjeta */
+.marinoDocs {
+  margin: 4px 0 14px; padding-top: 12px;
+  border-top: 1px dashed var(--border-2);
+}
+.marinoDocsTitulo {
+  color: var(--text-2); font-size: .74rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .5px; margin-bottom: 9px;
+}
+.marinoDocs .casilla { background: var(--card); }
+
+/* Resumen de documentos por tripulante (sección de documentos de la solicitud) */
+.resumenTripulantes { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.resumenTripulante {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 12px; border-radius: 100px;
+  border: 1px solid var(--border); background: var(--card-2);
+  color: var(--text); font-size: .8rem; cursor: pointer;
+}
+.resumenTripulante:hover { border-color: var(--y-border); }
+.resumenOk    { color: var(--acc-green); font-weight: 700; }
+.resumenFalta { color: var(--acc-amber); font-weight: 700; }
+.ayudaSeccion { color: var(--text-2); font-size: .8rem; margin-bottom: 12px; }
+
+.btnQuitar {
+  background: transparent; border: 1px solid var(--border);
+  color: var(--acc-red); border-radius: 7px;
+  padding: 6px 8px; cursor: pointer;
+  display: flex; align-items: center;
+}
+.btnQuitar:hover { background: rgba(248,113,113,.12); border-color: rgba(248,113,113,.4); }
+
+.btnAgregar {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 15px; border-radius: 8px;
+  border: 1px dashed var(--border-2);
+  background: transparent; color: var(--text-2);
+  font-size: .85rem; font-weight: 600; cursor: pointer;
+}
+.btnAgregar:hover { border-color: var(--y); color: var(--acc-gold); }
+
+/* ─── Checklist ─── */
+.casillas { display: flex; flex-direction: column; gap: 9px; }
+
+.casilla {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 15px;
+  border-radius: 10px;
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  transition: border-color .18s, background .18s;
+}
+.casillaOk { border-color: rgba(21,128,61,.45); background: rgba(21,128,61,.07); }
+
+.casillaInfo { flex: 1; min-width: 0; }
+.casillaDoc { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: .88rem; font-weight: 600; }
+.casillaAlcance { color: var(--text-2); font-size: .77rem; margin-top: 3px; margin-left: 21px; }
+
+.casillaAccion { display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
+.archivoNombre, .archivoCargado {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: .78rem;
+  max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.archivoNombre  { color: var(--acc-green); }
+.archivoCargado { color: var(--text-2); }
+.btnMini {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 7px;
+  border: 1px solid var(--border-2); background: transparent; color: var(--text-2);
+}
+.btnMini:hover { color: var(--text); border-color: var(--y-border); }
+.btnArchivo {
+  padding: 7px 14px; border-radius: 7px;
+  border: 1px solid var(--y-border);
+  background: rgba(245,200,0,.1); color: var(--acc-gold);
+  font-size: .8rem; font-weight: 600; cursor: pointer;
+  white-space: nowrap;
+}
+.btnArchivo:hover { background: rgba(245,200,0,.2); }
+
+.sinDocs { color: var(--muted); font-size: .85rem; font-style: italic; }
+
+/* ─── Errores y acciones ─── */
+.panelErrores {
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: rgba(220,38,38,.08);
+  border: 1px solid rgba(220,38,38,.40);
+}
+.panelErroresTitulo { display: flex; align-items: center; gap: 8px; color: var(--acc-red); font-weight: 800; font-size: .88rem; margin-bottom: 6px; }
+.panelErrores ul { margin-left: 20px; color: var(--text); font-size: .83rem; line-height: 1.6; }
+
+.acciones {
+  display: flex; align-items: center; justify-content: flex-end; gap: 16px;
+  padding-top: 6px;
+}
+.avisoFaltan { color: var(--acc-amber); font-size: .84rem; font-weight: 600; }
+
+.btnEnviar {
+  padding: 13px 30px; border-radius: 9px; border: 0;
+  background: var(--y); color: var(--on-accent);
+  font-size: .94rem; font-weight: 800; cursor: pointer;
+  transition: .18s;
+}
+.btnEnviar:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
+.btnEnviar:disabled { opacity: .45; cursor: not-allowed; }
+
+@media (max-width: 900px) {
+  .marinoGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .marinoGrid { grid-template-columns: 1fr; }
+  .sinLibreta { grid-column: auto; }
+  .casilla { flex-direction: column; align-items: stretch; }
+  .casillaAccion { justify-content: space-between; flex-wrap: wrap; }
+  .acciones { flex-direction: column; align-items: stretch; }
+}

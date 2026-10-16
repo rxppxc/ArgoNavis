@@ -1,50 +1,23 @@
-import { useState, useCallback } from "react";
-import { apiAutenticacion } from "../api/auth";
+import { createContext, useContext } from "react";
 import type { Usuario } from "../types";
 
-export function useAutenticacion() {
-  const [usuario, setUsuario] = useState<Usuario | null>(() => {
-    try { return JSON.parse(localStorage.getItem("user") ?? "null"); }
-    catch { return null; }
-  });
+export interface ValorAutenticacion {
+  usuario: Usuario | null;
+  estaAutenticado: boolean;
+  iniciarSesion: (nombreUsuario: string, contrasena: string) => Promise<Usuario>;
+  cerrarSesion: (reportar?: boolean, expirada?: boolean) => Promise<void>;
+  extenderSesion: () => Promise<void>;
+  /** Cambia la propia contraseña y sigue con el token nuevo que devuelve el
+   *  backend (el anterior queda invalidado). */
+  cambiarContrasena: (actual: string, nueva: string) => Promise<void>;
+}
 
-  const iniciarSesion = useCallback(async (nombreUsuario: string, contrasena: string) => {
-    const datos = await apiAutenticacion.iniciarSesion(nombreUsuario, contrasena);
-    // Si había un usuario distinto antes (login directo en /login sin pasar
-    // por "Cerrar sesión"), sus permisos cacheados quedarían viejos y
-    // usePermisos() los usaría por un instante hasta que llegue la respuesta
-    // real — causando llamadas a endpoints que este usuario no puede ver.
-    localStorage.removeItem("permisos");
-    localStorage.setItem("access_token", datos.access_token);
-    localStorage.setItem("user", JSON.stringify(datos.user));
-    setUsuario(datos.user);
-    return datos.user;
-  }, []);
+export const ContextoAutenticacion = createContext<ValorAutenticacion | null>(null);
 
-  const cerrarSesion = useCallback(async (reportar = true, expirada = false) => {
-    // Reportar ANTES de borrar el token: si no, la llamada sale sin
-    // Authorization y el backend la rechaza con 401 sin dejar registro de
-    // auditoría del cierre de sesión.
-    if (reportar) {
-      try {
-        if (expirada) await apiAutenticacion.notificarExpiracion();
-        else await apiAutenticacion.cerrarSesion();
-      } catch {
-        // Si el token ya no es válido o falla la red, igual cerramos localmente.
-      }
-    }
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("user");
-    localStorage.removeItem("permisos");
-    setUsuario(null);
-  }, []);
-
-  const extenderSesion = useCallback(async () => {
-    const datos = await apiAutenticacion.refrescarSesion();
-    localStorage.setItem("access_token", datos.access_token);
-    localStorage.setItem("user", JSON.stringify(datos.user));
-    setUsuario(datos.user);
-  }, []);
-
-  return { usuario, iniciarSesion, cerrarSesion, extenderSesion, estaAutenticado: !!usuario };
+/** Sesión del usuario. El estado vive en <ProveedorAutenticacion>: todos los
+ *  componentes comparten el mismo usuario. */
+export function useAutenticacion(): ValorAutenticacion {
+  const valor = useContext(ContextoAutenticacion);
+  if (!valor) throw new Error("useAutenticacion debe usarse dentro de <ProveedorAutenticacion>");
+  return valor;
 }

@@ -11,7 +11,9 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     server: {
       port: 5173,
-      host: "0.0.0.0",
+      // Solo este equipo: el servidor de desarrollo no tiene las protecciones de
+      // producción. Para probar desde otro equipo o el celular: VITE_HOST=0.0.0.0.
+      host: env.VITE_HOST || "localhost",
       proxy: {
         "/api": { target: proxyTarget, changeOrigin: true },
       },

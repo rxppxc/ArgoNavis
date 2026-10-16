@@ -1,0 +1,30 @@
+/* Franja institucional (la del login, en todas las páginas). Tres columnas:
+   escudo a la izquierda, jerarquía al centro y la derecha para el menú; las dos
+   de los lados miden lo mismo para que la jerarquía quede centrada. */
+.franja {
+  position: relative; z-index: 20;   /* el menú desplegable queda sobre el contenido */
+  background: var(--cabecera); border-bottom: 1px solid var(--border);
+}
+.interior { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; padding: 8px 24px; }
+.escudo { justify-self: start; height: 72px; width: auto; max-width: 100%; object-fit: contain; }
+.jerarquia { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.jerarquia small {
+  display: block; font-size: .66rem; line-height: 1.4; letter-spacing: 1.4px; text-transform: uppercase;
+  color: var(--text-2); font-weight: 600;
+}
+.jerarquia strong { display: block; margin-top: 1px; font-size: .95rem; letter-spacing: .5px; text-transform: uppercase; color: var(--text); }
+.derecha { justify-self: end; display: flex; align-items: center; }
+.bandera { height: 4px; background: linear-gradient(90deg, #005293 0 50%, #D21034 50% 100%); }
+
+@media (max-width: 880px) {
+  .interior { padding: 8px 16px; gap: 10px; }
+  .escudo { height: 56px; }
+  .jerarquia strong { font-size: .85rem; letter-spacing: .3px; }
+}
+/* Teléfonos: escudo y texto más chicos para que la jerarquía no se parta. */
+@media (max-width: 520px) {
+  .interior { gap: 8px; }
+  .escudo { height: 42px; }
+  .jerarquia small { font-size: .56rem; letter-spacing: .8px; }
+  .jerarquia strong { font-size: .72rem; letter-spacing: .2px; }
+}

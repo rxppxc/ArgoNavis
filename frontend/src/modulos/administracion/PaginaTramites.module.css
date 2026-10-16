@@ -1,0 +1,204 @@
+/* ─── Contenedor ─── */
+.container {
+  flex: 1;
+  width: 100%;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 34px 28px 60px;
+}
+
+.titulo { text-align: center; margin-bottom: 26px; }
+.titulo h1 {
+  color: var(--text);
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: .3px;
+}
+.titulo p {
+  color: var(--text-2);
+  font-size: .9rem;
+  max-width: 620px;
+  margin: 10px auto 0;
+  line-height: 1.55;
+}
+
+/* ─── Lista de trámites ─── */
+.lista { display: flex; flex-direction: column; gap: 10px; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-color .18s;
+}
+.card:hover { border-color: var(--border-2); }
+.cardOpen { border-color: var(--y-border); }
+
+.cardHeader {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 15px 18px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+
+.chevron {
+  display: flex;
+  color: var(--muted);
+  transition: transform .18s;
+  flex-shrink: 0;
+}
+.chevronOpen { transform: rotate(90deg); color: var(--y); }
+
+.cardInfo { flex: 1; min-width: 0; }
+.cardNombre {
+  color: var(--text);
+  font-size: .97rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.cardCodigo {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: .72rem;
+  color: var(--muted);
+  margin-top: 3px;
+  letter-spacing: .4px;
+}
+
+.docCount {
+  font-size: .78rem;
+  color: var(--text-2);
+  background: var(--overlay);
+  border: 1px solid var(--border);
+  padding: 4px 11px;
+  border-radius: 100px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ─── Cuerpo expandido ─── */
+.cardBody {
+  padding: 4px 18px 20px 46px;
+  border-top: 1px solid var(--border);
+  margin-top: -1px;
+}
+
+.seccion { margin-top: 18px; }
+.seccionTitulo {
+  font-size: .68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.chipCampo, .chipFecha {
+  font-size: .78rem;
+  padding: 5px 11px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--card-2);
+  color: var(--text);
+}
+.chipFecha {
+  border-color: var(--y-border);
+  color: var(--y);
+}
+
+.nota {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 16px;
+  padding: 11px 13px;
+  border-radius: 9px;
+  background: rgba(245,200,0,.08);
+  border: 1px solid var(--y-border);
+  color: var(--text);
+  font-size: .82rem;
+  line-height: 1.5;
+}
+.nota svg { color: var(--y); flex-shrink: 0; margin-top: 2px; }
+
+/* ─── Tabla de documentos ─── */
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .85rem;
+}
+.tabla thead th {
+  text-align: left;
+  font-size: .68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .9px;
+  color: var(--muted);
+  padding: 0 12px 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.tabla tbody td {
+  padding: 11px 12px 11px 0;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.tabla tbody tr:last-child td { border-bottom: 0; }
+
+.docNombre { color: var(--text); font-weight: 500; }
+.docDesc { color: var(--muted); font-size: .76rem; margin-top: 3px; }
+
+.badgeMarino, .badgeSolicitud {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .76rem;
+  padding: 4px 10px;
+  border-radius: 100px;
+  white-space: nowrap;
+}
+.badgeMarino {
+  background: rgba(59,130,246,.14);
+  border: 1px solid rgba(59,130,246,.34);
+  color: var(--acc-blue);
+}
+.badgeSolicitud {
+  background: var(--overlay);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+}
+
+.condSiempre { color: var(--text-2); font-size: .8rem; }
+.condCondicional {
+  display: inline-block;
+  font-size: .76rem;
+  padding: 4px 10px;
+  border-radius: 100px;
+  background: rgba(245,158,11,.13);
+  border: 1px solid rgba(245,158,11,.34);
+  color: var(--acc-amber);
+  white-space: nowrap;
+}
+
+.sinDocs {
+  color: var(--muted);
+  font-size: .84rem;
+  font-style: italic;
+}
+
+/* ─── Estados ─── */
+.empty {
+  text-align: center;
+  color: var(--text-2);
+  padding: 50px 20px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: .9rem;
+}

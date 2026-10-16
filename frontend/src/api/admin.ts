@@ -1,7 +1,7 @@
 import { clienteApi } from "./client";
+import type { CatalogoMini } from "../types";
 
 export interface UsuarioAD {
-  dn: string;
   username: string;
   name: string;
   last_name: string;
@@ -26,6 +26,9 @@ export interface UsuarioSistema {
   status: "active" | "inactive";
   rol_id: number | null;
   rol_personalizado: RolMini | null;
+  agencia_id: number | null;
+  agencia: CatalogoMini | null;
+  debe_cambiar_password: boolean;
   full_name: string;
 }
 
@@ -56,17 +59,53 @@ export interface DatosUsuarioLocal {
   rol_id?: number | null;
 }
 
-export interface StatsAdmin {
-  usuarios:        number;
-  transferencias:  number;
-  activas:         number;
-  expiradas:       number;
-  total_descargas: number;
-  storage_bytes:   number;
-  top_uploaders:   { id: number; full_name: string; total: number }[];
+/** Uso del sistema (no del flujo): cuentas, agencias y documentos almacenados. */
+export interface UsoSistema {
+  usuarios:             number;
+  usuarios_activos:     number;
+  agencias:             number;
+  documentos:           number;
+  almacenamiento_bytes: number;
+  top_agencias:         { agencia_id: number; nombre: string; total: number }[];
+}
+
+export interface RegistroBitacora {
+  id:        number;
+  creado_en: string;
+  accion:    string;
+  user_id:   number | null;
+  username:  string | null;
+  detalle:   Record<string, unknown> | null;
+  ip:        string | null;
+}
+
+export interface PaginaBitacora {
+  total:      number;
+  pagina:     number;
+  por_pagina: number;
+  items:      RegistroBitacora[];
+}
+
+export interface FiltrosBitacora {
+  accion?:     string;
+  usuario?:    string;
+  texto?:      string;
+  desde?:      string;
+  hasta?:      string;
+  pagina?:     number;
+  por_pagina?: number;
 }
 
 export const apiAdmin = {
+  // Bitácora
+  consultarBitacora: (filtros: FiltrosBitacora) =>
+    clienteApi.get<PaginaBitacora>("/admin/bitacora", {
+      params: Object.fromEntries(Object.entries(filtros).filter(([, v]) => v !== undefined && v !== "")),
+    }),
+
+  accionesBitacora: () =>
+    clienteApi.get<string[]>("/admin/bitacora/acciones"),
+
   buscarEnAD: (q: string) =>
     clienteApi.get<UsuarioAD[]>(`/admin/usuarios/buscar-ad`, { params: { q } }),
 
@@ -76,9 +115,14 @@ export const apiAdmin = {
   crearUsuario: (username: string) =>
     clienteApi.post<UsuarioSistema>("/admin/usuarios", { username }),
 
-  // Usuario local de prueba (sin AD) — solo disponible fuera de producción.
+  // Cuenta local (sin AD), p. ej. para usuarios de agencias navieras.
   crearUsuarioLocal: (datos: DatosUsuarioLocal) =>
     clienteApi.post<UsuarioSistema>("/admin/usuarios/local", datos),
+
+  /** Genera una contraseña temporal (se muestra una sola vez). */
+  restablecerContrasena: (id: number) =>
+    clienteApi.post<{ contrasena_temporal: string }>(`/admin/usuarios/${id}/restablecer-contrasena`)
+      .then((r) => r.data.contrasena_temporal),
 
   cambiarEstado: (id: number, status: "active" | "inactive") =>
     clienteApi.patch<UsuarioSistema>(`/admin/usuarios/${id}/estado`, { status }),
@@ -86,22 +130,13 @@ export const apiAdmin = {
   eliminarUsuario: (id: number) =>
     clienteApi.delete(`/admin/usuarios/${id}`),
 
-  // Stats
-  obtenerStats: () =>
-    clienteApi.get<StatsAdmin>("/admin/stats"),
+  // Uso del sistema
+  obtenerUso: () =>
+    clienteApi.get<UsoSistema>("/admin/stats").then((r) => r.data),
 
-  // Permisos
+  // Permisos (solo lectura: los define el sistema)
   listarPermisos: () =>
     clienteApi.get<Permiso[]>("/admin/permisos"),
-
-  crearPermiso: (codigo: string, nombre: string, descripcion?: string) =>
-    clienteApi.post<Permiso>("/admin/permisos", { codigo, nombre, descripcion }),
-
-  actualizarPermiso: (id: number, datos: { nombre?: string; descripcion?: string }) =>
-    clienteApi.patch<Permiso>(`/admin/permisos/${id}`, datos),
-
-  eliminarPermiso: (id: number) =>
-    clienteApi.delete(`/admin/permisos/${id}`),
 
   // Roles
   listarRoles: () =>

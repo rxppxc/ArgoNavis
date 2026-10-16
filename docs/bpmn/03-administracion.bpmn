@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definiciones_Administracion" targetNamespace="https://argonavis.migracion.gob.pa/bpmn" exporter="ARGO NAVIS" exporterVersion="1.0">
+  <bpmn:collaboration id="Colaboracion_Administracion">
+    <bpmn:participant id="Pool_Admin" name="Administración de ARGO NAVIS" processRef="Proceso_Administracion" />
+  </bpmn:collaboration>
+  <bpmn:process id="Proceso_Administracion" name="Puesta en marcha y administración" isExecutable="false">
+    <bpmn:laneSet id="Carriles_Proceso_Administracion">
+      <bpmn:lane id="Carril_TI" name="Equipo técnico (TI)">
+        <bpmn:flowNodeRef>SeInstala</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Instalar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>PrimerSysAdmin</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>CambiaRequisito</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AjustarCatalogo</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>CatalogoAjustado</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Carril_SysAdmin" name="SysAdmin">
+        <bpmn:flowNodeRef>RegistrarUsuarios</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AsignarRoles</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>OlvidoContrasena</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Restablecer</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Restablecida</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>DejaNAVIS</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>DesactivarCuenta</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>CuentaDesactivada</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Carril_Admin" name="Administrador">
+        <bpmn:flowNodeRef>CrearAgencias</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>CrearPuestos</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Nacionalidades</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Listo</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AgenciaDejaDeOperar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>DesactivarAgencia</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AgenciaDesactivada</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>RevisarOperacion</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ConsultarBitacora</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>RevisionHecha</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="SeInstala" name="Se instala ARGO NAVIS">
+      <bpmn:outgoing>Flujo_SeInstala_Instalar</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:task id="Instalar" name="Instalar ARGO NAVIS y aplicar las migraciones">
+      <bpmn:incoming>Flujo_SeInstala_Instalar</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Instalar_PrimerSysAdmin</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="PrimerSysAdmin" name="Nombrar el primer SysAdmin (consola)">
+      <bpmn:documentation>python -m app.infrastructure.asignar_rol &lt;usuario&gt; SysAdmin (queda en la bitácora).</bpmn:documentation>
+      <bpmn:incoming>Flujo_Instalar_PrimerSysAdmin</bpmn:incoming>
+      <bpmn:outgoing>Flujo_PrimerSysAdmin_RegistrarUsuarios</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:userTask id="RegistrarUsuarios" name="Registrar usuarios (AD o cuentas locales)">
+      <bpmn:incoming>Flujo_PrimerSysAdmin_RegistrarUsuarios</bpmn:incoming>
+      <bpmn:outgoing>Flujo_RegistrarUsuarios_AsignarRoles</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="AsignarRoles" name="Asignar el rol de cada usuario">
+      <bpmn:incoming>Flujo_RegistrarUsuarios_AsignarRoles</bpmn:incoming>
+      <bpmn:outgoing>Flujo_AsignarRoles_CrearAgencias</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="CrearAgencias" name="Crear agencias navieras y asignarles usuarios">
+      <bpmn:incoming>Flujo_AsignarRoles_CrearAgencias</bpmn:incoming>
+      <bpmn:outgoing>Flujo_CrearAgencias_CrearPuestos</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="CrearPuestos" name="Crear puestos de control y asignar funcionarios">
+      <bpmn:incoming>Flujo_CrearAgencias_CrearPuestos</bpmn:incoming>
+      <bpmn:outgoing>Flujo_CrearPuestos_Nacionalidades</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="Nacionalidades" name="Marcar las nacionalidades restringidas">
+      <bpmn:incoming>Flujo_CrearPuestos_Nacionalidades</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Nacionalidades_Listo</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="Listo" name="ARGO NAVIS listo para recibir solicitudes">
+      <bpmn:incoming>Flujo_Nacionalidades_Listo</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:startEvent id="CambiaRequisito" name="UCVMM cambia un requisito">
+      <bpmn:outgoing>Flujo_CambiaRequisito_AjustarCatalogo</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:task id="AjustarCatalogo" name="Ajustar el catálogo de trámites (migración)">
+      <bpmn:incoming>Flujo_CambiaRequisito_AjustarCatalogo</bpmn:incoming>
+      <bpmn:outgoing>Flujo_AjustarCatalogo_CatalogoAjustado</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:endEvent id="CatalogoAjustado" name="Rige para las solicitudes nuevas">
+      <bpmn:incoming>Flujo_AjustarCatalogo_CatalogoAjustado</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:startEvent id="OlvidoContrasena" name="Un usuario local olvidó su contraseña">
+      <bpmn:outgoing>Flujo_OlvidoContrasena_Restablecer</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="Restablecer" name="Restablecer la contraseña (temporal)">
+      <bpmn:incoming>Flujo_OlvidoContrasena_Restablecer</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Restablecer_Restablecida</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="Restablecida" name="Debe cambiarla al entrar">
+      <bpmn:incoming>Flujo_Restablecer_Restablecida</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:startEvent id="DejaNAVIS" name="Alguien deja de usar ARGO NAVIS">
+      <bpmn:outgoing>Flujo_DejaNAVIS_DesactivarCuenta</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="DesactivarCuenta" name="Desactivar la cuenta">
+      <bpmn:incoming>Flujo_DejaNAVIS_DesactivarCuenta</bpmn:incoming>
+      <bpmn:outgoing>Flujo_DesactivarCuenta_CuentaDesactivada</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="CuentaDesactivada" name="Sus sesiones se cierran al instante">
+      <bpmn:incoming>Flujo_DesactivarCuenta_CuentaDesactivada</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:startEvent id="AgenciaDejaDeOperar" name="Una agencia deja de operar">
+      <bpmn:outgoing>Flujo_AgenciaDejaDeOperar_DesactivarAgencia</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="DesactivarAgencia" name="Desactivar la agencia">
+      <bpmn:incoming>Flujo_AgenciaDejaDeOperar_DesactivarAgencia</bpmn:incoming>
+      <bpmn:outgoing>Flujo_DesactivarAgencia_AgenciaDesactivada</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="AgenciaDesactivada" name="Sus usuarios ya no entran">
+      <bpmn:incoming>Flujo_DesactivarAgencia_AgenciaDesactivada</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:startEvent id="RevisarOperacion" name="Hace falta revisar la operación">
+      <bpmn:outgoing>Flujo_RevisarOperacion_ConsultarBitacora</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="ConsultarBitacora" name="Consultar la bitácora y las estadísticas">
+      <bpmn:incoming>Flujo_RevisarOperacion_ConsultarBitacora</bpmn:incoming>
+      <bpmn:outgoing>Flujo_ConsultarBitacora_RevisionHecha</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="RevisionHecha" name="Revisión hecha">
+      <bpmn:incoming>Flujo_ConsultarBitacora_RevisionHecha</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flujo_SeInstala_Instalar" sourceRef="SeInstala" targetRef="Instalar" />
+    <bpmn:sequenceFlow id="Flujo_Instalar_PrimerSysAdmin" sourceRef="Instalar" targetRef="PrimerSysAdmin" />
+    <bpmn:sequenceFlow id="Flujo_PrimerSysAdmin_RegistrarUsuarios" sourceRef="PrimerSysAdmin" targetRef="RegistrarUsuarios" />
+    <bpmn:sequenceFlow id="Flujo_RegistrarUsuarios_AsignarRoles" sourceRef="RegistrarUsuarios" targetRef="AsignarRoles" />
+    <bpmn:sequenceFlow id="Flujo_AsignarRoles_CrearAgencias" sourceRef="AsignarRoles" targetRef="CrearAgencias" />
+    <bpmn:sequenceFlow id="Flujo_CrearAgencias_CrearPuestos" sourceRef="CrearAgencias" targetRef="CrearPuestos" />
+    <bpmn:sequenceFlow id="Flujo_CrearPuestos_Nacionalidades" sourceRef="CrearPuestos" targetRef="Nacionalidades" />
+    <bpmn:sequenceFlow id="Flujo_Nacionalidades_Listo" sourceRef="Nacionalidades" targetRef="Listo" />
+    <bpmn:sequenceFlow id="Flujo_CambiaRequisito_AjustarCatalogo" sourceRef="CambiaRequisito" targetRef="AjustarCatalogo" />
+    <bpmn:sequenceFlow id="Flujo_AjustarCatalogo_CatalogoAjustado" sourceRef="AjustarCatalogo" targetRef="CatalogoAjustado" />
+    <bpmn:sequenceFlow id="Flujo_OlvidoContrasena_Restablecer" sourceRef="OlvidoContrasena" targetRef="Restablecer" />
+    <bpmn:sequenceFlow id="Flujo_Restablecer_Restablecida" sourceRef="Restablecer" targetRef="Restablecida" />
+    <bpmn:sequenceFlow id="Flujo_DejaNAVIS_DesactivarCuenta" sourceRef="DejaNAVIS" targetRef="DesactivarCuenta" />
+    <bpmn:sequenceFlow id="Flujo_DesactivarCuenta_CuentaDesactivada" sourceRef="DesactivarCuenta" targetRef="CuentaDesactivada" />
+    <bpmn:sequenceFlow id="Flujo_AgenciaDejaDeOperar_DesactivarAgencia" sourceRef="AgenciaDejaDeOperar" targetRef="DesactivarAgencia" />
+    <bpmn:sequenceFlow id="Flujo_DesactivarAgencia_AgenciaDesactivada" sourceRef="DesactivarAgencia" targetRef="AgenciaDesactivada" />
+    <bpmn:sequenceFlow id="Flujo_RevisarOperacion_ConsultarBitacora" sourceRef="RevisarOperacion" targetRef="ConsultarBitacora" />
+    <bpmn:sequenceFlow id="Flujo_ConsultarBitacora_RevisionHecha" sourceRef="ConsultarBitacora" targetRef="RevisionHecha" />
+    <bpmn:textAnnotation id="Nota_Migraciones"><bpmn:text>Las migraciones siembran roles, permisos y el catálogo de trámites (Form. 3).</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_Nota_Migraciones" associationDirection="None" sourceRef="Nota_Migraciones" targetRef="Instalar" />
+    <bpmn:textAnnotation id="Nota_Roles"><bpmn:text>El SysAdmin no ve solicitudes; el Administrador no crea usuarios ni cambia roles.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:textAnnotation id="Nota_Catalogo"><bpmn:text>Las solicitudes ya enviadas conservan el checklist con el que se enviaron.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_Nota_Catalogo" associationDirection="None" sourceRef="Nota_Catalogo" targetRef="CatalogoAjustado" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagrama_Administracion" name="Puesta en marcha y administración de ARGO NAVIS">
+    <bpmndi:BPMNPlane id="Plano_Administracion" bpmnElement="Colaboracion_Administracion">
+      <bpmndi:BPMNShape id="Pool_Admin_di" bpmnElement="Pool_Admin" isHorizontal="true"><dc:Bounds x="100" y="40" width="1880" height="720" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Carril_TI_di" bpmnElement="Carril_TI" isHorizontal="true"><dc:Bounds x="130" y="40" width="1850" height="180" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Carril_SysAdmin_di" bpmnElement="Carril_SysAdmin" isHorizontal="true"><dc:Bounds x="130" y="220" width="1850" height="260" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Carril_Admin_di" bpmnElement="Carril_Admin" isHorizontal="true"><dc:Bounds x="130" y="480" width="1850" height="280" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SeInstala_di" bpmnElement="SeInstala"><dc:Bounds x="202" y="112" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="165" y="152" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Instalar_di" bpmnElement="Instalar"><dc:Bounds x="290" y="85" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="PrimerSysAdmin_di" bpmnElement="PrimerSysAdmin"><dc:Bounds x="450" y="85" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="RegistrarUsuarios_di" bpmnElement="RegistrarUsuarios"><dc:Bounds x="450" y="255" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AsignarRoles_di" bpmnElement="AsignarRoles"><dc:Bounds x="610" y="255" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CrearAgencias_di" bpmnElement="CrearAgencias"><dc:Bounds x="610" y="515" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CrearPuestos_di" bpmnElement="CrearPuestos"><dc:Bounds x="770" y="515" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Nacionalidades_di" bpmnElement="Nacionalidades"><dc:Bounds x="930" y="515" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Listo_di" bpmnElement="Listo"><dc:Bounds x="1122" y="542" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1085" y="582" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CambiaRequisito_di" bpmnElement="CambiaRequisito"><dc:Bounds x="1282" y="112" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1245" y="152" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AjustarCatalogo_di" bpmnElement="AjustarCatalogo"><dc:Bounds x="1380" y="85" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CatalogoAjustado_di" bpmnElement="CatalogoAjustado"><dc:Bounds x="1582" y="112" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1545" y="152" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="OlvidoContrasena_di" bpmnElement="OlvidoContrasena"><dc:Bounds x="1282" y="282" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1245" y="322" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Restablecer_di" bpmnElement="Restablecer"><dc:Bounds x="1380" y="255" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Restablecida_di" bpmnElement="Restablecida"><dc:Bounds x="1582" y="282" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1545" y="322" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DejaNAVIS_di" bpmnElement="DejaNAVIS"><dc:Bounds x="1282" y="392" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1245" y="432" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DesactivarCuenta_di" bpmnElement="DesactivarCuenta"><dc:Bounds x="1380" y="365" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CuentaDesactivada_di" bpmnElement="CuentaDesactivada"><dc:Bounds x="1582" y="392" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1545" y="432" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AgenciaDejaDeOperar_di" bpmnElement="AgenciaDejaDeOperar"><dc:Bounds x="1282" y="542" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1245" y="582" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DesactivarAgencia_di" bpmnElement="DesactivarAgencia"><dc:Bounds x="1380" y="515" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AgenciaDesactivada_di" bpmnElement="AgenciaDesactivada"><dc:Bounds x="1582" y="542" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1545" y="582" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="RevisarOperacion_di" bpmnElement="RevisarOperacion"><dc:Bounds x="1282" y="662" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1245" y="702" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ConsultarBitacora_di" bpmnElement="ConsultarBitacora"><dc:Bounds x="1380" y="635" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="RevisionHecha_di" bpmnElement="RevisionHecha"><dc:Bounds x="1582" y="662" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1545" y="702" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Nota_Migraciones_di" bpmnElement="Nota_Migraciones"><dc:Bounds x="240" y="182" width="250" height="34" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Nota_Roles_di" bpmnElement="Nota_Roles"><dc:Bounds x="760" y="385" width="380" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Nota_Catalogo_di" bpmnElement="Nota_Catalogo"><dc:Bounds x="1680" y="60" width="280" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flujo_SeInstala_Instalar_di" bpmnElement="Flujo_SeInstala_Instalar"><di:waypoint x="238" y="130" /><di:waypoint x="290" y="130" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Instalar_PrimerSysAdmin_di" bpmnElement="Flujo_Instalar_PrimerSysAdmin"><di:waypoint x="430" y="130" /><di:waypoint x="450" y="130" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_PrimerSysAdmin_RegistrarUsuarios_di" bpmnElement="Flujo_PrimerSysAdmin_RegistrarUsuarios"><di:waypoint x="520" y="175" /><di:waypoint x="520" y="255" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_RegistrarUsuarios_AsignarRoles_di" bpmnElement="Flujo_RegistrarUsuarios_AsignarRoles"><di:waypoint x="590" y="300" /><di:waypoint x="610" y="300" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_AsignarRoles_CrearAgencias_di" bpmnElement="Flujo_AsignarRoles_CrearAgencias"><di:waypoint x="680" y="345" /><di:waypoint x="680" y="515" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_CrearAgencias_CrearPuestos_di" bpmnElement="Flujo_CrearAgencias_CrearPuestos"><di:waypoint x="750" y="560" /><di:waypoint x="770" y="560" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_CrearPuestos_Nacionalidades_di" bpmnElement="Flujo_CrearPuestos_Nacionalidades"><di:waypoint x="910" y="560" /><di:waypoint x="930" y="560" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Nacionalidades_Listo_di" bpmnElement="Flujo_Nacionalidades_Listo"><di:waypoint x="1070" y="560" /><di:waypoint x="1122" y="560" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_CambiaRequisito_AjustarCatalogo_di" bpmnElement="Flujo_CambiaRequisito_AjustarCatalogo"><di:waypoint x="1318" y="130" /><di:waypoint x="1380" y="130" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_AjustarCatalogo_CatalogoAjustado_di" bpmnElement="Flujo_AjustarCatalogo_CatalogoAjustado"><di:waypoint x="1520" y="130" /><di:waypoint x="1582" y="130" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_OlvidoContrasena_Restablecer_di" bpmnElement="Flujo_OlvidoContrasena_Restablecer"><di:waypoint x="1318" y="300" /><di:waypoint x="1380" y="300" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Restablecer_Restablecida_di" bpmnElement="Flujo_Restablecer_Restablecida"><di:waypoint x="1520" y="300" /><di:waypoint x="1582" y="300" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_DejaNAVIS_DesactivarCuenta_di" bpmnElement="Flujo_DejaNAVIS_DesactivarCuenta"><di:waypoint x="1318" y="410" /><di:waypoint x="1380" y="410" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_DesactivarCuenta_CuentaDesactivada_di" bpmnElement="Flujo_DesactivarCuenta_CuentaDesactivada"><di:waypoint x="1520" y="410" /><di:waypoint x="1582" y="410" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_AgenciaDejaDeOperar_DesactivarAgencia_di" bpmnElement="Flujo_AgenciaDejaDeOperar_DesactivarAgencia"><di:waypoint x="1318" y="560" /><di:waypoint x="1380" y="560" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_DesactivarAgencia_AgenciaDesactivada_di" bpmnElement="Flujo_DesactivarAgencia_AgenciaDesactivada"><di:waypoint x="1520" y="560" /><di:waypoint x="1582" y="560" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_RevisarOperacion_ConsultarBitacora_di" bpmnElement="Flujo_RevisarOperacion_ConsultarBitacora"><di:waypoint x="1318" y="680" /><di:waypoint x="1380" y="680" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_ConsultarBitacora_RevisionHecha_di" bpmnElement="Flujo_ConsultarBitacora_RevisionHecha"><di:waypoint x="1520" y="680" /><di:waypoint x="1582" y="680" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_Nota_Migraciones_di" bpmnElement="Asoc_Nota_Migraciones"><di:waypoint x="360" y="182" /><di:waypoint x="360" y="175" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_Nota_Catalogo_di" bpmnElement="Asoc_Nota_Catalogo"><di:waypoint x="1690" y="100" /><di:waypoint x="1600" y="112" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

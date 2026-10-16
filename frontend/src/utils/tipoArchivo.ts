@@ -1,6 +1,6 @@
 /**
- * Clasificación de archivos por su tipo, usada en la vista pública de descarga
- * y en el modal de previsualización.
+ * Clasificación de archivos por su tipo, usada en el modal de previsualización
+ * (el expediente admite PDF, Word y Excel; los viejos pueden ser de otros tipos).
  */
 export type CategoriaArchivo =
   | "imagen" | "pdf" | "word" | "excel" | "ppt"
@@ -34,10 +34,4 @@ export function infoTipo(mime: string | null, nombre: string): InfoTipo {
   if (m.startsWith("text/") || ["txt","md","xml","json"].includes(ex))
     return { etiqueta: "TXT",   categoria: "texto" };
   return { etiqueta: "FILE",  categoria: "otro" };
-}
-
-/** True si el navegador puede renderizar el archivo inline (img / iframe). */
-export function esPrevisualizable(mime: string | null, nombre: string): boolean {
-  const { categoria } = infoTipo(mime, nombre);
-  return categoria === "imagen" || categoria === "pdf";
 }

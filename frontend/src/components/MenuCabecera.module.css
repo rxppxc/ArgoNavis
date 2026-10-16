@@ -4,32 +4,6 @@
   gap: 8px;
 }
 
-/* ── Chip de nombre ── */
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(255,255,255,.08);
-  border: 1.5px solid rgba(255,255,255,.18);
-  border-radius: var(--r-sm);
-  padding: 7px 13px;
-  color: rgba(255,255,255,.90);
-  font-size: .84rem;
-  font-weight: 500;
-}
-.avatar {
-  width: 24px; height: 24px;
-  background: var(--y);
-  color: var(--ink);
-  border-radius: 50%;
-  font-size: .67rem;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
 /* ── Botón Menú ── */
 .dropdown { position: relative; }
 
@@ -37,10 +11,10 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgba(245,200,0,.13);
-  border: 1.5px solid rgba(245,200,0,.38);
+  background: var(--y-soft);
+  border: 1.5px solid var(--y-border);
   border-radius: var(--r-sm);
-  color: var(--y);
+  color: var(--acc-gold);
   padding: 7px 14px;
   font-size: .84rem;
   font-weight: 700;
@@ -51,8 +25,8 @@
 }
 .menuBtn:hover,
 .menuBtnOpen {
-  background: rgba(245,200,0,.24);
-  border-color: rgba(245,200,0,.65);
+  border-color: var(--y);
+  box-shadow: 0 0 0 3px var(--y-soft);
 }
 
 .chevron {
@@ -67,7 +41,7 @@
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  min-width: 190px;
+  min-width: 230px;
   background: var(--surface);
   border: 1px solid var(--border-2);
   border-radius: var(--r-md);
@@ -97,35 +71,33 @@
   transition: background var(--t), color var(--t);
 }
 .item:hover {
-  background: rgba(255,255,255,.07);
+  background: var(--hover);
   color: var(--text);
 }
+.item:focus-visible { outline-offset: -2px; }
 
-.itemSalir { color: rgba(239,68,68,.80); }
+.itemSalir { color: var(--acc-red); }
 .itemSalir:hover {
-  background: rgba(239,68,68,.10);
+  background: var(--red-soft);
   color: var(--acc-red);
+}
+
+/* ── Tema ── */
+.tema {
+  padding: 10px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.temaTitulo {
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--muted);
 }
 
 .sep {
   height: 1px;
   background: var(--border);
-}
-
-/* ── Modo claro ── */
-:global([data-theme="light"]) .chip {
-  background: rgba(0,0,0,.06);
-  border-color: rgba(0,0,0,.16);
-  color: #2a2d4a;
-}
-:global([data-theme="light"]) .panel {
-  background: #fff;
-  border-color: rgba(0,0,0,.12);
-}
-:global([data-theme="light"]) .item:hover {
-  background: rgba(0,0,0,.05);
-  color: #111;
-}
-:global([data-theme="light"]) .sep {
-  background: rgba(0,0,0,.08);
 }

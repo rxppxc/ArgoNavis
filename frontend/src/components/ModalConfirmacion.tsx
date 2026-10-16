@@ -30,6 +30,7 @@ type Resolver = (decision: boolean) => void;
 
 const Contexto = createContext<((opt: OpcionesConfirmacion) => Promise<boolean>) | null>(null);
 
+// eslint-disable-next-line react-refresh/only-export-components -- el hook va junto a su proveedor; separarlos solo cambiaría las rutas de import
 export function useConfirmar() {
   const ctx = useContext(Contexto);
   if (!ctx) throw new Error("useConfirmar debe usarse dentro de <ProveedorConfirmacion>");

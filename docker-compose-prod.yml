@@ -1,3 +1,7 @@
+# Nombre fijo del proyecto: los volúmenes se llaman argonavis_* aunque cambie la
+# carpeta donde se despliega (sin esto, Docker los nombra según la carpeta).
+name: argonavis
+
 services:
   postgres_db:
     image: postgres:15-alpine
@@ -30,43 +34,53 @@ services:
     build: ./backend
     container_name: snm_backend
     restart: always
-    ports:
-      - "8000:8000"
+    # Sin "ports": el backend solo es accesible por la red interna de Docker, a
+    # través de nginx (servicio frontend, /api/). Por eso uvicorn puede confiar
+    # en los encabezados X-Forwarded-* (ver docker-entrypoint.sh).
     environment:
-      - APP_NAME=FileDrop - SNM
+      - APP_NAME=ARGO NAVIS - SNM
       - APP_ENV=production
       - SECRET_KEY=${SECRET_KEY}
       - ACCESS_TOKEN_EXPIRE_MINUTES=60
+      - SESION_MAXIMA_HORAS=${SESION_MAXIMA_HORAS:-12}
       - ALGORITHM=HS256
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres_db:5432/${POSTGRES_DB}
       - LDAP_HOST=${LDAP_HOST}
-      - LDAP_PORT=389
+      - LDAP_PORT=${LDAP_PORT:-389}
+      - LDAP_USAR_SSL=${LDAP_USAR_SSL:-false}
+      - LDAP_STARTTLS=${LDAP_STARTTLS:-false}
+      - LDAP_CA_CERT=${LDAP_CA_CERT:-}
       - LDAP_BASE_DN=${LDAP_BASE_DN}
       - LDAP_BIND_USER=${LDAP_BIND_USER}
       - LDAP_BIND_PASSWORD=${LDAP_BIND_PASSWORD}
       - LDAP_TIMEOUT=10
       - LDAP_ALLOWED_OU=
-      - STORAGE_PATH=/app/storage/transfers
-      - MAX_FILE_SIZE_MB=50
-      - TRANSFER_EXPIRY_DAYS=7
+      - STORAGE_PATH=/app/storage/documentos
       - MAIL_HOST=${MAIL_HOST}
       - MAIL_PORT=25
       - MAIL_FROM=${MAIL_FROM}
-      - MAIL_FROM_NAME=FileDrop - SNM
-      - LIMPIEZA_INTERVALO_HORAS=6
-      - LIMPIEZA_RETENER_DIAS=0
+      - MAIL_FROM_NAME=ARGO NAVIS - SNM
       - FRONTEND_URL=${APP_URL}
       - APP_URL=${APP_URL}
-      - RATE_LIMIT_DOWNLOADS_PER_MINUTE=30
-      # Temporal (fase de pruebas) — quitar esta línea antes de producción real.
+      - LIMITE_VERIFICACIONES_POR_MINUTO=30
+      - LIMITE_ENVIOS_POR_HORA=30
+      # Autorizaciones Marítimas
+      - CORREO_UCVMM=${CORREO_UCVMM:-}
+      - PLAZO_CORRECCION_DIAS=2
+      - DIAS_GRACIA_FINALIZACION=1
+      - VENCIMIENTOS_INTERVALO_MINUTOS=15
+      # Cuentas locales (sin AD), p. ej. para los usuarios de las agencias navieras.
       - PERMITIR_LOGIN_LOCAL=${PERMITIR_LOGIN_LOCAL:-false}
+      # Freno del login del AD: ajustar a la política de bloqueo del dominio.
+      - LOGIN_AD_MAX_FALLOS=${LOGIN_AD_MAX_FALLOS:-3}
+      - LOGIN_AD_MINUTOS_ESPERA=${LOGIN_AD_MINUTOS_ESPERA:-30}
     volumes:
-      - filetransfer_storage:/app/storage/transfers
+      - documentos:/app/storage/documentos
     depends_on:
       postgres_db:
         condition: service_healthy
     healthcheck:
-      # python está garantizado en la imagen; curl no viene en python:3.11-slim.
+      # python está garantizado en la imagen; curl no viene en python:3.12-slim.
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=5)"]
       interval: 30s
       timeout: 10s
@@ -102,4 +116,4 @@ services:
 
 volumes:
   postgres_data:
-  filetransfer_storage:
+  documentos:

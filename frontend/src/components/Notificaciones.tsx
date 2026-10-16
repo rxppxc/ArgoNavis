@@ -31,6 +31,7 @@ interface ContextoNotificaciones {
 
 const Contexto = createContext<ContextoNotificaciones | null>(null);
 
+// eslint-disable-next-line react-refresh/only-export-components -- el hook va junto a su proveedor; separarlos solo cambiaría las rutas de import
 export function useNotificacion(): ContextoNotificaciones {
   const ctx = useContext(Contexto);
   if (!ctx) throw new Error("useNotificacion debe usarse dentro de <ProveedorNotificaciones>");

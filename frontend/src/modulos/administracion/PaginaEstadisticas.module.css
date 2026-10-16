@@ -1,93 +1,4 @@
-/* ─── Shell ─── */
-.page {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background-image:
-    linear-gradient(150deg, rgba(26,32,64,.92) 0%, rgba(13,17,40,.94) 100%),
-    url('/images/bg-migracion.jpg');
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
-}
-:global([data-theme="light"]) .page {
-  background-image:
-    linear-gradient(rgba(228,234,252,.92), rgba(228,234,252,.92)),
-    url('/images/bg-migracion.jpg');
-}
-
-/* ─── Header (barra oscura de marca en ambos temas) ─── */
-.header {
-  background: var(--ink);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  border-bottom: 2px solid var(--y);
-}
-.headerInner {
-  max-width: 1160px;
-  margin: 0 auto;
-  padding: 0 28px;
-  height: 62px;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 16px;
-}
-.headerCenter {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.headerRight {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  justify-content: flex-end;
-}
-.logo { height: 38px; }
-.headerText .org {
-  color: rgba(255,255,255,.72);
-  font-size: .63rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1.8px;
-}
-.headerText .app {
-  color: var(--y);
-  font-size: 1.05rem;
-  font-weight: 800;
-  letter-spacing: .8px;
-  line-height: 1.1;
-}
-
-.backBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  justify-self: start;
-  font-size: .76rem;
-  font-weight: 600;
-  padding: 7px 13px 7px 10px;
-  border-radius: var(--r-sm);
-  border: 1.5px solid #EF4444;
-  background: rgba(239,68,68,.12);
-  color: #FCA5A5;
-  transition: background var(--t), box-shadow var(--t);
-  white-space: nowrap;
-  text-decoration: none;
-}
-.backBtn:hover {
-  background: rgba(239,68,68,.24);
-  border-color: #EF4444;
-  color: #fff;
-}
-
 /* ─── Body ─── */
-.body {
-  flex: 1;
-  padding: 32px 28px 60px;
-}
 .container {
   max-width: 1160px;
   margin: 0 auto;
@@ -216,8 +127,6 @@
 .statIcon.gray   { background: var(--overlay-2);         color: var(--muted); }
 .statIcon.blue   { background: rgba(59,130,246,.14);     color: var(--acc-blue); }
 .statIcon.purple { background: rgba(168,85,247,.14);     color: var(--acc-purple); }
-.statIcon.orange { background: rgba(249,115,22,.14);     color: var(--acc-orange); }
-.statIcon.teal   { background: rgba(45,212,191,.14);     color: var(--acc-teal); }
 
 .statNum {
   position: relative;
@@ -324,14 +233,9 @@
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ─── Footer (barra oscura sólida en ambos temas) ─── */
-.footer {
-  background: rgba(15,20,50,.95);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-top: 1px solid rgba(255,255,255,.08);
-  color: rgba(255,255,255,.60);
-  font-size: .80rem;
-  text-align: center;
-  padding: 14px 20px;
+.subtituloSeccion {
+  color: var(--text);
+  font-size: 1.12rem;
+  font-weight: 800;
+  margin-bottom: 14px;
 }

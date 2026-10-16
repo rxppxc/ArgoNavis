@@ -1,0 +1,56 @@
+.tarjeta {
+  display: block;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border-2);
+  border-radius: 12px;
+  padding: 14px 18px;
+  text-decoration: none;
+  transition: border-color var(--t) var(--ease), background var(--t) var(--ease), box-shadow var(--t) var(--ease);
+}
+.tarjeta:hover { background: var(--surface-2); box-shadow: var(--sh-sm); }
+.tarjeta:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+
+.review    { border-left-color: var(--acc-blue); }
+.returned  { border-left-color: var(--acc-amber); }
+.approved  { border-left-color: var(--acc-green); }
+.denied    { border-left-color: var(--acc-red); }
+.finalized { border-left-color: var(--acc-teal); }
+.expired   { border-left-color: var(--acc-gray); opacity: .8; }
+
+.filaSuperior { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.numero { color: var(--acc-gold); font-weight: 800; font-size: .86rem; letter-spacing: .3px; }
+
+
+.chipAlerta, .chipRestringida {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: .68rem; font-weight: 700;
+  padding: 2px 8px; border-radius: 100px; border: 1px solid currentColor;
+}
+.chipAlerta      { color: var(--acc-red); }
+.chipRestringida { color: var(--acc-orange); }
+
+.titulo {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  color: var(--text); font-weight: 800; font-size: 1rem;
+  margin-top: 7px;
+}
+.buque {
+  display: inline-flex; align-items: center; gap: 5px;
+  color: var(--text-2); font-weight: 600; font-size: .86rem;
+}
+
+.meta {
+  display: flex; flex-wrap: wrap; gap: 4px 16px;
+  margin-top: 6px;
+  color: var(--text-2); font-size: .78rem;
+}
+.meta span { display: inline-flex; align-items: center; gap: 4px; }
+
+.plazo, .plazoVencido {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: 8px; padding: 3px 10px; border-radius: 6px;
+  font-size: .76rem; font-weight: 600;
+}
+.plazo        { color: var(--acc-amber); background: rgba(180,83,9,.10); }
+.plazoVencido { color: var(--acc-red);   background: rgba(220,38,38,.10); }

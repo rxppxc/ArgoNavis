@@ -16,27 +16,29 @@ export class CapturadorErrores extends Component<Props, Estado> {
   }
 
   componentDidCatch(error: Error) {
-    console.error("[FileDrop-SNM] Error no capturado:", error);
+    console.error("[ARGO NAVIS] Error no capturado:", error);
   }
 
   render() {
     if (this.state.hayError) {
+      // Usa los tokens del tema: data-theme ya está puesto por public/tema-inicial.js
+      // aunque el error haya ocurrido antes de montar ProveedorTema.
       return (
         <div style={{
           minHeight: "100vh", display: "flex", flexDirection: "column",
           alignItems: "center", justifyContent: "center",
-          background: "#111421", color: "#E4E6F0", fontFamily: "Segoe UI, sans-serif",
+          background: "var(--bg)", color: "var(--text)", fontFamily: "Segoe UI, sans-serif",
           padding: "40px 20px", textAlign: "center",
         }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
           <h2 style={{ fontSize: "1.4rem", marginBottom: 8 }}>Algo salió mal</h2>
-          <p style={{ color: "#9A9DC0", marginBottom: 24, maxWidth: 400 }}>
+          <p style={{ color: "var(--text-2)", marginBottom: 24, maxWidth: 400 }}>
             Ocurrió un error inesperado en la aplicación. Por favor recarga la página.
           </p>
           <button
             onClick={() => window.location.reload()}
             style={{
-              background: "#F5C800", color: "#0F0F0F", border: "none",
+              background: "var(--y)", color: "var(--on-accent)", border: "none",
               borderRadius: 8, padding: "12px 28px", fontWeight: 700,
               fontSize: "0.95rem", cursor: "pointer",
             }}

@@ -6,10 +6,8 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from app.infrastructure.database import Base
-from app.domain.models.user import Usuario
-from app.domain.models.transfer import Transferencia, ArchivoTransferencia
-from app.domain.models.audit_log import RegistroAuditoria  # noqa: F401
-from app.domain.models.rol import Rol, Permiso, RolPermiso
+# Todos los modelos, para que Base.metadata tenga el esquema completo.
+from app.domain.models import user, audit_log, rol, tramite, catalogo, solicitud  # noqa: F401
 from app.core.config import obtener_configuracion
 
 configuracion = obtener_configuracion()

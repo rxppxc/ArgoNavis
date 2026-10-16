@@ -1,27 +1,67 @@
 /**
- * Modal de previsualización de un archivo de una transferencia.
+ * Modal de previsualización de un documento del expediente.
  *
- * - Imágenes y PDF se muestran inline (img / iframe) contra el endpoint
- *   público `/transfers/preview/{token}/{fileId}`.
- * - Word (.docx) y Excel (.xlsx/.xls) se renderizan inline en el navegador
- *   con `docx-preview` / `exceljs` — sin subir el archivo a ningún servicio
- *   externo (el servidor es de red interna, no hay forma de usar visores
- *   tipo Office Online).
- * - Lo que no se puede renderizar (.doc legado, ppt, zip, etc., o si el
- *   render falla) muestra un fallback con botón para abrir/descargar ese
- *   archivo individual — sin obligar a bajar el ZIP completo.
+ * El archivo se pide con la sesión (`/solicitudes/{id}/documentos/{doc}`,
+ * con la cabecera Authorization) y se muestra desde un blob local: no hay
+ * enlaces públicos, y cada vista previa queda en la bitácora.
+ *
+ * - Imágenes y PDF se muestran inline (img / iframe sobre una URL blob:).
+ * - Word (.docx) y Excel (.xlsx) se renderizan en el navegador con
+ *   `docx-preview` / `exceljs` — sin subir el archivo a ningún servicio
+ *   externo (el servidor es de red interna, no hay visores tipo Office Online).
+ * - El Word lo sube una agencia (fuente no confiable): se muestra en un marco
+ *   aislado, sin scripts ni acceso a la sesión, sin enlaces activos, sin el
+ *   HTML que pueda traer incrustado (altChunk) y sin cargar nada externo.
+ *   Sin esto, un enlace `javascript:` dentro del .docx corría en ARGO NAVIS al
+ *   hacerle clic y podía robar la sesión de quien revisa.
+ * - Lo que no se puede renderizar (.doc y .xls del formato binario viejo, o si
+ *   el render falla) muestra un botón para descargar el archivo.
  */
-import { useEffect, useRef, useState } from "react";
-import { apiTransferencias } from "../api/transfers";
+import { useEffect, useState } from "react";
+import { apiSolicitudes } from "../api/solicitudes";
 import { infoTipo } from "../utils/tipoArchivo";
 import { useAtraparFoco } from "../hooks/useAtraparFoco";
+import { mensajeDeError } from "../utils/errores";
+import { useNotificacion } from "./Notificaciones";
 import { IconoX, IconoDescargar, IconoArchivo } from "./Iconos";
 import styles from "./ModalPreview.module.css";
 
 interface Props {
-  token:    string;
-  archivo:  { id: number; original_name: string; mime_type: string | null };
-  onCerrar: () => void;
+  solicitudId: number;
+  documento:   { id: number; nombre_original: string; tipo_mime: string | null };
+  onCerrar:    () => void;
+}
+
+interface Carga {
+  url:      string | null;          // blob: para imagen / PDF
+  html:     string | null;          // Word: documento ya aislado para el marco
+  filas:    string[][] | null;      // hoja de cálculo
+  truncado: boolean;
+  fallo:    boolean;
+}
+
+const VACIA: Carga = { url: null, html: null, filas: null, truncado: false, fallo: false };
+
+/** Política del marco del Word: nada de scripts, ni conexiones, ni recursos
+ *  externos; solo los estilos e imágenes (data:) que trae el propio documento. */
+const CSP_WORD = "default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:";
+
+/** Documento HTML para el marco aislado, a partir de lo que armó docx-preview.
+ *  Se quitan por si acaso elementos activos, manejadores on* y enlaces. */
+function documentoAislado(estilos: HTMLElement, cuerpo: HTMLElement): string {
+  for (const raiz of [estilos, cuerpo]) {
+    raiz.querySelectorAll("script, iframe, frame, object, embed, link, meta, base, form").forEach((n) => n.remove());
+    raiz.querySelectorAll("*").forEach((n) => {
+      for (const { name } of [...n.attributes]) {
+        if (name.toLowerCase().startsWith("on")) n.removeAttribute(name);
+      }
+    });
+    raiz.querySelectorAll("a[href]").forEach((a) => a.removeAttribute("href"));
+  }
+  return `<!doctype html><html><head><meta charset="utf-8">`
+    + `<meta http-equiv="Content-Security-Policy" content="${CSP_WORD}">`
+    + `<style>body{margin:0;background:#e8e8e8}</style>${estilos.innerHTML}</head>`
+    + `<body>${cuerpo.innerHTML}</body></html>`;
 }
 
 const MAX_FILAS_EXCEL = 300;
@@ -42,17 +82,15 @@ function celdaTexto(valor: unknown): string {
   return String(valor);
 }
 
-export function ModalPreview({ token, archivo, onCerrar }: Props) {
+export function ModalPreview({ solicitudId, documento, onCerrar }: Props) {
   const refModal = useAtraparFoco(true);
-  const refDocx  = useRef<HTMLDivElement>(null);
-  const { categoria } = infoTipo(archivo.mime_type, archivo.original_name);
-  const url = apiTransferencias.urlPreview(token, archivo.id);
+  const { mostrar } = useNotificacion();
+  const { categoria } = infoTipo(documento.tipo_mime, documento.nombre_original);
+  const previsualizable = ["imagen", "pdf", "word", "excel"].includes(categoria);
 
-  const necesitaRender = categoria === "word" || categoria === "excel";
-  const [cargando, setCargando] = useState(necesitaRender);
-  const [fallo,    setFallo]    = useState(false);
-  const [filas,    setFilas]    = useState<string[][] | null>(null);
-  const [truncado, setTruncado] = useState(false);
+  const [carga, setCarga] = useState<Carga | null>(null);
+  const [descargando, setDescargando] = useState(false);
+  const cargando = previsualizable && carga === null;
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -63,22 +101,30 @@ export function ModalPreview({ token, archivo, onCerrar }: Props) {
   }, [onCerrar]);
 
   useEffect(() => {
-    if (!necesitaRender) return;
+    if (!previsualizable) return;
     let cancelado = false;
+    let urlCreada: string | null = null;
 
-    async function render() {
+    (async () => {
       try {
-        const resp = await fetch(url);
-        if (!resp.ok) throw new Error("No se pudo descargar el archivo.");
-
-        if (categoria === "word") {
-          const [{ renderAsync }, blob] = await Promise.all([import("docx-preview"), resp.blob()]);
-          if (cancelado || !refDocx.current) return;
-          await renderAsync(blob, refDocx.current, undefined, {
+        const blob = await apiSolicitudes.obtenerDocumento(solicitudId, documento.id);
+        if (cancelado) return;
+        if (categoria === "imagen" || categoria === "pdf") {
+          urlCreada = URL.createObjectURL(blob);
+          setCarga({ ...VACIA, url: urlCreada });
+        } else if (categoria === "word") {
+          const { renderAsync } = await import("docx-preview");
+          // Se arma fuera de la página y se pasa al marco aislado como HTML.
+          const cuerpo = document.createElement("div");
+          const estilos = document.createElement("div");
+          await renderAsync(blob, cuerpo, estilos, {
             ignoreWidth: true, ignoreHeight: true, className: "docxDoc",
+            useBase64URL: true,       // imágenes como data: (el marco no ve los blob: de la página)
+            renderAltChunks: false,   // un altChunk es HTML del autor del documento: nunca se incrusta
           });
+          if (!cancelado) setCarga({ ...VACIA, html: documentoAislado(estilos, cuerpo) });
         } else {
-          const [{ default: ExcelJS }, buffer] = await Promise.all([import("exceljs"), resp.arrayBuffer()]);
+          const [{ default: ExcelJS }, buffer] = await Promise.all([import("exceljs"), blob.arrayBuffer()]);
           const libro = new ExcelJS.Workbook();
           await libro.xlsx.load(buffer);
           const hoja = libro.worksheets[0];
@@ -87,22 +133,37 @@ export function ModalPreview({ token, archivo, onCerrar }: Props) {
           const todasFilas = valores.slice(1).map(fila =>
             Array.isArray(fila) ? fila.slice(1).map(celdaTexto) : [],
           );
-          if (cancelado) return;
-          setTruncado(todasFilas.length > MAX_FILAS_EXCEL);
-          setFilas(todasFilas.slice(0, MAX_FILAS_EXCEL));
+          if (!cancelado) {
+            setCarga({
+              ...VACIA, filas: todasFilas.slice(0, MAX_FILAS_EXCEL),
+              truncado: todasFilas.length > MAX_FILAS_EXCEL,
+            });
+          }
         }
       } catch {
-        if (!cancelado) setFallo(true);
-      } finally {
-        if (!cancelado) setCargando(false);
+        if (!cancelado) setCarga({ ...VACIA, fallo: true });
       }
+    })();
+
+    return () => {
+      cancelado = true;
+      if (urlCreada) URL.revokeObjectURL(urlCreada);
+    };
+  }, [solicitudId, documento.id, categoria, previsualizable]);
+
+  async function descargar() {
+    setDescargando(true);
+    try {
+      await apiSolicitudes.descargarDocumento(solicitudId, documento);
+    } catch (e) {
+      mostrar(mensajeDeError(e, "No se pudo descargar el documento."), "error");
+    } finally {
+      setDescargando(false);
     }
+  }
 
-    render();
-    return () => { cancelado = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categoria, url]);
-
+  const fallo = carga?.fallo ?? false;
+  const filas = carga?.filas ?? null;
   const colMax = filas ? Math.max(0, ...filas.map(f => f.length)) : 0;
 
   return (
@@ -113,58 +174,60 @@ export function ModalPreview({ token, archivo, onCerrar }: Props) {
         onClick={e => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label={`Previsualización de ${archivo.original_name}`}
+        aria-label={`Previsualización de ${documento.nombre_original}`}
       >
         <div className={styles.header}>
-          <span className={styles.titulo}>{archivo.original_name}</span>
+          <span className={styles.titulo}>{documento.nombre_original}</span>
+          <button className={styles.cerrar} onClick={descargar} disabled={descargando}
+            aria-label="Descargar" title="Descargar">
+            <IconoDescargar tamano={16} />
+          </button>
           <button className={styles.cerrar} onClick={onCerrar} aria-label="Cerrar" data-focus-inicial>
             <IconoX tamano={16} />
           </button>
         </div>
         <div className={styles.body}>
-          {categoria === "imagen" ? (
-            <img src={url} alt={archivo.original_name} className={styles.img} />
-          ) : categoria === "pdf" ? (
-            <iframe src={url} title={archivo.original_name} className={styles.pdf} />
-          ) : categoria === "word" && !fallo ? (
-            <div className={styles.officeWrap}>
-              {cargando && <div className={styles.cargando}>Cargando documento…</div>}
-              <div ref={refDocx} className={styles.docxWrap} />
-            </div>
-          ) : categoria === "excel" && !fallo ? (
-            cargando ? (
-              <div className={styles.cargando}>Cargando hoja de cálculo…</div>
-            ) : (
-              <div className={styles.officeWrap}>
-                <table className={styles.tablaExcel}>
-                  <tbody>
-                    {filas?.map((fila, i) => (
-                      <tr key={i}>
-                        {Array.from({ length: colMax }, (_, j) => (
-                          <td key={j}>{fila[j] ?? ""}</td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {truncado && (
-                  <div className={styles.notaTruncado}>
-                    Mostrando las primeras {MAX_FILAS_EXCEL} filas — descargá el archivo para verlo completo.
-                  </div>
-                )}
-              </div>
-            )
-          ) : (
+          {!previsualizable || fallo ? (
             <div className={styles.fallback}>
               <div className={styles.fallbackIcono}><IconoArchivo tamano={30} /></div>
               <div className={styles.fallbackTexto}>
-                El archivo <span className={styles.fallbackNombre}>{archivo.original_name}</span> no
-                se puede previsualizar en el navegador. Ábrelo o descárgalo para revisarlo.
+                El archivo <span className={styles.fallbackNombre}>{documento.nombre_original}</span> no
+                se puede previsualizar en el navegador. Descárgalo para revisarlo.
               </div>
-              <a className={styles.btnDescargar} href={url} target="_blank" rel="noopener noreferrer">
+              <button type="button" className={styles.btnDescargar} onClick={descargar} disabled={descargando}>
                 <IconoDescargar tamano={16} />
-                Abrir archivo
-              </a>
+                {descargando ? "Descargando…" : "Descargar archivo"}
+              </button>
+            </div>
+          ) : categoria === "word" ? (
+            cargando ? <div className={styles.cargando}>Cargando documento…</div> : (
+              // sandbox vacío: sin scripts, sin origen propio, sin formularios ni ventanas.
+              <iframe sandbox="" srcDoc={carga?.html ?? ""} title={documento.nombre_original} className={styles.pdf} />
+            )
+          ) : cargando ? (
+            <div className={styles.cargando}>Cargando…</div>
+          ) : categoria === "imagen" && carga?.url ? (
+            <img src={carga.url} alt={documento.nombre_original} className={styles.img} />
+          ) : categoria === "pdf" && carga?.url ? (
+            <iframe src={carga.url} title={documento.nombre_original} className={styles.pdf} />
+          ) : (
+            <div className={styles.officeWrap}>
+              <table className={styles.tablaExcel}>
+                <tbody>
+                  {filas?.map((fila, i) => (
+                    <tr key={i}>
+                      {Array.from({ length: colMax }, (_, j) => (
+                        <td key={j}>{fila[j] ?? ""}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {carga?.truncado && (
+                <div className={styles.notaTruncado}>
+                  Mostrando las primeras {MAX_FILAS_EXCEL} filas — descarga el archivo para verlo completo.
+                </div>
+              )}
             </div>
           )}
         </div>
