@@ -5,8 +5,9 @@
  *  - **Revisión** (UCVMM / Sector Pacífico): la cola de todas las solicitudes.
  *  - **Puesto de control**: las autorizaciones aprobadas de sus puestos.
  *
- * El admin ve las tres. Filtros, conteos por estado y páginas los resuelve el
- * servidor. Cada fila abre el expediente (/solicitudes/:id).
+ * El admin ve las de revisión y puesto (y "Mi agencia" solo si tiene agencia).
+ * Filtros, conteos por estado y páginas los resuelve el servidor. Cada fila
+ * abre el expediente (/solicitudes/:id).
  */
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -16,6 +17,7 @@ import {
 import { useAutenticacion } from "../../hooks/useAutenticacion";
 import { usePermisos } from "../../hooks/usePermisos";
 import { MarcoPagina } from "../../components/MarcoPagina";
+import { EncabezadoPagina } from "../../components/EncabezadoPagina";
 import FiltroFechas, { type RangoFechas } from "../../components/FiltroFechas";
 import { IconoBandeja, IconoBuscar, IconoMas, IconoX } from "../../components/Iconos";
 import { TarjetaSolicitud } from "./TarjetaSolicitud";
@@ -51,7 +53,7 @@ const PESTANAS: Record<Bandeja, { id: FiltroEstado; etiqueta: string }[]> = {
   agencia: [
     { id: "todas", etiqueta: "Todas" },
     { id: "review", etiqueta: "En revisión" },
-    { id: "returned", etiqueta: "Por corregir" },
+    { id: "returned", etiqueta: "En corrección" },
     { id: "approved", etiqueta: "Aprobadas" },
     { id: "finalized", etiqueta: "Finalizadas" },
     { id: "denied", etiqueta: "Denegadas" },
@@ -70,9 +72,12 @@ export default function PaginaPanel() {
   const { usuario } = useAutenticacion();
   const { tiene, esAdmin, cargando: cargandoPermisos } = usePermisos();
 
+  const tieneAgencia = usuario?.agencia_id != null;
   const puedeRevisar = esAdmin || tiene("T-PROCESAR-PACIFICO");
   const esPuerto     = esAdmin || tiene("T-FINALIZAR-PUERTO");
-  const puedeCrear   = esAdmin || tiene("T-CREAR-BASICA");
+  // Las solicitudes son de una agencia: sin agencia el backend no deja enviar y
+  // "Mi agencia" saldría vacía (le pasaba al Administrador, que tiene todos los permisos).
+  const puedeCrear   = (esAdmin || tiene("T-CREAR-BASICA")) && tieneAgencia;
 
   const vistas = useMemo(() => {
     const lista: Bandeja[] = [];
@@ -138,6 +143,7 @@ export default function PaginaPanel() {
   const totalTodas = Object.values(conteos).reduce((a, b) => a + (b ?? 0), 0);
   const totalPaginas = datos ? Math.max(1, Math.ceil(datos.total / datos.por_pagina)) : 1;
   const hayFiltros = !!texto || rango.desde !== null || rango.hasta !== null;
+  const sinAgencia = vista === "agencia" && !tieneAgencia;
 
   function cambiarVista(v: Bandeja) {
     setVistaElegida(v);
@@ -157,20 +163,18 @@ export default function PaginaPanel() {
 
   return (
     <MarcoPagina ancho="amplio">
-      <div className={styles.encabezado}>
-        <div>
-          <h1 className={styles.saludo}>Bienvenido, {usuario?.full_name?.split(" ")[0] ?? usuario?.username}</h1>
-          <p className={styles.subtitulo}>
-            {VISTAS[vista].subtitulo}
-            {vista === "agencia" && usuario?.agencia && <> — {usuario.agencia.nombre}</>}
-          </p>
-        </div>
-        {puedeCrear && (
+      <EncabezadoPagina
+        titulo={<>Hola, {usuario?.full_name?.split(" ")[0] ?? usuario?.username}</>}
+        descripcion={<>
+          {VISTAS[vista].subtitulo}
+          {vista === "agencia" && usuario?.agencia && <> — {usuario.agencia.nombre}</>}
+        </>}
+        acciones={puedeCrear && (
           <Link to="/new" className={styles.btnNuevo}>
             <IconoMas /> Nueva solicitud
           </Link>
         )}
-      </div>
+      />
 
       {!cargandoPermisos && vistas.length > 1 && (
         <div className={styles.vistas} role="tablist" aria-label="Bandeja">
@@ -199,7 +203,7 @@ export default function PaginaPanel() {
         <div className={styles.searchWrap}>
           <span className={styles.searchIcon}><IconoBuscar tamano={15} /></span>
           <input type="text" className={styles.searchInput} value={busqueda} maxLength={100}
-            placeholder="Buscar por número, buque, IMO, agencia o puesto…"
+            placeholder="Buscar por número, buque, IMO, agencia o puesto…" aria-label="Buscar solicitudes"
             onChange={(e) => setBusqueda(e.target.value)} />
           {busqueda && (
             <button type="button" className={styles.searchLimpiar} onClick={() => setBusqueda("")} aria-label="Limpiar búsqueda">
@@ -218,9 +222,10 @@ export default function PaginaPanel() {
         !error && (
           <div className={styles.vacio}>
             <div className={styles.vacioIcono}><IconoBandeja tamano={30} /></div>
-            <h3>{hayFiltros ? "Sin resultados" : "No hay solicitudes aquí"}</h3>
+            <h3>{hayFiltros ? "Sin resultados" : sinAgencia ? "Tu usuario no tiene agencia" : "No hay solicitudes aquí"}</h3>
             <p>
               {hayFiltros ? "Nada coincide con la búsqueda o el rango de fechas."
+                : sinAgencia ? "Para ver y enviar solicitudes, pide al administrador que te asigne a tu agencia naviera."
                 : vista === "agencia" ? "Cuando tu agencia envíe una solicitud de autorización aparecerá en esta lista."
                 : vista === "puerto" ? "Aquí verás las autorizaciones aprobadas para tus puestos de control."
                 : "No hay solicitudes en este estado."}
@@ -234,7 +239,7 @@ export default function PaginaPanel() {
         <>
           <div className={`${styles.lista} ${cargando ? styles.listaActualizando : ""}`} aria-busy={cargando}>
             {datos.items.map((s) => (
-              <TarjetaSolicitud key={s.id} s={s} mostrarRemitente={vista !== "agencia"} />
+              <TarjetaSolicitud key={s.id} s={s} vista={vista} />
             ))}
           </div>
           {totalPaginas > 1 && (

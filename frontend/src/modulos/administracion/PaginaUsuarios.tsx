@@ -4,9 +4,10 @@ import { useAutenticacion } from "../../hooks/useAutenticacion";
 import { useNotificacion } from "../../components/Notificaciones";
 import { useConfirmar } from "../../components/ModalConfirmacion";
 import { MarcoPagina } from "../../components/MarcoPagina";
+import { EncabezadoPagina } from "../../components/EncabezadoPagina";
 import {
   IconoBuscar, IconoUsuario, IconoCorreo, IconoMaletin, IconoMas,
-  IconoCheck, IconoBasura, IconoPoder, IconoEscudo, IconoLlave,
+  IconoCheck, IconoBasura, IconoPoder, IconoLlave,
 } from "../../components/Iconos";
 import { copiarAlPortapapeles } from "../../utils/portapapeles";
 import { LARGO_MINIMO_CONTRASENA, problemaContrasena } from "../../utils/contrasena";
@@ -200,13 +201,10 @@ export default function PaginaUsuarios() {
     <MarcoPagina volverA="/dashboard">
       <div className={styles.container}>
 
-        <div className={styles.pageTitle}>
-          <span className={styles.titleIcon}><IconoEscudo /></span>
-          <div>
-            <h1>Gestión de usuarios</h1>
-            <p>Agrega usuarios del Active Directory o crea cuentas locales para usuarios externos.</p>
-          </div>
-        </div>
+        <EncabezadoPagina
+          titulo="Gestión de usuarios"
+          descripcion="Agrega usuarios del Active Directory o crea cuentas locales para usuarios externos."
+        />
 
         {claveTemporal && (
           <section className={`${styles.panel} ${styles.claveTemporal}`} role="status">
@@ -214,7 +212,7 @@ export default function PaginaUsuarios() {
               <strong>Contraseña temporal de @{claveTemporal.username}:</strong>
               <code>{claveTemporal.clave}</code>
               <button type="button" className={styles.searchBtn} onClick={copiarClave}>Copiar</button>
-              <button type="button" className={`${styles.actionBtn} ${styles.btnCancelar}`} onClick={() => setClaveTemporal(null)}>
+              <button type="button" className={styles.actionBtn} onClick={() => setClaveTemporal(null)}>
                 Listo
               </button>
               <p>Entrégala por un medio seguro: no se volverá a mostrar. Al entrar, el sistema le pedirá cambiarla.</p>
@@ -367,8 +365,9 @@ export default function PaginaUsuarios() {
                       const esYo = u.id === usuario?.id;
                       const trabajando = ocupado === u.id;
                       return (
+                        // data-etiqueta: el título de cada dato cuando la tabla pasa a fichas en el celular.
                         <tr key={u.id} className={u.status === "inactive" ? styles.rowInactive : ""}>
-                          <td>
+                          <td className={styles.celdaAncha}>
                             <div className={styles.cellUser}>
                               <div className={`${styles.cellAvatar} ${["Administrador", "SysAdmin"].includes(u.rol_personalizado?.nombre ?? "") ? styles.cellAvatarAdmin : ""}`}>
                                 {(u.name?.[0] ?? u.username[0]).toUpperCase()}
@@ -383,9 +382,9 @@ export default function PaginaUsuarios() {
                               </div>
                             </div>
                           </td>
-                          <td className={styles.cellEmail}>{u.email ?? "—"}</td>
-                          <td className={styles.cellEmail}>{u.agencia?.nombre ?? "—"}</td>
-                          <td>
+                          <td className={styles.cellEmail} data-etiqueta="Correo">{u.email ?? "—"}</td>
+                          <td className={styles.cellEmail} data-etiqueta="Agencia">{u.agencia?.nombre ?? "—"}</td>
+                          <td data-etiqueta="Rol">
                             <select
                               className={styles.rolSelect}
                               value={u.rol_id ?? ""}
@@ -396,15 +395,15 @@ export default function PaginaUsuarios() {
                               {roles.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
                             </select>
                           </td>
-                          <td>
+                          <td data-etiqueta="Estado">
                             <span className={`${styles.badge} ${u.status === "active" ? styles.badgeActive : styles.badgeInactive}`}>
                               {u.status === "active" ? "Activo" : "Inactivo"}
                             </span>
                           </td>
-                          <td>
+                          <td className={styles.celdaAncha}>
                             <div className={styles.actions}>
                               <button
-                                className={`${styles.actionBtn} ${u.status === "active" ? styles.btnDesactivar : styles.btnActivar}`}
+                                className={`${styles.actionBtn} ${u.status === "active" ? "" : styles.btnActivar}`}
                                 onClick={() => alToggleEstado(u)}
                                 disabled={trabajando || esYo}
                                 title={u.status === "active" ? "Desactivar" : "Activar"}
@@ -414,7 +413,7 @@ export default function PaginaUsuarios() {
                               </button>
                               {u.user_type === "local" && (
                                 <button
-                                  className={`${styles.actionBtn} ${styles.btnRestablecer}`}
+                                  className={styles.actionBtn}
                                   onClick={() => alRestablecer(u)}
                                   disabled={trabajando}
                                   title="Generar una contraseña temporal"

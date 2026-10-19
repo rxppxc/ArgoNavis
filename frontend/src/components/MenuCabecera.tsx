@@ -17,6 +17,9 @@ export function MenuCabecera() {
   const [abierto, setAbierto] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const esPacifico = !esAdmin && tiene("T-PROCESAR-PACIFICO");
+  // Quién está en la sesión y con qué rol: se ve junto al menú (escritorio) y arriba del panel.
+  const nombre = usuario?.full_name?.trim() || usuario?.username || "";
+  const detalle = [usuario?.rol_personalizado?.nombre, usuario?.agencia?.nombre].filter(Boolean).join(" · ");
 
   useEffect(() => {
     function clickFuera(e: MouseEvent) {
@@ -34,6 +37,12 @@ export function MenuCabecera() {
 
   return (
     <div className={styles.wrap}>
+      {nombre && (
+        <div className={styles.identidad}>
+          <span className={styles.identidadNombre} title={nombre}>{nombre}</span>
+          {detalle && <span className={styles.identidadDetalle} title={detalle}>{detalle}</span>}
+        </div>
+      )}
       <div className={styles.dropdown} ref={ref}>
         <button
           className={`${styles.menuBtn} ${abierto ? styles.menuBtnOpen : ""}`}
@@ -49,6 +58,15 @@ export function MenuCabecera() {
 
         {abierto && (
           <div className={styles.panel}>
+            {nombre && (
+              <>
+                <div className={styles.cuenta}>
+                  <span className={styles.cuentaNombre}>{nombre}</span>
+                  {detalle && <span className={styles.cuentaDetalle}>{detalle}</span>}
+                </div>
+                <div className={styles.sep} />
+              </>
+            )}
             {esSysAdmin && (
               <>
                 <Link to="/admin" className={styles.item} onClick={() => setAbierto(false)}>

@@ -1,12 +1,9 @@
-.titulo { text-align: center; margin-bottom: 20px; }
-.titulo h1 { color: var(--text); font-size: 1.55rem; font-weight: 800; }
-.titulo p { color: var(--text-2); font-size: .9rem; margin-top: 6px; }
-
+/* Las mismas pestañas subrayadas que el selector de bandeja del panel. */
 .pestanas { display: flex; gap: 6px; border-bottom: 1px solid var(--border); margin-bottom: 16px; flex-wrap: wrap; }
 .pestana {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 10px 16px; margin-bottom: -1px;
-  border-bottom: 2px solid transparent;
+  border-bottom: 3px solid transparent;
   color: var(--text-2); font-weight: 700; font-size: .88rem;
 }
 .pestana:hover { color: var(--text); }
@@ -20,9 +17,10 @@
 
 .input {
   padding: 9px 11px; border-radius: 8px;
-  border: 1px solid var(--border); background: var(--card-2); color: var(--text);
+  border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text);
   font-size: .86rem; min-width: 0;
 }
+.input::placeholder { color: var(--muted); }
 .input:focus { outline: 2px solid var(--foco); border-color: transparent; }
 
 .formNuevo {
@@ -36,7 +34,10 @@
   background: var(--card); border: 1px solid var(--border); border-radius: 12px;
   padding: 14px 16px;
 }
-.inactivo { opacity: .65; }
+/* Inactivo: se atenúan los datos, no los controles (el interruptor "Activo"
+   es justo lo que hay que poder usar). */
+.inactivo { border-style: dashed; }
+.inactivo .tarjetaInfo, .inactivo .asignados .chip { opacity: .7; }
 .tarjetaCabecera { display: flex; align-items: center; gap: 10px; }
 .tarjetaInfo { flex: 1; min-width: 0; }
 .tarjetaNombre { color: var(--text); font-weight: 800; font-size: .95rem; }
@@ -82,19 +83,23 @@
   padding: 9px 14px; border-radius: 8px; border: 0;
   background: var(--y); color: var(--on-accent); font-weight: 800; font-size: .82rem; white-space: nowrap;
 }
-.btnPrimario:disabled { opacity: .5; cursor: not-allowed; }
+.btnPrimario:hover:not(:disabled) { filter: brightness(1.07); }
+/* Desactivado en gris: el amarillo a media opacidad quedaba mostaza. */
+.btnPrimario:disabled { background: var(--overlay-2); color: var(--muted); cursor: not-allowed; }
 .btnSecundario {
   padding: 6px 12px; border-radius: 8px;
-  border: 1.5px solid var(--y-border); background: var(--y-soft);
-  color: var(--acc-gold); font-weight: 700; font-size: .78rem;
+  border: 1.5px solid var(--border-2); background: var(--card);
+  color: var(--text); font-weight: 700; font-size: .78rem;
 }
+.btnSecundario:hover { background: var(--hover); border-color: var(--input-border); }
 .btnTexto { padding: 8px 10px; color: var(--text-2); font-size: .82rem; font-weight: 600; }
+.btnTexto:hover { color: var(--text); }
 .btnIcono {
   display: flex; align-items: center; justify-content: center;
   width: 30px; height: 30px; border-radius: 7px;
   border: 1px solid var(--border-2); color: var(--text-2);
 }
-.btnIcono:hover:not(:disabled) { color: var(--text); border-color: var(--y-border); }
+.btnIcono:hover:not(:disabled) { color: var(--text); border-color: var(--input-border); background: var(--hover); }
 .btnIcono:disabled { opacity: .35; cursor: not-allowed; }
 .peligro:hover:not(:disabled) { color: var(--acc-red); border-color: var(--acc-red); }
 

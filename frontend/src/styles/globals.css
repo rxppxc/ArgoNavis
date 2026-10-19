@@ -1,7 +1,10 @@
 /* ─── Tema oscuro (por defecto) — paleta neutra "pizarra" ─────────────────
-   El amarillo de marca (--y) es solo acento: botón principal, línea de la
-   cabecera y estados activos. Todos los pares texto/fondo cumplen WCAG AA
-   (4.5:1 en texto, 3:1 en bordes de campos): si cambias un valor, recalcula.
+   El amarillo de marca (--y) es solo acento: relleno del botón principal, lo
+   seleccionado (pestaña, filtro, paso) y el foco. Nunca como color de texto:
+   los textos van en --text / --text-2 / --muted y los estados en --acc-*.
+   Si todo es amarillo, la acción principal deja de destacar.
+   Todos los pares texto/fondo cumplen WCAG AA (4.5:1 en texto, 3:1 en bordes
+   de campos), también sobre los fondos teñidos: si cambias un valor, recalcula.
    El tema se fija en <html data-theme> antes de pintar (public/tema-inicial.js). */
 :root {
   color-scheme: dark;   /* calendario, desplegables y scroll nativos en oscuro */
@@ -47,7 +50,7 @@
      oscuro; el modo claro los reemplaza por tonos legibles sobre blanco. */
   --acc-green:  #34D399;
   --acc-red:    #F87171;
-  --acc-amber:  #FBBF24;
+  --acc-amber:  #F59E0B;   /* corrido al naranja: el #FBBF24 se confundía con el amarillo de marca */
   --acc-blue:   #60A5FA;
   --acc-gray:   #94A3B8;
   --acc-purple: #C084FC;
@@ -55,6 +58,12 @@
   --acc-teal:   #2DD4BF;
   --acc-orange: #FB923C;
   --acc-cyan:   #22D3EE;
+
+  /* Botones con relleno de aprobar / denegar. El mismo valor sirve en los dos
+     temas: texto blanco a más de 4.5:1 y el botón se distingue del fondo. */
+  --exito-fuerte:   #15803D;
+  --peligro-fuerte: #B91C1C;
+  --sobre-fuerte:   #FFFFFF;
 
   --r-xs: 5px;
   --r-sm: 8px;
@@ -106,15 +115,17 @@
 
   --cabecera:       #FFFFFF;
 
-  --acc-green:  #15803D;
+  /* Un tono más oscuros que los "-700": sobre sus propios fondos teñidos
+     (insignias, avisos, contadores) los -700 quedaban entre 3.8 y 4.49:1. */
+  --acc-green:  #166534;
   --acc-red:    #B91C1C;
-  --acc-amber:  #B45309;
-  --acc-blue:   #2563EB;
+  --acc-amber:  #92400E;
+  --acc-blue:   #1D4ED8;
   --acc-gray:   #5B6178;
   --acc-purple: #7E22CE;
-  --acc-gold:   #8A6D00;
+  --acc-gold:   #7A5F00;
   --acc-teal:   #0F766E;
-  --acc-orange: #C2410C;
+  --acc-orange: #9A3412;
   --acc-cyan:   #0E7490;
 
   --sh-xs: 0 1px 2px rgba(15,23,42,.06);

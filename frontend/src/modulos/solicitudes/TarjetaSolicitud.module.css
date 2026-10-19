@@ -12,15 +12,14 @@
 .tarjeta:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
 
 .review    { border-left-color: var(--acc-blue); }
-.returned  { border-left-color: var(--acc-amber); }
+.returned  { border-left-color: var(--acc-orange); }
 .approved  { border-left-color: var(--acc-green); }
 .denied    { border-left-color: var(--acc-red); }
 .finalized { border-left-color: var(--acc-teal); }
 .expired   { border-left-color: var(--acc-gray); opacity: .8; }
 
 .filaSuperior { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.numero { color: var(--acc-gold); font-weight: 800; font-size: .86rem; letter-spacing: .3px; }
-
+.numero { color: var(--text-2); font-weight: 800; font-size: .86rem; letter-spacing: .3px; }
 
 .chipAlerta, .chipRestringida {
   display: inline-flex; align-items: center; gap: 4px;

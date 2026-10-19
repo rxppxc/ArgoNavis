@@ -13,6 +13,7 @@ import {
   apiCatalogos, type CatalogoConUsuarios, type DatosCatalogo, type Pais,
 } from "../../api/catalogos";
 import { MarcoPagina } from "../../components/MarcoPagina";
+import { EncabezadoPagina } from "../../components/EncabezadoPagina";
 import { useConfirmar } from "../../components/ModalConfirmacion";
 import { useNotificacion } from "../../components/Notificaciones";
 import { IconoBasura, IconoBuscar, IconoEditar, IconoMas, IconoUsuarios } from "../../components/Iconos";
@@ -363,10 +364,7 @@ export default function PaginaCatalogos() {
 
   return (
     <MarcoPagina volverA="/dashboard">
-      <div className={styles.titulo}>
-        <h1>Agencias, puestos y países</h1>
-        <p>Catálogos del flujo de autorizaciones marítimas.</p>
-      </div>
+      <EncabezadoPagina titulo="Agencias, puestos y países" descripcion="Catálogos del flujo de autorizaciones marítimas." />
 
       <div className={styles.pestanas} role="tablist">
         {pestanas.map((p) => (

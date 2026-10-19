@@ -104,6 +104,15 @@ constants/          → números mágicos.
 - TS quita `noUnusedLocals` y `noUnusedParameters`. Si una variable sale, eliminarla.
 - `eslint-plugin-react-hooks` en exhaustive deps. Si quitas una dep, deja `// eslint-disable-next-line` con el porqué.
 
+### Interfaz (revisión de UI/UX del 2026-10-19)
+- El amarillo de marca (`--y`) es solo **relleno**: el botón principal de cada pantalla, lo seleccionado (pestaña, filtro, tema) y el foco. **Nunca como color de texto** (en claro da 1.6:1 y el dorado se ve oliva): textos con `--text` / `--text-2` / `--muted`, estados con `--acc-*`.
+- Botones: principal amarillo; secundario neutro con borde; aprobar con `--exito-fuerte`, denegar/eliminar con `--peligro-fuerte` (o contorno rojo); "Volver" discreto. Desactivado en gris (`--overlay-2` + `--muted`), no amarillo a media opacidad. En `useConfirmar`, `peligroso` (rojo) o `exito` (verde) según la acción.
+- "En corrección" va en naranja (`--acc-orange`): el ámbar se confundía con la marca.
+- Encabezado de página: `EncabezadoPagina` (título y descripción a la izquierda, acciones a la derecha); el expediente lleva el suyo.
+- Campos con `--input-border` / `--input-bg` (borde de 3:1). Las notas informativas, neutras con borde izquierdo `--acc-blue`.
+- Tablas que en el celular pasan a fichas: cada `<td>` lleva `data-etiqueta` (tripulantes del expediente, usuarios).
+- Si cambias un color, recalcula el contraste también sobre los fondos teñidos (insignias, avisos, contadores).
+
 ## Estado actual (snapshot 2026-10-16)
 
 ### Lo que se hizo en la adaptación storage → sistema (revisión `d4f1a8c27e90`)

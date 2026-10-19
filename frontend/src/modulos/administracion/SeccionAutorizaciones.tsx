@@ -86,12 +86,12 @@ export default function SeccionAutorizaciones() {
               <span className={styles.valor}>{datos.negadas.toLocaleString("es-PA")}</span>
             </div>
             <div className={styles.indicador}>
-              <span className={`${styles.icono} ${styles.aviso}`}><IconoReloj tamano={18} /></span>
+              <span className={`${styles.icono} ${styles.expirada}`}><IconoReloj tamano={18} /></span>
               <span className={styles.etiqueta}>Expiradas</span>
               <span className={styles.valor}>{datos.expiradas.toLocaleString("es-PA")}</span>
             </div>
             <div className={styles.indicador}>
-              <span className={`${styles.icono} ${styles.neutro}`}><IconoProcesada tamano={18} /></span>
+              <span className={`${styles.icono} ${styles.finalizada}`}><IconoProcesada tamano={18} /></span>
               <span className={styles.etiqueta}>Finalizadas en puerto</span>
               <span className={styles.valor}>{datos.finalizadas.toLocaleString("es-PA")}</span>
             </div>

@@ -1,15 +1,17 @@
 import { Link } from "react-router-dom";
-import type { SolicitudResumen } from "../../api/solicitudes";
+import type { Bandeja, SolicitudResumen } from "../../api/solicitudes";
 import { IconoAlerta, IconoBarco, IconoReloj, IconoUsuario } from "../../components/Iconos";
 import { InsigniaEstado } from "./InsigniaEstado";
 import { formatearFecha, formatearFechaHora, tiempoRestante } from "./presentacion";
 import styles from "./TarjetaSolicitud.module.css";
 
 /** Fila de las bandejas: lleva al expediente de la solicitud. */
-export function TarjetaSolicitud({ s, mostrarRemitente }: { s: SolicitudResumen; mostrarRemitente: boolean }) {
+export function TarjetaSolicitud({ s, vista }: { s: SolicitudResumen; vista: Bandeja }) {
+  const deAgencia = vista === "agencia";
+  // Quien finaliza es el puesto de control: a la agencia le basta saber hasta cuándo vale.
   const plazo =
     s.estado === "returned" ? { etiqueta: "Corregir antes del", fecha: s.plazo_correccion }
-    : s.estado === "approved" ? { etiqueta: "Finalizar antes del", fecha: s.vigente_hasta }
+    : s.estado === "approved" ? { etiqueta: deAgencia ? "Vigente hasta el" : "Finalizar antes del", fecha: s.vigente_hasta }
     : null;
   const restante = plazo ? tiempoRestante(plazo.fecha) : null;
 
@@ -38,14 +40,14 @@ export function TarjetaSolicitud({ s, mostrarRemitente }: { s: SolicitudResumen;
         <span><IconoUsuario tamano={12} /> {s.cantidad_tripulantes} tripulante{s.cantidad_tripulantes === 1 ? "" : "s"}</span>
         <span>
           Enviada {formatearFechaHora(s.enviada_en)}
-          {mostrarRemitente && s.creada_por && <> por {s.creada_por}</>}
+          {!deAgencia && s.creada_por && <> por {s.creada_por}</>}
         </span>
       </div>
 
       {plazo && restante && (
         <div className={restante.vencido ? styles.plazoVencido : styles.plazo}>
           <IconoReloj tamano={12} /> {plazo.etiqueta} {formatearFechaHora(plazo.fecha)}
-          {restante.vencido ? " — plazo vencido" : ` (quedan ${restante.texto})`}
+          {restante.vencido ? " — plazo vencido" : ` (${restante.frase})`}
         </div>
       )}
     </Link>

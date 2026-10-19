@@ -2,6 +2,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { apiAdmin, type FiltrosBitacora, type PaginaBitacora as Pagina } from "../../api/admin";
 import { MarcoPagina } from "../../components/MarcoPagina";
+import { EncabezadoPagina } from "../../components/EncabezadoPagina";
 import { useNotificacion } from "../../components/Notificaciones";
 import { mensajeDeError } from "../../utils/errores";
 import type { EstadoSolicitud } from "../../api/solicitudes";
@@ -124,10 +125,10 @@ export default function PaginaBitacora() {
 
   return (
     <MarcoPagina volverA="/dashboard" ancho="amplio">
-      <div className={styles.titulo}>
-        <h1>Bitácora</h1>
-        <p>Registro de todo lo que se realiza en la aplicación: sesiones, solicitudes, verificaciones y administración.</p>
-      </div>
+      <EncabezadoPagina
+        titulo="Bitácora"
+        descripcion="Registro de todo lo que se realiza en la aplicación: sesiones, solicitudes, verificaciones y administración."
+      />
 
       <form className={styles.filtros} onSubmit={aplicar}>
         <label>

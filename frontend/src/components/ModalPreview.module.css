@@ -129,10 +129,10 @@
 .fallbackIcono {
   width: 64px; height: 64px;
   border-radius: var(--r-md);
-  background: var(--y-soft);
-  border: 1.5px solid var(--y-border);
+  background: var(--overlay);
+  border: 1px solid var(--border-2);
   display: flex; align-items: center; justify-content: center;
-  color: var(--acc-gold);
+  color: var(--text-2);
 }
 .fallbackTexto {
   font-size: .9rem;

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { apiTramites, ETIQUETA_ALCANCE, ETIQUETA_CONDICION, type TipoTramite } from "../../api/tramites";
 import { MarcoPagina } from "../../components/MarcoPagina";
+import { EncabezadoPagina } from "../../components/EncabezadoPagina";
 import { useNotificacion } from "../../components/Notificaciones";
 import { ETIQUETA_RANGO } from "../solicitudes/presentacion";
 import {
@@ -28,15 +29,15 @@ export default function PaginaTramites() {
 
   return (
     <MarcoPagina volverA="/dashboard">
-      <div className={styles.container}>
-        <div className={styles.titulo}>
-          <h1>Catálogo de trámites</h1>
-          <p>
-            Qué datos y documentos exige cada trámite del Formulario 3 (Solicitud de Autorización, la llena la
-            agencia naviera). Es lo que el sistema pide al crear una solicitud; el catálogo se ajusta con una
-            migración de la base de datos.
-          </p>
-        </div>
+      <>
+        <EncabezadoPagina
+          titulo="Catálogo de trámites"
+          descripcion={
+            "Qué datos y documentos exige cada trámite del Formulario 3 (Solicitud de Autorización, la llena la "
+            + "agencia naviera). Es lo que el sistema pide al crear una solicitud; el catálogo se ajusta con una "
+            + "migración de la base de datos."
+          }
+        />
 
         {cargando ? (
           <div className={styles.empty}>Cargando catálogo…</div>
@@ -80,7 +81,7 @@ export default function PaginaTramites() {
                         <div className={styles.seccion}>
                           <div className={styles.seccionTitulo}>Campos que pide el formulario</div>
                           <div className={styles.chips}>
-                            <span className={styles.chipFecha}>Fecha de la operación</span>
+                            <span className={styles.chipCampo}>Fecha de la operación</span>
                             {campos.map((c) => (
                               <span key={c} className={styles.chipCampo}>{c}</span>
                             ))}
@@ -178,7 +179,7 @@ export default function PaginaTramites() {
             })}
           </div>
         )}
-      </div>
+      </>
     </MarcoPagina>
   );
 }

@@ -42,7 +42,7 @@ function BannerEstado({ s }: { s: SolicitudDetalle }) {
           <div className={styles.bannerTexto}>{s.motivo_devolucion}</div>
           <div className={styles.bannerPie}>
             Plazo para corregir: hasta el {formatearFechaHora(s.plazo_correccion)}
-            {plazo.vencido ? " (vencido)" : ` (quedan ${plazo.texto})`}
+            {plazo.vencido ? " (vencido)" : ` (${plazo.frase})`}
           </div>
         </div>
       );
@@ -185,7 +185,9 @@ export default function PaginaDetalleSolicitud() {
             </Link>
           )}
           {s.acciones.descargar_autorizacion && (
-            <button type="button" className={styles.btnPrimario} onClick={descargarPdf} disabled={descargando}>
+            // Para el puesto de control la acción principal es finalizar (en su panel): la descarga queda secundaria.
+            <button type="button" className={s.acciones.finalizar ? styles.btnSecundario : styles.btnPrimario}
+              onClick={descargarPdf} disabled={descargando}>
               <IconoDescargar tamano={15} /> {descargando ? "Generando…" : "Descargar autorización (PDF)"}
             </button>
           )}
@@ -244,10 +246,12 @@ export default function PaginaDetalleSolicitud() {
                 <tbody>
                   {s.tripulantes.map((m, i) => {
                     const faltan = s.checklist.filter((c) => c.tripulante_id === m.id && !c.cubierta).length;
+                    const adjuntos = s.documentos.filter((d) => d.tripulante_id === m.id).length;
+                    // data-etiqueta: el título de cada dato cuando la tabla pasa a fichas en el celular.
                     return (
                       <tr key={m.id}>
-                        <td>{i + 1}</td>
-                        <td>
+                        <td className={styles.celdaOrden}>{i + 1}</td>
+                        <td className={styles.celdaAncha}>
                           <div className={styles.celdaPrincipal}>{m.nombre_completo}</div>
                           <div className={styles.celdaSecundaria}>
                             {ETIQUETA_SEXO[m.sexo]} · Nac. {formatearFecha(m.fecha_nacimiento)}
@@ -256,19 +260,19 @@ export default function PaginaDetalleSolicitud() {
                           {/* Solo llega al personal del SNM: a la agencia el backend le manda null */}
                           {m.con_impedimento && <span className={styles.chipImpedimento}>Con impedimento</span>}
                         </td>
-                        <td>
+                        <td data-etiqueta="Nacionalidad">
                           {m.nacionalidad_nombre ?? m.nacionalidad}
                           {m.nacionalidad_restringida && s.tipo_tramite_aviso_custodia && (
                             <div className={styles.chipRestringida}>Restringida</div>
                           )}
                         </td>
-                        <td>
+                        <td data-etiqueta="Pasaporte">
                           <div className={styles.celdaPrincipal}>{m.pasaporte}</div>
                           <div className={m.pasaporte_vencido ? styles.vencido : styles.celdaSecundaria}>
                             Vence {formatearFecha(m.pasaporte_expira)}{m.pasaporte_vencido && " — vencido"}
                           </div>
                         </td>
-                        <td>
+                        <td data-etiqueta="Seamanbook">
                           {m.porta_libreta ? (
                             <>
                               <div className={styles.celdaPrincipal}>{m.libreta_marino ?? "—"}</div>
@@ -280,16 +284,15 @@ export default function PaginaDetalleSolicitud() {
                             <span className={styles.celdaSecundaria}>No aplica</span>
                           )}
                         </td>
-                        <td>
+                        <td data-etiqueta="Rango / ocupación">
                           <div className={styles.celdaPrincipal}>{ETIQUETA_RANGO[m.rango]}</div>
                           <div className={styles.celdaSecundaria}>{m.ocupacion}</div>
                         </td>
-                        <td>
+                        <td className={styles.celdaAncha}>
                           <button type="button" className={styles.btnDocumentacion} onClick={() => setDocumentacionDe(m)}
                             aria-label={`Ver documentación de ${m.nombre_completo}`}>
                             <IconoArchivo tamano={13} />
-                            {s.documentos.filter((d) => d.tripulante_id === m.id).length}
-                            <span>Ver documentación</span>
+                            <span>{adjuntos > 0 ? `Ver ${adjuntos} documento${adjuntos === 1 ? "" : "s"}` : "Ver documentación"}</span>
                           </button>
                           {faltan > 0 && (
                             <div className={styles.textoFalta}>

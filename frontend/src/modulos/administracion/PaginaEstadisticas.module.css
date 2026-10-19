@@ -4,33 +4,6 @@
   margin: 0 auto;
 }
 
-.pageTitle {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  margin-bottom: 28px;
-}
-.titleIcon {
-  width: 44px; height: 44px;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--y-soft);
-  border: 1.5px solid var(--y-border);
-  border-radius: var(--r-sm);
-  color: var(--acc-gold);
-  flex-shrink: 0;
-}
-.pageTitle h1 {
-  font-size: 1.35rem;
-  font-weight: 800;
-  color: var(--text);
-  margin: 0 0 4px;
-}
-.pageTitle p {
-  font-size: .85rem;
-  color: var(--muted);
-  margin: 0;
-}
-
 .loading {
   display: flex;
   align-items: center;
@@ -49,102 +22,42 @@
   margin-bottom: 20px;
 }
 
-/* ─── Stat cards ─── */
+/* ─── Uso del sistema: las mismas tarjetas que los indicadores de
+   autorizaciones (antes llevaban un brillo amarillo en la esquina que en el
+   tema claro parecía una mancha, y un color de ícono distinto cada una). ─── */
 .statGrid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-  margin-bottom: 28px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 24px;
 }
-@media (max-width: 900px) { .statGrid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 480px) { .statGrid { grid-template-columns: 1fr; } }
+/* En dos columnas, la última tarjeta impar ocupa la fila entera: sin tarjetas sueltas. */
+@media (max-width: 900px) {
+  .statGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .statCard:last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
 
 .statCard {
-  position: relative;
-  overflow: hidden;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  padding: 14px 16px;
+  border-radius: var(--r-md);
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  padding: 18px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  box-shadow: var(--sh-sm);
-  transition: transform .22s var(--ease), box-shadow .22s var(--ease), border-color .22s var(--ease);
-  animation: statCardIn .5s var(--ease) both;
 }
-.statGrid .statCard:nth-child(1) { animation-delay: .02s; }
-.statGrid .statCard:nth-child(2) { animation-delay: .06s; }
-.statGrid .statCard:nth-child(3) { animation-delay: .10s; }
-.statGrid .statCard:nth-child(4) { animation-delay: .14s; }
-.statGrid .statCard:nth-child(5) { animation-delay: .18s; }
-.statGrid .statCard:nth-child(6) { animation-delay: .22s; }
-.statGrid .statCard:nth-child(7) { animation-delay: .26s; }
-.statGrid .statCard:nth-child(8) { animation-delay: .30s; }
-@keyframes statCardIn {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-/* Barra de acento superior + glow de esquina: dorado uniforme en las 8 cards,
-   para combinar con los paneles de abajo (Top subidores, Puertos más activos),
-   que ya usan ese mismo acento. El color solo varía en el ícono (chico,
-   contenido) — un brillo grande de color distinto por card era lo que
-   rompía la combinación con el resto de la página. */
-.statCard::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 3px;
-  background: linear-gradient(90deg, transparent, var(--y-dark), transparent);
-  opacity: .8;
-}
-.statCard::after {
-  content: '';
-  position: absolute;
-  top: -45px; right: -45px;
-  width: 120px; height: 120px;
-  background: radial-gradient(circle, var(--y-soft) 0%, transparent 70%);
-  pointer-events: none;
-}
-.statCard:hover {
-  transform: translateY(-3px);
-  border-color: var(--y-border);
-  box-shadow: var(--sh-md);
-}
-
 .statIcon {
-  position: relative;
-  z-index: 1;
-  width: 42px; height: 42px;
+  grid-row: span 2;
+  align-self: center;
+  width: 36px; height: 36px;
+  border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
-  border-radius: var(--r-sm);
-  flex-shrink: 0;
-  transition: transform .22s var(--ease);
-}
-.statCard:hover .statIcon { transform: scale(1.08); }
-.statIcon.yellow { background: var(--y-soft);            color: var(--acc-gold); }
-.statIcon.green  { background: var(--green-soft);        color: var(--acc-green); }
-.statIcon.gray   { background: var(--overlay-2);         color: var(--muted); }
-.statIcon.blue   { background: rgba(59,130,246,.14);     color: var(--acc-blue); }
-.statIcon.purple { background: rgba(168,85,247,.14);     color: var(--acc-purple); }
-
-.statNum {
-  position: relative;
-  z-index: 1;
-  font-size: 1.7rem;
-  font-weight: 800;
-  color: var(--text);
-  line-height: 1;
-  letter-spacing: -.4px;
-}
-.statLabel {
-  position: relative;
-  z-index: 1;
-  font-size: .76rem;
+  background: var(--overlay);
   color: var(--text-2);
-  font-weight: 500;
-  margin-top: 3px;
 }
+.statLabel { color: var(--text-2); font-size: .76rem; font-weight: 600; }
+.statNum { color: var(--text); font-size: 1.45rem; font-weight: 700; line-height: 1.2; }
 
 /* ─── Paneles apilados ─── */
 .panelesStack {
@@ -153,38 +66,33 @@
   gap: 20px;
 }
 
-/* ─── Panel ─── */
+/* ─── Panel (como los de "Autorizaciones marítimas") ─── */
 .panel {
-  background: var(--surface);
+  background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   overflow: hidden;
-  box-shadow: var(--sh-sm);
 }
 .panelHeader {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 18px;
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--border);
-  border-left: 4px solid var(--y);
-  font-size: .80rem;
+  padding: 14px 16px 0;
+  color: var(--text);
+  font-size: .9rem;
   font-weight: 800;
-  color: var(--acc-gold);
-  text-transform: uppercase;
-  letter-spacing: .7px;
 }
-.panelBody { padding: 16px 18px; }
+.panelHeader svg { color: var(--text-2); }
+.panelBody { padding: 12px 16px 16px; }
 
-/* ─── Uploaders ─── */
+/* ─── Agencias con más solicitudes ─── */
 .uploaderList { display: flex; flex-direction: column; gap: 8px; }
 .uploaderRow {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
-  background: var(--surface-2);
+  background: var(--card-2);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
 }
@@ -193,21 +101,18 @@
   display: flex; align-items: center; justify-content: center;
   border-radius: 50%;
   background: var(--overlay-2);
-  color: var(--muted);
+  color: var(--text-2);
   font-size: .72rem;
   font-weight: 800;
   flex-shrink: 0;
 }
-.rankGold   { background: var(--y-soft);            color: var(--acc-gold); }
-.rankSilver { background: var(--overlay-2);         color: var(--text-2); }
-.rankBronze { background: rgba(249,115,22,.15);     color: var(--acc-orange); }
 .uploaderAvatar {
   width: 34px; height: 34px;
   display: flex; align-items: center; justify-content: center;
   border-radius: 50%;
-  background: var(--y-soft);
-  border: 1px solid var(--y-border);
-  color: var(--acc-gold);
+  background: var(--overlay);
+  border: 1px solid var(--border-2);
+  color: var(--text-2);
   font-size: .85rem;
   font-weight: 800;
   flex-shrink: 0;
@@ -216,7 +121,7 @@
 .uploaderName { font-size: .88rem; font-weight: 600; color: var(--text); }
 .uploaderBarWrap { margin-top: 7px; max-width: 260px; }
 .uploaderCount { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; }
-.uploaderNum   { font-size: 1.1rem; font-weight: 800; color: var(--acc-gold); line-height: 1; }
+.uploaderNum   { font-size: 1.1rem; font-weight: 800; color: var(--text); line-height: 1; }
 .uploaderLabel { font-size: .68rem; color: var(--muted); }
 
 /* ─── Empty ─── */

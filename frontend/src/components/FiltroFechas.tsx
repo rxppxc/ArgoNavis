@@ -9,10 +9,11 @@ export interface RangoFechas {
 
 type Preset = "todas" | "hoy" | "7d";
 
+// "Cualquier fecha" y no "Todas": junto a las pestañas de estado había dos "Todas".
 const PRESETS: { id: Preset; etiqueta: string }[] = [
-  { id: "todas", etiqueta: "Todas" },
+  { id: "todas", etiqueta: "Cualquier fecha" },
   { id: "hoy",   etiqueta: "Hoy" },
-  { id: "7d",    etiqueta: "7 días" },
+  { id: "7d",    etiqueta: "Últimos 7 días" },
 ];
 
 /** Fecha local (no UTC) en formato YYYY-MM-DD — evita el desfase de zona horaria de toISOString. */
@@ -51,7 +52,7 @@ export default function FiltroFechas({ valor, onCambio }: Props) {
   }
 
   return (
-    <div className={styles.barra}>
+    <div className={styles.barra} role="group" aria-label="Fecha de envío">
       <span className={styles.icono}><IconoReloj tamano={15} /></span>
       <div className={styles.chips}>
         {PRESETS.map((p) => (

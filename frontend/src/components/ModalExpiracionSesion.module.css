@@ -1,7 +1,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.65);
+  background: var(--velo);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -42,7 +42,7 @@
 .cuenta {
   font-size: 2.75rem;
   font-weight: 800;
-  color: var(--acc-gold);
+  color: var(--text);
   letter-spacing: 0.05em;
   margin-bottom: 2rem;
   font-variant-numeric: tabular-nums;

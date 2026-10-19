@@ -17,6 +17,7 @@ import {
 } from "../../api/solicitudes";
 import { apiTramites, type TipoTramite } from "../../api/tramites";
 import { MarcoPagina } from "../../components/MarcoPagina";
+import { EncabezadoPagina } from "../../components/EncabezadoPagina";
 import { ModalPreview } from "../../components/ModalPreview";
 import { useNotificacion } from "../../components/Notificaciones";
 import { IconoAlerta, IconoMas } from "../../components/Iconos";
@@ -314,7 +315,7 @@ export default function PaginaSolicitud() {
       return;
     }
     if (faltantes.length > 0) {
-      mostrar(`Faltan ${faltantes.length} documento(s) del checklist.`, "aviso");
+      mostrar(`${faltantes.length === 1 ? "Falta 1 documento" : `Faltan ${faltantes.length} documentos`} del checklist.`, "aviso");
       return;
     }
 
@@ -408,14 +409,12 @@ export default function PaginaSolicitud() {
 
   return (
     <MarcoPagina volverA={volverA}>
-      <div className={styles.titulo}>
-        <h1>{corrigiendo ? `Corregir solicitud ${original?.numero ?? ""}` : "Nueva solicitud de autorización"}</h1>
-        <p>
-          {corrigiendo
-            ? "Corrige lo que indicó UCVMM y reenvía. Los documentos ya cargados se conservan si no los reemplazas."
-            : "Formulario No. 3 en línea: elige el trámite y el sistema te indicará exactamente qué datos y documentos debes adjuntar."}
-        </p>
-      </div>
+      <EncabezadoPagina
+        titulo={corrigiendo ? `Corregir solicitud ${original?.numero ?? ""}` : "Nueva solicitud de autorización"}
+        descripcion={corrigiendo
+          ? "Corrige lo que indicó UCVMM y reenvía. Los documentos ya cargados se conservan si no los reemplazas."
+          : "Formulario No. 3 en línea: elige el trámite y el sistema te indicará exactamente qué datos y documentos debes adjuntar."}
+      />
 
       {corrigiendo && original && (
         <div className={styles.bannerDevolucion}>
@@ -423,7 +422,7 @@ export default function PaginaSolicitud() {
           <div className={styles.bannerTexto}>{original.motivo_devolucion}</div>
           <div className={styles.bannerPlazo}>
             Plazo para corregir: hasta el {formatearFechaHora(original.plazo_correccion)}
-            {!plazo.vencido && <> (quedan {plazo.texto})</>}
+            {!plazo.vencido && <> ({plazo.frase})</>}
           </div>
         </div>
       )}
@@ -610,7 +609,7 @@ export default function PaginaSolicitud() {
               )}
               {faltantesSolicitud > 0 && casillasSolicitud.length > 0 && (
                 <p className={styles.ayudaSeccion}>
-                  Faltan {faltantesSolicitud} documento{faltantesSolicitud === 1 ? "" : "s"} de la solicitud.
+                  {faltantesSolicitud === 1 ? "Falta 1 documento" : `Faltan ${faltantesSolicitud} documentos`} de la solicitud.
                 </p>
               )}
             </section>
@@ -651,7 +650,7 @@ export default function PaginaSolicitud() {
             <div className={styles.acciones}>
               {faltantes.length > 0 && (
                 <div className={styles.avisoFaltan}>
-                  Faltan {faltantes.length} documento{faltantes.length === 1 ? "" : "s"} por adjuntar
+                  {faltantes.length === 1 ? "Falta 1 documento" : `Faltan ${faltantes.length} documentos`} por adjuntar
                 </div>
               )}
               <button type="submit" className={styles.btnEnviar} disabled={enviando}>

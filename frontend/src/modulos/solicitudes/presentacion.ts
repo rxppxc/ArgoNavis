@@ -66,16 +66,21 @@ export function formatearFechaHora(iso: string | null | undefined): string {
   return `${dosDigitos(d.getDate())}/${dosDigitos(d.getMonth() + 1)}/${d.getFullYear()}, ${hora}`;
 }
 
-/** Tiempo que falta hasta `iso`, en lenguaje corto ("1 día 4 h", "35 min"). */
-export function tiempoRestante(iso: string | null | undefined): { texto: string; vencido: boolean } {
-  if (!iso) return { texto: "—", vencido: false };
+/** Tiempo que falta hasta `iso`: `texto` corto ("1 día 4 h", "2 días", "35 min")
+ *  y `frase` lista para mostrar ("queda 1 día", "quedan 2 días 4 h"). */
+export function tiempoRestante(iso: string | null | undefined): { texto: string; frase: string; vencido: boolean } {
+  if (!iso) return { texto: "—", frase: "—", vencido: false };
   const ms = new Date(iso).getTime() - Date.now();
-  if (ms <= 0) return { texto: "venció", vencido: true };
+  if (ms <= 0) return { texto: "venció", frase: "venció", vencido: true };
   const horas = Math.floor(ms / 3_600_000);
   const dias = Math.floor(horas / 24);
-  if (dias > 0) return { texto: `${dias} día${dias === 1 ? "" : "s"} ${horas % 24} h`, vencido: false };
-  if (horas > 0) return { texto: `${horas} h`, vencido: false };
-  return { texto: `${Math.max(1, Math.floor(ms / 60_000))} min`, vencido: false };
+  const minutos = Math.max(1, Math.floor(ms / 60_000));
+  const [cifra, texto]: [number, string] =
+    dias > 0 ? [dias, `${dias} día${dias === 1 ? "" : "s"}${horas % 24 ? ` ${horas % 24} h` : ""}`]
+    : horas > 0 ? [horas, `${horas} h`]
+    : [minutos, `${minutos} min`];
+  // El verbo concuerda con la primera cifra: "queda 1 día 4 h", "quedan 2 días".
+  return { texto, frase: `${cifra === 1 ? "queda" : "quedan"} ${texto}`, vencido: false };
 }
 
 /** Fecha de hoy en hora local, como "YYYY-MM-DD". */

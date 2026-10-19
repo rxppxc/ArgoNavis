@@ -23,8 +23,9 @@
   transition: background var(--t), color var(--t), border-color var(--t);
 }
 .opcion:hover { color: var(--text); background: var(--hover); }
+/* Elegida: el amarillo como relleno (estado activo), el texto normal. */
 .opcion[aria-checked="true"] {
   background: var(--y-soft);
   border-color: var(--y-border);
-  color: var(--acc-gold);
+  color: var(--text);
 }

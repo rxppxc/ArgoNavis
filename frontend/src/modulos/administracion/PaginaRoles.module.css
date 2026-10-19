@@ -4,38 +4,12 @@
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 22px;
 }
+/* El encabezado ya trae su margen: con el gap quedaba demasiado aire. */
+.container > header:first-child { margin-bottom: 0; }
 
-/* ─── Page title ─── */
-.pageTitle {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  color: var(--text);
-}
-.titleIcon {
-  width: 44px;
-  height: 44px;
-  background: var(--y-soft);
-  border: 1px solid var(--y-border);
-  border-radius: var(--r-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--acc-gold);
-  flex-shrink: 0;
-}
-.pageTitle h1 {
-  font-size: 1.30rem;
-  font-weight: 800;
-  color: var(--text);
-  margin-bottom: 2px;
-}
-.pageTitle p {
-  font-size: .82rem;
-  color: var(--text-2);
-}
+/* El título es el común de EncabezadoPagina. */
 
 /* ─── Panel ─── */
 .panel {
@@ -60,13 +34,12 @@
 }
 .count {
   margin-left: 4px;
-  background: var(--y-soft);
-  color: var(--acc-gold);
+  background: var(--overlay-2);
+  color: var(--text);
   font-size: .70rem;
   font-weight: 700;
-  padding: 1px 7px;
+  padding: 1px 8px;
   border-radius: 99px;
-  border: 1px solid var(--y-border);
 }
 .panelBody { padding: 20px; }
 .nota { font-size: .8rem; color: var(--text-2); margin: 0 0 12px; }
@@ -80,9 +53,9 @@
 }
 .input {
   padding: 10px 13px;
-  border: 1.5px solid var(--border);
+  border: 1.5px solid var(--input-border);
   border-radius: var(--r-sm);
-  background: var(--surface-2);
+  background: var(--input-bg);
   color: var(--text);
   font-size: .88rem;
   outline: none;
@@ -91,29 +64,26 @@
 .input::placeholder { color: var(--muted); }
 .input:focus {
   border-color: var(--foco);
-  box-shadow: 0 0 0 3px rgba(245,200,0,.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--foco) 18%, transparent);
 }
-.btnCrear {
+.btnCrear, .btnGuardar {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 10px 18px;
   background: var(--y);
-  color: var(--ink);
+  color: var(--on-accent);
   border-radius: var(--r-sm);
   font-size: .85rem;
   font-weight: 700;
   font-family: inherit;
   cursor: pointer;
   white-space: nowrap;
-  transition: background var(--t), transform var(--t), box-shadow var(--t);
+  transition: filter var(--t);
 }
-.btnCrear:hover:not(:disabled) {
-  background: #FFD600;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(245,200,0,.30);
-}
-.btnCrear:disabled { opacity: .45; cursor: not-allowed; }
+.btnCrear:hover:not(:disabled), .btnGuardar:hover:not(:disabled) { filter: brightness(1.07); }
+/* Desactivado en gris: el amarillo a media opacidad quedaba mostaza. */
+.btnCrear:disabled, .btnGuardar:disabled { background: var(--overlay-2); color: var(--muted); cursor: not-allowed; }
 
 /* ─── Lista de permisos ─── */
 .permisoList {
@@ -131,12 +101,13 @@
   border-radius: var(--r-md);
   transition: border-color var(--t);
 }
-.permisoRow:hover { border-color: rgba(245,200,0,.30); }
+.permisoRow:hover { border-color: var(--border-2); }
+/* Código técnico: etiqueta neutra (antes amarilla, como si fuera un botón). */
 .permisoCodigo {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  background: var(--y-soft);
-  color: var(--acc-gold);
-  border: 1px solid var(--y-border);
+  background: var(--overlay-2);
+  color: var(--text);
+  border: 1px solid var(--border);
   padding: 3px 9px;
   border-radius: var(--r-xs);
   font-size: .80rem;
@@ -169,10 +140,10 @@
   overflow: hidden;
   transition: border-color var(--t);
 }
-.rolCard:hover { border-color: rgba(245,200,0,.25); }
+.rolCard:hover { border-color: var(--border-2); }
 .rolCardOpen {
-  border-color: rgba(245,200,0,.45);
-  box-shadow: 0 4px 18px rgba(0,0,0,.15);
+  border-color: var(--y-border);
+  box-shadow: var(--sh-md);
 }
 
 /* Cabecera del rol: el botón que lo despliega y el de eliminar van lado a lado
@@ -205,7 +176,7 @@
   transition: transform .2s ease;
   flex-shrink: 0;
 }
-.rolChevronOpen { transform: rotate(90deg); color: var(--acc-gold); }
+.rolChevronOpen { transform: rotate(90deg); color: var(--text); }
 .rolInfo { flex: 1; min-width: 0; }
 .rolNombre {
   font-size: .94rem;
@@ -224,9 +195,9 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: rgba(148,163,184,.12);
-  color: var(--acc-gray);
-  border: 1px solid rgba(148,163,184,.25);
+  background: var(--overlay);
+  color: var(--text-2);
+  border: 1px solid var(--border-2);
   font-size: .65rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -287,9 +258,10 @@
   transition: background var(--t), border-color var(--t), color var(--t);
   text-align: left;
 }
-.permisoChip:hover { border-color: rgba(245,200,0,.40); }
+.permisoChip:hover { border-color: var(--input-border); }
+/* Seleccionado: el amarillo como relleno (estado activo), el texto normal. */
 .permisoChipOn {
-  background: rgba(245,200,0,.10);
+  background: var(--y-soft);
   border-color: var(--y);
   color: var(--text);
 }
@@ -297,11 +269,11 @@
   width: 18px;
   height: 18px;
   border-radius: 4px;
-  border: 1.5px solid var(--border);
+  border: 1.5px solid var(--input-border);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--ink);
+  color: var(--on-accent);
   background: transparent;
   flex-shrink: 0;
 }
@@ -312,11 +284,11 @@
 .chipCodigo {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   font-weight: 700;
-  color: var(--acc-gold);
+  color: var(--text-2);
   font-size: .76rem;
   letter-spacing: .4px;
 }
-.permisoChipOn .chipCodigo { color: var(--acc-gold); }
+.permisoChipOn .chipCodigo { color: var(--text); }
 .chipNombre {
   font-weight: 500;
   font-size: .78rem;
@@ -331,26 +303,7 @@
   justify-content: flex-end;
   margin-top: 14px;
 }
-.btnGuardar {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 10px 18px;
-  background: rgba(34,197,94,.14);
-  border: 1.5px solid rgba(34,197,94,.45);
-  border-radius: var(--r-sm);
-  color: var(--acc-green);
-  font-size: .85rem;
-  font-weight: 700;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background var(--t), border-color var(--t);
-}
-.btnGuardar:hover:not(:disabled) {
-  background: rgba(34,197,94,.24);
-  border-color: rgba(34,197,94,.70);
-}
-.btnGuardar:disabled { opacity: .55; cursor: not-allowed; }
+/* "Guardar permisos" usa el botón principal (.btnCrear, arriba). */
 
 /* ─── Action btns ─── */
 .actionBtn {
@@ -368,11 +321,11 @@
 }
 .actionBtn:disabled { opacity: .5; cursor: not-allowed; }
 .btnEliminar {
-  background: rgba(239,68,68,.10);
-  border: 1.5px solid rgba(239,68,68,.30);
+  background: transparent;
+  border: 1.5px solid color-mix(in srgb, var(--acc-red) 55%, transparent);
   color: var(--acc-red);
 }
-.btnEliminar:hover { background: rgba(239,68,68,.20); border-color: rgba(239,68,68,.55); }
+.btnEliminar:hover:not(:disabled) { background: var(--red-soft); border-color: var(--acc-red); }
 
 /* ─── Estados ─── */
 .loading {
@@ -393,7 +346,7 @@
 /* ─── Spinner ─── */
 .spinner {
   width: 13px; height: 13px;
-  border: 2px solid rgba(0,0,0,.20);
+  border: 2px solid var(--overlay-2);
   border-top-color: currentColor;
   border-radius: 50%;
   animation: spin .6s linear infinite;
@@ -401,7 +354,7 @@
 }
 .spinnerSm {
   width: 11px; height: 11px;
-  border: 1.5px solid rgba(255,255,255,.20);
+  border: 1.5px solid var(--overlay-2);
   border-top-color: currentColor;
   border-radius: 50%;
   animation: spin .6s linear infinite;

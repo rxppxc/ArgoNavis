@@ -21,7 +21,8 @@
 }
 
 .review    { color: var(--acc-blue); }
-.returned  { color: var(--acc-amber); }
+/* Naranja y no ámbar: el ámbar se confundía con el amarillo de marca. */
+.returned  { color: var(--acc-orange); }
 .approved  { color: var(--acc-green); }
 .denied    { color: var(--acc-red); }
 .finalized { color: var(--acc-teal); }

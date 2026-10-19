@@ -3,10 +3,11 @@ import { apiAdmin, type UsoSistema } from "../../api/admin";
 import { formatBytes } from "../../utils/format";
 import { mensajeDeError } from "../../utils/errores";
 import { MarcoPagina } from "../../components/MarcoPagina";
+import { EncabezadoPagina } from "../../components/EncabezadoPagina";
 import BarraProgreso from "../../components/BarraProgreso";
 import SeccionAutorizaciones from "./SeccionAutorizaciones";
 import {
-  IconoUsuario, IconoUsuarios, IconoGrafico, IconoArchivo, IconoDisco, IconoBarco, IconoTrofeo,
+  IconoUsuario, IconoUsuarios, IconoArchivo, IconoDisco, IconoBarco, IconoTrofeo,
 } from "../../components/Iconos";
 import styles from "./PaginaEstadisticas.module.css";
 
@@ -26,19 +27,19 @@ export default function PaginaEstadisticas() {
 
   const uso = resultado?.uso ?? null;
   const maxAgencia = uso ? Math.max(...uso.top_agencias.map(a => a.total), 1) : 1;
-  // "2.50 KB" → cifra en grande y la unidad en la etiqueta (como las otras tarjetas).
-  const [espacio, unidad] = uso ? formatBytes(uso.almacenamiento_bytes).split(" ") : ["0", "B"];
+  // Misma forma que los indicadores de autorizaciones: ícono, etiqueta y cifra.
+  const tarjetas = uso ? [
+    { icono: <IconoUsuarios />, etiqueta: "Usuarios registrados", valor: uso.usuarios.toLocaleString("es-PA") },
+    { icono: <IconoUsuario />, etiqueta: "Usuarios activos", valor: uso.usuarios_activos.toLocaleString("es-PA") },
+    { icono: <IconoBarco tamano={20} />, etiqueta: "Agencias navieras", valor: uso.agencias.toLocaleString("es-PA") },
+    { icono: <IconoArchivo />, etiqueta: "Documentos en expedientes", valor: uso.documentos.toLocaleString("es-PA") },
+    { icono: <IconoDisco />, etiqueta: "Almacenamiento usado", valor: formatBytes(uso.almacenamiento_bytes) },
+  ] : [];
 
   return (
     <MarcoPagina volverA="/dashboard">
       <div className={styles.container}>
-        <div className={styles.pageTitle}>
-          <span className={styles.titleIcon}><IconoGrafico tamano={22} /></span>
-          <div>
-            <h1>Estadísticas</h1>
-            <p>Autorizaciones marítimas y uso general del sistema.</p>
-          </div>
-        </div>
+        <EncabezadoPagina titulo="Estadísticas" descripcion="Autorizaciones marítimas y uso general del sistema." />
 
         <SeccionAutorizaciones />
 
@@ -51,39 +52,21 @@ export default function PaginaEstadisticas() {
         ) : uso && (
           <>
             <div className={styles.statGrid}>
-              <div className={styles.statCard}>
-                <div className={`${styles.statIcon} ${styles.gray}`}><IconoUsuarios /></div>
-                <div className={styles.statNum}>{uso.usuarios}</div>
-                <div className={styles.statLabel}>Usuarios registrados</div>
-              </div>
-              <div className={styles.statCard}>
-                <div className={`${styles.statIcon} ${styles.green}`}><IconoUsuario /></div>
-                <div className={styles.statNum}>{uso.usuarios_activos}</div>
-                <div className={styles.statLabel}>Usuarios activos</div>
-              </div>
-              <div className={styles.statCard}>
-                <div className={`${styles.statIcon} ${styles.blue}`}><IconoBarco tamano={22} /></div>
-                <div className={styles.statNum}>{uso.agencias}</div>
-                <div className={styles.statLabel}>Agencias navieras</div>
-              </div>
-              <div className={styles.statCard}>
-                <div className={`${styles.statIcon} ${styles.yellow}`}><IconoArchivo /></div>
-                <div className={styles.statNum}>{uso.documentos}</div>
-                <div className={styles.statLabel}>Documentos en expedientes</div>
-              </div>
-              <div className={styles.statCard}>
-                <div className={`${styles.statIcon} ${styles.purple}`}><IconoDisco /></div>
-                <div className={styles.statNum}>{espacio}</div>
-                <div className={styles.statLabel}>{unidad} almacenados</div>
-              </div>
+              {tarjetas.map((t) => (
+                <div key={t.etiqueta} className={styles.statCard}>
+                  <span className={styles.statIcon}>{t.icono}</span>
+                  <span className={styles.statLabel}>{t.etiqueta}</span>
+                  <span className={styles.statNum}>{t.valor}</span>
+                </div>
+              ))}
             </div>
 
             <div className={styles.panelesStack}>
               <section className={styles.panel}>
-                <div className={styles.panelHeader}>
+                <h3 className={styles.panelHeader}>
                   <IconoTrofeo />
                   Agencias con más solicitudes
-                </div>
+                </h3>
                 <div className={styles.panelBody}>
                   {uso.top_agencias.length === 0 ? (
                     <p className={styles.empty}>Sin solicitudes aún.</p>
@@ -91,9 +74,7 @@ export default function PaginaEstadisticas() {
                     <div className={styles.uploaderList}>
                       {uso.top_agencias.map((a, i) => (
                         <div key={a.agencia_id} className={styles.uploaderRow}>
-                          <div className={`${styles.rankBadge} ${i === 0 ? styles.rankGold : i === 1 ? styles.rankSilver : i === 2 ? styles.rankBronze : ""}`}>
-                            {i + 1}
-                          </div>
+                          <div className={styles.rankBadge}>{i + 1}</div>
                           <div className={styles.uploaderAvatar}>{(a.nombre[0] ?? "?").toUpperCase()}</div>
                           <div className={styles.uploaderInfo}>
                             <div className={styles.uploaderName}>{a.nombre}</div>

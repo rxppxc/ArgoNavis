@@ -126,6 +126,7 @@ export function PanelRevision({ solicitud, onActualizada }: Props) {
                 + "Se emitirá la autorización en PDF y se avisará a la agencia y al puesto de control."
               : "Se emitirá la autorización en PDF y se avisará a la agencia y al puesto de control.",
             textoOk: "Aprobar",
+            exito: true,
           }
         : decision === "devolver"
           ? {
@@ -181,7 +182,7 @@ export function PanelRevision({ solicitud, onActualizada }: Props) {
               <span className={styles.ayuda}>
                 {corrigiendo ? "Corrige el resultado de cada tripulante:" : "Resultado de cada tripulante en SIMPLUS:"}
               </span>
-              <button type="button" className={styles.btnTexto}
+              <button type="button" className={styles.btnPequeno}
                 onClick={() => setResultados(Object.fromEntries(solicitud.tripulantes.map((t) => [t.id, false])))}>
                 Marcar todos sin impedimento
               </button>
@@ -225,7 +226,7 @@ export function PanelRevision({ solicitud, onActualizada }: Props) {
                   Cancelar
                 </button>
               )}
-              <button type="button" className={styles.btnSecundario} onClick={guardarImpedimentos}
+              <button type="button" className={styles.btnPrimario} onClick={guardarImpedimentos}
                 disabled={trabajando || !hayCambios} title={hayCambios ? undefined : "No hay cambios que guardar"}>
                 {corrigiendo ? "Guardar corrección" : "Guardar verificación"}
               </button>
@@ -273,7 +274,7 @@ export function PanelRevision({ solicitud, onActualizada }: Props) {
             Aprobar
           </button>
           <button type="button" disabled={trabajando || corrigiendo}
-            className={`${styles.btnDecision} ${styles.devolver} ${decision === "devolver" ? styles.activa : ""}`}
+            className={`${styles.btnDecision} ${decision === "devolver" ? styles.activa : ""}`}
             onClick={() => {
               setDecision("devolver");
               if (!texto.trim()) setTexto(motivoPorVencimientos(solicitud));
@@ -300,7 +301,8 @@ export function PanelRevision({ solicitud, onActualizada }: Props) {
               <button type="button" className={styles.btnTexto} onClick={() => { setDecision(null); setTexto(""); }}>
                 Cancelar
               </button>
-              <button type="button" className={styles.btnPrimario} onClick={decidir} disabled={trabajando}>
+              <button type="button" onClick={decidir} disabled={trabajando}
+                className={decision === "aprobar" ? styles.btnExito : decision === "negar" ? styles.btnPeligro : styles.btnPrimario}>
                 {trabajando ? "Procesando…" : "Confirmar"}
               </button>
             </div>

@@ -9,7 +9,7 @@
 .icono {
   width: 42px; height: 42px; margin-bottom: 12px;
   display: flex; align-items: center; justify-content: center;
-  border-radius: 50%; background: var(--y-soft); color: var(--acc-gold);
+  border-radius: 50%; background: var(--overlay-2); color: var(--text-2);
 }
 
 .ayuda { color: var(--text-2); font-size: .86rem; line-height: 1.5; margin-bottom: 18px; }
@@ -19,15 +19,16 @@
   padding: 11px 13px; margin-bottom: 18px;
   border-radius: var(--r-sm); font-size: .84rem; line-height: 1.45;
 }
-.aviso { background: rgba(245,200,0,.08); border: 1px solid var(--y-border); color: var(--text); }
-.error { background: var(--red-soft); border: 1px solid rgba(239,68,68,.35); color: var(--acc-red); }
+/* Aviso (cambio obligatorio): neutro con acento ámbar, como el resto de los avisos. */
+.aviso { background: var(--overlay); border: 1px solid var(--border); border-left: 3px solid var(--acc-amber); color: var(--text); }
+.error { background: var(--red-soft); border: 1px solid color-mix(in srgb, var(--acc-red) 35%, transparent); color: var(--acc-red); }
 
 .campo { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 .campo > span { color: var(--text-2); font-size: .78rem; font-weight: 600; }
 .campo input {
   width: 100%; padding: 10px 12px;
-  border-radius: var(--r-sm); border: 1px solid var(--border);
-  background: var(--card-2); color: var(--text);
+  border-radius: var(--r-sm); border: 1px solid var(--input-border);
+  background: var(--input-bg); color: var(--text);
   font: inherit; font-size: .9rem;
 }
 .campo input:focus { outline: 2px solid var(--foco); border-color: transparent; }
@@ -50,6 +51,6 @@
   font-weight: 800; font-size: .86rem; cursor: pointer;
 }
 .btnPrimario:hover:not(:disabled) { filter: brightness(1.07); }
-.btnPrimario:disabled { opacity: .5; cursor: not-allowed; }
+.btnPrimario:disabled { background: var(--overlay-2); color: var(--muted); cursor: not-allowed; }
 .btnTexto { padding: 8px 10px; color: var(--text-2); font-size: .84rem; font-weight: 600; cursor: pointer; }
 .btnTexto:hover { color: var(--text); }

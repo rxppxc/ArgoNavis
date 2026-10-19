@@ -15,9 +15,13 @@
 .atenuado { opacity: .55; transition: opacity var(--t); }
 
 /* ─── Indicadores (stat tiles) ─── */
+/* Columnas fijas que dividen a 6 (6, 3, 2): con auto-fit quedaba un indicador
+   suelto en la segunda fila. */
 .indicadores {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px;
+  display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px;
 }
+@media (max-width: 960px) { .indicadores { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .indicadores { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .indicador {
   display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 10px;
   padding: 14px 16px; border-radius: var(--r-md);
@@ -29,10 +33,13 @@
   display: flex; align-items: center; justify-content: center;
   background: var(--overlay);
 }
-.neutro  { color: var(--acc-gold); }
-.bien    { color: var(--acc-green); }
-.critico { color: var(--acc-red); }
-.aviso   { color: var(--acc-amber); }
+/* Mismos colores que los estados de las solicitudes (expirada gris, finalizada
+   verde azulado); lo que no es un estado va neutro. */
+.neutro     { color: var(--text-2); }
+.bien       { color: var(--acc-green); }
+.critico    { color: var(--acc-red); }
+.expirada   { color: var(--acc-gray); }
+.finalizada { color: var(--acc-teal); }
 .etiqueta { color: var(--text-2); font-size: .76rem; font-weight: 600; }
 /* Cifras proporcionales en los valores grandes (tabulares solo en columnas). */
 .valor { color: var(--text); font-size: 1.45rem; font-weight: 700; line-height: 1.2; }

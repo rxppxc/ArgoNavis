@@ -1,5 +1,5 @@
 import type { DocumentoSolicitud } from "../../api/solicitudes";
-import { IconoArchivo, IconoCheck, IconoOjo, IconoX } from "../../components/Iconos";
+import { IconoArchivo, IconoCheck, IconoMas, IconoOjo, IconoX } from "../../components/Iconos";
 import { TIPOS_ACEPTADOS } from "../../utils/archivos";
 import { formatBytes } from "../../utils/format";
 import styles from "./PaginaSolicitud.module.css";
@@ -63,8 +63,9 @@ export function DocumentosAdicionales({
       ))}
       {total === 0 && <div className={styles.sinDocs}>Sin documentos adicionales.</div>}
       {total < MAX_ADICIONALES && (
-        <label className={styles.btnArchivo}>
-          Agregar documento
+        // Mismo botón que "Agregar tripulante" (antes se estiraba a todo el ancho y parecía un aviso).
+        <label className={styles.btnAgregar}>
+          <IconoMas /> Agregar documento
           <input type="file" hidden multiple accept={TIPOS_ACEPTADOS}
             onChange={(e) => {
               const archivos = Array.from(e.target.files ?? []);

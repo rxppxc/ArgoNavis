@@ -14,7 +14,7 @@
 .encabezadoTexto { min-width: 0; }
 .numero {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  color: var(--acc-gold); font-weight: 800; font-size: .95rem; letter-spacing: .4px;
+  color: var(--text-2); font-weight: 800; font-size: .95rem; letter-spacing: .4px;
 }
 .encabezado h1 { color: var(--text); font-size: 1.55rem; font-weight: 800; margin-top: 6px; }
 .subtitulo { color: var(--text-2); font-size: .88rem; margin-top: 4px; }
@@ -36,8 +36,8 @@
 .bannerTexto { white-space: pre-wrap; line-height: 1.55; }
 .bannerPie { color: var(--text-2); font-size: .8rem; margin-top: 6px; }
 .bannerRevision   { border-left-color: var(--acc-blue); }
-.bannerCorreccion { border-left-color: var(--acc-amber); }
-.bannerCorreccion .bannerTitulo { color: var(--acc-amber); }
+.bannerCorreccion { border-left-color: var(--acc-orange); }
+.bannerCorreccion .bannerTitulo { color: var(--acc-orange); }
 .bannerAprobada   { border-left-color: var(--acc-green); }
 .bannerAprobada .bannerTitulo { color: var(--acc-green); }
 .bannerFinalizada { border-left-color: var(--acc-teal); }
@@ -74,9 +74,10 @@
 .datos { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px 18px; }
 .dato dt { color: var(--muted); font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
 .dato dd { color: var(--text); font-size: .9rem; margin-top: 2px; word-break: break-word; }
+/* Nota informativa del trámite: neutra con acento azul, como el resto de las notas. */
 .nota {
   margin-top: 14px; padding: 10px 13px; border-radius: 8px;
-  background: rgba(245,200,0,.08); border: 1px solid var(--y-border);
+  background: var(--overlay); border: 1px solid var(--border); border-left: 3px solid var(--acc-blue);
   color: var(--text); font-size: .82rem;
 }
 .observaciones {
@@ -100,7 +101,7 @@
 .celdaSecundaria { color: var(--text-2); font-size: .76rem; margin-top: 2px; }
 .vencido { color: var(--acc-red); font-size: .76rem; font-weight: 700; margin-top: 2px; }
 .chipRestringida {
-  display: inline-block; margin-top: 4px;
+  display: block; width: fit-content; margin-top: 4px;
   font-size: .68rem; font-weight: 700;
   padding: 1px 8px; border-radius: 100px;
   color: var(--acc-orange); border: 1px solid currentColor;
@@ -108,7 +109,7 @@
 
 /* ─── Documentos ─── */
 .documentos { display: flex; flex-direction: column; gap: 14px; }
-.grupoTitulo { color: var(--acc-gold); font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+.grupoTitulo { color: var(--muted); font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
 .grupoDocs { display: flex; flex-direction: column; gap: 6px; }
 .casilla { border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; background: var(--card-2); }
 .casillaCabecera { display: flex; align-items: center; gap: 8px; }
@@ -128,13 +129,16 @@
 }
 .archivoNombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
 .archivoPeso { color: var(--muted); font-size: .72rem; flex-shrink: 0; }
+/* Ver / descargar / cerrar: neutros (se repiten en cada documento). */
 .btnIcono {
   display: flex; align-items: center; justify-content: center;
-  width: 26px; height: 26px; flex-shrink: 0;
-  border-radius: 6px; border: 1.5px solid var(--y-border);
-  background: var(--y-soft); color: var(--acc-gold);
+  width: 28px; height: 28px; flex-shrink: 0;
+  border-radius: 6px; border: 1px solid var(--border-2);
+  background: var(--card); color: var(--text-2);
+  transition: background var(--t), border-color var(--t), color var(--t);
 }
-.btnIcono:hover { border-color: var(--y); }
+.btnIcono:hover:not(:disabled) { background: var(--hover); border-color: var(--input-border); color: var(--text); }
+.btnIcono:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ─── Historial ─── */
 .historial { list-style: none; display: flex; flex-direction: column; }
@@ -159,7 +163,7 @@
 .evento_corregida .eventoPunto  { background: var(--acc-blue); }
 .evento_impedimentos .eventoPunto { background: var(--acc-purple); }
 .evento_impedimentos_corregidos .eventoPunto { background: var(--acc-purple); }
-.evento_devuelta .eventoPunto   { background: var(--acc-amber); }
+.evento_devuelta .eventoPunto   { background: var(--acc-orange); }
 .evento_aprobada .eventoPunto   { background: var(--acc-green); }
 .evento_negada .eventoPunto     { background: var(--acc-red); }
 .evento_comentario .eventoPunto { background: var(--acc-cyan); }
@@ -188,8 +192,10 @@
   font-size: .76rem; font-weight: 600; color: var(--text-2);
 }
 .opcionesImpedimento input { accent-color: var(--foco); }
-.opcionesImpedimento .opcionSin { border-color: var(--acc-green); color: var(--acc-green); }
-.opcionesImpedimento .opcionCon { border-color: var(--acc-red); color: var(--acc-red); }
+.opcionesImpedimento .opcionSin { border-color: var(--acc-green); color: var(--acc-green); background: var(--green-soft); }
+.opcionesImpedimento .opcionSin input { accent-color: var(--acc-green); }
+.opcionesImpedimento .opcionCon { border-color: var(--acc-red); color: var(--acc-red); background: var(--red-soft); }
+.opcionesImpedimento .opcionCon input { accent-color: var(--acc-red); }
 .verificacionRegistrada {
   display: flex; align-items: center; gap: 6px; margin: 2px 0 8px;
   color: var(--text-2); font-size: .8rem;
@@ -208,9 +214,10 @@
 .etiqueta { display: block; color: var(--text-2); font-size: .78rem; font-weight: 600; margin-bottom: 6px; }
 .textarea {
   width: 100%; padding: 9px 11px; border-radius: 8px;
-  border: 1px solid var(--border); background: var(--card-2); color: var(--text);
+  border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text);
   font: inherit; font-size: .85rem; resize: vertical;
 }
+.textarea::placeholder { color: var(--muted); }
 .textarea:focus { outline: 2px solid var(--foco); border-color: transparent; }
 .textarea + .etiqueta { margin-top: 10px; }
 .select {
@@ -223,38 +230,77 @@
 .filaBotones { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .filaBotones .ayuda { margin: 0 auto 0 0; }
 
+/* Aprobar es la acción principal (relleno verde), devolver es neutra y denegar
+   va en rojo de contorno. Antes eran tres contornos de color con el mismo peso. */
 .decisiones { display: grid; grid-template-columns: 1fr; gap: 7px; }
 .btnDecision {
-  padding: 9px 12px; border-radius: 8px; font-weight: 700; font-size: .84rem;
-  border: 1.5px solid currentColor; background: transparent; text-align: left;
-  transition: background var(--t);
+  padding: 10px 12px; border-radius: 8px; font-weight: 700; font-size: .85rem;
+  border: 1.5px solid var(--border-2); background: transparent; color: var(--text); text-align: left;
+  transition: background var(--t), border-color var(--t), box-shadow var(--t), filter var(--t);
 }
-.btnDecision:disabled { opacity: .45; cursor: not-allowed; }
-.aprobar  { color: var(--acc-green); }
-.devolver { color: var(--acc-amber); }
-.negar    { color: var(--acc-red); }
-.btnDecision:hover:not(:disabled), .activa { background: var(--overlay-2); }
+.btnDecision:hover:not(:disabled) { background: var(--hover); border-color: var(--input-border); }
+.btnDecision:disabled { cursor: not-allowed; color: var(--muted); border-color: var(--border); background: transparent; }
+.aprobar:not(:disabled),
+.aprobar:hover:not(:disabled) { background: var(--exito-fuerte); border-color: var(--exito-fuerte); color: var(--sobre-fuerte); }
+.aprobar:hover:not(:disabled) { filter: brightness(1.1); }
+.negar:not(:disabled) { color: var(--acc-red); border-color: var(--acc-red); }
+.negar:hover:not(:disabled) { background: var(--red-soft); border-color: var(--acc-red); }
+.activa { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--foco); }
 .formDecision { margin-top: 12px; }
 
-.btnPrimario {
+.btnPrimario, .btnSecundario, .btnExito, .btnPeligro {
   display: inline-flex; align-items: center; gap: 7px;
-  padding: 9px 16px; border-radius: 8px; border: 0;
-  background: var(--y); color: var(--on-accent);
+  padding: 9px 16px; border-radius: 8px;
   font-weight: 800; font-size: .84rem; text-decoration: none;
+  transition: background var(--t), border-color var(--t), filter var(--t);
 }
-.btnPrimario:hover:not(:disabled) { filter: brightness(1.07); }
-.btnPrimario:disabled { opacity: .5; cursor: not-allowed; }
+.btnPrimario { border: 0; background: var(--y); color: var(--on-accent); }
+.btnExito    { border: 0; background: var(--exito-fuerte); color: var(--sobre-fuerte); }
+.btnPeligro  { border: 0; background: var(--peligro-fuerte); color: var(--sobre-fuerte); }
+.btnPrimario:hover:not(:disabled), .btnExito:hover:not(:disabled), .btnPeligro:hover:not(:disabled) { filter: brightness(1.08); }
+/* Desactivado en gris: el amarillo a media opacidad quedaba mostaza y casi
+   igual al activo. */
+.btnPrimario:disabled, .btnExito:disabled, .btnPeligro:disabled {
+  background: var(--overlay-2); color: var(--muted); cursor: not-allowed;
+}
 .btnSecundario {
-  padding: 8px 14px; border-radius: 8px;
-  border: 1.5px solid var(--y-border); background: var(--y-soft);
-  color: var(--acc-gold); font-weight: 700; font-size: .82rem;
+  padding: 8px 14px; font-weight: 700; font-size: .82rem;
+  border: 1.5px solid var(--border-2); background: var(--card); color: var(--text);
 }
-.btnSecundario:disabled { opacity: .5; cursor: not-allowed; }
+.btnSecundario:hover:not(:disabled) { background: var(--hover); border-color: var(--input-border); }
+.btnSecundario:disabled { color: var(--muted); border-color: var(--border); background: transparent; cursor: not-allowed; }
+.btnPequeno {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 11px; border-radius: 999px;
+  border: 1px solid var(--border-2); background: var(--card);
+  color: var(--text); font-size: .76rem; font-weight: 600;
+}
+.btnPequeno:hover { background: var(--hover); border-color: var(--input-border); }
 .btnTexto { padding: 8px 10px; color: var(--text-2); font-size: .82rem; font-weight: 600; }
 .btnTexto:hover { color: var(--text); }
 
 @media (max-width: 980px) {
   .columnas { grid-template-columns: 1fr; }
+}
+
+/* En el celular la tabla de tripulantes pasa a fichas: antes se cortaban el
+   seamanbook, el rango y "Ver documentación". */
+@media (max-width: 640px) {
+  .tablaScroll { overflow-x: visible; }
+  .tabla thead { display: none; }
+  .tabla, .tabla tbody { display: block; }
+  .tabla tr {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px;
+    padding: 12px 0; border-bottom: 1px solid var(--border);
+  }
+  .tabla tr:last-child { border-bottom: 0; }
+  .tabla td { display: block; padding: 0; border: 0; }
+  .tabla td[data-etiqueta]::before {
+    content: attr(data-etiqueta); display: block; margin-bottom: 2px;
+    color: var(--muted); font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+  }
+  .tabla td.celdaOrden { display: none; }
+  .tabla td.celdaAncha { grid-column: 1 / -1; }
 }
 
 /* Columna "Documentos" de la tabla de tripulantes y su modal */

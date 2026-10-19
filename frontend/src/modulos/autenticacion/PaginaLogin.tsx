@@ -93,7 +93,7 @@ export default function PaginaLogin() {
               <input
                 id="contrasena"
                 type={mostrarContrasena ? "text" : "password"}
-                placeholder="••••••••"
+                placeholder="Tu contraseña"
                 value={contrasena}
                 onChange={(e) => setContrasena(e.target.value)}
                 autoComplete="current-password"

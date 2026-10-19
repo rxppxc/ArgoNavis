@@ -4,38 +4,10 @@
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 22px;
 }
-
-/* ─── Page title ─── */
-.pageTitle {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  color: var(--text);
-}
-.titleIcon {
-  width: 44px;
-  height: 44px;
-  background: var(--y-soft);
-  border: 1px solid var(--y-border);
-  border-radius: var(--r-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--acc-gold);
-  flex-shrink: 0;
-}
-.pageTitle h1 {
-  font-size: 1.30rem;
-  font-weight: 800;
-  color: var(--text);
-  margin-bottom: 2px;
-}
-.pageTitle p {
-  font-size: .82rem;
-  color: var(--text-2);
-}
+/* El encabezado ya trae su margen: con el gap quedaba demasiado aire. */
+.container > header:first-child { margin-bottom: 0; }
 
 /* ─── Panel ─── */
 .panel {
@@ -60,13 +32,12 @@
 }
 .count {
   margin-left: 4px;
-  background: var(--y-soft);
-  color: var(--acc-gold);
+  background: var(--overlay-2);
+  color: var(--text);
   font-size: .70rem;
   font-weight: 700;
-  padding: 1px 7px;
+  padding: 1px 8px;
   border-radius: 99px;
-  border: 1px solid var(--y-border);
 }
 .panelBody { padding: 20px; }
 
@@ -78,9 +49,9 @@
 .searchInput {
   flex: 1;
   padding: 11px 14px;
-  border: 1.5px solid var(--border);
+  border: 1.5px solid var(--input-border);
   border-radius: var(--r-sm);
-  background: var(--surface-2);
+  background: var(--input-bg);
   color: var(--text);
   font-size: .90rem;
   outline: none;
@@ -89,7 +60,7 @@
 .searchInput::placeholder { color: var(--muted); }
 .searchInput:focus {
   border-color: var(--foco);
-  box-shadow: 0 0 0 3px rgba(245,200,0,.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--foco) 18%, transparent);
 }
 .searchBtn {
   display: inline-flex;
@@ -97,21 +68,18 @@
   gap: 7px;
   padding: 11px 20px;
   background: var(--y);
-  color: var(--ink);
+  color: var(--on-accent);
   border-radius: var(--r-sm);
   font-size: .88rem;
   font-weight: 700;
   font-family: inherit;
   cursor: pointer;
   white-space: nowrap;
-  transition: background var(--t), transform var(--t), box-shadow var(--t);
+  transition: filter var(--t);
 }
-.searchBtn:hover:not(:disabled) {
-  background: #FFD600;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(245,200,0,.30);
-}
-.searchBtn:disabled { opacity: .45; cursor: not-allowed; }
+.searchBtn:hover:not(:disabled) { filter: brightness(1.07); }
+/* Desactivado en gris: el amarillo a media opacidad quedaba mostaza. */
+.searchBtn:disabled { background: var(--overlay-2); color: var(--muted); cursor: not-allowed; }
 
 .searchError {
   margin-top: 12px;
@@ -140,18 +108,18 @@
   padding: 12px 16px;
   transition: border-color var(--t);
 }
-.adCard:hover { border-color: rgba(245,200,0,.30); }
+.adCard:hover { border-color: var(--border-2); }
 
 .adAvatar {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: rgba(34,211,238,.12);
-  border: 1.5px solid rgba(34,211,238,.30);
+  background: var(--overlay);
+  border: 1px solid var(--border-2);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--acc-cyan);
+  color: var(--text-2);
   flex-shrink: 0;
 }
 .adInfo { flex: 1; min-width: 0; }
@@ -180,20 +148,17 @@
   align-items: center;
   gap: 6px;
   padding: 7px 14px;
-  background: rgba(34,197,94,.12);
-  border: 1.5px solid rgba(34,197,94,.40);
+  background: var(--card);
+  border: 1.5px solid var(--border-2);
   border-radius: var(--r-sm);
-  color: var(--acc-green);
+  color: var(--text);
   font-size: .80rem;
   font-weight: 700;
   font-family: inherit;
   cursor: pointer;
   transition: background var(--t), border-color var(--t);
 }
-.btnAgregar:hover:not(:disabled) {
-  background: rgba(34,197,94,.22);
-  border-color: rgba(34,197,94,.65);
-}
+.btnAgregar:hover:not(:disabled) { background: var(--hover); border-color: var(--input-border); }
 .btnAgregar:disabled { opacity: .5; cursor: not-allowed; }
 
 .badgeExiste {
@@ -201,10 +166,10 @@
   align-items: center;
   gap: 5px;
   padding: 5px 11px;
-  background: var(--y-soft);
-  border: 1px solid var(--y-border);
+  background: var(--overlay);
+  border: 1px solid var(--border);
   border-radius: var(--r-sm);
-  color: var(--acc-gold);
+  color: var(--text-2);
   font-size: .76rem;
   font-weight: 700;
 }
@@ -247,16 +212,18 @@
   vertical-align: middle;
 }
 .table tr:last-child td { border-bottom: none; }
-.rowInactive { opacity: .60; }
+/* Inactivo: se atenúan los datos (usuario, correo, agencia), no los controles:
+   "Activar" es justo lo que hay que poder usar. */
+.rowInactive td:nth-child(-n+3) { opacity: .6; }
 
 .cellUser { display: flex; align-items: center; gap: 10px; }
 .cellAvatar {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: var(--y-soft);
-  border: 1.5px solid var(--y-border);
-  color: var(--acc-gold);
+  background: var(--overlay);
+  border: 1px solid var(--border-2);
+  color: var(--text-2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -264,17 +231,17 @@
   font-weight: 700;
   flex-shrink: 0;
 }
+/* Administrador y SysAdmin se distinguen con el acento (relleno, no texto). */
+.cellAvatar.cellAvatarAdmin {
+  background: var(--y-soft);
+  border-color: var(--y-border);
+  color: var(--text);
+}
 .cellName { font-weight: 600; color: var(--text); }
 .cellUsername { font-size: .74rem; color: var(--text-2); margin-top: 1px; }
 .cellEmail { color: var(--text-2); font-size: .82rem; }
 
 /* ─── Badges ─── */
-.cellAvatarAdmin {
-  background: rgba(245,200,0,.18) !important;
-  border-color: rgba(245,200,0,.55) !important;
-  color: var(--acc-gold) !important;
-}
-
 .badge {
   display: inline-flex;
   align-items: center;
@@ -287,8 +254,8 @@
 
 .rolSelect {
   padding: 5px 10px;
-  background: var(--surface-2);
-  border: 1.5px solid var(--border);
+  background: var(--input-bg);
+  border: 1.5px solid var(--input-border);
   border-radius: var(--r-xs);
   color: var(--text);
   font-size: .78rem;
@@ -297,17 +264,19 @@
   transition: border-color var(--t), box-shadow var(--t);
   min-width: 150px;
 }
-.rolSelect:hover:not(:disabled) { border-color: rgba(245,200,0,.40); }
+.rolSelect:hover:not(:disabled) { border-color: var(--text-2); }
 .rolSelect:focus {
   outline: none;
   border-color: var(--foco);
-  box-shadow: 0 0 0 3px rgba(245,200,0,.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--foco) 18%, transparent);
 }
 .rolSelect:disabled { opacity: .55; cursor: not-allowed; }
-.badgeActive   { background: rgba(34,197,94,.14); color: var(--acc-green); border: 1px solid rgba(34,197,94,.25); }
-.badgeInactive { background: rgba(239,68,68,.12); color: var(--acc-red); border: 1px solid rgba(239,68,68,.22); }
+.badgeActive   { background: var(--green-soft); color: var(--acc-green); border: 1px solid color-mix(in srgb, var(--acc-green) 35%, transparent); }
+.badgeInactive { background: var(--red-soft);   color: var(--acc-red);   border: 1px solid color-mix(in srgb, var(--acc-red) 35%, transparent); }
 
-/* ─── Actions ─── */
+/* ─── Actions: neutras salvo eliminar (rojo) y activar (verde). Antes eran
+   tres botones de color por fila y en oscuro "Desactivar" y "Restablecer"
+   casi no se distinguían. ─── */
 .actions {
   display: flex;
   align-items: center;
@@ -320,6 +289,9 @@
   gap: 5px;
   padding: 5px 11px;
   border-radius: var(--r-xs);
+  border: 1.5px solid var(--border-2);
+  background: var(--card);
+  color: var(--text);
   font-size: .75rem;
   font-weight: 600;
   font-family: inherit;
@@ -327,44 +299,18 @@
   transition: background var(--t), border-color var(--t);
   white-space: nowrap;
 }
+.actionBtn:hover:not(:disabled) { background: var(--hover); border-color: var(--input-border); }
 .actionBtn:disabled { opacity: .5; cursor: not-allowed; }
 
-.btnDesactivar {
-  background: rgba(245,158,11,.12);
-  border: 1.5px solid rgba(245,158,11,.35);
-  color: var(--acc-amber);
-}
-.btnDesactivar:hover:not(:disabled) {
-  background: rgba(245,158,11,.22);
-  border-color: rgba(245,158,11,.60);
-}
-.btnActivar {
-  background: rgba(34,197,94,.12);
-  border: 1.5px solid rgba(34,197,94,.35);
-  color: var(--acc-green);
-}
-.btnActivar:hover:not(:disabled) {
-  background: rgba(34,197,94,.22);
-  border-color: rgba(34,197,94,.60);
-}
-.btnEliminar {
-  background: rgba(239,68,68,.10);
-  border: 1.5px solid rgba(239,68,68,.30);
-  color: var(--acc-red);
-}
-.btnEliminar:hover { background: rgba(239,68,68,.20); border-color: rgba(239,68,68,.55); }
-
-.btnCancelar {
-  background: var(--surface-2);
-  border: 1.5px solid var(--border);
-  color: var(--text-2);
-}
-.btnCancelar:hover { border-color: var(--border-2); }
+.btnActivar { color: var(--acc-green); border-color: color-mix(in srgb, var(--acc-green) 55%, transparent); }
+.btnActivar:hover:not(:disabled) { background: var(--green-soft); border-color: var(--acc-green); }
+.btnEliminar { color: var(--acc-red); border-color: color-mix(in srgb, var(--acc-red) 55%, transparent); }
+.btnEliminar:hover:not(:disabled) { background: var(--red-soft); border-color: var(--acc-red); }
 
 /* ─── Spinner ─── */
 .spinner {
   width: 13px; height: 13px;
-  border: 2px solid rgba(0,0,0,.20);
+  border: 2px solid var(--overlay-2);
   border-top-color: currentColor;
   border-radius: 50%;
   animation: spin .6s linear infinite;
@@ -372,20 +318,13 @@
 }
 .spinnerSm {
   width: 11px; height: 11px;
-  border: 1.5px solid rgba(255,255,255,.20);
+  border: 1.5px solid var(--overlay-2);
   border-top-color: currentColor;
   border-radius: 50%;
   animation: spin .6s linear infinite;
   display: inline-block;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-
-/* ─── Light mode ─── */
-:global([data-theme="light"]) .searchInput {
-  background: #fff;
-  border-color: rgba(0,0,0,.18);
-  color: var(--text);
-}
 
 /* ─── Cuentas locales ─── */
 .btnPanel { margin-left: auto; padding: 6px 14px; }
@@ -396,16 +335,30 @@
   display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 99px;
   border: 1px solid var(--border); color: var(--text-2); font-size: .66rem; font-weight: 700;
 }
-.btnRestablecer {
-  background: rgba(245,200,0,.10);
-  border: 1.5px solid rgba(245,200,0,.35);
-  color: var(--acc-gold);
-}
-.btnRestablecer:hover { background: rgba(245,200,0,.18); }
 .claveTemporal { border-color: var(--y-border); }
 .claveTemporal .panelBody { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; color: var(--text); }
 .claveTemporal code {
-  padding: 6px 12px; border-radius: var(--r-sm); background: var(--y-soft);
-  color: var(--acc-gold); font-size: 1rem; font-weight: 800; letter-spacing: 1px;
+  padding: 6px 12px; border-radius: var(--r-sm); background: var(--overlay-2);
+  color: var(--text); font-size: 1rem; font-weight: 800; letter-spacing: 1px;
 }
 .claveTemporal p { flex-basis: 100%; margin: 0; color: var(--text-2); font-size: .8rem; }
+
+/* En el celular la tabla pasa a fichas: antes se cortaban el rol, el estado y
+   las acciones. */
+@media (max-width: 720px) {
+  .searchRow { flex-wrap: wrap; }
+  .table thead { display: none; }
+  .table, .table tbody { display: block; }
+  .table tr {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px;
+    padding: 14px 0; border-bottom: 1px solid var(--border);
+  }
+  .table tr:last-child { border-bottom: 0; }
+  .table td { display: block; padding: 0; border: 0; }
+  .table td[data-etiqueta]::before {
+    content: attr(data-etiqueta); display: block; margin-bottom: 3px;
+    color: var(--muted); font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+  }
+  .table td.celdaAncha { grid-column: 1 / -1; }
+  .rolSelect { min-width: 0; width: 100%; }
+}

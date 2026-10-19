@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { apiAdmin, type Permiso, type Rol } from "../../api/admin";
 import { MarcoPagina } from "../../components/MarcoPagina";
+import { EncabezadoPagina } from "../../components/EncabezadoPagina";
 import { useNotificacion } from "../../components/Notificaciones";
 import { useConfirmar } from "../../components/ModalConfirmacion";
 import { mensajeDeError } from "../../utils/errores";
@@ -131,14 +132,10 @@ export default function PaginaRoles() {
     <MarcoPagina volverA="/dashboard">
         <div className={styles.container}>
 
-          {/* Page title */}
-          <div className={styles.pageTitle}>
-            <span className={styles.titleIcon}><IconoEscudo /></span>
-            <div>
-              <h1>Roles y permisos</h1>
-              <p>Agrupa los permisos del sistema en roles; los roles se asignan en Usuarios.</p>
-            </div>
-          </div>
+          <EncabezadoPagina
+            titulo="Roles y permisos"
+            descripcion="Agrupa los permisos del sistema en roles; los roles se asignan en Usuarios."
+          />
 
           {/* ── Panel: Permisos ── */}
           <section className={styles.panel}>
@@ -287,6 +284,7 @@ export default function PaginaRoles() {
 
                             <div className={styles.rolBodyFooter}>
                               <button
+                                type="button"
                                 className={styles.btnGuardar}
                                 onClick={() => guardarPermisosRol(r.id)}
                                 disabled={guardandoPermisosRol === r.id}

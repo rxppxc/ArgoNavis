@@ -1,11 +1,4 @@
-/* ─── Encabezado ─── */
-.encabezado {
-  display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap;
-  margin-bottom: 20px;
-}
-.saludo { color: var(--text); font-size: 1.55rem; font-weight: 800; letter-spacing: -.3px; }
-.subtitulo { color: var(--acc-gold); font-size: 1rem; font-weight: 700; margin-top: 4px; }
-
+/* El encabezado (saludo y subtítulo) es el común de EncabezadoPagina. */
 .btnNuevo {
   display: inline-flex; align-items: center; gap: 7px;
   background: linear-gradient(135deg, #FFD84D 0%, var(--y) 55%, var(--y-dark) 100%);
@@ -19,23 +12,34 @@
 }
 .btnNuevo:hover { filter: brightness(1.05); transform: translateY(-2px); box-shadow: 0 8px 22px rgba(245,200,0,.42); }
 
-/* ─── Selector de bandeja (rol) ─── */
+/* ─── Selector de bandeja (rol): las mismas pestañas subrayadas de Catálogos ─── */
 .vistas {
-  display: inline-flex; gap: 4px; padding: 4px;
-  background: var(--card); border: 1px solid var(--border); border-radius: 11px;
-  margin-bottom: 14px;
+  display: flex; gap: 6px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
 }
 .vista {
-  padding: 8px 16px; border-radius: 8px;
-  color: var(--text-2); font-weight: 700; font-size: .85rem;
+  padding: 10px 16px; margin-bottom: -1px;
+  border-bottom: 3px solid transparent;
+  color: var(--text-2); font-weight: 700; font-size: .88rem;
 }
-.vista:hover { color: var(--text); background: var(--hover); }
-.vistaActiva, .vistaActiva:hover { background: var(--y); color: var(--on-accent); }
+.vista:hover { color: var(--text); }
+.vistaActiva, .vistaActiva:hover { color: var(--text); border-bottom-color: var(--y); }
 
-/* ─── Pestañas de estado ─── */
+/* ─── Pestañas de estado (filtros) ─── */
 .pestanas {
   display: flex; gap: 6px; flex-wrap: wrap;
   margin-bottom: 14px;
+}
+/* En el celular van en una sola fila deslizable: en tres filas empujaban las
+   solicitudes a media pantalla. */
+@media (max-width: 640px) {
+  .pestanas {
+    flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+    margin-inline: -16px; padding: 0 16px 2px;
+  }
+  .pestanas::-webkit-scrollbar { display: none; }
+  .pestana { flex: 0 0 auto; }
 }
 .pestana {
   display: inline-flex; align-items: center; gap: 7px;
@@ -70,7 +74,7 @@
   transition: border-color var(--t), box-shadow var(--t);
 }
 .searchInput::placeholder { color: var(--muted); }
-.searchInput:focus { border-color: var(--foco); box-shadow: 0 0 0 3px rgba(245,200,0,.14); }
+.searchInput:focus { border-color: var(--foco); box-shadow: 0 0 0 3px color-mix(in srgb, var(--foco) 18%, transparent); }
 .searchLimpiar {
   position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
   display: flex; align-items: center; justify-content: center;
@@ -106,8 +110,8 @@
 .vacioIcono {
   width: 66px; height: 66px; margin: 0 auto 16px;
   display: flex; align-items: center; justify-content: center;
-  border-radius: var(--r-xl); background: var(--y-soft); border: 1px solid var(--y-border);
-  color: var(--acc-gold);
+  border-radius: var(--r-xl); background: var(--overlay); border: 1px solid var(--border);
+  color: var(--muted);
 }
 .vacio h3 { color: var(--text); font-size: 1.05rem; font-weight: 700; margin-bottom: 6px; }
 .vacio p { color: var(--text-2); font-size: .88rem; margin: 0 auto 20px; max-width: 360px; }

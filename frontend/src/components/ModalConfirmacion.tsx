@@ -24,6 +24,8 @@ interface OpcionesConfirmacion {
   textoOk?:       string;
   textoCancelar?: string;
   peligroso?:     boolean;
+  /** Botón verde: para confirmar una aprobación (como el botón que la inició). */
+  exito?:         boolean;
 }
 
 type Resolver = (decision: boolean) => void;
@@ -86,7 +88,7 @@ export function ProveedorConfirmacion({ children }: { children: ReactNode }) {
                 {estado.textoCancelar ?? "Cancelar"}
               </button>
               <button
-                className={estado.peligroso ? styles.btnPeligro : styles.btnConfirmar}
+                className={estado.peligroso ? styles.btnPeligro : estado.exito ? styles.btnExito : styles.btnConfirmar}
                 onClick={() => responder(true)}
                 data-focus-inicial
               >

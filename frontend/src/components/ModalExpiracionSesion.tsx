@@ -39,7 +39,7 @@ export function ModalExpiracionSesion({ segundos, onContinuar, onCerrarSesion }:
         <div className={styles.icono}>⏱</div>
         <h2 id="expiracion-titulo" className={styles.titulo}>Sesión por expirar</h2>
         <p id="expiracion-texto" className={styles.texto}>
-          Su sesión cerrará automáticamente por inactividad en:
+          Tu sesión se cerrará automáticamente por inactividad en:
         </p>
         <div className={styles.cuenta}>{cuenta}</div>
         <div className={styles.botones}>

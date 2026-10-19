@@ -1,0 +1,8 @@
+.encabezado {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+.texto { min-width: 0; max-width: 780px; }
+.titulo { color: var(--text); font-size: 1.55rem; font-weight: 800; letter-spacing: -.3px; line-height: 1.25; }
+.descripcion { color: var(--text-2); font-size: .92rem; line-height: 1.55; margin-top: 6px; }
+.acciones { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }

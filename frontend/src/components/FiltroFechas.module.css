@@ -15,7 +15,7 @@
 
 .icono {
   display: inline-flex;
-  color: var(--acc-gold);
+  color: var(--muted);
   line-height: 0;
 }
 
@@ -36,12 +36,13 @@
   transition: background .15s var(--ease), border-color .15s var(--ease), color .15s var(--ease);
 }
 .chip:hover {
-  border-color: var(--y-border);
+  border-color: var(--input-border);
   color: var(--text);
 }
-.chipActivo {
+/* Igual que la pestaña de estado activa: amarillo de relleno, texto normal. */
+.chipActivo, .chipActivo:hover {
   background: var(--y-soft);
   border-color: var(--y);
-  color: var(--acc-gold);
+  color: var(--text);
 }
 
