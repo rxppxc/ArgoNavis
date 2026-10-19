@@ -2,7 +2,7 @@
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: rgba(0,0,0,.72);
+  background: rgba(7,24,45,.78);   /* --snm-navy-dark: el visor oscurece más que un modal */
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
   display: flex;
@@ -17,7 +17,7 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  box-shadow: var(--sh-lg);
   width: 100%;
   max-width: 900px;
   max-height: 92vh;
@@ -155,4 +155,4 @@
   cursor: pointer;
   transition: box-shadow var(--t);
 }
-.btnDescargar:hover { box-shadow: 0 4px 14px rgba(245,200,0,.35); }
+.btnDescargar:hover { box-shadow: 0 4px 14px color-mix(in srgb, var(--y) 35%, transparent); }

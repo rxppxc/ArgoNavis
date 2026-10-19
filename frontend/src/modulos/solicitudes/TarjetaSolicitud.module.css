@@ -51,5 +51,5 @@
   margin-top: 8px; padding: 3px 10px; border-radius: 6px;
   font-size: .76rem; font-weight: 600;
 }
-.plazo        { color: var(--acc-amber); background: rgba(180,83,9,.10); }
-.plazoVencido { color: var(--acc-red);   background: rgba(220,38,38,.10); }
+.plazo        { color: var(--acc-amber); background: color-mix(in srgb, var(--acc-amber) 10%, transparent); }
+.plazoVencido { color: var(--acc-red);   background: color-mix(in srgb, var(--acc-red) 10%, transparent); }

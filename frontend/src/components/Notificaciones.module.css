@@ -19,11 +19,11 @@
   border-radius: 10px;
   font-size: .9rem;
   font-weight: 600;
-  color: #fff;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
+  color: var(--sobre-fuerte);
+  box-shadow: var(--sh-lg);
   pointer-events: auto;
   animation: entrar 0.18s ease-out;
-  border: 1px solid rgba(255, 255, 255, .12);
+  border: 1px solid color-mix(in srgb, var(--sobre-fuerte) 14%, transparent);
 }
 
 .texto {
@@ -34,18 +34,21 @@
 .cerrar {
   background: transparent;
   border: 0;
-  color: rgba(255, 255, 255, .9);
+  color: var(--sobre-fuerte);
+  opacity: .85;
   font-size: 1.3rem;
   line-height: 1;
   cursor: pointer;
   padding: 0 4px;
 }
-.cerrar:hover { color: #fff; }
+.cerrar:hover { opacity: 1; }
 
-.exito { background: linear-gradient(135deg, #15803d, #166534); }
-.error { background: linear-gradient(135deg, #b91c1c, #991b1b); }
-.aviso { background: linear-gradient(135deg, #b45309, #92400e); }
-.info  { background: linear-gradient(135deg, #1d4ed8, #1e40af); }
+/* Rellenos planos de la paleta (texto blanco a 5:1 o más); la información, en
+   el azul institucional. */
+.exito { background: var(--exito-fuerte); }
+.error { background: var(--peligro-fuerte); }
+.aviso { background: var(--aviso-fuerte); }
+.info  { background: var(--info-fuerte); }
 
 @keyframes entrar {
   from { transform: translateY(-8px); opacity: 0; }

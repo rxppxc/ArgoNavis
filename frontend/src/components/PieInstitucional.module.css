@@ -1,8 +1,9 @@
-/* Pie de todas las páginas (el del login): una línea debajo de otra, centradas. */
+/* Pie de todas las páginas (el del login): una línea debajo de otra, centradas.
+   En la pizarra del pie de migracion.gob.pa, en los dos temas. */
 .pie {
-  border-top: 1px solid var(--border); background: var(--cabecera);
+  background: var(--pie);
   padding: 14px 24px; display: flex; flex-direction: column; align-items: center; gap: 4px;
-  text-align: center; font-size: .76rem; color: var(--muted);
+  text-align: center; font-size: .76rem; color: var(--pie-texto);
 }
 
 @media (max-width: 880px) {

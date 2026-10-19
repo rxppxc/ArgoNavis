@@ -1,16 +1,17 @@
 /* El encabezado (saludo y subtítulo) es el común de EncabezadoPagina. */
 .btnNuevo {
   display: inline-flex; align-items: center; gap: 7px;
-  background: linear-gradient(135deg, #FFD84D 0%, var(--y) 55%, var(--y-dark) 100%);
+  background: var(--y);
   color: var(--on-accent);
   border-radius: var(--r-sm);
   padding: 11px 22px;
   font-weight: 800; font-size: .86rem;
   text-decoration: none; white-space: nowrap;
-  box-shadow: 0 2px 10px rgba(245,200,0,.22);
-  transition: transform var(--t) var(--ease), box-shadow var(--t) var(--ease), filter var(--t) var(--ease);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--y-dark) 22%, transparent);
+  transition: transform var(--t) var(--ease), box-shadow var(--t) var(--ease), background var(--t) var(--ease);
 }
-.btnNuevo:hover { filter: brightness(1.05); transform: translateY(-2px); box-shadow: 0 8px 22px rgba(245,200,0,.42); }
+/* Plano, con el hover y la sombra dorada de los botones de la web. */
+.btnNuevo:hover { background: var(--y-hover); transform: translateY(-2px); box-shadow: 0 8px 22px color-mix(in srgb, var(--y-dark) 30%, transparent); }
 
 /* ─── Selector de bandeja (rol): las mismas pestañas subrayadas de Catálogos ─── */
 .vistas {
@@ -87,7 +88,7 @@
 .lista { display: flex; flex-direction: column; gap: 10px; }
 
 .error {
-  background: rgba(239,68,68,.13); border: 1px solid rgba(239,68,68,.30);
+  background: var(--red-soft); border: 1px solid color-mix(in srgb, var(--acc-red) 35%, transparent);
   border-radius: 8px; color: var(--acc-red);
   padding: 11px 14px; margin-bottom: 16px; font-size: .87rem;
 }

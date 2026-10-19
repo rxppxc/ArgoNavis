@@ -18,6 +18,7 @@ import {
 import { apiTramites, type TipoTramite } from "../../api/tramites";
 import { MarcoPagina } from "../../components/MarcoPagina";
 import { EncabezadoPagina } from "../../components/EncabezadoPagina";
+import { useConfirmar } from "../../components/ModalConfirmacion";
 import { ModalPreview } from "../../components/ModalPreview";
 import { useNotificacion } from "../../components/Notificaciones";
 import { IconoAlerta, IconoMas } from "../../components/Iconos";
@@ -28,6 +29,7 @@ import { ChecklistDocumentos } from "./ChecklistDocumentos";
 import { claveCasilla, construirCasillas, type CasillaFormulario } from "./checklist";
 import { DocumentosAdicionales, MAX_ADICIONALES, type AdicionalNuevo } from "./DocumentosAdicionales";
 import { AYUDA_CAMPOS_TRAMITE, formatearFechaHora, hoyISO, normalizarImo, tiempoRestante } from "./presentacion";
+import { SelectorTramite } from "./SelectorTramite";
 import { TarjetaTripulante } from "./TarjetaTripulante";
 import {
   CABECERA_VACIA, fechaReferencia, operacionMaxima, portaLibreta, validarFormulario,
@@ -99,6 +101,7 @@ export default function PaginaSolicitud() {
   const corrigiendo = solicitudId !== null;
   const navegar = useNavigate();
   const { mostrar } = useNotificacion();
+  const confirmar = useConfirmar();
 
   const [tipos, setTipos]       = useState<TipoTramite[]>([]);
   const [puestos, setPuestos]   = useState<PuestoMini[]>([]);
@@ -259,14 +262,29 @@ export default function PaginaSolicitud() {
   }
 
   /** Al cambiar de trámite, los tripulantes con un rango que el nuevo no admite
-   *  pasan al primero que sí admite (p. ej. el trámite de Técnico). */
-  function elegirTramite(codigo: string) {
+   *  pasan al primero que sí admite (p. ej. el trámite de Técnico). Los archivos
+   *  del checklist se quitan (el nuevo pide otros): si ya había, se confirma.
+   *  Devuelve si se cambió. */
+  async function elegirTramite(codigo: string): Promise<boolean> {
+    const adjuntos = Object.keys(nuevos).length;
+    if (adjuntos > 0) {
+      const cuales = adjuntos === 1 ? "se quitará el documento" : `se quitarán los ${adjuntos} documentos`;
+      const ok = await confirmar({
+        titulo: "Cambiar de trámite",
+        mensaje: `Cada trámite pide sus propios documentos: ${cuales} que adjuntaste en el checklist. `
+          + "Los datos, los tripulantes y los documentos adicionales se conservan.",
+        textoOk: "Cambiar de trámite",
+        peligroso: true,
+      });
+      if (!ok) return false;
+    }
     setCodigoTramite(codigo);
     setNuevos({});
     const rangos = tipos.find((t) => t.codigo === codigo)?.rangos_permitidos;
     if (rangos?.length) {
       setTripulantes((prev) => prev.map((t) => (rangos.includes(t.rango) ? t : { ...t, rango: rangos[0] })));
     }
+    return true;
   }
 
   const quitarTripulante = useCallback((clave: string) => {
@@ -431,17 +449,14 @@ export default function PaginaSolicitud() {
         {/* ── 1. Tipo de trámite ── */}
         <section className={styles.bloque}>
           <div className={styles.bloqueTitulo}><span className={styles.paso}>1</span> Tipo de trámite</div>
-          <select className={styles.select} value={codigoTramite} disabled={corrigiendo}
-            onChange={(e) => elegirTramite(e.target.value)}>
-            <option value="">Selecciona un trámite…</option>
-            {tipos.map((t) => <option key={t.id} value={t.codigo}>{t.nombre}</option>)}
-          </select>
-          {tipo?.nota && <div className={styles.nota}>{tipo.nota}</div>}
-          {tipo?.valida_vigencia && (
-            <div className={styles.nota}>
-              Este trámite exige pasaporte y seamanbook <strong>vigentes</strong> a la fecha de la operación.
-            </div>
-          )}
+          <SelectorTramite tipos={tipos} elegido={tipo} fijo={corrigiendo} onElegir={elegirTramite}>
+            {tipo?.nota && <div className={styles.nota}>{tipo.nota}</div>}
+            {tipo?.valida_vigencia && (
+              <div className={styles.nota}>
+                Este trámite exige pasaporte y seamanbook <strong>vigentes</strong> a la fecha de la operación.
+              </div>
+            )}
+          </SelectorTramite>
         </section>
 
         {tipo && (

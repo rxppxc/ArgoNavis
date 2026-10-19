@@ -2,7 +2,7 @@
 .error {
   display: flex; align-items: center; gap: 10px;
   padding: 16px 18px; border-radius: 10px;
-  background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.35);
+  background: var(--red-soft); border: 1px solid color-mix(in srgb, var(--acc-red) 40%, transparent);
   color: var(--acc-red); font-size: .9rem;
 }
 
@@ -48,6 +48,9 @@
 
 /* ─── Columnas ─── */
 .columnas { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start; }
+/* UCVMM: lateral más angosta, para que la tabla de tripulantes (con la columna
+   de impedimentos) no apriete los nombres. */
+.columnasRevision { grid-template-columns: minmax(0, 1fr) 300px; }
 .principal, .lateral { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 
 .panel {
@@ -118,8 +121,8 @@
   width: 20px; height: 20px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
-.casillaOk    { color: var(--acc-green); background: rgba(21,128,61,.15); }
-.casillaFalta { color: var(--acc-red);   background: rgba(220,38,38,.15); }
+.casillaOk    { color: var(--acc-green); background: color-mix(in srgb, var(--acc-green) 15%, transparent); }
+.casillaFalta { color: var(--acc-red);   background: color-mix(in srgb, var(--acc-red) 15%, transparent); }
 .textoFalta { color: var(--acc-red); font-size: .74rem; font-weight: 700; }
 .archivo {
   display: flex; align-items: center; gap: 8px;
@@ -170,43 +173,50 @@
 .evento_finalizada .eventoPunto { background: var(--acc-teal); }
 .evento_expirada .eventoPunto   { background: var(--acc-gray); }
 
-/* ─── Paneles de acción ─── */
-.paso + .paso { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
-.pasoTitulo { color: var(--text); font-size: .84rem; font-weight: 700; margin-bottom: 8px; }
-.check { display: flex; align-items: center; gap: 9px; color: var(--text); font-size: .84rem; margin-bottom: 8px; cursor: pointer; }
-.check input { width: 16px; height: 16px; accent-color: var(--y); }
-
-/* Verificación de impedimentos por tripulante */
-.impedimentosCabecera { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-.impedimentosCabecera .ayuda { margin-bottom: 0; }
-.listaImpedimentos { list-style: none; display: flex; flex-direction: column; gap: 6px; margin: 6px 0 10px; }
-.filaImpedimento {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
-  padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--card-2);
+/* ─── Verificación de impedimentos (UCVMM), en la tabla de tripulantes ─── */
+.verifCabecera {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  margin: 2px 0 10px;
 }
-.filaConImpedimento { border-color: var(--acc-red); background: var(--red-soft); }
-.opcionesImpedimento { display: flex; gap: 6px; flex-wrap: wrap; }
-.opcionesImpedimento label {
-  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
-  padding: 5px 9px; border: 1px solid var(--border-2); border-radius: 999px;
-  font-size: .76rem; font-weight: 600; color: var(--text-2);
+.verifTitulo { color: var(--text); font-size: .84rem; font-weight: 700; }
+.progreso { display: flex; align-items: center; gap: 8px; margin-top: 5px; color: var(--text-2); font-size: .78rem; }
+.progresoBarra { display: flex; width: 140px; }
+/* Sin | Con: radios nativos (teclado y lector de pantalla) pintados como un control segmentado. */
+.segmento { display: inline-flex; border: 1px solid var(--border-2); border-radius: 8px; overflow: hidden; }
+.segmentoOpcion {
+  padding: 6px 13px; cursor: pointer;
+  font-size: .78rem; font-weight: 700; color: var(--text-2); background: var(--card);
+  transition: background var(--t), color var(--t);
 }
-.opcionesImpedimento input { accent-color: var(--foco); }
-.opcionesImpedimento .opcionSin { border-color: var(--acc-green); color: var(--acc-green); background: var(--green-soft); }
-.opcionesImpedimento .opcionSin input { accent-color: var(--acc-green); }
-.opcionesImpedimento .opcionCon { border-color: var(--acc-red); color: var(--acc-red); background: var(--red-soft); }
-.opcionesImpedimento .opcionCon input { accent-color: var(--acc-red); }
+.segmentoOpcion + .segmentoOpcion { border-left: 1px solid var(--border-2); }
+.segmentoOpcion:hover { background: var(--hover); color: var(--text); }
+.segmentoOpcion:has(input:focus-visible) { outline: 2px solid var(--foco); outline-offset: -2px; }
+/* Ya registrada: se ve el resultado, sin poder cambiarlo (eso es "Corregir verificación"). */
+.segmentoFijo { cursor: default; }
+.segmentoFijo:hover { background: var(--card); color: var(--text-2); }
+.segmentoFijo:not(.segmentoSin):not(.segmentoCon) { opacity: .45; }
+.segmentoSin, .segmentoSin:hover { background: var(--green-soft); color: var(--acc-green); }
+.segmentoCon, .segmentoCon:hover { background: var(--red-soft); color: var(--acc-red); }
+.tabla tr.filaConImpedimento { background: var(--red-soft); }
+.verifPie {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);
+}
+.verifPie .observaciones, .verifPie .filaBotones { margin-top: 0; }
 .verificacionRegistrada {
   display: flex; align-items: center; gap: 6px; margin: 2px 0 8px;
   color: var(--text-2); font-size: .8rem;
 }
 .verificacionRegistrada svg { color: var(--acc-green); flex-shrink: 0; }
-.resultadoSin, .resultadoCon {
-  padding: 4px 10px; border: 1px solid; border-radius: 999px;
-  font-size: .76rem; font-weight: 700; white-space: nowrap;
-}
-.resultadoSin { color: var(--acc-green); border-color: var(--acc-green); }
-.resultadoCon { color: var(--acc-red);   border-color: var(--acc-red); }
+.filaBotones .verificacionRegistrada { margin: 0 auto 0 0; }
+
+/* ─── Panel de decisión ─── */
+.resumenVerificacion { display: grid; gap: 3px; margin-bottom: 12px; color: var(--text-2); font-size: .82rem; line-height: 1.5; }
+.resumenVerificacion strong { color: var(--text); }
+.resumenVerificacion .estadoOk { color: var(--acc-green); }
+.resumenVerificacion .estadoPendiente { color: var(--acc-amber); }
+.modalAngosto { width: min(500px, 100%); }
+.modalMensaje { color: var(--text-2); font-size: .86rem; line-height: 1.55; margin-bottom: 14px; }
 .chipImpedimento {
   display: inline-block; margin-top: 4px; padding: 1px 8px; border-radius: 999px;
   font-size: .68rem; font-weight: 700; color: var(--acc-red); border: 1px solid var(--acc-red);
@@ -219,6 +229,7 @@
 }
 .textarea::placeholder { color: var(--muted); }
 .textarea:focus { outline: 2px solid var(--foco); border-color: transparent; }
+.textarea[aria-invalid="true"] { border-color: var(--acc-red); }
 .textarea + .etiqueta { margin-top: 10px; }
 .select {
   width: 100%; padding: 8px 10px; border-radius: 8px;
@@ -245,8 +256,6 @@
 .aprobar:hover:not(:disabled) { filter: brightness(1.1); }
 .negar:not(:disabled) { color: var(--acc-red); border-color: var(--acc-red); }
 .negar:hover:not(:disabled) { background: var(--red-soft); border-color: var(--acc-red); }
-.activa { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--foco); }
-.formDecision { margin-top: 12px; }
 
 .btnPrimario, .btnSecundario, .btnExito, .btnPeligro {
   display: inline-flex; align-items: center; gap: 7px;
@@ -282,6 +291,14 @@
 @media (max-width: 980px) {
   .columnas { grid-template-columns: 1fr; }
 }
+/* La decisión de UCVMM queda a la vista al bajar por la tabla de tripulantes.
+   Si la columna no entra en la pantalla (historial largo), se desplaza por dentro. */
+@media (min-width: 981px) {
+  .lateralFijo {
+    position: sticky; top: 16px;
+    max-height: calc(100vh - 32px); overflow-y: auto;
+  }
+}
 
 /* En el celular la tabla de tripulantes pasa a fichas: antes se cortaban el
    seamanbook, el rango y "Ver documentación". */
@@ -301,6 +318,8 @@
   }
   .tabla td.celdaOrden { display: none; }
   .tabla td.celdaAncha { grid-column: 1 / -1; }
+  .tabla tr.filaConImpedimento { padding-left: 10px; padding-right: 10px; border-radius: 8px; }
+  .segmentoOpcion { padding: 8px 20px; }
 }
 
 /* Columna "Documentos" de la tabla de tripulantes y su modal */

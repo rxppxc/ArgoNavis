@@ -13,16 +13,16 @@ import {
 import { MarcoPagina } from "../../components/MarcoPagina";
 import { ModalPreview } from "../../components/ModalPreview";
 import { useNotificacion } from "../../components/Notificaciones";
-import { IconoAlerta, IconoArchivo, IconoDescargar, IconoEditar, IconoX } from "../../components/Iconos";
+import { IconoAlerta, IconoDescargar, IconoEditar, IconoX } from "../../components/Iconos";
 import { mensajeDeError } from "../../utils/errores";
 import { DocumentosSolicitud } from "./DocumentosSolicitud";
 import { HistorialSolicitud } from "./HistorialSolicitud";
 import { InsigniaEstado } from "./InsigniaEstado";
 import { PanelPuerto } from "./PanelPuerto";
 import { PanelRevision } from "./PanelRevision";
-import {
-  ETIQUETA_RANGO, ETIQUETA_SEXO, formatearFecha, formatearFechaHora, tiempoRestante,
-} from "./presentacion";
+import { formatearFecha, formatearFechaHora, tiempoRestante } from "./presentacion";
+import { SeccionTripulantes } from "./SeccionTripulantes";
+import { useVerificacionImpedimentos } from "./useVerificacionImpedimentos";
 import styles from "./DetalleSolicitud.module.css";
 
 function BannerEstado({ s }: { s: SolicitudDetalle }) {
@@ -120,12 +120,8 @@ function Dato({ etiqueta, valor }: { etiqueta: string; valor: string | null | un
 export default function PaginaDetalleSolicitud() {
   const { id = "" } = useParams<{ id: string }>();
   const solicitudId = Number(id);
-  const { mostrar } = useNotificacion();
   const [solicitud, setSolicitud] = useState<SolicitudDetalle | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [vistaPrevia, setVistaPrevia] = useState<DocumentoSolicitud | null>(null);
-  const [documentacionDe, setDocumentacionDe] = useState<TripulanteSolicitud | null>(null);
-  const [descargando, setDescargando] = useState(false);
 
   useEffect(() => {
     let cancelado = false;
@@ -134,18 +130,6 @@ export default function PaginaDetalleSolicitud() {
       .catch((e) => { if (!cancelado) setError(mensajeDeError(e, "No se pudo cargar la solicitud.")); });
     return () => { cancelado = true; };
   }, [solicitudId]);
-
-  async function descargarPdf() {
-    if (!solicitud) return;
-    setDescargando(true);
-    try {
-      await apiSolicitudes.descargarAutorizacion(solicitud.id, solicitud.numero);
-    } catch (e) {
-      mostrar(mensajeDeError(e, "No se pudo descargar la autorización."), "error");
-    } finally {
-      setDescargando(false);
-    }
-  }
 
   if (error) {
     return (
@@ -157,8 +141,30 @@ export default function PaginaDetalleSolicitud() {
   if (!solicitud) {
     return <MarcoPagina volverA="/dashboard"><div className={styles.cargando}>Cargando expediente…</div></MarcoPagina>;
   }
+  // key: al pasar a otro expediente se descarta lo que se estaba marcando o viendo en el anterior.
+  return <Expediente key={solicitud.id} s={solicitud} onActualizada={setSolicitud} />;
+}
 
-  const s = solicitud;
+function Expediente({ s, onActualizada }: { s: SolicitudDetalle; onActualizada: (s: SolicitudDetalle) => void }) {
+  const { mostrar } = useNotificacion();
+  // La verificación de impedimentos se marca en la tabla de tripulantes y la
+  // resume el panel de decisión: el estado vive aquí, compartido por los dos.
+  const verificacion = useVerificacionImpedimentos(s, onActualizada);
+  const [vistaPrevia, setVistaPrevia] = useState<DocumentoSolicitud | null>(null);
+  const [documentacionDe, setDocumentacionDe] = useState<TripulanteSolicitud | null>(null);
+  const [descargando, setDescargando] = useState(false);
+
+  async function descargarPdf() {
+    setDescargando(true);
+    try {
+      await apiSolicitudes.descargarAutorizacion(s.id, s.numero);
+    } catch (e) {
+      mostrar(mensajeDeError(e, "No se pudo descargar la autorización."), "error");
+    } finally {
+      setDescargando(false);
+    }
+  }
+
   const buque = [s.nombre_buque, s.imo && `IMO ${s.imo}`].filter(Boolean).join(" · ");
   // Los de cada tripulante se abren desde su fila; abajo solo va lo que no es de nadie.
   const hayDocumentosDeLaSolicitud = s.checklist.some((c) => c.tripulante_id === null)
@@ -196,7 +202,7 @@ export default function PaginaDetalleSolicitud() {
 
       <BannerEstado s={s} />
 
-      <div className={styles.columnas}>
+      <div className={`${styles.columnas} ${s.acciones.revisar ? styles.columnasRevision : ""}`}>
         <div className={styles.principal}>
           <section className={styles.panel}>
             <h2 className={styles.panelTitulo}>Datos del trámite</h2>
@@ -223,90 +229,8 @@ export default function PaginaDetalleSolicitud() {
             )}
           </section>
 
-          <section className={styles.panel}>
-            <h2 className={styles.panelTitulo}>
-              Tripulantes <span className={styles.contador}>{s.tripulantes.length}</span>
-            </h2>
-            {s.valida_vigencia && (
-              <p className={styles.ayuda}>Este trámite exige pasaporte y seamanbook vigentes a la fecha de la operación.</p>
-            )}
-            <div className={styles.tablaScroll}>
-              <table className={styles.tabla}>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Tripulante</th>
-                    <th>Nacionalidad</th>
-                    <th>Pasaporte</th>
-                    <th>Seamanbook</th>
-                    <th>Rango / ocupación</th>
-                    <th>Documentos</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {s.tripulantes.map((m, i) => {
-                    const faltan = s.checklist.filter((c) => c.tripulante_id === m.id && !c.cubierta).length;
-                    const adjuntos = s.documentos.filter((d) => d.tripulante_id === m.id).length;
-                    // data-etiqueta: el título de cada dato cuando la tabla pasa a fichas en el celular.
-                    return (
-                      <tr key={m.id}>
-                        <td className={styles.celdaOrden}>{i + 1}</td>
-                        <td className={styles.celdaAncha}>
-                          <div className={styles.celdaPrincipal}>{m.nombre_completo}</div>
-                          <div className={styles.celdaSecundaria}>
-                            {ETIQUETA_SEXO[m.sexo]} · Nac. {formatearFecha(m.fecha_nacimiento)}
-                            {m.pais_nacimiento_nombre && <> · {m.pais_nacimiento_nombre}</>}
-                          </div>
-                          {/* Solo llega al personal del SNM: a la agencia el backend le manda null */}
-                          {m.con_impedimento && <span className={styles.chipImpedimento}>Con impedimento</span>}
-                        </td>
-                        <td data-etiqueta="Nacionalidad">
-                          {m.nacionalidad_nombre ?? m.nacionalidad}
-                          {m.nacionalidad_restringida && s.tipo_tramite_aviso_custodia && (
-                            <div className={styles.chipRestringida}>Restringida</div>
-                          )}
-                        </td>
-                        <td data-etiqueta="Pasaporte">
-                          <div className={styles.celdaPrincipal}>{m.pasaporte}</div>
-                          <div className={m.pasaporte_vencido ? styles.vencido : styles.celdaSecundaria}>
-                            Vence {formatearFecha(m.pasaporte_expira)}{m.pasaporte_vencido && " — vencido"}
-                          </div>
-                        </td>
-                        <td data-etiqueta="Seamanbook">
-                          {m.porta_libreta ? (
-                            <>
-                              <div className={styles.celdaPrincipal}>{m.libreta_marino ?? "—"}</div>
-                              <div className={m.libreta_vencida ? styles.vencido : styles.celdaSecundaria}>
-                                Vence {formatearFecha(m.libreta_expira)}{m.libreta_vencida && " — vencido"}
-                              </div>
-                            </>
-                          ) : (
-                            <span className={styles.celdaSecundaria}>No aplica</span>
-                          )}
-                        </td>
-                        <td data-etiqueta="Rango / ocupación">
-                          <div className={styles.celdaPrincipal}>{ETIQUETA_RANGO[m.rango]}</div>
-                          <div className={styles.celdaSecundaria}>{m.ocupacion}</div>
-                        </td>
-                        <td className={styles.celdaAncha}>
-                          <button type="button" className={styles.btnDocumentacion} onClick={() => setDocumentacionDe(m)}
-                            aria-label={`Ver documentación de ${m.nombre_completo}`}>
-                            <IconoArchivo tamano={13} />
-                            <span>{adjuntos > 0 ? `Ver ${adjuntos} documento${adjuntos === 1 ? "" : "s"}` : "Ver documentación"}</span>
-                          </button>
-                          {faltan > 0 && (
-                            <div className={styles.textoFalta}>
-                              {faltan === 1 ? "Falta 1 documento" : `Faltan ${faltan} documentos`}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </section>
+          <SeccionTripulantes solicitud={s} verificacion={s.acciones.revisar ? verificacion : null}
+            onVerDocumentacion={setDocumentacionDe} />
 
           {hayDocumentosDeLaSolicitud && (
             <section className={styles.panel}>
@@ -316,8 +240,9 @@ export default function PaginaDetalleSolicitud() {
           )}
         </div>
 
-        <aside className={styles.lateral}>
-          {s.acciones.revisar && <PanelRevision solicitud={s} onActualizada={setSolicitud} />}
+        {/* Para UCVMM la columna queda fija al bajar por la tabla: la decisión siempre a la vista. */}
+        <aside className={`${styles.lateral} ${s.acciones.revisar ? styles.lateralFijo : ""}`}>
+          {s.acciones.revisar && <PanelRevision solicitud={s} verificacion={verificacion} onActualizada={onActualizada} />}
           {s.acciones.conflicto_revision && (
             <section className={styles.panel}>
               <h2 className={styles.panelTitulo}>Revisión UCVMM</h2>
@@ -327,7 +252,7 @@ export default function PaginaDetalleSolicitud() {
               </p>
             </section>
           )}
-          {s.acciones.finalizar && <PanelPuerto solicitud={s} onActualizada={setSolicitud} />}
+          {s.acciones.finalizar && <PanelPuerto solicitud={s} onActualizada={onActualizada} />}
           {/* Solo llega al personal del SNM: el backend no lo envía a la agencia */}
           {!s.acciones.revisar && s.impedimentos_verificados_en && (
             <section className={styles.panel}>

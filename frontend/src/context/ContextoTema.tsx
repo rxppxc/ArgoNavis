@@ -28,8 +28,9 @@ interface CtxTema {
 
 const CLAVE = "tema";
 const CONSULTA_CLARO = "(prefers-color-scheme: light)";
-/** Color de la barra del navegador en móviles: el de la cabecera. */
-const COLOR_BARRA: Record<Tema, string> = { dark: "#0F1218", light: "#FFFFFF" };
+/** Color de la barra del navegador en móviles: el de la cabecera (--cabecera),
+ *  el mismo en los dos temas. */
+const COLOR_BARRA = "#1B252F";
 
 const ContextoTema = createContext<CtxTema>({ tema: "dark", preferencia: "system", elegirPreferencia: () => {} });
 
@@ -54,7 +55,7 @@ function aplicar(tema: Tema) {
   // de animarse componente por componente.
   raiz.classList.add("sin-transiciones");
   raiz.setAttribute("data-theme", tema);
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", COLOR_BARRA[tema]);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", COLOR_BARRA);
   requestAnimationFrame(() => requestAnimationFrame(() => raiz.classList.remove("sin-transiciones")));
 }
 

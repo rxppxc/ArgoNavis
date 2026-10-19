@@ -64,6 +64,8 @@ class TipoTramite(Base):
     # restringida (Desembarque, Urgencias, Renovación y Shore Pass).
     aviso_custodia: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
+    # Cuándo se usa el trámite, en una línea (tarjetas del paso 1 de «Nueva solicitud»).
+    descripcion: Mapped[str | None] = mapped_column(String(300))
     nota:       Mapped[str | None] = mapped_column(Text)   # aviso al usuario (ej. prórroga de extensión)
     orden:      Mapped[int]        = mapped_column(Integer, default=0)
     activo:     Mapped[bool]       = mapped_column(Boolean, default=True, server_default="true")

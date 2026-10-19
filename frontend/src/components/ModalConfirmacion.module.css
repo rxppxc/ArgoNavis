@@ -10,8 +10,8 @@
 }
 
 .modal {
-  background: var(--surface, #1f2433);
-  color: var(--text, #f4f5f8);
+  background: var(--surface);
+  color: var(--text);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 22px 24px;
@@ -28,7 +28,7 @@
 
 .mensaje {
   font-size: .92rem;
-  color: var(--text-2, rgba(244, 245, 248, .85));
+  color: var(--text-2);
   line-height: 1.45;
   margin-bottom: 18px;
 }
@@ -55,7 +55,7 @@
 .btnCancelar {
   background: transparent;
   border-color: var(--border-2);
-  color: var(--text, #f4f5f8);
+  color: var(--text);
 }
 .btnCancelar:hover { background: var(--hover); }
 

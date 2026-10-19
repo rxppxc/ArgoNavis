@@ -105,13 +105,25 @@ constants/          → números mágicos.
 - `eslint-plugin-react-hooks` en exhaustive deps. Si quitas una dep, deja `// eslint-disable-next-line` con el porqué.
 
 ### Interfaz (revisión de UI/UX del 2026-10-19)
-- El amarillo de marca (`--y`) es solo **relleno**: el botón principal de cada pantalla, lo seleccionado (pestaña, filtro, tema) y el foco. **Nunca como color de texto** (en claro da 1.6:1 y el dorado se ve oliva): textos con `--text` / `--text-2` / `--muted`, estados con `--acc-*`.
+- **Paleta SNM** (pedido del usuario del 2026-10-19: «basate en los colores del logo y en el estándar de la página web»). Sale del escudo (amarillo `#FFE400`, negro, celeste `#15B0DE`) y de los tokens propios de migracion.gob.pa (`--snm-*`):
+  - Marino `#10233F` / `#17283E` para los textos, azul institucional `#003DA5`, amarillo `#F2C94C` (hover `#FFD633`), líneas `#DCE4ED` / `#CAD5E1`, fondos `#F6F9FC` / `#EEF4F8` y crema `#FFF8D8`.
+  - El tema claro es el de la web. El oscuro, la pizarra de su cabecera. El detalle, con cada valor y su contraste, está en el comentario de `styles/globals.css`.
+  - Cabecera y pie en pizarra (`#1B252F` / `#2D363F`) en los **dos** temas, como en la web: sus textos van en `--cabecera-texto*` / `--pie-texto`, no en `--text`.
+  - El foco va en azul institucional en claro y en amarillo en oscuro y sobre la cabecera.
+  - Sin colores fijos en los CSS: los tintes de estado se arman con `color-mix(in srgb, var(--acc-*) N%, transparent)`. Quedan fijos solo la bandera, la hoja del visor de documentos y la barra del navegador (`#1B252F`: `index.html`, `tema-inicial.js` y `ContextoTema.tsx`).
+- El amarillo de marca (`--y`) es solo **relleno**: el botón principal de cada pantalla, lo seleccionado (pestaña, filtro, tema) y el foco en oscuro. **Nunca como color de texto** (en claro da 1.6:1 y el dorado se ve oliva): textos con `--text` / `--text-2` / `--muted`, estados con `--acc-*`. Sobre el amarillo, texto marino (`--on-accent`), como los botones de la web.
 - Botones: principal amarillo; secundario neutro con borde; aprobar con `--exito-fuerte`, denegar/eliminar con `--peligro-fuerte` (o contorno rojo); "Volver" discreto. Desactivado en gris (`--overlay-2` + `--muted`), no amarillo a media opacidad. En `useConfirmar`, `peligroso` (rojo) o `exito` (verde) según la acción.
 - "En corrección" va en naranja (`--acc-orange`): el ámbar se confundía con la marca.
 - Encabezado de página: `EncabezadoPagina` (título y descripción a la izquierda, acciones a la derecha); el expediente lleva el suyo.
 - Campos con `--input-border` / `--input-bg` (borde de 3:1). Las notas informativas, neutras con borde izquierdo `--acc-blue`.
 - Tablas que en el celular pasan a fichas: cada `<td>` lleva `data-etiqueta` (tripulantes del expediente, usuarios).
 - Si cambias un color, recalcula el contraste también sobre los fondos teñidos (insignias, avisos, contadores).
+- Revisión de UCVMM (propuesta 1A, elegida por el usuario el 2026-10-19):
+  - Los impedimentos se marcan en una columna Sin / Con de la tabla de tripulantes (`SeccionTripulantes`). El estado vive en `useVerificacionImpedimentos`, que lo comparte con el panel de decisión (`PanelRevision`).
+  - La columna lateral queda fija al bajar (sticky, 300 px) y cada decisión es un solo modal (`ModalDecision`).
+  - `ModalDecision` va en un portal al `body`: dentro del sticky quedaba debajo de la cabecera.
+- Paso 1 de «Nueva solicitud» en tarjetas (`SelectorTramite`, propuesta 2A): la descripción sale del catálogo y lo que pide, del checklist. Cambiar de trámite con archivos ya adjuntos pide confirmación (se quitan).
+  - Cada trámite tiene ícono y color propios (`PRESENTACION`, por código, en el frontend): mosaico sólido en un `--acc-*` con el ícono en `--card`. Con todos en gris no se distinguían (pedido del usuario del 2026-10-19). En la grilla, los colores vecinos no se parecen.
 
 ## Estado actual (snapshot 2026-10-16)
 
@@ -129,7 +141,7 @@ constants/          → números mágicos.
 - Catálogo alineado al Form. 3 y al documento de UCVMM (ver "Reglas" abajo).
 - Validaciones de fechas, impedimentos por tripulante y puesto de finalización.
 - Rol SysAdmin separado del Administrador.
-- Tema Claro / Oscuro / Sistema (paleta "pizarra", tokens en `styles/globals.css`, `public/tema-inicial.js` lo fija antes de pintar).
+- Tema Claro / Oscuro / Sistema (tokens en `styles/globals.css`, `public/tema-inicial.js` lo fija antes de pintar). La paleta "pizarra" de entonces se reemplazó por la del SNM el 2026-10-19 (ver "Interfaz").
 
 ### Revisión completa (2026-10-15, revisión `0a1c93f169d4`)
 - Login sin enumeración de usuarios del AD; logs de la app configurados (`core/registro.py`).
@@ -165,7 +177,7 @@ Las agencias entran por la VPN, pero no son del SNM: se las trata como no confia
 1. **HTTPS y TLS con el AD** — la configuración está lista (README → "Producción"); falta el certificado del servidor y el del controlador de dominio (infraestructura).
 2. **JWT en cookie httpOnly** — actualmente en localStorage, con la CSP como barrera (regla 15). Plan en README → "Decisiones documentadas".
 3. **Redis para rate limit** si se escala a varios hosts (en un host con varios workers el límite es por proceso).
-4. **Refactor de componentes grandes** (`PaginaSolicitud` ~670 líneas, `PaginaDetalleSolicitud`) extrayendo subcomponentes y hooks.
+4. **Refactor de componentes grandes** (`PaginaSolicitud` ~680 líneas) extrayendo subcomponentes y hooks. El expediente ya se partió (2026-10-19).
 5. **Edición del catálogo de trámites desde la UI** — hoy se ajusta con migraciones.
 6. **Solicitud de Custodia y Solicitud de Transbordos** — el documento de UCVMM dice que faltan por levantar; no están modeladas.
 7. **Política de retención de datos personales** — decisión del equipo.
@@ -176,6 +188,8 @@ Las agencias entran por la VPN, pero no son del SNM: se las trata como no confia
     - Dos vías: el trámite «Cambio de Puerto» del Form. 3 ligado a la original (que pasaría a un estado nuevo «Reemplazada»), o una reasignación del puesto con un permiso propio. Recomendada la primera si UCVMM la confirma: es su trámite.
     - Preguntas abiertas: ¿aplica solo a embarques («nuevo puerto a embarcar»)? ¿Puede ser de algunos tripulantes? ¿Se reutilizan los documentos? ¿Quién cierra un cambio de último minuto? ¿Qué pasa con la original?
     - Mientras tanto: la agencia presenta el «Cambio de Puerto» con el número original en las observaciones (la original vence sola), o el puesto autorizado finaliza indicando dónde terminó.
+11. **Importar tripulantes desde una plantilla Excel** (propuesta 3 de la revisión de UI) — por ahora no (2026-10-19).
+    - Vale la pena si las tripulaciones suelen ser grandes. Para decidir: `SELECT count(*), round(avg(cantidad_tripulantes), 1), max(cantidad_tripulantes), count(*) FILTER (WHERE cantidad_tripulantes > 10) FROM solicitudes;`.
 
 ### Flujo actual: Autorizaciones Marítimas (UCVMM)
 
@@ -234,6 +248,9 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
   - **Ninguna nacionalidad viene sembrada**: la lista oficial la marca el admin.
 - `tipos_tramite.rangos_permitidos` limita los rangos del trámite (nulo = cualquiera); hoy solo F3-TECNICO, por el nombre del trámite en el Form. 3. Lo valida `ServicioTramite.validar_tripulantes` y lo espeja `validacionFormulario.ts`.
 - Las aclaraciones del instructivo del Form. 3 para el buque y el puerto ("nueva nave a embarcar", etc.) viven en `AYUDA_CAMPOS_TRAMITE` (`modulos/solicitudes/presentacion.ts`).
+- `tipos_tramite.descripcion` (revisión `a3d9c6e1f584`) es una línea con cuándo se usa el trámite, para las tarjetas del paso 1.
+  - Primera versión del 2026-10-19, apoyada en los documentos que pide cada trámite (el boleto aéreo del Desembarque, la cita del consulado de la Renovación): **falta validarla con UCVMM**.
+  - Se cambia con una migración, como el resto del catálogo.
 - `tests/test_documento_ucvmm.py` es la lectura literal del Form. 3 y del documento de UCVMM por trámite: si cambias el catálogo, esa tabla tiene que seguir coincidiendo (o cambia porque UCVMM cambió el requisito).
 - Lo interno no le llega a la agencia. Lo filtra el backend (`ContextoAcceso.es_personal_snm`, `_evento_para` en `solicitud_service.py`), no la vista:
   - Los eventos `impedimentos` y `comentario`.

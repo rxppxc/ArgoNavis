@@ -66,6 +66,7 @@ export default function PaginaTramites() {
                     </span>
                     <div className={styles.cardInfo}>
                       <div className={styles.cardNombre}>{t.nombre}</div>
+                      {t.descripcion && <div className={styles.cardDescripcion}>{t.descripcion}</div>}
                       <div className={styles.cardCodigo}>{t.codigo}</div>
                     </div>
                     <span className={styles.docCount}>

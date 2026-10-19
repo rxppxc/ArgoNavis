@@ -35,6 +35,8 @@ export interface TipoTramite {
   rangos_permitidos: RangoMarino[] | null;
   /** Al aprobar se avisa que se debe tramitar la custodia de los restringidos. */
   aviso_custodia: boolean;
+  /** Cuándo se usa el trámite, en una línea (tarjetas del paso 1). */
+  descripcion: string | null;
   nota: string | null;
   orden: number;
   activo: boolean;

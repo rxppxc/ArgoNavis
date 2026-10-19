@@ -43,6 +43,7 @@
   font-weight: 700;
   line-height: 1.35;
 }
+.cardDescripcion { color: var(--text-2); font-size: .84rem; line-height: 1.45; margin-top: 2px; }
 .cardCodigo {
   font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
   font-size: .72rem;
@@ -143,8 +144,8 @@
   white-space: nowrap;
 }
 .badgeMarino {
-  background: rgba(59,130,246,.14);
-  border: 1px solid rgba(59,130,246,.34);
+  background: color-mix(in srgb, var(--acc-blue) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--acc-blue) 34%, transparent);
   color: var(--acc-blue);
 }
 .badgeSolicitud {
@@ -159,8 +160,8 @@
   font-size: .76rem;
   padding: 4px 10px;
   border-radius: 100px;
-  background: rgba(245,158,11,.13);
-  border: 1px solid rgba(245,158,11,.34);
+  background: color-mix(in srgb, var(--acc-amber) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--acc-amber) 34%, transparent);
   color: var(--acc-amber);
   white-space: nowrap;
 }

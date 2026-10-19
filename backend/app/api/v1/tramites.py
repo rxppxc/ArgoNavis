@@ -41,6 +41,7 @@ def mapear_tipo(tipo: TipoTramite) -> SalidaTipoTramite:
         valida_vigencia=tipo.valida_vigencia,
         rangos_permitidos=tipo.rangos_permitidos,
         aviso_custodia=tipo.aviso_custodia,
+        descripcion=tipo.descripcion,
         nota=tipo.nota,
         orden=tipo.orden or 0,
         activo=tipo.activo,
