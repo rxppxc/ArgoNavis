@@ -125,6 +125,8 @@ ArgoNavis/
 │  ├─ tests/                   # pytest sobre BD temporal
 │  └─ storage/documentos/      # documentos de los expedientes (NO versionar)
 │
+├─ docs/                       # línea base funcional y técnica: Word, BPMN y diagramas (ver docs/README.md)
+│
 └─ frontend/src/
    ├─ App.tsx                  # rutas y proveedores (tema, sesión, permisos, avisos)
    ├─ api/                     # cliente axios + un módulo por dominio

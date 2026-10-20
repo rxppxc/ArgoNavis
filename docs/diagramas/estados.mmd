@@ -1,0 +1,19 @@
+stateDiagram-v2
+    direction LR
+    state "En revisión (review)" as review
+    state "En corrección (returned)" as returned
+    state "Aprobada (approved)" as approved
+    state "Denegada (denied)" as denied
+    state "Finalizada (finalized)" as finalized
+    state "Expirada (expired)" as expired
+    [*] --> review: La agencia envía
+    review --> returned: UCVMM devuelve con motivo y plazo de 2 días
+    returned --> review: La agencia corrige dentro del plazo
+    review --> approved: UCVMM aprueba (verificación completa)
+    review --> denied: UCVMM deniega (motivo)
+    approved --> finalized: El puesto de control finaliza
+    returned --> expired: Vence el plazo de corrección
+    approved --> expired: Vence la vigencia sin finalizar
+    denied --> [*]
+    finalized --> [*]
+    expired --> [*]

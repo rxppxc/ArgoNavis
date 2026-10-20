@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definiciones_MapaGeneral" targetNamespace="https://argonavis.migracion.gob.pa/bpmn" exporter="ARGO NAVIS" exporterVersion="1.0">
+  <bpmn:collaboration id="Colaboracion_MapaGeneral">
+    <bpmn:participant id="Pool_MapaGeneral" name="ARGO NAVIS · Mapa general de procesos (Autorizaciones Marítimas)" processRef="Proceso_MapaGeneral" />
+  </bpmn:collaboration>
+  <bpmn:process id="Proceso_MapaGeneral" name="Mapa general de procesos" isExecutable="false">
+    <bpmn:laneSet id="Carriles_Proceso_MapaGeneral">
+      <bpmn:lane id="C_Agencia" name="Agencia naviera">
+        <bpmn:flowNodeRef>Inicio</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>P01</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>P02</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>P04</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="C_UCVMM" name="UCVMM · Sector Pacífico">
+        <bpmn:flowNodeRef>P03</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GDecision</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>FinDenegada</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="C_Puesto" name="Puesto de control">
+        <bpmn:flowNodeRef>P05</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>FinFinalizada</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="C_Sistema" name="ARGO NAVIS (sistema)">
+        <bpmn:flowNodeRef>IniVenc</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>P06</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>FinVenc</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>IniQR</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>P07</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>FinQR</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>IniAviso</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>P08</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>FinAviso</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="C_Admin" name="Administración">
+        <bpmn:flowNodeRef>IniAdmin</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>P09</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>P10</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>FinAdmin</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Inicio" name="Se necesita una autorización marítima">
+      <bpmn:outgoing>Flujo_Inicio_P01</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:subProcess id="P01" name="P01 · Acceso al sistema">
+      <bpmn:incoming>Flujo_Inicio_P01</bpmn:incoming>
+      <bpmn:outgoing>Flujo_P01_P02</bpmn:outgoing>
+    </bpmn:subProcess>
+    <bpmn:subProcess id="P02" name="P02 · Registrar y enviar la solicitud">
+      <bpmn:incoming>Flujo_P01_P02</bpmn:incoming>
+      <bpmn:outgoing>Flujo_P02_P03</bpmn:outgoing>
+    </bpmn:subProcess>
+    <bpmn:subProcess id="P03" name="P03 · Revisar y decidir">
+      <bpmn:incoming>Flujo_P02_P03</bpmn:incoming>
+      <bpmn:incoming>Flujo_P04_P03</bpmn:incoming>
+      <bpmn:outgoing>Flujo_P03_GDecision</bpmn:outgoing>
+    </bpmn:subProcess>
+    <bpmn:exclusiveGateway id="GDecision" name="¿Qué decidió UCVMM?">
+      <bpmn:incoming>Flujo_P03_GDecision</bpmn:incoming>
+      <bpmn:outgoing>Flujo_GDecision_P04</bpmn:outgoing>
+      <bpmn:outgoing>Flujo_GDecision_P05</bpmn:outgoing>
+      <bpmn:outgoing>Flujo_GDecision_FinDenegada</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="FinDenegada" name="Solicitud denegada">
+      <bpmn:incoming>Flujo_GDecision_FinDenegada</bpmn:incoming>
+      <bpmn:messageEventDefinition id="Def_FinDenegada" />
+    </bpmn:endEvent>
+    <bpmn:subProcess id="P04" name="P04 · Corregir la solicitud devuelta">
+      <bpmn:incoming>Flujo_GDecision_P04</bpmn:incoming>
+      <bpmn:outgoing>Flujo_P04_P03</bpmn:outgoing>
+    </bpmn:subProcess>
+    <bpmn:subProcess id="P05" name="P05 · Finalizar en el puesto de control">
+      <bpmn:incoming>Flujo_GDecision_P05</bpmn:incoming>
+      <bpmn:outgoing>Flujo_P05_FinFinalizada</bpmn:outgoing>
+    </bpmn:subProcess>
+    <bpmn:endEvent id="FinFinalizada" name="Finalizada">
+      <bpmn:incoming>Flujo_P05_FinFinalizada</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:startEvent id="IniVenc" name="Cada 15 minutos">
+      <bpmn:outgoing>Flujo_IniVenc_P06</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Def_IniVenc" />
+    </bpmn:startEvent>
+    <bpmn:subProcess id="P06" name="P06 · Vencimientos automáticos">
+      <bpmn:incoming>Flujo_IniVenc_P06</bpmn:incoming>
+      <bpmn:outgoing>Flujo_P06_FinVenc</bpmn:outgoing>
+    </bpmn:subProcess>
+    <bpmn:endEvent id="FinVenc" name="Vencidas expiradas">
+      <bpmn:incoming>Flujo_P06_FinVenc</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:startEvent id="IniQR" name="Se escanea el código QR">
+      <bpmn:outgoing>Flujo_IniQR_P07</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="Def_IniQR" />
+    </bpmn:startEvent>
+    <bpmn:subProcess id="P07" name="P07 · Verificación pública (QR)">
+      <bpmn:incoming>Flujo_IniQR_P07</bpmn:incoming>
+      <bpmn:outgoing>Flujo_P07_FinQR</bpmn:outgoing>
+    </bpmn:subProcess>
+    <bpmn:endEvent id="FinQR" name="Respuesta al verificador">
+      <bpmn:incoming>Flujo_P07_FinQR</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:startEvent id="IniAviso" name="Ocurre un paso del flujo">
+      <bpmn:outgoing>Flujo_IniAviso_P08</bpmn:outgoing>
+      <bpmn:signalEventDefinition id="Def_IniAviso" />
+    </bpmn:startEvent>
+    <bpmn:subProcess id="P08" name="P08 · Avisos por correo">
+      <bpmn:incoming>Flujo_IniAviso_P08</bpmn:incoming>
+      <bpmn:outgoing>Flujo_P08_FinAviso</bpmn:outgoing>
+    </bpmn:subProcess>
+    <bpmn:endEvent id="FinAviso" name="Avisos enviados">
+      <bpmn:incoming>Flujo_P08_FinAviso</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:startEvent id="IniAdmin" name="Puesta en marcha o mantenimiento">
+      <bpmn:outgoing>Flujo_IniAdmin_P09</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:subProcess id="P09" name="P09 · Administración funcional">
+      <bpmn:incoming>Flujo_IniAdmin_P09</bpmn:incoming>
+      <bpmn:outgoing>Flujo_P09_P10</bpmn:outgoing>
+    </bpmn:subProcess>
+    <bpmn:subProcess id="P10" name="P10 · Administración técnica">
+      <bpmn:incoming>Flujo_P09_P10</bpmn:incoming>
+      <bpmn:outgoing>Flujo_P10_FinAdmin</bpmn:outgoing>
+    </bpmn:subProcess>
+    <bpmn:endEvent id="FinAdmin" name="Catálogos y cuentas al día">
+      <bpmn:incoming>Flujo_P10_FinAdmin</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flujo_Inicio_P01" sourceRef="Inicio" targetRef="P01" />
+    <bpmn:sequenceFlow id="Flujo_P01_P02" sourceRef="P01" targetRef="P02" />
+    <bpmn:sequenceFlow id="Flujo_P02_P03" sourceRef="P02" targetRef="P03" />
+    <bpmn:sequenceFlow id="Flujo_P03_GDecision" sourceRef="P03" targetRef="GDecision" />
+    <bpmn:sequenceFlow id="Flujo_GDecision_P04" name="Devuelta" sourceRef="GDecision" targetRef="P04" />
+    <bpmn:sequenceFlow id="Flujo_GDecision_P05" name="Aprobada" sourceRef="GDecision" targetRef="P05" />
+    <bpmn:sequenceFlow id="Flujo_GDecision_FinDenegada" name="Denegada" sourceRef="GDecision" targetRef="FinDenegada" />
+    <bpmn:sequenceFlow id="Flujo_P04_P03" name="Reenvía la solicitud corregida" sourceRef="P04" targetRef="P03" />
+    <bpmn:sequenceFlow id="Flujo_P05_FinFinalizada" sourceRef="P05" targetRef="FinFinalizada" />
+    <bpmn:sequenceFlow id="Flujo_IniVenc_P06" sourceRef="IniVenc" targetRef="P06" />
+    <bpmn:sequenceFlow id="Flujo_P06_FinVenc" sourceRef="P06" targetRef="FinVenc" />
+    <bpmn:sequenceFlow id="Flujo_IniQR_P07" sourceRef="IniQR" targetRef="P07" />
+    <bpmn:sequenceFlow id="Flujo_P07_FinQR" sourceRef="P07" targetRef="FinQR" />
+    <bpmn:sequenceFlow id="Flujo_IniAviso_P08" sourceRef="IniAviso" targetRef="P08" />
+    <bpmn:sequenceFlow id="Flujo_P08_FinAviso" sourceRef="P08" targetRef="FinAviso" />
+    <bpmn:sequenceFlow id="Flujo_IniAdmin_P09" sourceRef="IniAdmin" targetRef="P09" />
+    <bpmn:sequenceFlow id="Flujo_P09_P10" sourceRef="P09" targetRef="P10" />
+    <bpmn:sequenceFlow id="Flujo_P10_FinAdmin" sourceRef="P10" targetRef="FinAdmin" />
+    <bpmn:textAnnotation id="N_P01"><bpmn:text>Lo usan todos los actores (cuenta del Active Directory o cuenta local).</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_N_P01" sourceRef="P01" targetRef="N_P01" />
+    <bpmn:textAnnotation id="N_P04"><bpmn:text>Si vence el plazo de corrección, P06 la expira.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_N_P04" sourceRef="P04" targetRef="N_P04" />
+    <bpmn:textAnnotation id="N_P05"><bpmn:text>Si vence la vigencia sin finalizarse, P06 la expira.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_N_P05" sourceRef="P05" targetRef="N_P05" />
+    <bpmn:textAnnotation id="N_P08"><bpmn:text>Nueva o corregida: a UCVMM. Aprobada: a la agencia y al puesto. Devuelta, denegada o expirada: a la agencia.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:textAnnotation id="N_Admin"><bpmn:text>Procesos de soporte (Administrador y SysAdmin): habilitan cuentas, agencias, puestos y nacionalidades restringidas.</bpmn:text></bpmn:textAnnotation>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagrama_MapaGeneral">
+    <bpmndi:BPMNPlane id="Plano_MapaGeneral" bpmnElement="Colaboracion_MapaGeneral">
+      <bpmndi:BPMNShape id="Pool_MapaGeneral_di" bpmnElement="Pool_MapaGeneral" isHorizontal="true"><dc:Bounds x="100" y="40" width="1300" height="930" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="C_Agencia_di" bpmnElement="C_Agencia" isHorizontal="true"><dc:Bounds x="130" y="40" width="1270" height="180" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="C_UCVMM_di" bpmnElement="C_UCVMM" isHorizontal="true"><dc:Bounds x="130" y="220" width="1270" height="200" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="C_Puesto_di" bpmnElement="C_Puesto" isHorizontal="true"><dc:Bounds x="130" y="420" width="1270" height="160" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="C_Sistema_di" bpmnElement="C_Sistema" isHorizontal="true"><dc:Bounds x="130" y="580" width="1270" height="230" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="C_Admin_di" bpmnElement="C_Admin" isHorizontal="true"><dc:Bounds x="130" y="810" width="1270" height="160" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Inicio_di" bpmnElement="Inicio"><dc:Bounds x="184" y="112.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="166" y="152" width="74" height="56" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="P01_di" bpmnElement="P01" isExpanded="false"><dc:Bounds x="250" y="85.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="P02_di" bpmnElement="P02" isExpanded="false"><dc:Bounds x="420" y="85.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="P03_di" bpmnElement="P03" isExpanded="false"><dc:Bounds x="600" y="275.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GDecision_di" bpmnElement="GDecision" isMarkerVisible="true"><dc:Bounds x="780" y="295.0" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="835" y="256" width="120" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="FinDenegada_di" bpmnElement="FinDenegada"><dc:Bounds x="960" y="302.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="918.0" y="342.0" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="P04_di" bpmnElement="P04" isExpanded="false"><dc:Bounds x="880" y="85.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="P05_di" bpmnElement="P05" isExpanded="false"><dc:Bounds x="880" y="455.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="FinFinalizada_di" bpmnElement="FinFinalizada"><dc:Bounds x="1060" y="482.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1018.0" y="522.0" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="IniVenc_di" bpmnElement="IniVenc"><dc:Bounds x="184" y="622.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="166" y="662" width="74" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="P06_di" bpmnElement="P06" isExpanded="false"><dc:Bounds x="250" y="595.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="FinVenc_di" bpmnElement="FinVenc"><dc:Bounds x="430" y="622.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="388.0" y="662.0" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="IniQR_di" bpmnElement="IniQR"><dc:Bounds x="600" y="622.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="558.0" y="662.0" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="P07_di" bpmnElement="P07" isExpanded="false"><dc:Bounds x="680" y="595.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="FinQR_di" bpmnElement="FinQR"><dc:Bounds x="860" y="622.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="818.0" y="662.0" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="IniAviso_di" bpmnElement="IniAviso"><dc:Bounds x="184" y="729.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="166" y="769" width="74" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="P08_di" bpmnElement="P08" isExpanded="false"><dc:Bounds x="250" y="702.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="FinAviso_di" bpmnElement="FinAviso"><dc:Bounds x="430" y="729.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="388.0" y="769.0" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="IniAdmin_di" bpmnElement="IniAdmin"><dc:Bounds x="184" y="872.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="166" y="912" width="74" height="56" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="P09_di" bpmnElement="P09" isExpanded="false"><dc:Bounds x="250" y="845.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="P10_di" bpmnElement="P10" isExpanded="false"><dc:Bounds x="420" y="845.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="FinAdmin_di" bpmnElement="FinAdmin"><dc:Bounds x="600" y="872.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="558.0" y="912.0" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_P01_di" bpmnElement="N_P01"><dc:Bounds x="250" y="182" width="330" height="32" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_P04_di" bpmnElement="N_P04"><dc:Bounds x="1060" y="100" width="290" height="32" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_P05_di" bpmnElement="N_P05"><dc:Bounds x="1010" y="382" width="330" height="32" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_P08_di" bpmnElement="N_P08"><dc:Bounds x="530" y="722" width="470" height="48" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_Admin_di" bpmnElement="N_Admin"><dc:Bounds x="780" y="866" width="470" height="48" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flujo_Inicio_P01_di" bpmnElement="Flujo_Inicio_P01"><di:waypoint x="220" y="130" /><di:waypoint x="250" y="130" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_P01_P02_di" bpmnElement="Flujo_P01_P02"><di:waypoint x="390" y="130" /><di:waypoint x="420" y="130" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_P02_P03_di" bpmnElement="Flujo_P02_P03"><di:waypoint x="560" y="130" /><di:waypoint x="580" y="130" /><di:waypoint x="580" y="320" /><di:waypoint x="600" y="320" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_P03_GDecision_di" bpmnElement="Flujo_P03_GDecision"><di:waypoint x="740" y="320" /><di:waypoint x="780" y="320" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_GDecision_P04_di" bpmnElement="Flujo_GDecision_P04"><di:waypoint x="805" y="295" /><di:waypoint x="805" y="130" /><di:waypoint x="880" y="130" /><bpmndi:BPMNLabel><dc:Bounds x="812" y="228" width="70" height="20" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_GDecision_P05_di" bpmnElement="Flujo_GDecision_P05"><di:waypoint x="805" y="345" /><di:waypoint x="805" y="500" /><di:waypoint x="880" y="500" /><bpmndi:BPMNLabel><dc:Bounds x="812" y="372" width="70" height="20" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_GDecision_FinDenegada_di" bpmnElement="Flujo_GDecision_FinDenegada"><di:waypoint x="830" y="320" /><di:waypoint x="960" y="320" /><bpmndi:BPMNLabel><dc:Bounds x="860" y="300" width="70" height="18" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_P04_P03_di" bpmnElement="Flujo_P04_P03"><di:waypoint x="950" y="85" /><di:waypoint x="950" y="58" /><di:waypoint x="670" y="58" /><di:waypoint x="670" y="275" /><bpmndi:BPMNLabel><dc:Bounds x="690" y="63" width="180" height="20" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_P05_FinFinalizada_di" bpmnElement="Flujo_P05_FinFinalizada"><di:waypoint x="1020" y="500" /><di:waypoint x="1060" y="500" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_IniVenc_P06_di" bpmnElement="Flujo_IniVenc_P06"><di:waypoint x="220" y="640" /><di:waypoint x="250" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_P06_FinVenc_di" bpmnElement="Flujo_P06_FinVenc"><di:waypoint x="390" y="640" /><di:waypoint x="430" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_IniQR_P07_di" bpmnElement="Flujo_IniQR_P07"><di:waypoint x="636" y="640" /><di:waypoint x="680" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_P07_FinQR_di" bpmnElement="Flujo_P07_FinQR"><di:waypoint x="820" y="640" /><di:waypoint x="860" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_IniAviso_P08_di" bpmnElement="Flujo_IniAviso_P08"><di:waypoint x="220" y="747" /><di:waypoint x="250" y="747" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_P08_FinAviso_di" bpmnElement="Flujo_P08_FinAviso"><di:waypoint x="390" y="747" /><di:waypoint x="430" y="747" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_IniAdmin_P09_di" bpmnElement="Flujo_IniAdmin_P09"><di:waypoint x="220" y="890" /><di:waypoint x="250" y="890" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_P09_P10_di" bpmnElement="Flujo_P09_P10"><di:waypoint x="390" y="890" /><di:waypoint x="420" y="890" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_P10_FinAdmin_di" bpmnElement="Flujo_P10_FinAdmin"><di:waypoint x="560" y="890" /><di:waypoint x="600" y="890" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_N_P01_di" bpmnElement="Asoc_N_P01"><di:waypoint x="320" y="175" /><di:waypoint x="320" y="182" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_N_P04_di" bpmnElement="Asoc_N_P04"><di:waypoint x="1020" y="130" /><di:waypoint x="1060" y="132" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_N_P05_di" bpmnElement="Asoc_N_P05"><di:waypoint x="950" y="455" /><di:waypoint x="1010" y="414" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

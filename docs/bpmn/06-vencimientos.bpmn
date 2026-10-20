@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definiciones_Vencimientos" targetNamespace="https://argonavis.migracion.gob.pa/bpmn" exporter="ARGO NAVIS" exporterVersion="1.0">
+  <bpmn:collaboration id="Colaboracion_Vencimientos">
+    <bpmn:participant id="Pool_Vencimientos" name="ARGO NAVIS · Vencimientos automáticos (tarea de fondo)" processRef="Proceso_Vencimientos" />
+    <bpmn:participant id="Pool_Agencia" name="Agencia naviera (buzón y usuarios activos)" />
+    <bpmn:messageFlow id="Mensaje_Aviso" name="Aviso de expiración" sourceRef="Avisar" targetRef="Pool_Agencia" />
+  </bpmn:collaboration>
+  <bpmn:process id="Proceso_Vencimientos" name="Vencimientos automáticos" isExecutable="false">
+    <bpmn:laneSet id="Carriles_Proceso_Vencimientos">
+      <bpmn:lane id="C_Tarea" name="ARGO NAVIS (tarea automática)">
+        <bpmn:flowNodeRef>Inicio</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Candado</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GCandado</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>FinOtro</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Buscar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GHay</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Expirar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Avisar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GUne</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Limpiar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Fin</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Inicio" name="Al arrancar y cada 15 minutos">
+      <bpmn:outgoing>Flujo_Inicio_Candado</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Def_Inicio" />
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="Candado" name="Tomar el candado de la vuelta">
+      <bpmn:incoming>Flujo_Inicio_Candado</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Candado_GCandado</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="GCandado" name="¿Lo tomó?">
+      <bpmn:incoming>Flujo_Candado_GCandado</bpmn:incoming>
+      <bpmn:outgoing>Flujo_GCandado_FinOtro</bpmn:outgoing>
+      <bpmn:outgoing>Flujo_GCandado_Buscar</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="FinOtro" name="Otro proceso hace esta vuelta">
+      <bpmn:incoming>Flujo_GCandado_FinOtro</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="Buscar" name="Buscar las vencidas">
+      <bpmn:incoming>Flujo_GCandado_Buscar</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Buscar_GHay</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="GHay" name="¿Hay vencidas?">
+      <bpmn:incoming>Flujo_Buscar_GHay</bpmn:incoming>
+      <bpmn:outgoing>Flujo_GHay_Expirar</bpmn:outgoing>
+      <bpmn:outgoing>Flujo_GHay_GUne</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Expirar" name="Expirar cada una: estado, historial y bitácora">
+      <bpmn:incoming>Flujo_GHay_Expirar</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Expirar_Avisar</bpmn:outgoing>
+      <bpmn:multiInstanceLoopCharacteristics id="Multi_Expirar" />
+    </bpmn:serviceTask>
+    <bpmn:sendTask id="Avisar" name="Avisar a la agencia por correo">
+      <bpmn:incoming>Flujo_Expirar_Avisar</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Avisar_GUne</bpmn:outgoing>
+      <bpmn:multiInstanceLoopCharacteristics id="Multi_Avisar" />
+    </bpmn:sendTask>
+    <bpmn:exclusiveGateway id="GUne" name="">
+      <bpmn:incoming>Flujo_Avisar_GUne</bpmn:incoming>
+      <bpmn:incoming>Flujo_GHay_GUne</bpmn:incoming>
+      <bpmn:outgoing>Flujo_GUne_Limpiar</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Limpiar" name="Limpiar carpetas temporales de más de 24 h">
+      <bpmn:incoming>Flujo_GUne_Limpiar</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Limpiar_Fin</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="Fin" name="Fin de la vuelta">
+      <bpmn:incoming>Flujo_Limpiar_Fin</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flujo_Inicio_Candado" sourceRef="Inicio" targetRef="Candado" />
+    <bpmn:sequenceFlow id="Flujo_Candado_GCandado" sourceRef="Candado" targetRef="GCandado" />
+    <bpmn:sequenceFlow id="Flujo_GCandado_FinOtro" name="No" sourceRef="GCandado" targetRef="FinOtro" />
+    <bpmn:sequenceFlow id="Flujo_GCandado_Buscar" name="Sí" sourceRef="GCandado" targetRef="Buscar" />
+    <bpmn:sequenceFlow id="Flujo_Buscar_GHay" sourceRef="Buscar" targetRef="GHay" />
+    <bpmn:sequenceFlow id="Flujo_GHay_Expirar" name="Sí" sourceRef="GHay" targetRef="Expirar" />
+    <bpmn:sequenceFlow id="Flujo_Expirar_Avisar" sourceRef="Expirar" targetRef="Avisar" />
+    <bpmn:sequenceFlow id="Flujo_Avisar_GUne" sourceRef="Avisar" targetRef="GUne" />
+    <bpmn:sequenceFlow id="Flujo_GHay_GUne" name="No" sourceRef="GHay" targetRef="GUne" />
+    <bpmn:sequenceFlow id="Flujo_GUne_Limpiar" sourceRef="GUne" targetRef="Limpiar" />
+    <bpmn:sequenceFlow id="Flujo_Limpiar_Fin" sourceRef="Limpiar" targetRef="Fin" />
+    <bpmn:textAnnotation id="N_Candado"><bpmn:text>Con varios procesos del servidor, solo uno trabaja en cada vuelta (candado de PostgreSQL).</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_N_Candado" sourceRef="Candado" targetRef="N_Candado" />
+    <bpmn:textAnnotation id="N_Buscar"><bpmn:text>Devueltas sin corregir al vencer el plazo (2 días) y aprobadas sin finalizar al terminar el día de la operación + 1. Cada fila se toma una sola vez.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_N_Buscar" sourceRef="Buscar" targetRef="N_Buscar" />
+    <bpmn:textAnnotation id="N_Avisar"><bpmn:text>Solo si el correo está configurado; si el envío falla, queda en el log y la tarea sigue.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_N_Avisar" sourceRef="Avisar" targetRef="N_Avisar" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagrama_Vencimientos">
+    <bpmndi:BPMNPlane id="Plano_Vencimientos" bpmnElement="Colaboracion_Vencimientos">
+      <bpmndi:BPMNShape id="Pool_Vencimientos_di" bpmnElement="Pool_Vencimientos" isHorizontal="true"><dc:Bounds x="100" y="40" width="1520" height="300" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="C_Tarea_di" bpmnElement="C_Tarea" isHorizontal="true"><dc:Bounds x="130" y="40" width="1490" height="300" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Pool_Agencia_di" bpmnElement="Pool_Agencia" isHorizontal="true"><dc:Bounds x="100" y="380" width="1520" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Inicio_di" bpmnElement="Inicio"><dc:Bounds x="184" y="172.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="166" y="212" width="74" height="44" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Candado_di" bpmnElement="Candado"><dc:Bounds x="250" y="145.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GCandado_di" bpmnElement="GCandado" isMarkerVisible="true"><dc:Bounds x="430" y="165.0" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="420" y="136" width="70" height="24" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="FinOtro_di" bpmnElement="FinOtro"><dc:Bounds x="500" y="257.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="458.0" y="297.0" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Buscar_di" bpmnElement="Buscar"><dc:Bounds x="540" y="145.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GHay_di" bpmnElement="GHay" isMarkerVisible="true"><dc:Bounds x="720" y="165.0" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="685.0" y="219.0" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Expirar_di" bpmnElement="Expirar"><dc:Bounds x="810" y="145.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Avisar_di" bpmnElement="Avisar"><dc:Bounds x="980" y="145.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GUne_di" bpmnElement="GUne" isMarkerVisible="true"><dc:Bounds x="1160" y="165.0" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Limpiar_di" bpmnElement="Limpiar"><dc:Bounds x="1250" y="145.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Fin_di" bpmnElement="Fin"><dc:Bounds x="1430" y="172.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1388.0" y="212.0" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_Candado_di" bpmnElement="N_Candado"><dc:Bounds x="250" y="46" width="340" height="44" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_Buscar_di" bpmnElement="N_Buscar"><dc:Bounds x="600" y="254" width="360" height="64" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_Avisar_di" bpmnElement="N_Avisar"><dc:Bounds x="1090" y="258" width="360" height="48" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flujo_Inicio_Candado_di" bpmnElement="Flujo_Inicio_Candado"><di:waypoint x="220" y="190" /><di:waypoint x="250" y="190" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Candado_GCandado_di" bpmnElement="Flujo_Candado_GCandado"><di:waypoint x="390" y="190" /><di:waypoint x="430" y="190" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_GCandado_FinOtro_di" bpmnElement="Flujo_GCandado_FinOtro"><di:waypoint x="455" y="215" /><di:waypoint x="455" y="275" /><di:waypoint x="500" y="275" /><bpmndi:BPMNLabel><dc:Bounds x="461" y="226" width="30" height="20" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_GCandado_Buscar_di" bpmnElement="Flujo_GCandado_Buscar"><di:waypoint x="480" y="190" /><di:waypoint x="540" y="190" /><bpmndi:BPMNLabel><dc:Bounds x="484" y="168" width="24" height="20" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Buscar_GHay_di" bpmnElement="Flujo_Buscar_GHay"><di:waypoint x="680" y="190" /><di:waypoint x="720" y="190" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_GHay_Expirar_di" bpmnElement="Flujo_GHay_Expirar"><di:waypoint x="770" y="190" /><di:waypoint x="810" y="190" /><bpmndi:BPMNLabel><dc:Bounds x="772" y="170" width="24" height="20" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Expirar_Avisar_di" bpmnElement="Flujo_Expirar_Avisar"><di:waypoint x="950" y="190" /><di:waypoint x="980" y="190" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Avisar_GUne_di" bpmnElement="Flujo_Avisar_GUne"><di:waypoint x="1120" y="190" /><di:waypoint x="1160" y="190" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_GHay_GUne_di" bpmnElement="Flujo_GHay_GUne"><di:waypoint x="745" y="165" /><di:waypoint x="745" y="105" /><di:waypoint x="1185" y="105" /><di:waypoint x="1185" y="165" /><bpmndi:BPMNLabel><dc:Bounds x="752" y="112" width="30" height="20" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_GUne_Limpiar_di" bpmnElement="Flujo_GUne_Limpiar"><di:waypoint x="1210" y="190" /><di:waypoint x="1250" y="190" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Limpiar_Fin_di" bpmnElement="Flujo_Limpiar_Fin"><di:waypoint x="1390" y="190" /><di:waypoint x="1430" y="190" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_N_Candado_di" bpmnElement="Asoc_N_Candado"><di:waypoint x="320" y="145" /><di:waypoint x="320" y="90" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_N_Buscar_di" bpmnElement="Asoc_N_Buscar"><di:waypoint x="610" y="235" /><di:waypoint x="610" y="254" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_N_Avisar_di" bpmnElement="Asoc_N_Avisar"><di:waypoint x="1090" y="235" /><di:waypoint x="1090" y="258" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Mensaje_Aviso_di" bpmnElement="Mensaje_Aviso"><di:waypoint x="1050" y="235" /><di:waypoint x="1050" y="380" /><bpmndi:BPMNLabel><dc:Bounds x="980" y="318" width="64" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

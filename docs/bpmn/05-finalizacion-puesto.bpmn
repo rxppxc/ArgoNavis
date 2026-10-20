@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definiciones_FinalizacionPuesto" targetNamespace="https://argonavis.migracion.gob.pa/bpmn" exporter="ARGO NAVIS" exporterVersion="1.0">
+  <bpmn:collaboration id="Colaboracion_FinalizacionPuesto">
+    <bpmn:participant id="Pool_FinalizacionPuesto" name="ARGO NAVIS · Finalización en el puesto de control (detalle)" processRef="Proceso_FinalizacionPuesto" />
+  </bpmn:collaboration>
+  <bpmn:process id="Proceso_FinalizacionPuesto" name="Finalización en el puesto de control" isExecutable="false">
+    <bpmn:laneSet id="Carriles_Proceso_FinalizacionPuesto">
+      <bpmn:lane id="C_Puesto" name="Puesto de control">
+        <bpmn:flowNodeRef>Inicio</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Abrir</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Atender</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Vence</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Elegir</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Comentar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Confirmar</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="C_Sistema" name="ARGO NAVIS (sistema)">
+        <bpmn:flowNodeRef>Comprobar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GVigente</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>FinVencida</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>FinExpirada</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Registrar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>FinFinalizada</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Inicio" name="Aviso: autorización aprobada para su puesto">
+      <bpmn:outgoing>Flujo_Inicio_Abrir</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="Def_Inicio" />
+    </bpmn:startEvent>
+    <bpmn:userTask id="Abrir" name="Abrir la autorización desde la bandeja de su puesto">
+      <bpmn:incoming>Flujo_Inicio_Abrir</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Abrir_Comprobar</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="Comprobar" name="Comprobar que es de sus puestos, está aprobada y sigue vigente">
+      <bpmn:incoming>Flujo_Abrir_Comprobar</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Comprobar_GVigente</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="GVigente" name="¿Sigue vigente?">
+      <bpmn:incoming>Flujo_Comprobar_GVigente</bpmn:incoming>
+      <bpmn:outgoing>Flujo_GVigente_FinVencida</bpmn:outgoing>
+      <bpmn:outgoing>Flujo_GVigente_Atender</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="FinVencida" name="Venció: ya no se puede finalizar">
+      <bpmn:incoming>Flujo_GVigente_FinVencida</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:manualTask id="Atender" name="Atender la operación en el muelle (fuera de ARGO NAVIS)">
+      <bpmn:incoming>Flujo_GVigente_Atender</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Atender_Elegir</bpmn:outgoing>
+    </bpmn:manualTask>
+    <bpmn:boundaryEvent id="Vence" name="Vence: fin del día de la operación + 1 día" attachedToRef="Atender">
+      <bpmn:outgoing>Flujo_Vence_FinExpirada</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Def_Vence" />
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="FinExpirada" name="Expirada: la cierra la tarea automática">
+      <bpmn:incoming>Flujo_Vence_FinExpirada</bpmn:incoming>
+      <bpmn:messageEventDefinition id="Def_FinExpirada" />
+    </bpmn:endEvent>
+    <bpmn:userTask id="Elegir" name="Indicar el puesto donde terminó la operación">
+      <bpmn:incoming>Flujo_Atender_Elegir</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Elegir_Comentar</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="Comentar" name="Escribir el comentario de la operación (obligatorio)">
+      <bpmn:incoming>Flujo_Elegir_Comentar</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Comentar_Confirmar</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="Confirmar" name="Confirmar la finalización">
+      <bpmn:incoming>Flujo_Comentar_Confirmar</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Confirmar_Registrar</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="Registrar" name="Registrar la finalización en el historial y la bitácora">
+      <bpmn:incoming>Flujo_Confirmar_Registrar</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Registrar_FinFinalizada</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="FinFinalizada" name="Finalizada (estado final)">
+      <bpmn:incoming>Flujo_Registrar_FinFinalizada</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flujo_Inicio_Abrir" sourceRef="Inicio" targetRef="Abrir" />
+    <bpmn:sequenceFlow id="Flujo_Abrir_Comprobar" sourceRef="Abrir" targetRef="Comprobar" />
+    <bpmn:sequenceFlow id="Flujo_Comprobar_GVigente" sourceRef="Comprobar" targetRef="GVigente" />
+    <bpmn:sequenceFlow id="Flujo_GVigente_FinVencida" name="No" sourceRef="GVigente" targetRef="FinVencida" />
+    <bpmn:sequenceFlow id="Flujo_GVigente_Atender" name="Sí" sourceRef="GVigente" targetRef="Atender" />
+    <bpmn:sequenceFlow id="Flujo_Vence_FinExpirada" sourceRef="Vence" targetRef="FinExpirada" />
+    <bpmn:sequenceFlow id="Flujo_Atender_Elegir" sourceRef="Atender" targetRef="Elegir" />
+    <bpmn:sequenceFlow id="Flujo_Elegir_Comentar" sourceRef="Elegir" targetRef="Comentar" />
+    <bpmn:sequenceFlow id="Flujo_Comentar_Confirmar" sourceRef="Comentar" targetRef="Confirmar" />
+    <bpmn:sequenceFlow id="Flujo_Confirmar_Registrar" sourceRef="Confirmar" targetRef="Registrar" />
+    <bpmn:sequenceFlow id="Flujo_Registrar_FinFinalizada" sourceRef="Registrar" targetRef="FinFinalizada" />
+    <bpmn:textAnnotation id="N_Bandeja"><bpmn:text>Solo ve las aprobadas de sus puestos asignados; el Administrador ve todas.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_N_Bandeja" sourceRef="Abrir" targetRef="N_Bandeja" />
+    <bpmn:textAnnotation id="N_Comentarios"><bpmn:text>La API también admite comentarios del puesto sin finalizar (POST /solicitudes/{id}/comentarios), pero hoy no hay pantalla para eso.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_N_Comentarios" sourceRef="Abrir" targetRef="N_Comentarios" />
+    <bpmn:textAnnotation id="N_Puesto"><bpmn:text>Por defecto, el puesto autorizado. Puede ser otro (activo): queda en el expediente, el PDF y la verificación pública.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_N_Puesto" sourceRef="Elegir" targetRef="N_Puesto" />
+    <bpmn:textAnnotation id="N_Comentario"><bpmn:text>De 3 a 2000 caracteres.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_N_Comentario" sourceRef="Comentar" targetRef="N_Comentario" />
+    <bpmn:textAnnotation id="N_Bloqueo"><bpmn:text>Toma el bloqueo de la fila: si ya no está aprobada o venció, se rechaza.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_N_Bloqueo" sourceRef="Registrar" targetRef="N_Bloqueo" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagrama_FinalizacionPuesto">
+    <bpmndi:BPMNPlane id="Plano_FinalizacionPuesto" bpmnElement="Colaboracion_FinalizacionPuesto">
+      <bpmndi:BPMNShape id="Pool_FinalizacionPuesto_di" bpmnElement="Pool_FinalizacionPuesto" isHorizontal="true"><dc:Bounds x="100" y="40" width="1460" height="500" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="C_Puesto_di" bpmnElement="C_Puesto" isHorizontal="true"><dc:Bounds x="130" y="40" width="1430" height="260" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="C_Sistema_di" bpmnElement="C_Sistema" isHorizontal="true"><dc:Bounds x="130" y="300" width="1430" height="240" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Inicio_di" bpmnElement="Inicio"><dc:Bounds x="184" y="152.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="166" y="192" width="74" height="70" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Abrir_di" bpmnElement="Abrir"><dc:Bounds x="250" y="125.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Comprobar_di" bpmnElement="Comprobar"><dc:Bounds x="420" y="375.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GVigente_di" bpmnElement="GVigente" isMarkerVisible="true"><dc:Bounds x="600" y="395.0" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="565.0" y="449.0" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="FinVencida_di" bpmnElement="FinVencida"><dc:Bounds x="700" y="402.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="658.0" y="442.0" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Atender_di" bpmnElement="Atender"><dc:Bounds x="700" y="125.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Vence_di" bpmnElement="Vence"><dc:Bounds x="794.0" y="197.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="836" y="222" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="FinExpirada_di" bpmnElement="FinExpirada"><dc:Bounds x="880" y="402.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="838.0" y="442.0" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Elegir_di" bpmnElement="Elegir"><dc:Bounds x="880" y="125.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Comentar_di" bpmnElement="Comentar"><dc:Bounds x="1050" y="125.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Confirmar_di" bpmnElement="Confirmar"><dc:Bounds x="1220" y="125.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Registrar_di" bpmnElement="Registrar"><dc:Bounds x="1220" y="375.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="FinFinalizada_di" bpmnElement="FinFinalizada"><dc:Bounds x="1400" y="402.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1358.0" y="442.0" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_Bandeja_di" bpmnElement="N_Bandeja"><dc:Bounds x="262" y="228" width="300" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_Comentarios_di" bpmnElement="N_Comentarios"><dc:Bounds x="250" y="48" width="430" height="48" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_Puesto_di" bpmnElement="N_Puesto"><dc:Bounds x="870" y="48" width="380" height="48" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_Comentario_di" bpmnElement="N_Comentario"><dc:Bounds x="1060" y="236" width="160" height="30" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_Bloqueo_di" bpmnElement="N_Bloqueo"><dc:Bounds x="1000" y="486" width="340" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flujo_Inicio_Abrir_di" bpmnElement="Flujo_Inicio_Abrir"><di:waypoint x="220" y="170" /><di:waypoint x="250" y="170" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Abrir_Comprobar_di" bpmnElement="Flujo_Abrir_Comprobar"><di:waypoint x="390" y="170" /><di:waypoint x="405" y="170" /><di:waypoint x="405" y="420" /><di:waypoint x="420" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Comprobar_GVigente_di" bpmnElement="Flujo_Comprobar_GVigente"><di:waypoint x="560" y="420" /><di:waypoint x="600" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_GVigente_FinVencida_di" bpmnElement="Flujo_GVigente_FinVencida"><di:waypoint x="650" y="420" /><di:waypoint x="700" y="420" /><bpmndi:BPMNLabel><dc:Bounds x="658" y="400" width="30" height="20" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_GVigente_Atender_di" bpmnElement="Flujo_GVigente_Atender"><di:waypoint x="625" y="395" /><di:waypoint x="625" y="170" /><di:waypoint x="700" y="170" /><bpmndi:BPMNLabel><dc:Bounds x="602" y="345" width="20" height="20" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Vence_FinExpirada_di" bpmnElement="Flujo_Vence_FinExpirada"><di:waypoint x="812" y="233" /><di:waypoint x="812" y="420" /><di:waypoint x="880" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Atender_Elegir_di" bpmnElement="Flujo_Atender_Elegir"><di:waypoint x="840" y="170" /><di:waypoint x="880" y="170" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Elegir_Comentar_di" bpmnElement="Flujo_Elegir_Comentar"><di:waypoint x="1020" y="170" /><di:waypoint x="1050" y="170" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Comentar_Confirmar_di" bpmnElement="Flujo_Comentar_Confirmar"><di:waypoint x="1190" y="170" /><di:waypoint x="1220" y="170" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Confirmar_Registrar_di" bpmnElement="Flujo_Confirmar_Registrar"><di:waypoint x="1290" y="215" /><di:waypoint x="1290" y="375" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Registrar_FinFinalizada_di" bpmnElement="Flujo_Registrar_FinFinalizada"><di:waypoint x="1360" y="420" /><di:waypoint x="1400" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_N_Bandeja_di" bpmnElement="Asoc_N_Bandeja"><di:waypoint x="320" y="215" /><di:waypoint x="320" y="228" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_N_Comentarios_di" bpmnElement="Asoc_N_Comentarios"><di:waypoint x="320" y="125" /><di:waypoint x="320" y="96" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_N_Puesto_di" bpmnElement="Asoc_N_Puesto"><di:waypoint x="950" y="125" /><di:waypoint x="950" y="96" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_N_Comentario_di" bpmnElement="Asoc_N_Comentario"><di:waypoint x="1120" y="215" /><di:waypoint x="1120" y="236" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_N_Bloqueo_di" bpmnElement="Asoc_N_Bloqueo"><di:waypoint x="1290" y="465" /><di:waypoint x="1290" y="486" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

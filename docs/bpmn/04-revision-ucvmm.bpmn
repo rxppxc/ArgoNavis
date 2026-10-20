@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definiciones_RevisionUCVMM" targetNamespace="https://argonavis.migracion.gob.pa/bpmn" exporter="ARGO NAVIS" exporterVersion="1.0">
+  <bpmn:collaboration id="Colaboracion_RevisionUCVMM">
+    <bpmn:participant id="Pool_RevisionUCVMM" name="ARGO NAVIS · Revisión de UCVMM (detalle)" processRef="Proceso_RevisionUCVMM" />
+  </bpmn:collaboration>
+  <bpmn:process id="Proceso_RevisionUCVMM" name="Revisión de UCVMM" isExecutable="false">
+    <bpmn:laneSet id="Carriles_Proceso_RevisionUCVMM">
+      <bpmn:lane id="C_UCVMM" name="UCVMM · Sector Pacífico">
+        <bpmn:flowNodeRef>Inicio</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Revisar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Simplus</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Marcar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GCorregir</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Corregir</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GUne1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GImpedimento</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Operaciones</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GUne2</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Decidir</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="C_Sistema" name="ARGO NAVIS (sistema)">
+        <bpmn:flowNodeRef>Expediente</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GConflicto</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>FinConflicto</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Registrar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>RegCorreccion</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GDecision</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Devolver</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>FinDevuelta</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Denegar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>FinDenegada</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Aprobar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>FinAprobada</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ErrAprobar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>FinNoAprobable</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Inicio" name="Solicitud en la cola de revisión">
+      <bpmn:outgoing>Flujo_Inicio_Expediente</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="Def_Inicio" />
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="Expediente" name="Mostrar el expediente y comprobar la separación de funciones">
+      <bpmn:incoming>Flujo_Inicio_Expediente</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Expediente_GConflicto</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="GConflicto" name="¿La creó o es de su agencia?">
+      <bpmn:incoming>Flujo_Expediente_GConflicto</bpmn:incoming>
+      <bpmn:outgoing>Flujo_GConflicto_FinConflicto</bpmn:outgoing>
+      <bpmn:outgoing>Flujo_GConflicto_Revisar</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="FinConflicto" name="La revisa otro funcionario">
+      <bpmn:incoming>Flujo_GConflicto_FinConflicto</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:userTask id="Revisar" name="Revisar datos y documentos del expediente">
+      <bpmn:incoming>Flujo_GConflicto_Revisar</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Revisar_Simplus</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:manualTask id="Simplus" name="Consultar a cada tripulante en SIMPLUS">
+      <bpmn:incoming>Flujo_Revisar_Simplus</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Simplus_Marcar</bpmn:outgoing>
+    </bpmn:manualTask>
+    <bpmn:userTask id="Marcar" name="Marcar Sin o Con impedimento por tripulante y guardar">
+      <bpmn:incoming>Flujo_Simplus_Marcar</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Marcar_Registrar</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="Registrar" name="Registrar la verificación en el historial y la bitácora">
+      <bpmn:incoming>Flujo_Marcar_Registrar</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Registrar_GCorregir</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="GCorregir" name="¿Hay que corregir algún resultado?">
+      <bpmn:incoming>Flujo_Registrar_GCorregir</bpmn:incoming>
+      <bpmn:outgoing>Flujo_GCorregir_Corregir</bpmn:outgoing>
+      <bpmn:outgoing>Flujo_GCorregir_GUne1</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Corregir" name="Corregir los resultados e indicar el motivo">
+      <bpmn:incoming>Flujo_GCorregir_Corregir</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Corregir_RegCorreccion</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="RegCorreccion" name="Registrar la corrección: qué cambió y por qué">
+      <bpmn:incoming>Flujo_Corregir_RegCorreccion</bpmn:incoming>
+      <bpmn:outgoing>Flujo_RegCorreccion_GUne1</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="GUne1" name="">
+      <bpmn:incoming>Flujo_GCorregir_GUne1</bpmn:incoming>
+      <bpmn:incoming>Flujo_RegCorreccion_GUne1</bpmn:incoming>
+      <bpmn:outgoing>Flujo_GUne1_GImpedimento</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="GImpedimento" name="¿Algún tripulante con impedimento?">
+      <bpmn:incoming>Flujo_GUne1_GImpedimento</bpmn:incoming>
+      <bpmn:outgoing>Flujo_GImpedimento_Operaciones</bpmn:outgoing>
+      <bpmn:outgoing>Flujo_GImpedimento_GUne2</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:manualTask id="Operaciones" name="Informar a Operaciones (fuera de ARGO NAVIS)">
+      <bpmn:incoming>Flujo_GImpedimento_Operaciones</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Operaciones_GUne2</bpmn:outgoing>
+    </bpmn:manualTask>
+    <bpmn:exclusiveGateway id="GUne2" name="">
+      <bpmn:incoming>Flujo_Operaciones_GUne2</bpmn:incoming>
+      <bpmn:incoming>Flujo_GImpedimento_GUne2</bpmn:incoming>
+      <bpmn:outgoing>Flujo_GUne2_Decidir</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Decidir" name="Decidir en el modal (aprobar, devolver o denegar) con su texto">
+      <bpmn:incoming>Flujo_GUne2_Decidir</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Decidir_GDecision</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="GDecision" name="¿Qué decidió?">
+      <bpmn:incoming>Flujo_Decidir_GDecision</bpmn:incoming>
+      <bpmn:outgoing>Flujo_GDecision_Devolver</bpmn:outgoing>
+      <bpmn:outgoing>Flujo_GDecision_Denegar</bpmn:outgoing>
+      <bpmn:outgoing>Flujo_GDecision_Aprobar</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Devolver" name="Devolver: plazo de corrección y aviso a la agencia">
+      <bpmn:incoming>Flujo_GDecision_Devolver</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Devolver_FinDevuelta</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="FinDevuelta" name="Devuelta a corrección">
+      <bpmn:incoming>Flujo_Devolver_FinDevuelta</bpmn:incoming>
+      <bpmn:messageEventDefinition id="Def_FinDevuelta" />
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="Denegar" name="Denegar (estado final) y avisar a la agencia">
+      <bpmn:incoming>Flujo_GDecision_Denegar</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Denegar_FinDenegada</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="FinDenegada" name="Denegada">
+      <bpmn:incoming>Flujo_Denegar_FinDenegada</bpmn:incoming>
+      <bpmn:messageEventDefinition id="Def_FinDenegada" />
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="Aprobar" name="Aprobar: vigencia, código del QR y aviso a la agencia y al puesto">
+      <bpmn:incoming>Flujo_GDecision_Aprobar</bpmn:incoming>
+      <bpmn:outgoing>Flujo_Aprobar_FinAprobada</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="FinAprobada" name="Aprobada">
+      <bpmn:incoming>Flujo_Aprobar_FinAprobada</bpmn:incoming>
+      <bpmn:messageEventDefinition id="Def_FinAprobada" />
+    </bpmn:endEvent>
+    <bpmn:boundaryEvent id="ErrAprobar" name="No cumple" attachedToRef="Aprobar">
+      <bpmn:outgoing>Flujo_ErrAprobar_FinNoAprobable</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="Def_ErrAprobar" />
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="FinNoAprobable" name="No se aprueba: falta la verificación o ya pasó la fecha (hay que devolverla)">
+      <bpmn:incoming>Flujo_ErrAprobar_FinNoAprobable</bpmn:incoming>
+      <bpmn:errorEventDefinition id="Def_FinNoAprobable" />
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flujo_Inicio_Expediente" sourceRef="Inicio" targetRef="Expediente" />
+    <bpmn:sequenceFlow id="Flujo_Expediente_GConflicto" sourceRef="Expediente" targetRef="GConflicto" />
+    <bpmn:sequenceFlow id="Flujo_GConflicto_FinConflicto" name="Sí" sourceRef="GConflicto" targetRef="FinConflicto" />
+    <bpmn:sequenceFlow id="Flujo_GConflicto_Revisar" name="No" sourceRef="GConflicto" targetRef="Revisar" />
+    <bpmn:sequenceFlow id="Flujo_Revisar_Simplus" sourceRef="Revisar" targetRef="Simplus" />
+    <bpmn:sequenceFlow id="Flujo_Simplus_Marcar" sourceRef="Simplus" targetRef="Marcar" />
+    <bpmn:sequenceFlow id="Flujo_Marcar_Registrar" sourceRef="Marcar" targetRef="Registrar" />
+    <bpmn:sequenceFlow id="Flujo_Registrar_GCorregir" sourceRef="Registrar" targetRef="GCorregir" />
+    <bpmn:sequenceFlow id="Flujo_GCorregir_Corregir" name="Sí" sourceRef="GCorregir" targetRef="Corregir" />
+    <bpmn:sequenceFlow id="Flujo_Corregir_RegCorreccion" sourceRef="Corregir" targetRef="RegCorreccion" />
+    <bpmn:sequenceFlow id="Flujo_GCorregir_GUne1" name="No" sourceRef="GCorregir" targetRef="GUne1" />
+    <bpmn:sequenceFlow id="Flujo_RegCorreccion_GUne1" sourceRef="RegCorreccion" targetRef="GUne1" />
+    <bpmn:sequenceFlow id="Flujo_GUne1_GImpedimento" sourceRef="GUne1" targetRef="GImpedimento" />
+    <bpmn:sequenceFlow id="Flujo_GImpedimento_Operaciones" name="Sí" sourceRef="GImpedimento" targetRef="Operaciones" />
+    <bpmn:sequenceFlow id="Flujo_Operaciones_GUne2" sourceRef="Operaciones" targetRef="GUne2" />
+    <bpmn:sequenceFlow id="Flujo_GImpedimento_GUne2" name="No" sourceRef="GImpedimento" targetRef="GUne2" />
+    <bpmn:sequenceFlow id="Flujo_GUne2_Decidir" sourceRef="GUne2" targetRef="Decidir" />
+    <bpmn:sequenceFlow id="Flujo_Decidir_GDecision" sourceRef="Decidir" targetRef="GDecision" />
+    <bpmn:sequenceFlow id="Flujo_GDecision_Devolver" name="Devolver" sourceRef="GDecision" targetRef="Devolver" />
+    <bpmn:sequenceFlow id="Flujo_Devolver_FinDevuelta" sourceRef="Devolver" targetRef="FinDevuelta" />
+    <bpmn:sequenceFlow id="Flujo_GDecision_Denegar" name="Denegar" sourceRef="GDecision" targetRef="Denegar" />
+    <bpmn:sequenceFlow id="Flujo_Denegar_FinDenegada" sourceRef="Denegar" targetRef="FinDenegada" />
+    <bpmn:sequenceFlow id="Flujo_GDecision_Aprobar" name="Aprobar" sourceRef="GDecision" targetRef="Aprobar" />
+    <bpmn:sequenceFlow id="Flujo_Aprobar_FinAprobada" sourceRef="Aprobar" targetRef="FinAprobada" />
+    <bpmn:sequenceFlow id="Flujo_ErrAprobar_FinNoAprobable" sourceRef="ErrAprobar" targetRef="FinNoAprobable" />
+    <bpmn:textAnnotation id="N_Separacion"><bpmn:text>Separación de funciones: nadie revisa lo que creó ni lo de su agencia (tampoco el Administrador).</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_N_Separacion" sourceRef="Expediente" targetRef="N_Separacion" />
+    <bpmn:textAnnotation id="N_Simplus"><bpmn:text>Fuera de ARGO NAVIS: no hay integración con SIMPLUS; el resultado se marca a mano.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_N_Simplus" sourceRef="Simplus" targetRef="N_Simplus" />
+    <bpmn:textAnnotation id="N_Registrar"><bpmn:text>Obligatoria para aprobar: cada tripulante, una vez.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_N_Registrar" sourceRef="Registrar" targetRef="N_Registrar" />
+    <bpmn:textAnnotation id="N_Correccion"><bpmn:text>Corrección: exige motivo (5 caracteres o más) y algún cambio; el historial guarda qué cambió y por qué.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_N_Correccion" sourceRef="RegCorreccion" targetRef="N_Correccion" />
+    <bpmn:textAnnotation id="N_Impedimento"><bpmn:text>Con impedimento igual se puede aprobar: el modal de aprobar pide confirmar que se informó a Operaciones.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_N_Impedimento" sourceRef="GImpedimento" targetRef="N_Impedimento" />
+    <bpmn:textAnnotation id="N_Concurrencia"><bpmn:text>Si otro funcionario decidió antes, se rechaza (bloqueo de la fila).</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_N_Concurrencia" sourceRef="Decidir" targetRef="N_Concurrencia" />
+    <bpmn:textAnnotation id="N_Plazo"><bpmn:text>Plazo: PLAZO_CORRECCION_DIAS (hoy, 2 días).</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_N_Plazo" sourceRef="Devolver" targetRef="N_Plazo" />
+    <bpmn:textAnnotation id="N_Vigencia"><bpmn:text>Vigente hasta el fin del día de la operación + 1 día (hora de Panamá). Genera el código del QR del PDF.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Asoc_N_Vigencia" sourceRef="Aprobar" targetRef="N_Vigencia" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagrama_RevisionUCVMM">
+    <bpmndi:BPMNPlane id="Plano_RevisionUCVMM" bpmnElement="Colaboracion_RevisionUCVMM">
+      <bpmndi:BPMNShape id="Pool_RevisionUCVMM_di" bpmnElement="Pool_RevisionUCVMM" isHorizontal="true"><dc:Bounds x="100" y="40" width="2420" height="740" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="C_UCVMM_di" bpmnElement="C_UCVMM" isHorizontal="true"><dc:Bounds x="130" y="40" width="2390" height="320" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="C_Sistema_di" bpmnElement="C_Sistema" isHorizontal="true"><dc:Bounds x="130" y="360" width="2390" height="420" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Inicio_di" bpmnElement="Inicio"><dc:Bounds x="184" y="182.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="166" y="136" width="74" height="44" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Expediente_di" bpmnElement="Expediente"><dc:Bounds x="240" y="525.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GConflicto_di" bpmnElement="GConflicto" isMarkerVisible="true"><dc:Bounds x="420" y="545.0" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="476" y="548" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="FinConflicto_di" bpmnElement="FinConflicto"><dc:Bounds x="520" y="672.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="478.0" y="712.0" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Revisar_di" bpmnElement="Revisar"><dc:Bounds x="520" y="155.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Simplus_di" bpmnElement="Simplus"><dc:Bounds x="690" y="155.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Marcar_di" bpmnElement="Marcar"><dc:Bounds x="860" y="155.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Registrar_di" bpmnElement="Registrar"><dc:Bounds x="860" y="525.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GCorregir_di" bpmnElement="GCorregir" isMarkerVisible="true"><dc:Bounds x="1050" y="175.0" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="1010" y="128" width="125" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Corregir_di" bpmnElement="Corregir"><dc:Bounds x="1120" y="260.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="RegCorreccion_di" bpmnElement="RegCorreccion"><dc:Bounds x="1120" y="405.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GUne1_di" bpmnElement="GUne1" isMarkerVisible="true"><dc:Bounds x="1310" y="175.0" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GImpedimento_di" bpmnElement="GImpedimento" isMarkerVisible="true"><dc:Bounds x="1400" y="175.0" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="1452" y="144" width="120" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Operaciones_di" bpmnElement="Operaciones"><dc:Bounds x="1480" y="50.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GUne2_di" bpmnElement="GUne2" isMarkerVisible="true"><dc:Bounds x="1660" y="175.0" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Decidir_di" bpmnElement="Decidir"><dc:Bounds x="1750" y="155.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GDecision_di" bpmnElement="GDecision" isMarkerVisible="true"><dc:Bounds x="1950" y="545.0" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="1852" y="598" width="96" height="34" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Devolver_di" bpmnElement="Devolver"><dc:Bounds x="2040" y="405.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="FinDevuelta_di" bpmnElement="FinDevuelta"><dc:Bounds x="2230" y="432.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="2188.0" y="472.0" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Denegar_di" bpmnElement="Denegar"><dc:Bounds x="2040" y="645.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="FinDenegada_di" bpmnElement="FinDenegada"><dc:Bounds x="2230" y="672.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="2188.0" y="712.0" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Aprobar_di" bpmnElement="Aprobar"><dc:Bounds x="2230" y="525.0" width="140" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="FinAprobada_di" bpmnElement="FinAprobada"><dc:Bounds x="2420" y="552.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="2378.0" y="592.0" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ErrAprobar_di" bpmnElement="ErrAprobar"><dc:Bounds x="2282.0" y="597.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="2222" y="618" width="56" height="20" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="FinNoAprobable_di" bpmnElement="FinNoAprobable"><dc:Bounds x="2400" y="672.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="2348" y="712" width="140" height="56" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_Separacion_di" bpmnElement="N_Separacion"><dc:Bounds x="180" y="655" width="290" height="48" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_Simplus_di" bpmnElement="N_Simplus"><dc:Bounds x="600" y="52" width="330" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_Registrar_di" bpmnElement="N_Registrar"><dc:Bounds x="790" y="660" width="280" height="34" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_Correccion_di" bpmnElement="N_Correccion"><dc:Bounds x="1080" y="540" width="330" height="56" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_Impedimento_di" bpmnElement="N_Impedimento"><dc:Bounds x="1460" y="285" width="340" height="56" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_Concurrencia_di" bpmnElement="N_Concurrencia"><dc:Bounds x="1480" y="520" width="350" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_Plazo_di" bpmnElement="N_Plazo"><dc:Bounds x="2310" y="408" width="200" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_Vigencia_di" bpmnElement="N_Vigencia"><dc:Bounds x="1960" y="160" width="370" height="56" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flujo_Inicio_Expediente_di" bpmnElement="Flujo_Inicio_Expediente"><di:waypoint x="220" y="200" /><di:waypoint x="228" y="200" /><di:waypoint x="228" y="570" /><di:waypoint x="240" y="570" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Expediente_GConflicto_di" bpmnElement="Flujo_Expediente_GConflicto"><di:waypoint x="380" y="570" /><di:waypoint x="420" y="570" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_GConflicto_FinConflicto_di" bpmnElement="Flujo_GConflicto_FinConflicto"><di:waypoint x="445" y="595" /><di:waypoint x="445" y="690" /><di:waypoint x="520" y="690" /><bpmndi:BPMNLabel><dc:Bounds x="452" y="615" width="24" height="20" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_GConflicto_Revisar_di" bpmnElement="Flujo_GConflicto_Revisar"><di:waypoint x="445" y="545" /><di:waypoint x="445" y="200" /><di:waypoint x="520" y="200" /><bpmndi:BPMNLabel><dc:Bounds x="452" y="505" width="24" height="20" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Revisar_Simplus_di" bpmnElement="Flujo_Revisar_Simplus"><di:waypoint x="660" y="200" /><di:waypoint x="690" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Simplus_Marcar_di" bpmnElement="Flujo_Simplus_Marcar"><di:waypoint x="830" y="200" /><di:waypoint x="860" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Marcar_Registrar_di" bpmnElement="Flujo_Marcar_Registrar"><di:waypoint x="930" y="245" /><di:waypoint x="930" y="525" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Registrar_GCorregir_di" bpmnElement="Flujo_Registrar_GCorregir"><di:waypoint x="1000" y="570" /><di:waypoint x="1025" y="570" /><di:waypoint x="1025" y="200" /><di:waypoint x="1050" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_GCorregir_Corregir_di" bpmnElement="Flujo_GCorregir_Corregir"><di:waypoint x="1075" y="225" /><di:waypoint x="1075" y="305" /><di:waypoint x="1120" y="305" /><bpmndi:BPMNLabel><dc:Bounds x="1081" y="240" width="24" height="20" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Corregir_RegCorreccion_di" bpmnElement="Flujo_Corregir_RegCorreccion"><di:waypoint x="1190" y="350" /><di:waypoint x="1190" y="405" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_GCorregir_GUne1_di" bpmnElement="Flujo_GCorregir_GUne1"><di:waypoint x="1100" y="200" /><di:waypoint x="1310" y="200" /><bpmndi:BPMNLabel><dc:Bounds x="1110" y="178" width="30" height="20" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_RegCorreccion_GUne1_di" bpmnElement="Flujo_RegCorreccion_GUne1"><di:waypoint x="1260" y="450" /><di:waypoint x="1335" y="450" /><di:waypoint x="1335" y="225" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_GUne1_GImpedimento_di" bpmnElement="Flujo_GUne1_GImpedimento"><di:waypoint x="1360" y="200" /><di:waypoint x="1400" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_GImpedimento_Operaciones_di" bpmnElement="Flujo_GImpedimento_Operaciones"><di:waypoint x="1425" y="175" /><di:waypoint x="1425" y="95" /><di:waypoint x="1480" y="95" /><bpmndi:BPMNLabel><dc:Bounds x="1398" y="118" width="24" height="20" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Operaciones_GUne2_di" bpmnElement="Flujo_Operaciones_GUne2"><di:waypoint x="1620" y="95" /><di:waypoint x="1685" y="95" /><di:waypoint x="1685" y="175" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_GImpedimento_GUne2_di" bpmnElement="Flujo_GImpedimento_GUne2"><di:waypoint x="1450" y="200" /><di:waypoint x="1660" y="200" /><bpmndi:BPMNLabel><dc:Bounds x="1462" y="178" width="30" height="20" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_GUne2_Decidir_di" bpmnElement="Flujo_GUne2_Decidir"><di:waypoint x="1710" y="200" /><di:waypoint x="1750" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Decidir_GDecision_di" bpmnElement="Flujo_Decidir_GDecision"><di:waypoint x="1890" y="200" /><di:waypoint x="1920" y="200" /><di:waypoint x="1920" y="570" /><di:waypoint x="1950" y="570" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_GDecision_Devolver_di" bpmnElement="Flujo_GDecision_Devolver"><di:waypoint x="1975" y="545" /><di:waypoint x="1975" y="450" /><di:waypoint x="2040" y="450" /><bpmndi:BPMNLabel><dc:Bounds x="1981" y="500" width="70" height="20" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Devolver_FinDevuelta_di" bpmnElement="Flujo_Devolver_FinDevuelta"><di:waypoint x="2180" y="450" /><di:waypoint x="2230" y="450" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_GDecision_Denegar_di" bpmnElement="Flujo_GDecision_Denegar"><di:waypoint x="1975" y="595" /><di:waypoint x="1975" y="690" /><di:waypoint x="2040" y="690" /><bpmndi:BPMNLabel><dc:Bounds x="1981" y="612" width="70" height="20" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Denegar_FinDenegada_di" bpmnElement="Flujo_Denegar_FinDenegada"><di:waypoint x="2180" y="690" /><di:waypoint x="2230" y="690" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_GDecision_Aprobar_di" bpmnElement="Flujo_GDecision_Aprobar"><di:waypoint x="2000" y="570" /><di:waypoint x="2230" y="570" /><bpmndi:BPMNLabel><dc:Bounds x="2010" y="548" width="70" height="20" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_Aprobar_FinAprobada_di" bpmnElement="Flujo_Aprobar_FinAprobada"><di:waypoint x="2370" y="570" /><di:waypoint x="2420" y="570" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flujo_ErrAprobar_FinNoAprobable_di" bpmnElement="Flujo_ErrAprobar_FinNoAprobable"><di:waypoint x="2300" y="633" /><di:waypoint x="2300" y="690" /><di:waypoint x="2400" y="690" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_N_Separacion_di" bpmnElement="Asoc_N_Separacion"><di:waypoint x="310" y="615" /><di:waypoint x="310" y="655" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_N_Simplus_di" bpmnElement="Asoc_N_Simplus"><di:waypoint x="760" y="155" /><di:waypoint x="760" y="92" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_N_Registrar_di" bpmnElement="Asoc_N_Registrar"><di:waypoint x="930" y="615" /><di:waypoint x="930" y="660" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_N_Correccion_di" bpmnElement="Asoc_N_Correccion"><di:waypoint x="1190" y="495" /><di:waypoint x="1190" y="540" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_N_Impedimento_di" bpmnElement="Asoc_N_Impedimento"><di:waypoint x="1425" y="225" /><di:waypoint x="1460" y="285" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_N_Concurrencia_di" bpmnElement="Asoc_N_Concurrencia"><di:waypoint x="1820" y="245" /><di:waypoint x="1820" y="520" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_N_Plazo_di" bpmnElement="Asoc_N_Plazo"><di:waypoint x="2110" y="405" /><di:waypoint x="2310" y="408" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_N_Vigencia_di" bpmnElement="Asoc_N_Vigencia"><di:waypoint x="2300" y="525" /><di:waypoint x="2300" y="216" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

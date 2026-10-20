@@ -1,0 +1,26 @@
+flowchart TB
+    subgraph USU["Usuarios"]
+        direction LR
+        VE["Verificador<br/>(escanea el QR del PDF)"]
+        AG["Agencias navieras<br/>(por la VPN)"]
+        FU["Funcionarios del SNM<br/>UCVMM · puestos · administración"]
+    end
+    subgraph SRV["Servidor de ARGO NAVIS (Docker)"]
+        direction LR
+        NG["nginx<br/>SPA React + proxy /api<br/>cabeceras de seguridad"]
+        API["API FastAPI + Uvicorn<br/>reglas · PDF · correos<br/>tarea de vencimientos"]
+        BD[("PostgreSQL 15<br/>datos y bitácora")]
+        DOC[("Volumen de documentos<br/>una carpeta por solicitud")]
+    end
+    AD["Active Directory del SNM<br/>LDAP / LDAPS"]
+    SMTP["Servidor de correo del SNM<br/>SMTP"]
+    SIM["SIMPLUS · fuera de ARGO NAVIS<br/>(UCVMM lo consulta a mano)"]
+    VE -->|"/verificar/{código}"| NG
+    AG -->|HTTP o HTTPS| NG
+    FU -->|HTTP o HTTPS| NG
+    NG -->|/api| API
+    API --> BD
+    API --> DOC
+    API -->|autenticación| AD
+    API -->|avisos| SMTP
+    FU -.->|consulta manual| SIM
