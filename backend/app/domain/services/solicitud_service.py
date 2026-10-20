@@ -15,7 +15,7 @@
     con plazo (PLAZO_CORRECCION_DIAS) o niega. Nadie revisa una solicitud que
     creó o que es de su propia agencia (separación de funciones).
   - El puesto de control (T-FINALIZAR-PUERTO + asignación en
-    `usuarios_puestos`) ve las aprobadas de sus puestos, comenta y finaliza.
+    `usuarios_puestos`) ve las aprobadas de sus puestos y las finaliza.
   - Cada transición bloquea la fila (SELECT ... FOR UPDATE): dos usuarios no
     pueden, por ejemplo, aprobar y negar la misma solicitud a la vez.
   - Cada paso queda en `solicitud_eventos` (historial con usuario y hora).
@@ -76,7 +76,7 @@ Asignacion = tuple[TramiteDocumento | None, int | None]
 _EVENTOS_INTERNOS = {
     TipoEventoSolicitud.IMPEDIMENTOS.value,
     TipoEventoSolicitud.IMPEDIMENTOS_CORREGIDOS.value,
-    TipoEventoSolicitud.COMENTARIO.value,
+    TipoEventoSolicitud.COMENTARIO.value,   # ya no se registran: quedan los de antes
 }
 _SIN_TEXTO_PARA_AGENCIA = {TipoEventoSolicitud.APROBADA.value, TipoEventoSolicitud.FINALIZADA.value}
 _AUTOR_PARA_AGENCIA = {
@@ -216,7 +216,6 @@ class ServicioSolicitud:
         return AccionesSolicitud(
             corregir=ctx.es_de_su_agencia(s) and s.estado == Estado.EN_CORRECCION.value and en_plazo,
             revisar=revisable and not conflicto,
-            comentar=del_puerto,
             finalizar=del_puerto,
             descargar_autorizacion=(
                 s.estado in (Estado.APROBADA.value, Estado.FINALIZADA.value) and self.puede_ver(ctx, s)
@@ -807,7 +806,7 @@ class ServicioSolicitud:
         await self.repo.guardar()
         return await self._recargar(s.id)
 
-    # ── Puesto de control: comentar y finalizar ──────────────────────────────
+    # ── Puesto de control: finalizar ─────────────────────────────────────────
 
     async def _para_puerto(self, ctx: ContextoAcceso, solicitud_id: int) -> Solicitud:
         s = await self.obtener(ctx, solicitud_id, bloquear=True)
@@ -818,12 +817,6 @@ class ServicioSolicitud:
         if s.vigente_hasta and s.vigente_hasta < ahora_utc():
             raise _error(status.HTTP_409_CONFLICT, "La autorización venció sin finalizarse.")
         return s
-
-    async def comentar(self, ctx: ContextoAcceso, solicitud_id: int, comentario: str) -> Solicitud:
-        s = await self._para_puerto(ctx, solicitud_id)
-        self._registrar_evento(s, ctx.usuario, TipoEventoSolicitud.COMENTARIO, None, None, comentario)
-        await self.repo.guardar()
-        return await self._recargar(s.id)
 
     async def finalizar(
         self, ctx: ContextoAcceso, solicitud_id: int, comentario: str, puesto_finalizacion_id: int | None = None,

@@ -24,7 +24,7 @@ from app.domain.models.solicitud import Solicitud
 from app.domain.models.user import Usuario
 from app.domain.repositories.audit_repository import RepositorioAuditoria
 from app.domain.schemas.solicitud import (
-    ConsultaBandeja, DatosAprobacion, DatosComentario, DatosCorregirSolicitud, DatosCrearSolicitud, DatosFinalizar,
+    ConsultaBandeja, DatosAprobacion, DatosCorregirSolicitud, DatosCrearSolicitud, DatosFinalizar,
     DatosImpedimentos, DatosMotivo, PaginaSolicitudes, SalidaEstadisticasSolicitudes, SalidaSolicitud,
 )
 from app.domain.services.notificacion_service import ServicioNotificacion
@@ -351,21 +351,6 @@ async def negar_solicitud(
 
 
 # ── Puesto de control ────────────────────────────────────────────────────────
-
-@enrutador.post("/{solicitud_id}/comentarios", response_model=SalidaSolicitud)
-async def comentar_solicitud(
-    solicitud_id: int,
-    datos:   DatosComentario,
-    request: Request,
-    ctx:     ContextoAcceso = Depends(_contexto),
-    svc:     ServicioSolicitud = Depends(_servicio),
-    sesion:  AsyncSession   = Depends(obtener_sesion_bd, scope="function"),
-):
-    """Comentario del puesto de control (queda con fecha, hora y usuario)."""
-    s = await svc.comentar(ctx, solicitud_id, datos.comentario)
-    await _auditar(sesion, request, ctx.usuario, AccionAuditoria.SOLICITUD_COMENTADA, s, comentario=datos.comentario)
-    return await svc.construir_detalle(ctx, s)
-
 
 @enrutador.post("/{solicitud_id}/finalizar", response_model=SalidaSolicitud)
 async def finalizar_solicitud(

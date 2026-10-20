@@ -162,7 +162,6 @@ export interface EventoSolicitud {
 export interface AccionesSolicitud {
   corregir: boolean;
   revisar: boolean;
-  comentar: boolean;
   finalizar: boolean;
   descargar_autorizacion: boolean;
   /** Podría revisar, pero la creó o es de su agencia (separación de funciones). */
@@ -298,8 +297,6 @@ export const apiSolicitudes = {
   negar: (id: number, motivo: string) =>
     clienteApi.post<SolicitudDetalle>(`/solicitudes/${id}/negar`, { motivo }).then((r) => r.data),
 
-  comentar: (id: number, comentario: string) =>
-    clienteApi.post<SolicitudDetalle>(`/solicitudes/${id}/comentarios`, { comentario }).then((r) => r.data),
 
   /** Cierra la autorización indicando en qué puesto terminó la operación. */
   finalizar: (id: number, comentario: string, puestoFinalizacionId: number | null) =>

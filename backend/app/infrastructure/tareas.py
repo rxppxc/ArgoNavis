@@ -62,8 +62,8 @@ async def expirar_solicitudes() -> int:
         logger.exception("[vencimientos] Error al expirar solicitudes")
         return 0
 
-    for aviso in avisos:
-        await enviar_aviso(aviso)
+    # En paralelo: con el correo caído, los reintentos de un aviso no esperan a los demás.
+    await asyncio.gather(*(enviar_aviso(aviso) for aviso in avisos))
     return len(vencidas)
 
 

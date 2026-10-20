@@ -93,7 +93,7 @@ docker compose -f docker-compose-prod.yml up -d --build
 
 > **Al migrar un servidor que venía del storage** (revisión `d4f1a8c27e90`): las transferencias sueltas que existan se **eliminan**, en la base y en disco. Si alguna hace falta, descárgala antes de actualizar.
 
-> **Primer SysAdmin** (desde la revisión `c7a2e94b1f30`): usuarios, roles y permisos solo los gestiona el rol SysAdmin, y la migración no se lo asigna a nadie. Después de migrar, nómbralo desde la consola del servidor (el usuario ya tiene que existir; queda en la bitácora):
+> **Primer SysAdmin** (desde la revisión `c7a2e94b1f30`): usuarios, roles y permisos los gestionan el SysAdmin y el Administrador, y la migración no le asigna esos roles a nadie. Después de migrar, nómbralo desde la consola del servidor (el usuario ya tiene que existir; queda en la bitácora):
 > ```bat
 > cd backend
 > venv\Scripts\python -m app.infrastructure.asignar_rol <usuario> SysAdmin
@@ -148,10 +148,10 @@ ArgoNavis/
 | **Naviera** (usuario de una agencia) | `T-CREAR-BASICA` | Envía solicitudes de su agencia y las corrige cuando UCVMM las devuelve. Todos los usuarios de la agencia comparten sus solicitudes. |
 | **Sector Pacífico** (UCVMM) | `T-PROCESAR-PACIFICO` | Verifica impedimentos tripulante por tripulante (obligatorio para aprobar), aprueba, devuelve a corrección o deniega. |
 | **Puesto de Control** | `T-FINALIZAR-PUERTO` + puestos asignados | Ve las aprobadas de sus puestos y las finaliza con un comentario, indicando en qué puesto terminó la operación. |
-| **Administrador** | todos los `T-*` | Bandejas y expedientes, catálogo de trámites, agencias, puestos, nacionalidades restringidas, estadísticas y bitácora. Ve la lista de usuarios para asignarlos a agencias y puestos, pero no los crea ni les cambia el rol. |
+| **Administrador** | todos los `T-*` | Acceso total: bandejas y expedientes, catálogo de trámites, agencias, puestos, nacionalidades restringidas, estadísticas, bitácora, usuarios y roles. |
 | **SysAdmin** | ninguno | Rol técnico: usuarios, roles (con los permisos fijos del sistema) y bitácora. No ve solicitudes ni expedientes. |
 
-Administrador y SysAdmin se reconocen por el nombre del rol (`rol_personalizado.nombre`) y no se pueden renombrar. El último SysAdmin activo no se puede desactivar, borrar ni cambiar de rol.
+Administrador y SysAdmin se reconocen por el nombre del rol (`rol_personalizado.nombre`): no se pueden renombrar y sus permisos son fijos. Nadie cambia su propio rol. El último SysAdmin activo no se puede desactivar, borrar ni cambiar de rol.
 
 **Estados:** `review` → `approved` → `finalized`; `review` → `returned` → (corrige) `review`; `review` → `denied`. Una aprobada sin finalizar a tiempo, o una devuelta sin corregir en el plazo (`PLAZO_CORRECCION_DIAS`), pasa a `expired`.
 
@@ -175,7 +175,7 @@ Administrador y SysAdmin se reconocen por el nombre del rol (`rol_personalizado.
 - Lo interno no le llega a la agencia, porque el backend lo filtra, no solo la vista:
   - La verificación de impedimentos (por tripulante).
   - La observación de aprobación.
-  - El comentario del puesto de control.
+  - El comentario de cierre del puesto de control.
   - Los nombres de los funcionarios: en su historial ve "UCVMM" o "Puesto de control".
   - Sí ve los motivos de devolución y de negación.
 - El PDF de la autorización no lleva observaciones. Una vez finalizada, dice en qué puesto terminó la operación, que puede ser distinto del autorizado.
@@ -195,7 +195,7 @@ Administrador y SysAdmin se reconocen por el nombre del rol (`rol_personalizado.
 La vista previa muestra PDF, .docx y .xlsx; los .doc y .xls del formato viejo se descargan.
 
 ### Puesta en marcha
-1. **Usuarios** (SysAdmin, en `/admin`): agrega los del Active Directory o crea cuentas locales para los usuarios externos, y asigna su rol (Naviera, Sector Pacífico, Puesto de Control, Administrador o SysAdmin). El primer SysAdmin se nombra desde la consola (ver *Producción*).
+1. **Usuarios** (Administrador o SysAdmin, en `/admin`): agrega los del Active Directory o crea cuentas locales para los usuarios externos, y asigna su rol (Naviera, Sector Pacífico, Puesto de Control, Administrador o SysAdmin). El primer SysAdmin se nombra desde la consola (ver *Producción*).
 2. **Agencias navieras** (Administrador, en `/admin/catalogos`): crea cada agencia y asígnale sus usuarios. Un usuario sin agencia no puede enviar solicitudes.
 3. **Puestos de control** (misma página): crea los puestos y asígnales sus funcionarios.
 4. **Nacionalidades restringidas** (misma página): marca las de la lista oficial.
@@ -207,7 +207,7 @@ La vista previa muestra PDF, .docx y .xlsx; los .doc y .xls del formato viejo se
 - El login responde lo mismo si el usuario no existe y si la contraseña está mal (no revela qué cuentas hay en el AD); el motivo real queda en la bitácora.
 - El JWT se verifica contra la BD en cada request: desactivar una cuenta la saca de inmediato.
 - Mientras el usuario trabaja, el token se renueva solo; tras 15 minutos sin actividad se cierra la sesión (con aviso). Ninguna sesión dura más de `SESION_MAXIMA_HORAS` (12) desde el login.
-- Cerrar sesión, cambiar la contraseña o que el SysAdmin la restablezca invalida los tokens ya emitidos de esa cuenta (en cualquier navegador).
+- Cerrar sesión, cambiar la contraseña o que un Administrador o SysAdmin la restablezca invalida los tokens ya emitidos de esa cuenta (en cualquier navegador).
 - Si se pide una página sin sesión (p. ej. el enlace de un correo), tras el login se vuelve a ella.
 
 ### Seguridad

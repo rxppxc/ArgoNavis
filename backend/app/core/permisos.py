@@ -3,8 +3,9 @@
 La fuente de verdad es `rol_personalizado` (rol_id en la tabla users), por
 nombre del rol:
 
-  - 'Administrador': administración funcional (catálogos, trámites,
-    estadísticas, bitácora) y todo el flujo de solicitudes.
+  - 'Administrador': acceso total. Todo el flujo de solicitudes (atajo a los
+    permisos T-*), catálogos, trámites, estadísticas, bitácora, y también
+    usuarios, roles y permisos (decisión del usuario del 2026-10-20).
   - 'SysAdmin': administración técnica (usuarios, roles, permisos y
     bitácora). No tiene el atajo de admin: no ve solicitudes ni expedientes.
 
@@ -91,25 +92,11 @@ async def requerir_admin(
     return user_id
 
 
-async def requerir_sysadmin(
-    user_id: int = Depends(obtener_id_usuario_actual),
-    sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
-) -> int:
-    """Dependencia: solo SysAdmin (usuarios, roles y permisos)."""
-    usuario = (await sesion.execute(select(Usuario).where(Usuario.id == user_id))).scalar_one_or_none()
-    if not usuario or not es_sysadmin_efectivo(usuario):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Se requiere el rol SysAdmin para administrar usuarios, roles y permisos.",
-        )
-    return user_id
-
-
 async def requerir_admin_o_sysadmin(
     user_id: int = Depends(obtener_id_usuario_actual),
     sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ) -> int:
-    """Dependencia: Administrador o SysAdmin (bitácora y consultas de usuarios/roles)."""
+    """Dependencia: Administrador o SysAdmin (usuarios, roles, permisos y bitácora)."""
     usuario = (await sesion.execute(select(Usuario).where(Usuario.id == user_id))).scalar_one_or_none()
     if not usuario or not (es_admin_efectivo(usuario) or es_sysadmin_efectivo(usuario)):
         raise HTTPException(

@@ -148,15 +148,13 @@ class DatosAprobacion(BaseModel):
         return _texto_o_nada(v)
 
 
-class DatosComentario(BaseModel):
+class DatosFinalizar(BaseModel):
+    """Cierre en el puesto de control, con el comentario de la operación.
+    `puesto_finalizacion_id` es donde terminó la operación (puede ser otro que
+    el autorizado); vacío = el autorizado."""
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    comentario: str = Field(min_length=3, max_length=2000)
-
-
-class DatosFinalizar(DatosComentario):
-    """Cierre en el puesto de control. `puesto_finalizacion_id` es donde terminó
-    la operación (puede ser otro que el autorizado); vacío = el autorizado."""
+    comentario:             str = Field(min_length=3, max_length=2000)
     puesto_finalizacion_id: int | None = None
 
 
@@ -248,7 +246,6 @@ class AccionesSolicitud(BaseModel):
     muestra los botones según esto; el backend igual lo vuelve a validar)."""
     corregir:               bool = False
     revisar:                bool = False
-    comentar:               bool = False
     finalizar:              bool = False
     descargar_autorizacion: bool = False
     # Tendría permiso de revisar, pero la solicitud la creó él o es de su

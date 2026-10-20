@@ -13,7 +13,7 @@
         <bpmn:flowNodeRef>AjustarCatalogo</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>CatalogoAjustado</bpmn:flowNodeRef>
       </bpmn:lane>
-      <bpmn:lane id="Carril_SysAdmin" name="SysAdmin">
+      <bpmn:lane id="Carril_SysAdmin" name="SysAdmin o Administrador">
         <bpmn:flowNodeRef>RegistrarUsuarios</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>AsignarRoles</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>OlvidoContrasena</bpmn:flowNodeRef>
@@ -141,7 +141,7 @@
     <bpmn:sequenceFlow id="Flujo_ConsultarBitacora_RevisionHecha" sourceRef="ConsultarBitacora" targetRef="RevisionHecha" />
     <bpmn:textAnnotation id="Nota_Migraciones"><bpmn:text>Las migraciones siembran roles, permisos y el catálogo de trámites (Form. 3).</bpmn:text></bpmn:textAnnotation>
     <bpmn:association id="Asoc_Nota_Migraciones" associationDirection="None" sourceRef="Nota_Migraciones" targetRef="Instalar" />
-    <bpmn:textAnnotation id="Nota_Roles"><bpmn:text>El SysAdmin no ve solicitudes; el Administrador no crea usuarios ni cambia roles.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:textAnnotation id="Nota_Roles"><bpmn:text>El SysAdmin no ve solicitudes; el Administrador tiene acceso total. Nadie cambia su propio rol.</bpmn:text></bpmn:textAnnotation>
     <bpmn:textAnnotation id="Nota_Catalogo"><bpmn:text>Las solicitudes ya enviadas conservan el checklist con el que se enviaron.</bpmn:text></bpmn:textAnnotation>
     <bpmn:association id="Asoc_Nota_Catalogo" associationDirection="None" sourceRef="Nota_Catalogo" targetRef="CatalogoAjustado" />
   </bpmn:process>

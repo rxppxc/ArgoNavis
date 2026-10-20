@@ -12,6 +12,7 @@
 .invalida { color: var(--acc-red); }
 .resultadoTitulo { font-size: 1.1rem; font-weight: 800; }
 .resultadoTexto  { color: var(--text-2); font-size: .88rem; margin-top: 3px; }
+.resultadoAyuda  { color: var(--text-2); font-size: .84rem; line-height: 1.5; margin: 8px 0 0; }
 
 .tarjeta {
   background: var(--card); border: 1px solid var(--border);

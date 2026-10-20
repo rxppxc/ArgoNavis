@@ -4,7 +4,7 @@ Línea base técnica y funcional de ARGO NAVIS (antes «NAVIS»), módulo **Auto
 
 - **Versión:** 0.1, borrador para revisión (20/10/2026).
 - **Base:** rama `main`, esquema de base de datos en la revisión Alembic `a3d9c6e1f584`.
-- **Pruebas citadas:** 113 casos del backend aprobados (19/10/2026).
+- **Pruebas citadas:** 115 casos del backend aprobados (20/10/2026).
 
 ## Documentos
 
@@ -21,6 +21,8 @@ Línea base técnica y funcional de ARGO NAVIS (antes «NAVIS»), módulo **Auto
 | 08 | Brechas, riesgos, pendientes y evidencias | [08-Brechas-riesgos-y-pendientes.docx](08-Brechas-riesgos-y-pendientes.docx) |
 
 Se sugiere empezar por el 00 (procesos y mapa general) y terminar con el 08, que reúne los riesgos, los pendientes y la lista de puntos a validar con UCVMM.
+
+Cada documento trae portada institucional, una página de control (datos, revisión y firmas, historial de versiones y convenciones) y un índice. Si editas un documento, actualiza el índice en Word: clic derecho sobre él → **Actualizar campo**.
 
 ## Diagramas
 

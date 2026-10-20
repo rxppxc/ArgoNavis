@@ -11,8 +11,16 @@ import {
 } from "../../components/Iconos";
 import styles from "./PaginaRoles.module.css";
 
-/** Roles y permisos (SysAdmin). Los permisos los define el sistema: el código
- *  revisa esos códigos, así que aquí solo se listan y se asignan a los roles. */
+/** Roles fijos: se reconocen por el nombre, que no cambia, y sus permisos no se
+ *  editan (el backend responde 400). */
+const NOTA_ROL_FIJO: Record<string, string> = {
+  Administrador: "Tiene acceso a todo el sistema por su rol: sus permisos no se editan.",
+  SysAdmin: "Administra usuarios, roles y la bitácora, y no ve solicitudes: sus permisos no se editan.",
+};
+
+/** Roles y permisos (Administrador y SysAdmin). Los permisos los define el
+ *  sistema: el código revisa esos códigos, así que aquí solo se listan y se
+ *  asignan a los roles. */
 export default function PaginaRoles() {
   /* ── Permisos (solo lectura) ── */
   const [permisos, setPermisos] = useState<Permiso[]>([]);
@@ -30,6 +38,8 @@ export default function PaginaRoles() {
   const [rolAbierto, setRolAbierto] = useState<number | null>(null);
   const [guardandoPermisosRol, setGuardandoPermisosRol] = useState<number | null>(null);
   const [seleccionPermisos, setSeleccionPermisos] = useState<Set<number>>(new Set());
+  const [edicion, setEdicion] = useState({ nombre: "", descripcion: "" });
+  const [guardandoDatos, setGuardandoDatos] = useState<number | null>(null);
 
   const { mostrar } = useNotificacion();
   const confirmar = useConfirmar();
@@ -99,6 +109,29 @@ export default function PaginaRoles() {
     }
     setRolAbierto(rol.id);
     setSeleccionPermisos(new Set(rol.permisos.map(p => p.id)));
+    setEdicion({ nombre: rol.nombre, descripcion: rol.descripcion ?? "" });
+  }
+
+  async function guardarDatosRol(rol: Rol) {
+    const nombre = edicion.nombre.trim();
+    if (!nombre) {
+      mostrarAviso("El nombre del rol no puede quedar vacío.", "err");
+      return;
+    }
+    setGuardandoDatos(rol.id);
+    try {
+      const { data } = await apiAdmin.actualizarRol(rol.id, {
+        ...(nombre !== rol.nombre ? { nombre } : {}),
+        descripcion: edicion.descripcion.trim(),
+      });
+      setRoles(prev => prev.map(r => r.id === rol.id ? data : r).sort((a, b) => a.nombre.localeCompare(b.nombre)));
+      setEdicion({ nombre: data.nombre, descripcion: data.descripcion ?? "" });
+      mostrarAviso("Datos del rol guardados.");
+    } catch (err) {
+      mostrarAviso(mensajeDeError(err, "Error al guardar el rol."), "err");
+    } finally {
+      setGuardandoDatos(null);
+    }
   }
 
   function togglePermiso(pid: number) {
@@ -208,6 +241,9 @@ export default function PaginaRoles() {
                 <div className={styles.rolList}>
                   {roles.map(r => {
                     const abierto = rolAbierto === r.id;
+                    const notaFijo = NOTA_ROL_FIJO[r.nombre];
+                    const sinCambios = edicion.nombre.trim() === r.nombre
+                      && edicion.descripcion.trim() === (r.descripcion ?? "");
                     return (
                       <div key={r.id} className={`${styles.rolCard} ${abierto ? styles.rolCardOpen : ""}`}>
                         <div className={styles.rolHeader}>
@@ -252,49 +288,93 @@ export default function PaginaRoles() {
                         {abierto && (
                           <div className={styles.rolBody}>
                             <div className={styles.rolBodyHeader}>
-                              <strong>Permisos asignados</strong>
-                              <span className={styles.muted}>
-                                {seleccionPermisos.size} de {permisos.length} seleccionados
-                              </span>
+                              <strong>Datos del rol</strong>
                             </div>
-
-                            {permisos.length === 0 ? (
-                              <p className={styles.empty}>No hay permisos para asignar.</p>
-                            ) : (
-                              <div className={styles.permisoGrid}>
-                                {permisosOrdenados.map(p => {
-                                  const seleccionado = seleccionPermisos.has(p.id);
-                                  return (
-                                    <button
-                                      key={p.id}
-                                      type="button"
-                                      className={`${styles.permisoChip} ${seleccionado ? styles.permisoChipOn : ""}`}
-                                      onClick={() => togglePermiso(p.id)}
-                                    >
-                                      <span className={styles.chipCheck}>
-                                        {seleccionado ? <IconoCheck /> : null}
-                                      </span>
-                                      <span className={styles.chipCodigo}>{p.codigo}</span>
-                                      <span className={styles.chipNombre}>{p.nombre}</span>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            )}
-
-                            <div className={styles.rolBodyFooter}>
+                            <div className={styles.datosRol}>
+                              <input
+                                className={styles.input}
+                                type="text"
+                                aria-label="Nombre del rol"
+                                value={edicion.nombre}
+                                onChange={e => setEdicion(prev => ({ ...prev, nombre: e.target.value }))}
+                                maxLength={100}
+                                disabled={!!notaFijo}
+                                title={notaFijo ? "Este rol no se puede renombrar" : undefined}
+                              />
+                              <input
+                                className={styles.input}
+                                type="text"
+                                aria-label="Descripción del rol"
+                                placeholder="Descripción (opcional)"
+                                value={edicion.descripcion}
+                                onChange={e => setEdicion(prev => ({ ...prev, descripcion: e.target.value }))}
+                                maxLength={255}
+                              />
                               <button
                                 type="button"
-                                className={styles.btnGuardar}
-                                onClick={() => guardarPermisosRol(r.id)}
-                                disabled={guardandoPermisosRol === r.id}
+                                className={styles.btnSecundario}
+                                onClick={() => guardarDatosRol(r)}
+                                disabled={guardandoDatos === r.id || sinCambios}
                               >
-                                {guardandoPermisosRol === r.id
-                                  ? <span className={styles.spinner} />
-                                  : <IconoCheck />}
-                                Guardar permisos
+                                {guardandoDatos === r.id ? <span className={styles.spinnerSm} /> : <IconoCheck />}
+                                Guardar datos
                               </button>
                             </div>
+
+                            {notaFijo ? (
+                              <>
+                                <div className={styles.rolBodyHeader}><strong>Permisos</strong></div>
+                                <p className={styles.nota}>{notaFijo}</p>
+                              </>
+                            ) : (
+                              <>
+                                <div className={styles.rolBodyHeader}>
+                                  <strong>Permisos asignados</strong>
+                                  <span className={styles.muted}>
+                                    {seleccionPermisos.size} de {permisos.length} seleccionados
+                                  </span>
+                                </div>
+                                {permisos.length === 0 ? (
+                                  <p className={styles.empty}>No hay permisos para asignar.</p>
+                                ) : (
+                                  <div className={styles.permisoGrid}>
+                                    {permisosOrdenados.map(p => {
+                                      const seleccionado = seleccionPermisos.has(p.id);
+                                      return (
+                                        <button
+                                          key={p.id}
+                                          type="button"
+                                          className={`${styles.permisoChip} ${seleccionado ? styles.permisoChipOn : ""}`}
+                                          onClick={() => togglePermiso(p.id)}
+                                        >
+                                          <span className={styles.chipCheck}>
+                                            {seleccionado ? <IconoCheck /> : null}
+                                          </span>
+                                          <span className={styles.chipCodigo}>{p.codigo}</span>
+                                          <span className={styles.chipNombre}>{p.nombre}</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </>
+                            )}
+
+                            {!notaFijo && (
+                              <div className={styles.rolBodyFooter}>
+                                <button
+                                  type="button"
+                                  className={styles.btnGuardar}
+                                  onClick={() => guardarPermisosRol(r.id)}
+                                  disabled={guardandoPermisosRol === r.id}
+                                >
+                                  {guardandoPermisosRol === r.id
+                                    ? <span className={styles.spinner} />
+                                    : <IconoCheck />}
+                                  Guardar permisos
+                                </button>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

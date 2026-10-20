@@ -215,8 +215,8 @@ export default function App() {
                       <Route path="/new"               element={<RutaSolicitudes><PaginaSolicitud /></RutaSolicitudes>} />
                       <Route path="/solicitudes/:id"          element={<RutaSolicitudes><PaginaDetalleSolicitud /></RutaSolicitudes>} />
                       <Route path="/solicitudes/:id/corregir" element={<RutaSolicitudes><PaginaSolicitud /></RutaSolicitudes>} />
-                      <Route path="/admin"             element={<RutaRol roles={["sysadmin"]}><PaginaUsuarios /></RutaRol>} />
-                      <Route path="/admin/roles"       element={<RutaRol roles={["sysadmin"]}><PaginaRoles /></RutaRol>} />
+                      <Route path="/admin"             element={<RutaRol roles={["admin", "sysadmin"]}><PaginaUsuarios /></RutaRol>} />
+                      <Route path="/admin/roles"       element={<RutaRol roles={["admin", "sysadmin"]}><PaginaRoles /></RutaRol>} />
                       <Route path="/admin/stats"       element={<RutaStats><PaginaEstadisticas /></RutaStats>} />
                       <Route path="/admin/tramites"    element={<RutaRol roles={["admin"]}><PaginaTramites /></RutaRol>} />
                       <Route path="/admin/catalogos"   element={<RutaRol roles={["admin"]}><PaginaCatalogos /></RutaRol>} />

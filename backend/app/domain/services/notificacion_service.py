@@ -152,7 +152,7 @@ class ServicioNotificacion:
                 f"Motivo: {s.motivo_devolucion}\n\n"
                 f"Plazo para corregir: hasta el {_fecha_hora(s.plazo_correccion)}."
             ),
-            tono="rojo",
+            tono="naranja",
             boton_texto="Corregir solicitud", boton_url=url_solicitud(s, "/corregir"),
         )])
 
@@ -176,7 +176,7 @@ class ServicioNotificacion:
             titulo=titulo,
             intro="El plazo de la solicitud venció y quedó registrada como expirada.",
             vista_previa=_vista_previa(motivo),
-            campos=_campos(s), destacado=motivo, tono="amarillo",
+            campos=_campos(s), destacado=motivo, tono="gris",
             boton_texto="Ver solicitud", boton_url=url_solicitud(s),
         )])
 

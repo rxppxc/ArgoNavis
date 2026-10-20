@@ -203,7 +203,9 @@ export default function PaginaPanel() {
         <div className={styles.searchWrap}>
           <span className={styles.searchIcon}><IconoBuscar tamano={15} /></span>
           <input type="text" className={styles.searchInput} value={busqueda} maxLength={100}
-            placeholder="Buscar por número, buque, IMO, agencia o puesto…" aria-label="Buscar solicitudes"
+            // La agencia solo ve las suyas: no busca por agencia. Corto para que quepa en el celular.
+            placeholder={vista === "agencia" ? "Número, buque, IMO o puesto" : "Número, buque, IMO, agencia o puesto"}
+            aria-label="Buscar solicitudes"
             onChange={(e) => setBusqueda(e.target.value)} />
           {busqueda && (
             <button type="button" className={styles.searchLimpiar} onClick={() => setBusqueda("")} aria-label="Limpiar búsqueda">

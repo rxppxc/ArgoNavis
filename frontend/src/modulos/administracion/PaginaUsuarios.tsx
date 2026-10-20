@@ -389,7 +389,8 @@ export default function PaginaUsuarios() {
                               className={styles.rolSelect}
                               value={u.rol_id ?? ""}
                               onChange={e => alAsignarRol(u.id, e.target.value ? Number(e.target.value) : null)}
-                              disabled={trabajando}
+                              disabled={trabajando || esYo}
+                              title={esYo ? "Tu propio rol lo cambia otra persona" : undefined}
                             >
                               <option value="">— Sin rol —</option>
                               {roles.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}

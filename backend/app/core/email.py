@@ -11,6 +11,7 @@ igual de claro).
     bloquee las imágenes externas.
   - Lleva versión en texto plano y una vista previa para la bandeja.
 """
+import asyncio
 import html
 import logging
 from dataclasses import dataclass, field
@@ -25,7 +26,8 @@ from app.core.config import obtener_configuracion
 logger        = logging.getLogger(__name__)
 configuracion = obtener_configuracion()
 
-NAVY, ORO = "#14213D", "#D9A62E"
+# Paleta del SNM (la de frontend/src/styles/globals.css): marino y amarillo de marca.
+NAVY, ORO = "#10233F", "#F2C94C"
 _FUENTE   = "'Segoe UI',Arial,sans-serif"
 _MONO     = "Consolas,'Courier New',monospace"
 _SOPORTE  = "mesadeayuda@migracion.gob.pa"
@@ -40,14 +42,22 @@ _CID_LOGO = "logo-argo-navis@argonavis.snm"
 # recuadro destacado (el resto, lo que escribió el usuario, va tal cual, escapado).
 _ETIQUETAS = ("Motivo:", "Plazo para corregir:", "Nacionalidad restringida:")
 
-# Color del sello (sobre el azul marino) y del recuadro destacado (fondo, borde) por tono.
-_SELLO = {"verde": "#4ADE80", "rojo": "#F87171", "amarillo": "#FBBF24", "azul": "#93C5FD"}
+# Tono de cada aviso = color del estado en la interfaz (InsigniaEstado): recibida
+# en azul, aprobada en verde, devuelta en naranja, denegada en rojo, expirada en gris.
+# El sello va sobre el marino con los acentos del tema oscuro; el recuadro
+# destacado (fondo, borde), con los del claro y su tinte al 10 %.
+_SELLO = {"verde": "#34D399", "rojo": "#F87171", "naranja": "#FB923C", "gris": "#9AA7B8", "azul": "#79A6F6"}
 _DESTACADO = {
-    "verde":    ("#EAF6EE", "#15803D"),
-    "rojo":     ("#FDECEC", "#B91C1C"),
-    "amarillo": ("#FFF6DD", "#B45309"),
-    "azul":     ("#E8F0FE", "#1D4ED8"),
+    "verde":   ("#E8F0EB", "#166534"),
+    "rojo":    ("#F8E8E8", "#B91C1C"),
+    "naranja": ("#F5EBE7", "#9A3412"),
+    "gris":    ("#EEEFF1", "#526176"),
+    "azul":    ("#E6ECF6", "#003DA5"),
 }
+
+# Si el servidor de correo falla, el aviso se reintenta a los 30 s y a los 2 min.
+# Los reintentos viven en memoria: si el backend se reinicia en medio, se pierde.
+_ESPERAS_REINTENTO = (30, 120)
 
 
 @dataclass
@@ -62,7 +72,7 @@ class Aviso:
     vista_previa:  str = ""                  # lo que muestra la bandeja junto al asunto
     campos:        list[tuple[str, str]] = field(default_factory=list)   # datos del pase (los vacíos no van)
     destacado:     str | None = None
-    tono:          str = "azul"              # verde | rojo | amarillo | azul
+    tono:          str = "azul"              # verde | rojo | naranja | gris | azul
     boton_texto:   str | None = None
     boton_url:     str | None = None
 
@@ -128,7 +138,7 @@ def _construir_html_aviso(aviso: Aviso) -> str:
     if aviso.destacado:
         fondo, borde = _DESTACADO.get(aviso.tono, _DESTACADO["azul"])
         destacado = f"""<div style="margin-top:14px;background:{fondo};border-left:4px solid {borde};padding:13px 16px;
-font:14px/1.6 {_FUENTE};color:#1F2937;">{_destacado_html(aviso.destacado)}</div>"""
+font:14px/1.6 {_FUENTE};color:#17283E;">{_destacado_html(aviso.destacado)}</div>"""
     boton = ""
     if aviso.boton_texto and aviso.boton_url:
         url = _esc(aviso.boton_url)
@@ -136,8 +146,8 @@ font:14px/1.6 {_FUENTE};color:#1F2937;">{_destacado_html(aviso.destacado)}</div>
   <table role="presentation" cellpadding="0" cellspacing="0" align="center"><tr><td bgcolor="{ORO}" style="border-radius:6px;">
     <a href="{url}" style="display:inline-block;padding:13px 30px;font:700 15px {_FUENTE};color:{NAVY};text-decoration:none;">{_esc(aviso.boton_texto)}</a>
   </td></tr></table>
-  <div style="font:12px/1.5 {_FUENTE};color:#7A8594;margin-top:12px;">Si el botón no abre, copie este enlace:<br>
-    <a href="{url}" style="color:#005293;word-break:break-all;">{url}</a></div>
+  <div style="font:12px/1.5 {_FUENTE};color:#5E6D83;margin-top:12px;">Si el botón no abre, copie este enlace:<br>
+    <a href="{url}" style="color:#003DA5;word-break:break-all;">{url}</a></div>
 </td></tr>"""
     # Relleno tras la vista previa: evita que la bandeja muestre después el texto del pase.
     relleno = "&nbsp;&zwnj;" * 80
@@ -146,9 +156,9 @@ font:14px/1.6 {_FUENTE};color:#1F2937;">{_destacado_html(aviso.destacado)}</div>
 <html lang="es">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="x-apple-disable-message-reformatting"><title>{_esc(aviso.asunto)}</title></head>
-<body style="margin:0;padding:0;background:#EEF1F5;">
-<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#EEF1F5;">{_esc(aviso.vista_previa)}{relleno}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#EEF1F5"><tr>
+<body style="margin:0;padding:0;background:#EEF4F8;">
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#EEF4F8;">{_esc(aviso.vista_previa)}{relleno}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#EEF4F8"><tr>
 <td align="center" style="padding:28px 12px 36px;">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
   <tr><td bgcolor="{NAVY}" style="border-radius:14px 14px 0 0;padding:20px 24px 16px;">
@@ -156,7 +166,7 @@ font:14px/1.6 {_FUENTE};color:#1F2937;">{_destacado_html(aviso.destacado)}</div>
       <td width="72" valign="middle">{logo}</td>
       <td valign="middle" style="font:700 11px {_FUENTE};letter-spacing:2px;color:{ORO};text-transform:uppercase;">Pase de autorización marítima
         <div style="font:600 13px {_FUENTE};letter-spacing:.4px;color:#FFFFFF;text-transform:none;margin-top:3px;">Servicio Nacional de Migración</div></td>
-      <td align="right" valign="top" style="font:12px {_MONO};color:#9FB0CC;white-space:nowrap;">09° 01′ N<br>079° 32′ O</td>
+      <td align="right" valign="top" style="font:12px {_MONO};color:#B8C4D2;white-space:nowrap;">09° 01′ N<br>079° 32′ O</td>
     </tr></table>
     <div style="margin-top:16px;">
       <div style="display:inline-block;vertical-align:middle;margin:0 18px 8px 0;font:800 26px {_MONO};color:{ORO};
@@ -173,13 +183,13 @@ font:14px/1.6 {_FUENTE};color:#1F2937;">{_destacado_html(aviso.destacado)}</div>
   <tr><td bgcolor="{NAVY}" style="border-radius:0 0 14px 14px;padding:14px 24px 20px;">{_grilla(aviso.campos)}</td></tr>
   <tr><td style="padding:24px 6px 0;">
     <div style="font:800 20px/1.3 {_FUENTE};color:{NAVY};margin-bottom:8px;">{_esc(aviso.titulo)}</div>
-    <div style="font:14px/1.65 {_FUENTE};color:#3F4A59;">{_esc_multilinea(aviso.intro)}</div>{destacado}
+    <div style="font:14px/1.65 {_FUENTE};color:#526176;">{_esc_multilinea(aviso.intro)}</div>{destacado}
   </td></tr>
   {boton}
-  <tr><td style="border-top:1px solid #DDE3EA;padding:14px 6px 0;text-align:center;font:12px/1.6 {_FUENTE};color:#5B6676;">
+  <tr><td style="border-top:1px solid #DCE4ED;padding:14px 6px 0;text-align:center;font:12px/1.6 {_FUENTE};color:#5E6D83;">
     <b style="color:{NAVY};">Servicio Nacional de Migración · República de Panamá</b><br>
     Mensaje automático de ARGO NAVIS: no responda a este correo. ¿Necesita ayuda?
-    <a href="mailto:{_SOPORTE}" style="color:#005293;">{_SOPORTE}</a></td></tr>
+    <a href="mailto:{_SOPORTE}" style="color:#003DA5;">{_SOPORTE}</a></td></tr>
 </table>
 </td></tr></table>
 </body>
@@ -221,7 +231,7 @@ def construir_mensaje(aviso: Aviso, destinatarios: list[str]) -> EmailMessage:
 
 async def enviar_aviso(aviso: Aviso) -> None:
     """Envía un aviso del flujo (se llama como tarea en segundo plano: un
-    fallo de SMTP se registra y no rompe la operación)."""
+    fallo de SMTP se reintenta y, si sigue, se registra sin romper la operación)."""
     asunto = _sanear_subject(aviso.asunto)
     destinatarios = list(dict.fromkeys(d.strip() for d in aviso.destinatarios if d and d.strip()))
     if not destinatarios:
@@ -230,16 +240,24 @@ async def enviar_aviso(aviso: Aviso) -> None:
         logger.warning("SMTP no configurado — se omite el aviso '%s'.", asunto)
         return
 
-    try:
-        await aiosmtplib.send(
-            construir_mensaje(aviso, destinatarios),
-            hostname=configuracion.MAIL_HOST,
-            port=configuracion.MAIL_PORT,
-            use_tls=False,
-            start_tls=False,
-            username=configuracion.MAIL_USERNAME or None,
-            password=configuracion.MAIL_PASSWORD or None,
-        )
-        logger.info("Aviso '%s' enviado a %d destinatario(s).", asunto, len(destinatarios))
-    except Exception as e:
-        logger.error("Error al enviar el aviso '%s': %s", asunto, e)
+    mensaje = construir_mensaje(aviso, destinatarios)
+    intentos = 1 + len(_ESPERAS_REINTENTO)
+    for intento, espera in enumerate((0, *_ESPERAS_REINTENTO), start=1):
+        if espera:
+            await asyncio.sleep(espera)
+        try:
+            await aiosmtplib.send(
+                mensaje,
+                hostname=configuracion.MAIL_HOST,
+                port=configuracion.MAIL_PORT,
+                use_tls=False,
+                start_tls=False,
+                username=configuracion.MAIL_USERNAME or None,
+                password=configuracion.MAIL_PASSWORD or None,
+            )
+            logger.info("Aviso '%s' enviado a %d destinatario(s) (intento %d).",
+                        asunto, len(destinatarios), intento)
+            return
+        except Exception as e:
+            logger.warning("Intento %d de %d del aviso '%s' falló: %s", intento, intentos, asunto, e)
+    logger.error("No se pudo enviar el aviso '%s' tras %d intentos.", asunto, intentos)

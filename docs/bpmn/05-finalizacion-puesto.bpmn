@@ -87,8 +87,6 @@
     <bpmn:sequenceFlow id="Flujo_Registrar_FinFinalizada" sourceRef="Registrar" targetRef="FinFinalizada" />
     <bpmn:textAnnotation id="N_Bandeja"><bpmn:text>Solo ve las aprobadas de sus puestos asignados; el Administrador ve todas.</bpmn:text></bpmn:textAnnotation>
     <bpmn:association id="Asoc_N_Bandeja" sourceRef="Abrir" targetRef="N_Bandeja" />
-    <bpmn:textAnnotation id="N_Comentarios"><bpmn:text>La API también admite comentarios del puesto sin finalizar (POST /solicitudes/{id}/comentarios), pero hoy no hay pantalla para eso.</bpmn:text></bpmn:textAnnotation>
-    <bpmn:association id="Asoc_N_Comentarios" sourceRef="Abrir" targetRef="N_Comentarios" />
     <bpmn:textAnnotation id="N_Puesto"><bpmn:text>Por defecto, el puesto autorizado. Puede ser otro (activo): queda en el expediente, el PDF y la verificación pública.</bpmn:text></bpmn:textAnnotation>
     <bpmn:association id="Asoc_N_Puesto" sourceRef="Elegir" targetRef="N_Puesto" />
     <bpmn:textAnnotation id="N_Comentario"><bpmn:text>De 3 a 2000 caracteres.</bpmn:text></bpmn:textAnnotation>
@@ -115,7 +113,6 @@
       <bpmndi:BPMNShape id="Registrar_di" bpmnElement="Registrar"><dc:Bounds x="1220" y="375.0" width="140" height="90" /></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="FinFinalizada_di" bpmnElement="FinFinalizada"><dc:Bounds x="1400" y="402.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1358.0" y="442.0" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="N_Bandeja_di" bpmnElement="N_Bandeja"><dc:Bounds x="262" y="228" width="300" height="40" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="N_Comentarios_di" bpmnElement="N_Comentarios"><dc:Bounds x="250" y="48" width="430" height="48" /></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="N_Puesto_di" bpmnElement="N_Puesto"><dc:Bounds x="870" y="48" width="380" height="48" /></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="N_Comentario_di" bpmnElement="N_Comentario"><dc:Bounds x="1060" y="236" width="160" height="30" /></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="N_Bloqueo_di" bpmnElement="N_Bloqueo"><dc:Bounds x="1000" y="486" width="340" height="40" /></bpmndi:BPMNShape>
@@ -131,7 +128,6 @@
       <bpmndi:BPMNEdge id="Flujo_Confirmar_Registrar_di" bpmnElement="Flujo_Confirmar_Registrar"><di:waypoint x="1290" y="215" /><di:waypoint x="1290" y="375" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flujo_Registrar_FinFinalizada_di" bpmnElement="Flujo_Registrar_FinFinalizada"><di:waypoint x="1360" y="420" /><di:waypoint x="1400" y="420" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Asoc_N_Bandeja_di" bpmnElement="Asoc_N_Bandeja"><di:waypoint x="320" y="215" /><di:waypoint x="320" y="228" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Asoc_N_Comentarios_di" bpmnElement="Asoc_N_Comentarios"><di:waypoint x="320" y="125" /><di:waypoint x="320" y="96" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Asoc_N_Puesto_di" bpmnElement="Asoc_N_Puesto"><di:waypoint x="950" y="125" /><di:waypoint x="950" y="96" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Asoc_N_Comentario_di" bpmnElement="Asoc_N_Comentario"><di:waypoint x="1120" y="215" /><di:waypoint x="1120" y="236" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Asoc_N_Bloqueo_di" bpmnElement="Asoc_N_Bloqueo"><di:waypoint x="1290" y="465" /><di:waypoint x="1290" y="486" /></bpmndi:BPMNEdge>

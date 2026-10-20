@@ -79,7 +79,7 @@ export function SeccionTripulantes({ solicitud: s, verificacion: v, onVerDocumen
                     <div className={styles.celdaPrincipal}>{m.nombre_completo}</div>
                     {v && <div className={styles.celdaSecundaria}>{ETIQUETA_RANGO[m.rango]} · {m.ocupacion}</div>}
                     <div className={styles.celdaSecundaria}>
-                      {ETIQUETA_SEXO[m.sexo]} · Nac. {formatearFecha(m.fecha_nacimiento)}
+                      {ETIQUETA_SEXO[m.sexo]} · Nacimiento: {formatearFecha(m.fecha_nacimiento)}
                       {m.pais_nacimiento_nombre && <> · {m.pais_nacimiento_nombre}</>}
                     </div>
                     {/* Solo llega al personal del SNM: a la agencia el backend le manda null.

@@ -15,13 +15,17 @@ import styles from "./PaginaVerificacion.module.css";
 export default function PaginaVerificacion() {
   const { codigo = "" } = useParams<{ codigo: string }>();
   const [datos, setDatos] = useState<VerificacionAutorizacion | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ texto: string; noExiste: boolean } | null>(null);
 
   useEffect(() => {
     let cancelado = false;
     apiSolicitudes.verificar(codigo)
       .then((d) => { if (!cancelado) setDatos(d); })
-      .catch((e) => { if (!cancelado) setError(mensajeDeError(e, "No se pudo verificar la autorización.")); });
+      .catch((e) => {
+        if (cancelado) return;
+        const estado = (e as { response?: { status?: number } })?.response?.status;
+        setError({ texto: mensajeDeError(e, "No se pudo verificar la autorización."), noExiste: estado === 404 });
+      });
     return () => { cancelado = true; };
   }, [codigo]);
 
@@ -36,8 +40,14 @@ export default function PaginaVerificacion() {
           <div className={`${styles.resultado} ${styles.invalida}`}>
             <IconoXCirculo tamano={34} />
             <div>
-              <div className={styles.resultadoTitulo}>Autorización no encontrada</div>
-              <div className={styles.resultadoTexto}>{error}</div>
+              <div className={styles.resultadoTitulo}>{error.noExiste ? "Autorización no encontrada" : "No se pudo verificar"}</div>
+              <div className={styles.resultadoTexto}>{error.texto}</div>
+              <p className={styles.resultadoAyuda}>
+                {error.noExiste
+                  ? "Si llegaste aquí escaneando el código QR de una autorización, el documento podría no ser "
+                    + "auténtico: confírmalo con UCVMM antes de aceptarlo."
+                  : "Revisa la conexión e intenta de nuevo en unos minutos."}
+              </p>
             </div>
           </div>
         )}

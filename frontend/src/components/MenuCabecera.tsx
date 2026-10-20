@@ -67,7 +67,8 @@ export function MenuCabecera() {
                 <div className={styles.sep} />
               </>
             )}
-            {esSysAdmin && (
+            {/* El Administrador ve todo; el SysAdmin, usuarios, roles y bitácora. */}
+            {(esAdmin || esSysAdmin) && (
               <>
                 <Link to="/admin" className={styles.item} onClick={() => setAbierto(false)}>
                   <IconoUsuarios />Usuarios
@@ -75,23 +76,19 @@ export function MenuCabecera() {
                 <Link to="/admin/roles" className={styles.item} onClick={() => setAbierto(false)}>
                   <IconoEscudo />Roles y permisos
                 </Link>
-                <Link to="/admin/bitacora" className={styles.item} onClick={() => setAbierto(false)}>
-                  <IconoActividad />Bitácora
-                </Link>
-                <div className={styles.sep} />
-              </>
-            )}
-            {esAdmin && (
-              <>
-                <Link to="/admin/tramites" className={styles.item} onClick={() => setAbierto(false)}>
-                  <IconoArchivo />Catálogo de trámites
-                </Link>
-                <Link to="/admin/catalogos" className={styles.item} onClick={() => setAbierto(false)}>
-                  <IconoAncla />Agencias, puestos y países
-                </Link>
-                <Link to="/admin/stats" className={styles.item} onClick={() => setAbierto(false)}>
-                  <IconoEstadisticas />Estadísticas
-                </Link>
+                {esAdmin && (
+                  <>
+                    <Link to="/admin/tramites" className={styles.item} onClick={() => setAbierto(false)}>
+                      <IconoArchivo />Catálogo de trámites
+                    </Link>
+                    <Link to="/admin/catalogos" className={styles.item} onClick={() => setAbierto(false)}>
+                      <IconoAncla />Agencias, puestos y países
+                    </Link>
+                    <Link to="/admin/stats" className={styles.item} onClick={() => setAbierto(false)}>
+                      <IconoEstadisticas />Estadísticas
+                    </Link>
+                  </>
+                )}
                 <Link to="/admin/bitacora" className={styles.item} onClick={() => setAbierto(false)}>
                   <IconoActividad />Bitácora
                 </Link>

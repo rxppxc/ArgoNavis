@@ -305,6 +305,38 @@
 }
 /* "Guardar permisos" usa el botón principal (.btnCrear, arriba). */
 
+/* Datos del rol (nombre y descripción): guardar es secundario, el principal
+   de la tarjeta sigue siendo "Guardar permisos". */
+.datosRol {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+@media (max-width: 640px) {
+  .datosRol { grid-template-columns: 1fr; }
+}
+.input:disabled { color: var(--muted); background: var(--overlay); cursor: not-allowed; }
+.btnSecundario {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background: var(--card);
+  border: 1.5px solid var(--border-2);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  font-size: .85rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color var(--t), background var(--t);
+}
+.btnSecundario:hover:not(:disabled) { border-color: var(--input-border); background: var(--overlay); }
+.btnSecundario:disabled { color: var(--muted); cursor: not-allowed; }
+
 /* ─── Action btns ─── */
 .actionBtn {
   display: inline-flex;

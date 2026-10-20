@@ -118,6 +118,7 @@ constants/          → números mágicos.
 - Campos con `--input-border` / `--input-bg` (borde de 3:1). Las notas informativas, neutras con borde izquierdo `--acc-blue`.
 - Tablas que en el celular pasan a fichas: cada `<td>` lleva `data-etiqueta` (tripulantes del expediente, usuarios).
 - Si cambias un color, recalcula el contraste también sobre los fondos teñidos (insignias, avisos, contadores).
+- El correo (`core/email.py`) y el PDF (`core/pdf_autorizacion.py`) usan la misma paleta (2026-10-20). El color de cada estado es el de su insignia (`InsigniaEstado`): recibida en azul, aprobada en verde, devuelta en naranja, denegada en rojo, expirada en gris y, en el PDF, finalizada en verde azulado.
 - Revisión de UCVMM (propuesta 1A, elegida por el usuario el 2026-10-19):
   - Los impedimentos se marcan en una columna Sin / Con de la tabla de tripulantes (`SeccionTripulantes`). El estado vive en `useVerificacionImpedimentos`, que lo comparte con el panel de decisión (`PanelRevision`).
   - La columna lateral queda fija al bajar (sticky, 300 px) y cada decisión es un solo modal (`ModalDecision`).
@@ -140,7 +141,7 @@ constants/          → números mágicos.
 ### Después (revisiones `b9e4d17a3c52` y `c7a2e94b1f30`)
 - Catálogo alineado al Form. 3 y al documento de UCVMM (ver "Reglas" abajo).
 - Validaciones de fechas, impedimentos por tripulante y puesto de finalización.
-- Rol SysAdmin separado del Administrador.
+- Rol SysAdmin separado del Administrador. Desde el 2026-10-20 el Administrador tiene acceso total (también usuarios y roles); el SysAdmin sigue sin ver solicitudes.
 - Tema Claro / Oscuro / Sistema (tokens en `styles/globals.css`, `public/tema-inicial.js` lo fija antes de pintar). La paleta "pizarra" de entonces se reemplazó por la del SNM el 2026-10-19 (ver "Interfaz").
 
 ### Revisión completa (2026-10-15, revisión `0a1c93f169d4`)
@@ -159,6 +160,7 @@ constants/          → números mágicos.
   - Asunto `Autorizaciones Marítimas · {número} · {estado}`, armado por `Aviso.asunto`.
   - Logo de ARGO NAVIS incrustado por Content-ID (`app/recursos/logo-argo-navis-correo.png`, PNG porque Outlook de escritorio no muestra WebP).
   - Versión en texto plano y vista previa para la bandeja. Cada paso arma su aviso en `notificacion_service.py`.
+  - Si el SMTP falla, el aviso se reintenta a los 30 s y a los 2 min (`_ESPERAS_REINTENTO`, 2026-10-20). Los reintentos viven en memoria: un reinicio a mitad los pierde.
 
 ### Endurecimiento ante usuarios externos (2026-10-15)
 Las agencias entran por la VPN, pero no son del SNM: se las trata como no confiables (reglas 12 y 14–18).
@@ -206,12 +208,14 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
     - `corregir()` de la agencia la reinicia: la siguiente es una verificación nueva, no una corrección.
   - Aprueba, devuelve a corrección o deniega (el estado se muestra como "Denegada"; en la BD y la API sigue siendo `denied` / `/negar`).
 - **Puesto de Control** (`T-FINALIZAR-PUERTO` + asignación en `usuarios_puestos`) — ve las aprobadas de sus puestos y las finaliza: un solo paso con comentario obligatorio.
+  - El comentario sin finalizar (`POST /solicitudes/{id}/comentarios`) se retiró el 2026-10-20: no tenía pantalla. Los eventos `comentario` de antes se siguen mostrando, solo al SNM.
   - Indica el puesto donde terminó la operación (`puesto_finalizacion_id` / `_nombre`, por defecto el autorizado). Puede ser otro: se muestra en el expediente, el PDF y la verificación pública.
   - El rol se siembra con `es_sistema = false` (el admin puede renombrarlo o borrarlo).
-- **Administrador** — bandejas y expedientes (atajo a todos los `T-*`), catálogo de trámites, agencias/puestos/nacionalidades (`/admin/catalogos`), estadísticas y bitácora. Lista usuarios y roles (para asignarlos a agencias y puestos), pero **no** los crea, edita ni les cambia el rol.
+- **Administrador** — acceso total (decisión del usuario del 2026-10-20): bandejas y expedientes (atajo a todos los `T-*`), catálogo de trámites, agencias/puestos/nacionalidades (`/admin/catalogos`), estadísticas, bitácora y también usuarios y roles (`/admin`, `/admin/roles`). Antes solo listaba usuarios y roles.
 - **SysAdmin** — rol técnico, sin permisos `T-*` y sin atajo: usuarios (`/admin`), roles (`/admin/roles`; los permisos son fijos y solo se asignan a roles) y bitácora. No ve solicitudes (403 en la API; el frontend lo manda a `/admin`).
   - El último SysAdmin activo no se puede desactivar, borrar ni cambiar de rol (409).
-  - Administrador y SysAdmin no se pueden renombrar.
+  - Administrador y SysAdmin no se pueden renombrar y sus permisos son fijos (400 en `asignar_permisos_a_rol`): el SysAdmin no puede darse permisos `T-*`.
+  - Nadie cambia su propio rol (400): ni subirse de rol ni quedarse fuera por error.
   - El primero se nombra desde la consola: `python -m app.infrastructure.asignar_rol <usuario> SysAdmin` (queda en la bitácora como "consola").
 
 **Estados (`solicitudes.estado`, con CHECK en la BD):** `review` → `approved` → `finalized`; `review` → `returned` → (corrige) `review`; `review` → `denied`; `approved` o `returned` con el plazo vencido → `expired` (`infrastructure/tareas.py`).
@@ -223,6 +227,7 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
   - Un cambio del catálogo no deja incompletas las solicitudes ya enviadas ni los expedientes cerrados. La siguiente corrección sí se valida con las reglas nuevas.
   - Antes de `7e3f1a9c2d64` se evaluaba en vivo, y el cambio de `b9e4d17a3c52` (Carta y Reporte "por tripulante") marcó como faltantes documentos que sí estaban.
 - `solicitud_documentos.documento_id` nulo = documento adicional (fuera del checklist; máx. 20 por solicitud).
+- Asignar un usuario a una agencia o a un puesto no le da acceso sin el permiso de su rol: la API exige las dos cosas (`ContextoAcceso`). Por eso la pantalla de catálogos ofrece «Mostrar todos los usuarios» a propósito.
 - `valida_vigencia` está activa en **todos** los trámites: un pasaporte o seamanbook que vence antes del día de la operación no deja enviar. Los rangos distintos de "marino" no portan seamanbook.
 - Fechas (`ServicioTramite.validar_tripulantes` y `_validar_formulario`, espejadas en `validacionFormulario.ts`):
   - La operación va de hoy a `DIAS_MAXIMOS_ANTICIPACION` (365).

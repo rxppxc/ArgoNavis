@@ -8,7 +8,7 @@ from app.infrastructure.database import obtener_sesion_bd
 from app.core.config import obtener_configuracion
 from app.core.security import cerrar_sesiones, generar_contrasena_temporal, hashear_password
 from app.core.permisos import (
-    ROL_ADMIN, ROL_SYSADMIN, requerir_admin_o_sysadmin, requerir_algun_permiso, requerir_sysadmin,
+    ROL_ADMIN, ROL_SYSADMIN, requerir_admin_o_sysadmin, requerir_algun_permiso,
 )
 from app.api.v1.dependencias import auditar_admin
 from app.domain.models.audit_log import AccionAuditoria
@@ -35,8 +35,8 @@ enrutador     = APIRouter(prefix="/admin", tags=["admin"])
 # ── Protección del último SysAdmin ───────────────────────────────────────────
 
 async def _impedir_quedar_sin_sysadmin(sesion: AsyncSession, usuario: Usuario) -> None:
-    """409 si `usuario` es el último SysAdmin activo: nadie podría administrar
-    usuarios ni roles (el primero se asigna con app.infrastructure.asignar_rol)."""
+    """409 si `usuario` es el último SysAdmin activo: TI se quedaría sin su cuenta
+    técnica (el primero se asigna con app.infrastructure.asignar_rol)."""
     if not (usuario.rol_personalizado and usuario.rol_personalizado.nombre == ROL_SYSADMIN
             and usuario.status == EstadoUsuario.ACTIVO):
         return
@@ -56,7 +56,7 @@ async def _impedir_quedar_sin_sysadmin(sesion: AsyncSession, usuario: Usuario) -
 @enrutador.get("/usuarios/buscar-ad")
 async def buscar_en_ad(
     q: str = Query(..., min_length=2, description="Nombre, usuario o email a buscar"),
-    _: int = Depends(requerir_sysadmin),
+    _: int = Depends(requerir_admin_o_sysadmin),
 ):
     try:
         resultados = await asyncio.to_thread(servicio_ldap.buscar_usuarios_ad, q)
@@ -83,7 +83,7 @@ async def listar_usuarios(
 async def crear_usuario(
     datos: DatosCrearUsuario,
     request: Request,
-    admin_id: int = Depends(requerir_sysadmin),
+    admin_id: int = Depends(requerir_admin_o_sysadmin),
     sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     try:
@@ -115,7 +115,7 @@ async def crear_usuario(
 async def crear_usuario_local(
     datos: DatosCrearUsuarioLocal,
     request: Request,
-    admin_id: int = Depends(requerir_sysadmin),
+    admin_id: int = Depends(requerir_admin_o_sysadmin),
     sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     if not configuracion.PERMITIR_LOGIN_LOCAL:
@@ -152,7 +152,7 @@ async def crear_usuario_local(
 async def restablecer_contrasena(
     user_id: int,
     request: Request,
-    admin_id: int = Depends(requerir_sysadmin),
+    admin_id: int = Depends(requerir_admin_o_sysadmin),
     sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     """Genera una contraseña temporal para una cuenta local (y la desbloquea).
@@ -183,7 +183,7 @@ async def cambiar_estado(
     user_id: int,
     datos: DatosCambiarEstado,
     request: Request,
-    admin_id: int = Depends(requerir_sysadmin),
+    admin_id: int = Depends(requerir_admin_o_sysadmin),
     sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     if user_id == admin_id and datos.status != EstadoUsuario.ACTIVO:
@@ -211,7 +211,7 @@ async def cambiar_estado(
 async def eliminar_usuario(
     user_id: int,
     request: Request,
-    admin_id: int = Depends(requerir_sysadmin),
+    admin_id: int = Depends(requerir_admin_o_sysadmin),
     sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     if user_id == admin_id:
@@ -242,7 +242,7 @@ async def eliminar_usuario(
 
 @enrutador.get("/permisos", response_model=list[SalidaPermiso])
 async def listar_permisos(
-    _: int = Depends(requerir_sysadmin),
+    _: int = Depends(requerir_admin_o_sysadmin),
     sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     resultado = await sesion.execute(select(Permiso).order_by(Permiso.codigo))
@@ -292,7 +292,7 @@ async def listar_roles(
 async def crear_rol(
     datos: DatosCrearRol,
     request: Request,
-    admin_id: int = Depends(requerir_sysadmin),
+    admin_id: int = Depends(requerir_admin_o_sysadmin),
     sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     existente = await sesion.execute(select(Rol).where(Rol.nombre == datos.nombre))
@@ -312,7 +312,7 @@ async def actualizar_rol(
     rol_id: int,
     datos: DatosActualizarRol,
     request: Request,
-    admin_id: int = Depends(requerir_sysadmin),
+    admin_id: int = Depends(requerir_admin_o_sysadmin),
     sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     resultado = await sesion.execute(select(Rol).where(Rol.id == rol_id))
@@ -344,7 +344,7 @@ async def actualizar_rol(
 async def eliminar_rol(
     rol_id: int,
     request: Request,
-    admin_id: int = Depends(requerir_sysadmin),
+    admin_id: int = Depends(requerir_admin_o_sysadmin),
     sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     resultado = await sesion.execute(select(Rol).where(Rol.id == rol_id))
@@ -364,13 +364,17 @@ async def asignar_permisos_a_rol(
     rol_id: int,
     datos: DatosAsignarPermisos,
     request: Request,
-    admin_id: int = Depends(requerir_sysadmin),
+    admin_id: int = Depends(requerir_admin_o_sysadmin),
     sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     resultado = await sesion.execute(select(Rol).where(Rol.id == rol_id))
     rol = resultado.scalar_one_or_none()
     if not rol:
         raise HTTPException(status_code=404, detail="Rol no encontrado.")
+    if rol.nombre in (ROL_ADMIN, ROL_SYSADMIN):
+        # El Administrador ya tiene todo por su nombre (el atajo) y el SysAdmin no
+        # lleva permisos del flujo: con uno T-* vería solicitudes.
+        raise HTTPException(status_code=400, detail=f"Los permisos del rol {rol.nombre} son fijos.")
 
     ids_unicos = list(set(datos.permiso_ids))
     if ids_unicos:
@@ -402,13 +406,16 @@ async def asignar_rol_a_usuario(
     user_id: int,
     datos: DatosAsignarRol,
     request: Request,
-    admin_id: int = Depends(requerir_sysadmin),
+    admin_id: int = Depends(requerir_admin_o_sysadmin),
     sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     resultado = await sesion.execute(select(Usuario).where(Usuario.id == user_id))
     usuario = resultado.scalar_one_or_none()
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    if user_id == admin_id and datos.rol_id != usuario.rol_id:
+        # Ni subirse de rol ni quedarse fuera por error: lo cambia otra persona.
+        raise HTTPException(status_code=400, detail="No puedes cambiar tu propio rol.")
     if datos.rol_id is not None:
         rol_q = await sesion.execute(select(Rol).where(Rol.id == datos.rol_id))
         if not rol_q.scalar_one_or_none():

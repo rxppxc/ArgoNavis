@@ -1,5 +1,8 @@
 """Correo de los avisos (diseño "pase marítimo"): asunto, partes del mensaje,
-logo incrustado y escape de lo que escribe el usuario. No envía nada."""
+logo incrustado, escape de lo que escribe el usuario y reintentos. No envía nada."""
+import pytest
+
+from app.core import email
 from app.core.email import Aviso, construir_mensaje
 from app.domain.services.notificacion_service import _vista_previa
 
@@ -71,3 +74,26 @@ def test_vista_previa_en_una_linea_y_corta():
         "Motivo: la libreta está ilegible · corrige antes del 17/10"
     larga = _vista_previa("x" * 400)
     assert len(larga) == 150 and larga.endswith("…")
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_reintenta_si_el_servidor_de_correo_falla(monkeypatch):
+    llamadas: list[str] = []
+    fallas = {"quedan": 2}
+
+    async def enviar_falso(mensaje, **_):
+        llamadas.append(mensaje["Subject"])
+        if fallas["quedan"]:
+            fallas["quedan"] -= 1
+            raise OSError("SMTP caído")
+
+    monkeypatch.setattr(email.configuracion, "MAIL_HOST", "smtp.prueba.local")
+    monkeypatch.setattr(email.aiosmtplib, "send", enviar_falso)
+    monkeypatch.setattr(email, "_ESPERAS_REINTENTO", (0, 0))
+    await email.enviar_aviso(_aviso())
+    assert len(llamadas) == 3, "dos fallas y al tercer intento sale"
+
+    llamadas.clear()
+    fallas["quedan"] = 99
+    await email.enviar_aviso(_aviso())   # no lanza: lo deja en el log
+    assert len(llamadas) == 3, "se rinde tras tres intentos"

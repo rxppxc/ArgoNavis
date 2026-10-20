@@ -1,8 +1,8 @@
 """Asigna un rol a un usuario existente desde la consola del servidor.
 
-Sirve para nombrar al primer SysAdmin (desde la interfaz solo un SysAdmin
-puede asignar roles) o para recuperar el acceso si se perdió. Queda en la
-bitácora como una acción hecha desde la consola.
+Sirve para nombrar al primer SysAdmin (desde la interfaz solo un Administrador
+o un SysAdmin puede asignar roles) o para recuperar el acceso si se perdió.
+Queda en la bitácora como una acción hecha desde la consola.
 
 Uso (desde backend/):
     venv\\Scripts\\python -m app.infrastructure.asignar_rol <usuario> <rol>

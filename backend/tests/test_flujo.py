@@ -303,8 +303,6 @@ async def test_ciclo_completo(cliente, escenario: Escenario):
     assert sid not in [x["id"] for x in r.json()["items"]]
     r = await cliente.post(f"/solicitudes/{sid}/finalizar", json={"comentario": "intento"}, headers=e.puerto_b.headers)
     assert r.status_code == 403
-    r = await cliente.post(f"/solicitudes/{sid}/comentarios", json={"comentario": "Tripulante presentado en garita"}, headers=e.puerto_a.headers)
-    assert r.status_code == 200 and r.json()["eventos"][-1]["tipo"] == "comentario"
     r = await cliente.post(f"/solicitudes/{sid}/finalizar",
                            json={"comentario": "Desembarque realizado sin novedad", "puesto_finalizacion_id": 999999},
                            headers=e.puerto_a.headers)

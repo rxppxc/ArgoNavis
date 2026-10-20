@@ -38,13 +38,16 @@ _CANDIDATOS_FUENTE = [
 ]
 _fuentes: tuple[str, str] | None = None
 
-NEGRO    = colors.HexColor("#111111")
-GRIS     = colors.HexColor("#555B66")
-AZUL     = colors.HexColor("#12395C")
-AMARILLO = colors.HexColor("#F5C800")
+# Paleta del SNM (frontend/src/styles/globals.css). Los estados, como sus
+# insignias en la interfaz: aprobada en verde, finalizada en verde azulado.
+NEGRO    = colors.HexColor("#17283E")
+GRIS     = colors.HexColor("#526176")
+AZUL     = colors.HexColor("#10233F")
+AMARILLO = colors.HexColor("#F2C94C")
 VERDE    = colors.HexColor("#15803D")
-BORDE    = colors.HexColor("#CBD5E1")
-FONDO    = colors.HexColor("#F4F6F9")
+TURQUESA = colors.HexColor("#0F766E")
+BORDE    = colors.HexColor("#CAD5E1")
+FONDO    = colors.HexColor("#F6F9FC")
 
 RANGOS = {
     "marino": "Marino", "militar": "Militar", "tecnico": "Técnico",
@@ -194,7 +197,7 @@ def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
 
     if d.estado == "finalized":
         lugar = f"EN {d.puesto_finalizacion.upper()} " if d.puesto_finalizacion else "EN PUERTO "
-        texto_estado, color_estado = f"FINALIZADA {lugar}EL {_f(d.finalizada_en, True)}", AZUL
+        texto_estado, color_estado = f"FINALIZADA {lugar}EL {_f(d.finalizada_en, True)}", TURQUESA
     else:
         texto_estado = "APROBADA" + (f" — VIGENTE HASTA EL {_f(d.vigente_hasta)}" if d.vigente_hasta else "")
         color_estado = VERDE
