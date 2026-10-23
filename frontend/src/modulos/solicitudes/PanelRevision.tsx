@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { SolicitudDetalle } from "../../api/solicitudes";
+import { IconoCheck, IconoEditar, IconoXCirculo } from "../../components/Iconos";
 import { ModalDecision, type Decision } from "./ModalDecision";
 import type { VerificacionImpedimentos } from "./useVerificacionImpedimentos";
 import styles from "./DetalleSolicitud.module.css";
@@ -50,15 +51,15 @@ export function PanelRevision({ solicitud, verificacion: v, onActualizada }: Pro
           disabled={!v.registrada || v.corrigiendo || v.trabajando}
           title={v.registrada ? undefined : "Primero guarda la verificación de impedimentos"}
           onClick={() => setDecision("aprobar")}>
-          Aprobar
+          <IconoCheck tamano={15} /> Aprobar
         </button>
-        <button type="button" className={styles.btnDecision} disabled={v.corrigiendo || v.trabajando}
+        <button type="button" className={`${styles.btnDecision} ${styles.devolver}`} disabled={v.corrigiendo || v.trabajando}
           onClick={() => setDecision("devolver")}>
-          Devolver a corrección
+          <IconoEditar tamano={15} /> Devolver a corrección
         </button>
         <button type="button" className={`${styles.btnDecision} ${styles.negar}`} disabled={v.corrigiendo || v.trabajando}
           onClick={() => setDecision("negar")}>
-          Denegar
+          <IconoXCirculo tamano={15} /> Denegar
         </button>
       </div>
       {decision && (

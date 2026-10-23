@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#10233F"/>
+  <circle cx="32" cy="32" r="25" fill="none" stroke="#F2C94C" stroke-width="3"/>
+  <!-- Estrella menor (diagonales) -->
+  <path d="M32 32 L46 18 L36 32 L46 46 L32 36 L18 46 L28 32 L18 18 Z" fill="#B38A00"/>
+  <!-- Estrella mayor (norte, sur, este, oeste) -->
+  <path d="M32 6 L38 26 L58 32 L38 38 L32 58 L26 38 L6 32 L26 26 Z" fill="#F2C94C"/>
+  <!-- Mitad norte en blanco -->
+  <path d="M32 6 L38 26 L32 32 L26 26 Z" fill="#FFFFFF"/>
+  <circle cx="32" cy="32" r="3.5" fill="#10233F"/>
+</svg>

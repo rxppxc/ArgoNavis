@@ -18,8 +18,9 @@ import { useAutenticacion } from "../../hooks/useAutenticacion";
 import { usePermisos } from "../../hooks/usePermisos";
 import { MarcoPagina } from "../../components/MarcoPagina";
 import { EncabezadoPagina } from "../../components/EncabezadoPagina";
+import { EstadoCarga } from "../../components/EstadoCarga";
 import FiltroFechas, { type RangoFechas } from "../../components/FiltroFechas";
-import { IconoBandeja, IconoBuscar, IconoMas, IconoX } from "../../components/Iconos";
+import { IconoAlerta, IconoBandeja, IconoBuscar, IconoMas, IconoX } from "../../components/Iconos";
 import { TarjetaSolicitud } from "./TarjetaSolicitud";
 import { mensajeDeError } from "../../utils/errores";
 import styles from "./PaginaPanel.module.css";
@@ -165,6 +166,7 @@ export default function PaginaPanel() {
     <MarcoPagina ancho="amplio">
       <EncabezadoPagina
         titulo={<>Hola, {usuario?.full_name?.split(" ")[0] ?? usuario?.username}</>}
+        tituloDocumento="Solicitudes"
         descripcion={<>
           {VISTAS[vista].subtitulo}
           {vista === "agencia" && usuario?.agencia && <> — {usuario.agencia.nombre}</>}
@@ -216,10 +218,10 @@ export default function PaginaPanel() {
         <FiltroFechas valor={rango} onCambio={cambiarRango} />
       </div>
 
-      {error && <div className={styles.error}>{error}</div>}
+      {error && <div className={styles.error} role="alert"><IconoAlerta tamano={16} /> {error}</div>}
 
       {cargando && !datos ? (
-        <div className={styles.cargando}><span className={styles.spinner} /> Cargando solicitudes…</div>
+        <EstadoCarga texto="Cargando solicitudes…" />
       ) : !datos || datos.items.length === 0 ? (
         !error && (
           <div className={styles.vacio}>

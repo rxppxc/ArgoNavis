@@ -14,6 +14,7 @@ import {
 } from "../../api/catalogos";
 import { MarcoPagina } from "../../components/MarcoPagina";
 import { EncabezadoPagina } from "../../components/EncabezadoPagina";
+import { EstadoCarga } from "../../components/EstadoCarga";
 import { useConfirmar } from "../../components/ModalConfirmacion";
 import { useNotificacion } from "../../components/Notificaciones";
 import { IconoBasura, IconoBuscar, IconoEditar, IconoMas, IconoUsuarios } from "../../components/Iconos";
@@ -31,17 +32,24 @@ const PERMISO_POR_TIPO: Record<Tipo, string> = {
 /** Textos y llamadas a la API de cada catálogo (misma forma, distinto recurso). */
 const CONFIG: Record<Tipo, {
   singular: string; usuarios: string; placeholder: string; ayudaCandidatos: string;
+  eliminado: string; activado: string; desactivado: string;
+  /** Qué pasa al desactivar (se confirma solo si corta el acceso de alguien). */
+  alDesactivar: string | null;
   actualizar: (id: number, datos: DatosCatalogo) => Promise<CatalogoConUsuarios>;
   eliminar:   (id: number) => Promise<unknown>;
   asignar:    (id: number, ids: number[]) => Promise<CatalogoConUsuarios>;
 }> = {
   agencia: {
     singular: "agencia", usuarios: "usuarios", placeholder: "Correo de la agencia (opcional)",
+    eliminado: "Agencia eliminada.", activado: "Agencia activada.", desactivado: "Agencia desactivada.",
+    alDesactivar: "Sus usuarios no podrán entrar a ARGO NAVIS y se les cerrará la sesión abierta. Sus solicitudes se conservan.",
     ayudaCandidatos: "Se listan los usuarios cuyo rol tiene el permiso T-CREAR-BASICA. Un usuario es de una sola agencia: asignarlo aquí lo saca de la que tenga.",
     actualizar: apiCatalogos.actualizarAgencia, eliminar: apiCatalogos.eliminarAgencia, asignar: apiCatalogos.asignarUsuariosAgencia,
   },
   puesto: {
     singular: "puesto", usuarios: "funcionarios", placeholder: "Correo del puesto (opcional)",
+    eliminado: "Puesto eliminado.", activado: "Puesto activado.", desactivado: "Puesto desactivado.",
+    alDesactivar: null,
     ayudaCandidatos: "Se listan los usuarios cuyo rol tiene el permiso T-FINALIZAR-PUERTO.",
     actualizar: apiCatalogos.actualizarPuesto, eliminar: apiCatalogos.eliminarPuesto, asignar: apiCatalogos.asignarUsuariosPuesto,
   },
@@ -72,6 +80,10 @@ function TarjetaCatalogo({
   );
 
   async function guardarDatos() {
+    if (nombre.trim().length < 3) {
+      mostrar("El nombre debe tener al menos 3 letras.", "aviso");
+      return;
+    }
     setGuardando(true);
     try {
       onCambio(await config.actualizar(entidad.id, { nombre: nombre.trim(), correo: correo.trim() || null }), entidad.id);
@@ -85,8 +97,19 @@ function TarjetaCatalogo({
   }
 
   async function alternarActivo() {
+    if (entidad.activo && config.alDesactivar) {
+      const ok = await confirmar({
+        titulo: `Desactivar ${config.singular}`,
+        mensaje: `"${entidad.nombre}": ${config.alDesactivar}`,
+        textoOk: "Desactivar",
+        peligroso: true,
+      });
+      if (!ok) return;
+    }
     try {
-      onCambio(await config.actualizar(entidad.id, { activo: !entidad.activo }), entidad.id);
+      const actualizada = await config.actualizar(entidad.id, { activo: !entidad.activo });
+      onCambio(actualizada, entidad.id);
+      mostrar(actualizada.activo ? config.activado : config.desactivado, "exito");
     } catch (e) {
       mostrar(mensajeDeError(e, "No se pudo cambiar el estado."), "error");
     }
@@ -103,7 +126,7 @@ function TarjetaCatalogo({
     try {
       await config.eliminar(entidad.id);
       onCambio(null, entidad.id);
-      mostrar("Eliminado.", "exito");
+      mostrar(config.eliminado, "exito");
     } catch (e) {
       mostrar(mensajeDeError(e, "No se pudo eliminar."), "error");
     }
@@ -127,10 +150,11 @@ function TarjetaCatalogo({
       <div className={styles.tarjetaCabecera}>
         {editando ? (
           <div className={styles.formEnLinea}>
-            <input className={styles.input} value={nombre} maxLength={200} onChange={(e) => setNombre(e.target.value)} />
-            <input className={styles.input} value={correo} maxLength={255} type="email"
+            <input className={styles.input} value={nombre} maxLength={200} aria-label="Nombre"
+              onChange={(e) => setNombre(e.target.value)} />
+            <input className={styles.input} value={correo} maxLength={255} type="email" aria-label="Correo"
               placeholder={config.placeholder} onChange={(e) => setCorreo(e.target.value)} />
-            <button type="button" className={styles.btnPrimario} onClick={guardarDatos} disabled={guardando || nombre.trim().length < 3}>
+            <button type="button" className={styles.btnPrimario} onClick={guardarDatos} disabled={guardando}>
               Guardar
             </button>
             <button type="button" className={styles.btnTexto} onClick={() => { setEditando(false); setNombre(entidad.nombre); setCorreo(entidad.correo ?? ""); }}>
@@ -235,7 +259,10 @@ function SeccionCatalogo({
 
   async function crear(e: React.FormEvent) {
     e.preventDefault();
-    if (nombre.trim().length < 3) return;
+    if (nombre.trim().length < 3) {
+      mostrar(`Escribe el nombre ${tipo === "agencia" ? "de la agencia" : "del puesto"} (al menos 3 letras).`, "aviso");
+      return;
+    }
     setCreando(true);
     try {
       const crearEn = tipo === "agencia" ? apiCatalogos.crearAgencia : apiCatalogos.crearPuesto;
@@ -255,10 +282,11 @@ function SeccionCatalogo({
       <p className={styles.descripcion}>{descripcion}</p>
       <form className={styles.formNuevo} onSubmit={crear}>
         <input className={styles.input} maxLength={200} value={nombre} onChange={(e) => setNombre(e.target.value)}
-          placeholder={tipo === "agencia" ? "Nombre de la agencia naviera" : "Nombre del puesto (ej. Puerto de Balboa)"} />
+          aria-label={tipo === "agencia" ? "Nombre de la agencia naviera nueva" : "Nombre del puesto nuevo"}
+          placeholder={tipo === "agencia" ? "Nombre de la agencia naviera" : "Nombre del puesto (p. ej. Puerto de Balboa)"} />
         <input className={styles.input} type="email" maxLength={255} value={correo} onChange={(e) => setCorreo(e.target.value)}
-          placeholder={CONFIG[tipo].placeholder} />
-        <button type="submit" className={styles.btnPrimario} disabled={creando || nombre.trim().length < 3}>
+          aria-label="Correo (opcional)" placeholder={CONFIG[tipo].placeholder} />
+        <button type="submit" className={styles.btnPrimario} disabled={creando}>
           <IconoMas tamano={14} /> {tipo === "agencia" ? "Agregar agencia" : "Agregar puesto"}
         </button>
       </form>
@@ -366,7 +394,7 @@ export default function PaginaCatalogos() {
     <MarcoPagina volverA="/dashboard">
       <EncabezadoPagina titulo="Agencias, puestos y países" descripcion="Catálogos del flujo de autorizaciones marítimas." />
 
-      <div className={styles.pestanas} role="tablist">
+      <div className={styles.pestanas} role="tablist" aria-label="Catálogo">
         {pestanas.map((p) => (
           <button key={p.id} type="button" role="tab" aria-selected={pestana === p.id}
             className={`${styles.pestana} ${pestana === p.id ? styles.pestanaActiva : ""}`}
@@ -377,7 +405,7 @@ export default function PaginaCatalogos() {
       </div>
 
       {cargando ? (
-        <div className={styles.vacioGrande}>Cargando…</div>
+        <EstadoCarga texto="Cargando catálogos…" />
       ) : pestana === "agencias" ? (
         <SeccionCatalogo
           tipo="agencia" lista={agencias} usuarios={usuarios} rolesCandidatos={rolesAgencia}
@@ -397,7 +425,7 @@ export default function PaginaCatalogos() {
           onCreado={(p) => setPuestos((prev) => ordenar([...prev, p]))}
           descripcion={
             "Cada solicitud indica el puesto donde se hará el trámite. Al aprobarse, se avisa al correo del puesto y a "
-            + "sus funcionarios asignados, que son los únicos que pueden comentarla y finalizarla."
+            + "sus funcionarios asignados, que son los que la ven y la finalizan."
           }
           vacio="Aún no hay puestos de control. Agrega el primero para que las agencias puedan elegirlo."
         />
@@ -412,7 +440,8 @@ export default function PaginaCatalogos() {
           <div className={styles.barraPaises}>
             <div className={styles.buscador}>
               <IconoBuscar tamano={14} />
-              <input placeholder="Buscar país o código…" value={buscarPais} onChange={(e) => setBuscarPais(e.target.value)} />
+              <input placeholder="Buscar país o código…" aria-label="Buscar país o código" value={buscarPais}
+                onChange={(e) => setBuscarPais(e.target.value)} />
             </div>
             <label className={styles.checkTodos}>
               <input type="checkbox" checked={soloRestringidas} onChange={(e) => setSoloRestringidas(e.target.checked)} />

@@ -60,6 +60,7 @@ export default function FiltroFechas({ valor, onCambio }: Props) {
             key={p.id}
             type="button"
             className={`${styles.chip} ${preset === p.id ? styles.chipActivo : ""}`}
+            aria-pressed={preset === p.id}
             onClick={() => aplicar(p.id)}
           >
             {p.etiqueta}

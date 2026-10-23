@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { apiSolicitudes, type EstadisticasSolicitudes } from "../../api/solicitudes";
 import BarraProgreso from "../../components/BarraProgreso";
+import { EstadoCarga } from "../../components/EstadoCarga";
 import FiltroFechas, { type RangoFechas } from "../../components/FiltroFechas";
 import {
   IconoActividad, IconoExito, IconoProcesada, IconoReloj, IconoXCirculo, IconoBandeja,
@@ -63,10 +64,10 @@ export default function SeccionAutorizaciones() {
         <FiltroFechas valor={rango} onCambio={cambiarRango} />
       </div>
 
-      {error && <div className={styles.error}>{error}</div>}
+      {error && <div className={styles.error} role="alert">{error}</div>}
 
       {!datos ? (
-        !error && <div className={styles.cargando}>Cargando estadísticas…</div>
+        !error && <EstadoCarga texto="Cargando estadísticas…" />
       ) : (
         <div className={actualizando ? styles.atenuado : undefined}>
           <div className={styles.indicadores}>

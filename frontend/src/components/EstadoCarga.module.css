@@ -1,0 +1,16 @@
+.seccion {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 28px 0; color: var(--text-2); font-size: .88rem;
+}
+.pagina { composes: seccion; padding: 72px 0; }
+.ruta { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); }
+
+/* Decorativo (el texto dice qué pasa): en azul, que contrasta en los dos temas. */
+.giro {
+  width: 18px; height: 18px; flex: none; border-radius: 50%;
+  border: 2px solid var(--border-2); border-top-color: var(--acc-blue);
+  animation: girar .7s linear infinite;
+}
+.giroGrande { width: 32px; height: 32px; border-width: 3px; }
+
+@keyframes girar { to { transform: rotate(360deg); } }

@@ -1,6 +1,5 @@
 .contenedor { max-width: 720px; margin: 0 auto; }
 .titulo { text-align: center; color: var(--text); font-size: 1.45rem; font-weight: 800; margin-bottom: 20px; }
-.cargando { text-align: center; color: var(--muted); padding: 40px 0; }
 
 .resultado {
   display: flex; align-items: center; gap: 16px;

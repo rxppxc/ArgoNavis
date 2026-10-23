@@ -4,6 +4,7 @@ import { formatBytes } from "../../utils/format";
 import { mensajeDeError } from "../../utils/errores";
 import { MarcoPagina } from "../../components/MarcoPagina";
 import { EncabezadoPagina } from "../../components/EncabezadoPagina";
+import { EstadoCarga } from "../../components/EstadoCarga";
 import BarraProgreso from "../../components/BarraProgreso";
 import SeccionAutorizaciones from "./SeccionAutorizaciones";
 import {
@@ -45,10 +46,10 @@ export default function PaginaEstadisticas() {
 
         <h2 className={styles.subtituloSeccion}>Uso del sistema</h2>
 
-        {resultado?.error && <div className={styles.errorMsg}>{resultado.error}</div>}
+        {resultado?.error && <div className={styles.errorMsg} role="alert">{resultado.error}</div>}
 
         {!resultado ? (
-          <div className={styles.loading}><span className={styles.spinner} /> Cargando estadísticas…</div>
+          <EstadoCarga texto="Cargando el uso del sistema…" />
         ) : uso && (
           <>
             <div className={styles.statGrid}>

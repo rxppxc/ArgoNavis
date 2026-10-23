@@ -5,6 +5,7 @@ import { useNotificacion } from "../../components/Notificaciones";
 import { useConfirmar } from "../../components/ModalConfirmacion";
 import { MarcoPagina } from "../../components/MarcoPagina";
 import { EncabezadoPagina } from "../../components/EncabezadoPagina";
+import { EstadoCarga } from "../../components/EstadoCarga";
 import {
   IconoBuscar, IconoUsuario, IconoCorreo, IconoMaletin, IconoMas,
   IconoCheck, IconoBasura, IconoPoder, IconoLlave,
@@ -60,7 +61,10 @@ export default function PaginaUsuarios() {
   async function alBuscar(e: React.FormEvent) {
     e.preventDefault();
     const q = busqueda.trim();
-    if (q.length < 2) return;
+    if (q.length < 2) {
+      setErrorBusq("Escribe al menos 2 letras del nombre, el usuario o el correo.");
+      return;
+    }
     setBuscando(true);
     setErrorBusq(null);
     setResultadosAD([]);
@@ -69,7 +73,7 @@ export default function PaginaUsuarios() {
       setResultadosAD(data);
       if (data.length === 0) setErrorBusq("No se encontraron usuarios con ese criterio.");
     } catch (err) {
-      setErrorBusq(mensajeDeError(err, "Error al conectar con Active Directory."));
+      setErrorBusq(mensajeDeError(err, "No se pudo consultar el Active Directory."));
     } finally {
       setBuscando(false);
     }
@@ -83,7 +87,7 @@ export default function PaginaUsuarios() {
       await cargarUsuarios();
       mostrarToast(`Usuario ${username} agregado.`, "exito");
     } catch (err) {
-      mostrarToast(mensajeDeError(err, "Error al crear el usuario."), "error");
+      mostrarToast(mensajeDeError(err, "No se pudo agregar el usuario."), "error");
     } finally {
       setCreando(null);
     }
@@ -117,7 +121,7 @@ export default function PaginaUsuarios() {
       await cargarUsuarios();
       mostrarToast(`Cuenta local ${username} creada. Deberá cambiar la contraseña al entrar.`, "exito");
     } catch (err) {
-      setErrorLocal(mensajeDeError(err, "Error al crear la cuenta local."));
+      setErrorLocal(mensajeDeError(err, "No se pudo crear la cuenta local."));
     } finally {
       setCreandoLocal(false);
     }
@@ -131,7 +135,7 @@ export default function PaginaUsuarios() {
       setUsuarios(prev => prev.map(x => x.id === u.id ? data : x));
       mostrarToast(`Usuario ${nuevoEstado === "active" ? "activado" : "desactivado"}.`, "exito");
     } catch (err) {
-      mostrarToast(mensajeDeError(err, "Error al cambiar el estado."), "error");
+      mostrarToast(mensajeDeError(err, "No se pudo cambiar el estado."), "error");
     } finally {
       setOcupado(null);
     }
@@ -142,9 +146,9 @@ export default function PaginaUsuarios() {
     try {
       const { data } = await apiAdmin.asignarRolAUsuario(id, rol_id);
       setUsuarios(prev => prev.map(u => u.id === id ? data : u));
-      mostrarToast("Rol asignado correctamente.", "exito");
+      mostrarToast("Rol asignado.", "exito");
     } catch (err) {
-      mostrarToast(mensajeDeError(err, "Error al asignar el rol."), "error");
+      mostrarToast(mensajeDeError(err, "No se pudo asignar el rol."), "error");
     } finally {
       setOcupado(null);
     }
@@ -155,6 +159,7 @@ export default function PaginaUsuarios() {
       titulo: "Restablecer contraseña",
       mensaje: `Se generará una contraseña temporal para @${u.username} y se desbloqueará la cuenta. Deberá cambiarla al entrar.`,
       textoOk: "Restablecer",
+      tono: "clave",
     });
     if (!ok) return;
     setOcupado(u.id);
@@ -183,7 +188,7 @@ export default function PaginaUsuarios() {
       setUsuarios(prev => prev.filter(x => x.id !== u.id));
       mostrarToast("Usuario eliminado.", "exito");
     } catch (err) {
-      mostrarToast(mensajeDeError(err, "Error al eliminar el usuario."), "error");
+      mostrarToast(mensajeDeError(err, "No se pudo eliminar el usuario."), "error");
     } finally {
       setOcupado(null);
     }
@@ -198,11 +203,11 @@ export default function PaginaUsuarios() {
   const usuariosRegistrados = new Set(usuarios.map(u => u.username));
 
   return (
-    <MarcoPagina volverA="/dashboard">
+    <MarcoPagina volverA="/dashboard" ancho="amplio">
       <div className={styles.container}>
 
         <EncabezadoPagina
-          titulo="Gestión de usuarios"
+          titulo="Usuarios"
           descripcion="Agrega usuarios del Active Directory o crea cuentas locales para usuarios externos."
         />
 
@@ -231,7 +236,8 @@ export default function PaginaUsuarios() {
               <input
                 className={styles.searchInput}
                 type="text"
-                placeholder="Nombre, usuario o correo..."
+                placeholder="Nombre, usuario o correo…"
+                aria-label="Buscar en Active Directory"
                 value={busqueda}
                 onChange={e => setBusqueda(e.target.value)}
                 autoFocus
@@ -239,7 +245,7 @@ export default function PaginaUsuarios() {
               <button
                 type="submit"
                 className={styles.searchBtn}
-                disabled={buscando || busqueda.trim().length < 2}
+                disabled={buscando}
               >
                 {buscando ? <span className={styles.spinner} /> : <IconoBuscar />}
                 {buscando ? "Buscando…" : "Buscar"}
@@ -294,10 +300,11 @@ export default function PaginaUsuarios() {
             Cuenta local (usuarios externos)
             <button
               type="button"
-              className={`${styles.searchBtn} ${styles.btnPanel}`}
+              className={styles.btnPanel}
               onClick={() => setMostrarLocal(v => !v)}
+              aria-expanded={mostrarLocal}
             >
-              <IconoMas tamano={14} />
+              {!mostrarLocal && <IconoMas tamano={14} />}
               {mostrarLocal ? "Ocultar" : "Nueva"}
             </button>
           </div>
@@ -309,26 +316,45 @@ export default function PaginaUsuarios() {
                 carácter especial, sin el nombre de usuario; el usuario deberá
                 cambiarla al entrar. Después, asígnalo a su agencia en Agencias, puestos y países.
               </p>
-              <form onSubmit={alCrearLocal} className={`${styles.searchRow} ${styles.formLocal}`}>
-                <input className={styles.searchInput} placeholder="Usuario *"
-                  value={localUsername} onChange={e => setLocalUsername(e.target.value)} required />
-                <input className={styles.searchInput} type="password" placeholder="Contraseña inicial *" autoComplete="new-password"
-                  value={localPassword} onChange={e => setLocalPassword(e.target.value)} required />
-                <input className={styles.searchInput} placeholder="Nombre"
-                  value={localNombre} onChange={e => setLocalNombre(e.target.value)} />
-                <input className={styles.searchInput} placeholder="Apellido"
-                  value={localApellido} onChange={e => setLocalApellido(e.target.value)} />
-                <input className={styles.searchInput} type="email" placeholder="Correo (recibe los avisos)"
-                  value={localEmail} onChange={e => setLocalEmail(e.target.value)} />
-                <select className={styles.rolSelect} value={localRolId}
-                  onChange={e => setLocalRolId(e.target.value ? Number(e.target.value) : "")}>
-                  <option value="">— Sin rol —</option>
-                  {roles.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
-                </select>
-                <button type="submit" className={styles.searchBtn} disabled={creandoLocal}>
-                  {creandoLocal ? <span className={styles.spinner} /> : <IconoCheck tamano={14} />}
-                  {creandoLocal ? "Creando…" : "Crear"}
-                </button>
+              {/* Con etiquetas visibles, como el resto de los formularios (antes solo
+                  el texto de ejemplo, que desaparece al escribir). */}
+              <form onSubmit={alCrearLocal} className={styles.formLocal}>
+                <label className={styles.campoLocal}>
+                  <span>Usuario *</span>
+                  <input className={styles.searchInput} autoComplete="off" spellCheck={false}
+                    value={localUsername} onChange={e => setLocalUsername(e.target.value)} required />
+                </label>
+                <label className={styles.campoLocal}>
+                  <span>Contraseña inicial *</span>
+                  <input className={styles.searchInput} type="password" autoComplete="new-password"
+                    value={localPassword} onChange={e => setLocalPassword(e.target.value)} required />
+                </label>
+                <label className={styles.campoLocal}>
+                  <span>Rol</span>
+                  <select className={styles.rolSelect} value={localRolId}
+                    onChange={e => setLocalRolId(e.target.value ? Number(e.target.value) : "")}>
+                    <option value="">— Sin rol —</option>
+                    {roles.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+                  </select>
+                </label>
+                <label className={styles.campoLocal}>
+                  <span>Nombre</span>
+                  <input className={styles.searchInput} value={localNombre} onChange={e => setLocalNombre(e.target.value)} />
+                </label>
+                <label className={styles.campoLocal}>
+                  <span>Apellido</span>
+                  <input className={styles.searchInput} value={localApellido} onChange={e => setLocalApellido(e.target.value)} />
+                </label>
+                <label className={styles.campoLocal}>
+                  <span>Correo <em>(recibe los avisos)</em></span>
+                  <input className={styles.searchInput} type="email" value={localEmail} onChange={e => setLocalEmail(e.target.value)} />
+                </label>
+                <div className={styles.formLocalAcciones}>
+                  <button type="submit" className={styles.btnCrear} disabled={creandoLocal}>
+                    {creandoLocal ? <span className={styles.spinner} /> : <IconoCheck tamano={14} />}
+                    {creandoLocal ? "Creando…" : "Crear cuenta"}
+                  </button>
+                </div>
               </form>
               {errorLocal && <p className={styles.searchError}>{errorLocal}</p>}
             </div>
@@ -344,7 +370,7 @@ export default function PaginaUsuarios() {
           </div>
           <div className={styles.panelBody}>
             {cargando ? (
-              <div className={styles.loading}><span className={styles.spinner} /> Cargando usuarios…</div>
+              <EstadoCarga texto="Cargando usuarios…" />
             ) : usuarios.length === 0 ? (
               <p className={styles.empty}>No hay usuarios registrados. Usa la búsqueda de arriba para agregar el primero.</p>
             ) : (
@@ -376,6 +402,8 @@ export default function PaginaUsuarios() {
                                 <div className={styles.cellName}>{u.full_name}</div>
                                 <div className={styles.cellUsername}>
                                   @{u.username}
+                                  {/* La propia cuenta: por eso Desactivar, Eliminar y el rol quedan inactivos. */}
+                                  {esYo && <span className={styles.badgeTipo}>Tú</span>}
                                   {u.user_type === "local" && <span className={styles.badgeTipo}>Local</span>}
                                   {u.debe_cambiar_password && <span className={styles.badgeTipo}>Cambio de clave pendiente</span>}
                                 </div>
@@ -404,7 +432,7 @@ export default function PaginaUsuarios() {
                           <td className={styles.celdaAncha}>
                             <div className={styles.actions}>
                               <button
-                                className={`${styles.actionBtn} ${u.status === "active" ? "" : styles.btnActivar}`}
+                                className={`${styles.actionBtn} ${u.status === "active" ? styles.btnDesactivar : styles.btnActivar}`}
                                 onClick={() => alToggleEstado(u)}
                                 disabled={trabajando || esYo}
                                 title={u.status === "active" ? "Desactivar" : "Activar"}
@@ -414,7 +442,7 @@ export default function PaginaUsuarios() {
                               </button>
                               {u.user_type === "local" && (
                                 <button
-                                  className={styles.actionBtn}
+                                  className={`${styles.actionBtn} ${styles.btnRestablecer}`}
                                   onClick={() => alRestablecer(u)}
                                   disabled={trabajando}
                                   title="Generar una contraseña temporal"

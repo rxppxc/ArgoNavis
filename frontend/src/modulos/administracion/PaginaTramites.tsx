@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { apiTramites, ETIQUETA_ALCANCE, ETIQUETA_CONDICION, type TipoTramite } from "../../api/tramites";
 import { MarcoPagina } from "../../components/MarcoPagina";
 import { EncabezadoPagina } from "../../components/EncabezadoPagina";
+import { EstadoCarga } from "../../components/EstadoCarga";
 import { useNotificacion } from "../../components/Notificaciones";
 import { ETIQUETA_RANGO } from "../solicitudes/presentacion";
 import {
@@ -40,7 +41,7 @@ export default function PaginaTramites() {
         />
 
         {cargando ? (
-          <div className={styles.empty}>Cargando catálogo…</div>
+          <EstadoCarga texto="Cargando catálogo…" />
         ) : tipos.length === 0 ? (
           <div className={styles.empty}>No hay trámites configurados.</div>
         ) : (
@@ -58,8 +59,10 @@ export default function PaginaTramites() {
               return (
                 <div key={t.id} className={`${styles.card} ${expandido ? styles.cardOpen : ""}`}>
                   <button
+                    type="button"
                     className={styles.cardHeader}
                     onClick={() => setAbierto(expandido ? null : t.id)}
+                    aria-expanded={expandido}
                   >
                     <span className={`${styles.chevron} ${expandido ? styles.chevronOpen : ""}`}>
                       <IconoChevronDerecha />

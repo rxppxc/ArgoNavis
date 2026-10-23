@@ -1,6 +1,5 @@
 /* ─── Body ─── */
 .container {
-  max-width: 1000px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -62,24 +61,8 @@
   border-color: var(--foco);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--foco) 18%, transparent);
 }
-.searchBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 11px 20px;
-  background: var(--y);
-  color: var(--on-accent);
-  border-radius: var(--r-sm);
-  font-size: .88rem;
-  font-weight: 700;
-  font-family: inherit;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: filter var(--t);
-}
-.searchBtn:hover:not(:disabled) { filter: brightness(1.07); }
-/* Desactivado en gris: el amarillo a media opacidad quedaba mostaza. */
-.searchBtn:disabled { background: var(--overlay-2); color: var(--muted); cursor: not-allowed; }
+.searchBtn { composes: boton consultar from "../../components/Botones.module.css"; }
+.btnCrear { composes: boton primario from "../../components/Botones.module.css"; }
 
 .searchError {
   margin-top: 12px;
@@ -143,23 +126,7 @@
 }
 .adAction { flex-shrink: 0; }
 
-.btnAgregar {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  background: var(--card);
-  border: 1.5px solid var(--border-2);
-  border-radius: var(--r-sm);
-  color: var(--text);
-  font-size: .80rem;
-  font-weight: 700;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background var(--t), border-color var(--t);
-}
-.btnAgregar:hover:not(:disabled) { background: var(--hover); border-color: var(--input-border); }
-.btnAgregar:disabled { opacity: .5; cursor: not-allowed; }
+.btnAgregar { composes: boton activar chico from "../../components/Botones.module.css"; }
 
 .badgeExiste {
   display: inline-flex;
@@ -175,14 +142,6 @@
 }
 
 /* ─── Table ─── */
-.loading {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--muted);
-  font-size: .86rem;
-  padding: 8px 0;
-}
 .empty {
   color: var(--muted);
   font-size: .86rem;
@@ -277,35 +236,21 @@
 /* ─── Actions: neutras salvo eliminar (rojo) y activar (verde). Antes eran
    tres botones de color por fila y en oscuro "Desactivar" y "Restablecer"
    casi no se distinguían. ─── */
+/* Las acciones en una sola fila: apiladas, cada usuario ocupaba tres renglones. */
 .actions {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
-.actionBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 11px;
-  border-radius: var(--r-xs);
-  border: 1.5px solid var(--border-2);
-  background: var(--card);
-  color: var(--text);
-  font-size: .75rem;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background var(--t), border-color var(--t);
-  white-space: nowrap;
-}
-.actionBtn:hover:not(:disabled) { background: var(--hover); border-color: var(--input-border); }
-.actionBtn:disabled { opacity: .5; cursor: not-allowed; }
+.actionBtn { composes: boton secundario chico from "../../components/Botones.module.css"; }
 
-.btnActivar { color: var(--acc-green); border-color: color-mix(in srgb, var(--acc-green) 55%, transparent); }
-.btnActivar:hover:not(:disabled) { background: var(--green-soft); border-color: var(--acc-green); }
-.btnEliminar { color: var(--acc-red); border-color: color-mix(in srgb, var(--acc-red) 55%, transparent); }
-.btnEliminar:hover:not(:disabled) { background: var(--red-soft); border-color: var(--acc-red); }
+/* Un color por acción: desactivar gris, activar verde (los de la insignia de estado),
+   restablecer morado, eliminar rojo. */
+.btnActivar { composes: activar from "../../components/Botones.module.css"; }
+.btnDesactivar { composes: apagar from "../../components/Botones.module.css"; }
+.btnRestablecer { composes: credencial from "../../components/Botones.module.css"; }
+.btnEliminar { composes: peligroContorno from "../../components/Botones.module.css"; }
 
 /* ─── Spinner ─── */
 .spinner {
@@ -327,9 +272,14 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ─── Cuentas locales ─── */
-.btnPanel { margin-left: auto; padding: 6px 14px; }
-.formLocal { flex-wrap: wrap; }
-.formLocal .searchInput { min-width: 140px; }
+.btnPanel { composes: boton secundario chico from "../../components/Botones.module.css"; margin-left: auto; }
+.formLocal { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 14px; }
+.campoLocal { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.campoLocal > span { font-size: .78rem; font-weight: 700; color: var(--text-2); }
+.campoLocal em { font-style: normal; font-weight: 500; color: var(--muted); }
+.campoLocal .rolSelect { padding: 10px 12px; font-size: .86rem; border-radius: var(--r-sm); }
+.formLocalAcciones { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
+@media (max-width: 720px) { .formLocal { grid-template-columns: 1fr; } }
 .ayudaLocal { margin: 0 0 14px; color: var(--text-2); font-size: .82rem; line-height: 1.5; }
 .badgeTipo {
   display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 99px;
@@ -361,4 +311,5 @@
   }
   .table td.celdaAncha { grid-column: 1 / -1; }
   .rolSelect { min-width: 0; width: 100%; }
+  .actions { flex-wrap: wrap; }
 }

@@ -34,7 +34,8 @@ export function TarjetaSolicitud({ s, vista }: { s: SolicitudResumen; vista: Ban
       </div>
 
       <div className={styles.meta}>
-        <span>{s.agencia_nombre}</span>
+        {/* La agencia solo ve las suyas: su nombre en cada tarjeta sobraba. */}
+        {!deAgencia && <span>{s.agencia_nombre}</span>}
         <span>{s.puesto_nombre}</span>
         <span>Operación: {formatearFecha(s.fecha_operacion)}</span>
         <span><IconoUsuario tamano={12} /> {s.cantidad_tripulantes} tripulante{s.cantidad_tripulantes === 1 ? "" : "s"}</span>

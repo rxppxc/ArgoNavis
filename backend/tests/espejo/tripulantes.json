@@ -1,0 +1,83 @@
+{
+  "_nota": "Reglas de la ficha del tripulante. `esperado` son las reglas que deben fallar; cada lado traduce sus mensajes a estas claves. Los campos que no se indican salen de `base`.",
+  "base": {
+    "nombre": "Ana", "apellido": "Pérez", "fecha_nacimiento": "1990-05-01", "pais_nacimiento": "PHL",
+    "nacionalidad": "PHL", "sexo": "F", "pasaporte": "P123456", "pasaporte_expira": "2030-01-01",
+    "libreta_marino": "SB1", "libreta_expira": "2030-01-01", "rango": "marino", "ocupacion": "Marinera"
+  },
+  "paises": ["PHL", "PAN", "CUB"],
+  "casos": [
+    {"caso": "ficha válida", "hoy": "2026-10-14", "fecha_operacion": "2026-10-20",
+     "tramite": {"valida_vigencia": true, "rangos_permitidos": null},
+     "tripulantes": [{}], "esperado": []},
+
+    {"caso": "cumple 18 años justo hoy", "hoy": "2026-10-14", "fecha_operacion": "2026-10-20",
+     "tramite": {"valida_vigencia": true, "rangos_permitidos": null},
+     "tripulantes": [{"fecha_nacimiento": "2008-10-14"}], "esperado": []},
+
+    {"caso": "le falta un día para los 18", "hoy": "2026-10-14", "fecha_operacion": "2026-10-20",
+     "tramite": {"valida_vigencia": true, "rangos_permitidos": null},
+     "tripulantes": [{"fecha_nacimiento": "2008-10-15"}], "esperado": ["menor_de_edad"]},
+
+    {"caso": "año bisiesto: el 29 de febrero aún no cumple 18 quien nació el 1 de marzo", "hoy": "2028-02-29", "fecha_operacion": "2028-03-05",
+     "tramite": {"valida_vigencia": true, "rangos_permitidos": null},
+     "tripulantes": [{"fecha_nacimiento": "2010-03-01"}], "esperado": ["menor_de_edad"]},
+
+    {"caso": "año bisiesto: el 29 de febrero ya cumple 18 quien nació el 28", "hoy": "2028-02-29", "fecha_operacion": "2028-03-05",
+     "tramite": {"valida_vigencia": true, "rangos_permitidos": null},
+     "tripulantes": [{"fecha_nacimiento": "2010-02-28"}], "esperado": []},
+
+    {"caso": "nacido antes de 1900", "hoy": "2026-10-14", "fecha_operacion": "2026-10-20",
+     "tramite": {"valida_vigencia": true, "rangos_permitidos": null},
+     "tripulantes": [{"fecha_nacimiento": "1899-12-31"}], "esperado": ["nacimiento_invalido"]},
+
+    {"caso": "nacimiento en el futuro", "hoy": "2026-10-14", "fecha_operacion": "2026-10-20",
+     "tramite": {"valida_vigencia": true, "rangos_permitidos": null},
+     "tripulantes": [{"fecha_nacimiento": "2026-10-15"}], "esperado": ["nacimiento_futuro"]},
+
+    {"caso": "pasaporte y seamanbook vencen antes de nacer", "hoy": "2026-10-14", "fecha_operacion": "2026-10-20",
+     "tramite": {"valida_vigencia": false, "rangos_permitidos": null},
+     "tripulantes": [{"pasaporte_expira": "1990-01-01", "libreta_expira": "1989-01-01"}],
+     "esperado": ["pasaporte_antes_de_nacer", "seamanbook_antes_de_nacer"]},
+
+    {"caso": "pasaporte vencido el día de la operación", "hoy": "2026-10-14", "fecha_operacion": "2026-11-01",
+     "tramite": {"valida_vigencia": true, "rangos_permitidos": null},
+     "tripulantes": [{"pasaporte_expira": "2026-10-20"}], "esperado": ["pasaporte_vencido"]},
+
+    {"caso": "pasaporte que vence justo el día de la operación", "hoy": "2026-10-14", "fecha_operacion": "2026-11-01",
+     "tramite": {"valida_vigencia": true, "rangos_permitidos": null},
+     "tripulantes": [{"pasaporte_expira": "2026-11-01"}], "esperado": []},
+
+    {"caso": "seamanbook vencido el día de la operación", "hoy": "2026-10-14", "fecha_operacion": "2026-11-01",
+     "tramite": {"valida_vigencia": true, "rangos_permitidos": null},
+     "tripulantes": [{"libreta_expira": "2026-10-20"}], "esperado": ["seamanbook_vencido"]},
+
+    {"caso": "si el trámite no valida vigencia, el vencimiento no importa", "hoy": "2026-10-14", "fecha_operacion": "2026-11-01",
+     "tramite": {"valida_vigencia": false, "rangos_permitidos": null},
+     "tripulantes": [{"pasaporte_expira": "2026-10-20"}], "esperado": []},
+
+    {"caso": "un marino sin seamanbook", "hoy": "2026-10-14", "fecha_operacion": "2026-10-20",
+     "tramite": {"valida_vigencia": true, "rangos_permitidos": null},
+     "tripulantes": [{"libreta_marino": null, "libreta_expira": null}], "esperado": ["marino_sin_seamanbook"]},
+
+    {"caso": "un técnico no porta seamanbook", "hoy": "2026-10-14", "fecha_operacion": "2026-10-20",
+     "tramite": {"valida_vigencia": true, "rangos_permitidos": null},
+     "tripulantes": [{"rango": "tecnico", "libreta_marino": null, "libreta_expira": null}], "esperado": []},
+
+    {"caso": "rango que el trámite no admite", "hoy": "2026-10-14", "fecha_operacion": "2026-10-20",
+     "tramite": {"valida_vigencia": true, "rangos_permitidos": ["tecnico", "superintendente", "supernumerario"]},
+     "tripulantes": [{}], "esperado": ["rango_no_permitido"]},
+
+    {"caso": "rango que el trámite admite", "hoy": "2026-10-14", "fecha_operacion": "2026-10-20",
+     "tramite": {"valida_vigencia": true, "rangos_permitidos": ["tecnico", "superintendente", "supernumerario"]},
+     "tripulantes": [{"rango": "superintendente", "libreta_marino": null, "libreta_expira": null}], "esperado": []},
+
+    {"caso": "el mismo pasaporte dos veces (sin distinguir mayúsculas)", "hoy": "2026-10-14", "fecha_operacion": "2026-10-20",
+     "tramite": {"valida_vigencia": true, "rangos_permitidos": null},
+     "tripulantes": [{}, {"nombre": "Luis", "pasaporte": "p123456"}], "esperado": ["pasaporte_repetido"]},
+
+    {"caso": "el mismo número con otra nacionalidad no se repite", "hoy": "2026-10-14", "fecha_operacion": "2026-10-20",
+     "tramite": {"valida_vigencia": true, "rangos_permitidos": null},
+     "tripulantes": [{}, {"nombre": "Luis", "nacionalidad": "PAN"}], "esperado": []}
+  ]
+}

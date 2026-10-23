@@ -4,14 +4,6 @@
   margin: 0 auto;
 }
 
-.loading {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--text-2);
-  font-size: .9rem;
-  padding: 48px 0;
-}
 .errorMsg {
   background: var(--red-soft);
   border: 1px solid var(--red);
@@ -40,24 +32,24 @@
 .statCard {
   display: grid;
   grid-template-columns: auto 1fr;
-  grid-template-rows: auto auto;
-  column-gap: 10px;
+  grid-template-rows: 1fr auto;
+  gap: 10px;
   padding: 14px 16px;
   border-radius: var(--r-md);
   background: var(--card);
   border: 1px solid var(--border);
 }
 .statIcon {
-  grid-row: span 2;
-  align-self: center;
+  grid-row: 2; grid-column: 1;
+  align-self: end;
   width: 36px; height: 36px;
   border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
   background: var(--overlay);
   color: var(--text-2);
 }
-.statLabel { color: var(--text-2); font-size: .76rem; font-weight: 600; }
-.statNum { color: var(--text); font-size: 1.45rem; font-weight: 700; line-height: 1.2; }
+.statLabel { grid-row: 1; grid-column: 1 / -1; color: var(--text-2); font-size: .76rem; font-weight: 600; line-height: 1.35; }
+.statNum { grid-row: 2; grid-column: 2; align-self: center; color: var(--text); font-size: 1.45rem; font-weight: 700; line-height: 1.2; }
 
 /* ─── Paneles apilados ─── */
 .panelesStack {
@@ -128,15 +120,6 @@
 .empty { color: var(--muted); font-size: .85rem; text-align: center; padding: 24px 0; }
 
 /* ─── Spinner ─── */
-.spinner {
-  display: inline-block;
-  width: 14px; height: 14px;
-  border: 2px solid var(--overlay-2);
-  border-top-color: var(--y);
-  border-radius: 50%;
-  animation: spin .7s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
 
 .subtituloSeccion {
   color: var(--text);

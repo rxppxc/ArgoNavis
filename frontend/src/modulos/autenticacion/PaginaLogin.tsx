@@ -2,9 +2,11 @@ import { useState } from "react";
 import type * as React from "react";
 import { useLocation, useNavigate, type Location } from "react-router-dom";
 import { useAutenticacion } from "../../hooks/useAutenticacion";
+import { useTituloDocumento } from "../../hooks/useTituloDocumento";
 import { RUTA_CAMBIAR_CONTRASENA } from "../../api/client";
 import { mensajeDeError } from "../../utils/errores";
 import { CabeceraInstitucional } from "../../components/CabeceraInstitucional";
+import { FondoPagina } from "../../components/FondoPagina";
 import { IconoUsuario, IconoCandado, IconoAlerta } from "../../components/Iconos";
 import { PieInstitucional } from "../../components/PieInstitucional";
 import styles from "./PaginaLogin.module.css";
@@ -32,10 +34,15 @@ export default function PaginaLogin() {
   const [mostrarContrasena, setMostrarContrasena] = useState(false);
   const [cargando,          setCargando]          = useState(false);
   const [error,             setError]             = useState<string | null>(null);
+  useTituloDocumento("Iniciar sesión");
 
   async function alEnviar(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+    if (!nombreUsuario.trim() || !contrasena) {
+      setError("Escribe tu usuario y tu contraseña.");
+      return;
+    }
     setCargando(true);
     try {
       const usuario = await iniciarSesion(nombreUsuario.trim(), contrasena);
@@ -51,6 +58,8 @@ export default function PaginaLogin() {
     <div className={styles.pagina}>
       <CabeceraInstitucional />
 
+      <div className={styles.medio}>
+      <FondoPagina coordenadas={false} animado />
       <main className={styles.cuerpo}>
         <section className={styles.insignia}>
           <h1 className={styles.titulo}>
@@ -77,7 +86,7 @@ export default function PaginaLogin() {
               <input
                 id="nombreUsuario"
                 type="text"
-                placeholder="Ej: jperez"
+                placeholder="Ej. jperez"
                 value={nombreUsuario}
                 onChange={(e) => setNombreUsuario(e.target.value)}
                 autoComplete="username"
@@ -109,7 +118,7 @@ export default function PaginaLogin() {
               </button>
             </div>
 
-            <button type="submit" className={styles.ingresar} disabled={cargando || !nombreUsuario || !contrasena}>
+            <button type="submit" className={styles.ingresar} disabled={cargando}>
               {cargando && <span className={styles.spinner} />}
               {cargando ? "Verificando…" : "Iniciar sesión"}
             </button>
@@ -128,6 +137,7 @@ export default function PaginaLogin() {
           </p>
         </section>
       </main>
+      </div>
 
       <PieInstitucional />
     </div>

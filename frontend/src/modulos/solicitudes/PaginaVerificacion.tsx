@@ -6,8 +6,10 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { apiSolicitudes, type VerificacionAutorizacion } from "../../api/solicitudes";
+import { EstadoCarga } from "../../components/EstadoCarga";
 import { MarcoPagina } from "../../components/MarcoPagina";
 import { IconoAlerta, IconoExito, IconoXCirculo } from "../../components/Iconos";
+import { useTituloDocumento } from "../../hooks/useTituloDocumento";
 import { mensajeDeError } from "../../utils/errores";
 import { ETIQUETA_ESTADO, ETIQUETA_RANGO, formatearFecha, formatearFechaHora } from "./presentacion";
 import styles from "./PaginaVerificacion.module.css";
@@ -16,6 +18,7 @@ export default function PaginaVerificacion() {
   const { codigo = "" } = useParams<{ codigo: string }>();
   const [datos, setDatos] = useState<VerificacionAutorizacion | null>(null);
   const [error, setError] = useState<{ texto: string; noExiste: boolean } | null>(null);
+  useTituloDocumento("Verificación de autorización");
 
   useEffect(() => {
     let cancelado = false;
@@ -34,10 +37,10 @@ export default function PaginaVerificacion() {
       <div className={styles.contenedor}>
         <h1 className={styles.titulo}>Verificación de Autorización Marítima</h1>
 
-        {!datos && !error && <div className={styles.cargando}>Verificando…</div>}
+        {!datos && !error && <EstadoCarga texto="Verificando…" />}
 
         {error && (
-          <div className={`${styles.resultado} ${styles.invalida}`}>
+          <div className={`${styles.resultado} ${styles.invalida}`} role="alert">
             <IconoXCirculo tamano={34} />
             <div>
               <div className={styles.resultadoTitulo}>{error.noExiste ? "Autorización no encontrada" : "No se pudo verificar"}</div>

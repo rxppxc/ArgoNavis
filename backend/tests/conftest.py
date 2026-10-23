@@ -144,5 +144,5 @@ async def admin(cliente) -> Actor:
 
 @pytest.fixture(scope="session")
 async def sysadmin(cliente) -> Actor:
-    """Administración técnica: usuarios, roles y permisos (el Administrador ya no los gestiona)."""
+    """Administración técnica: usuarios, roles y permisos (el Administrador también los gestiona)."""
     return await crear_actor("SysAdmin", correo="sysadmin@prueba.pa", prefijo="sysadmin")

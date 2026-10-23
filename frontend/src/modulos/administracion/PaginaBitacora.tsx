@@ -140,7 +140,7 @@ export default function PaginaBitacora() {
         </label>
         <label>
           <span>Usuario</span>
-          <input type="text" placeholder="usuario" maxLength={100} {...campo("usuario")} />
+          <input type="text" placeholder="Ej. jperez" maxLength={100} {...campo("usuario")} />
         </label>
         <label>
           <span>Texto en el detalle o IP</span>
@@ -183,7 +183,12 @@ export default function PaginaBitacora() {
                     <td className={styles.nowrap}>{formatearFechaHora(r.creado_en)}</td>
                     <td>{r.username ?? "—"}</td>
                     <td><span className={styles.accion}>{ETIQUETA_ACCION[r.accion] ?? r.accion}</span></td>
-                    <td className={styles.detalle}>{resumenDetalle(r.detalle)}</td>
+                    <td className={styles.detalle}>
+                      <button type="button" className={styles.verDetalle} aria-expanded={abierto === r.id}
+                        onClick={(e) => { e.stopPropagation(); setAbierto(abierto === r.id ? null : r.id); }}>
+                        {resumenDetalle(r.detalle)}
+                      </button>
+                    </td>
                     <td className={styles.nowrap}>{r.ip ?? "—"}</td>
                   </tr>
                   {abierto === r.id && (
@@ -200,12 +205,12 @@ export default function PaginaBitacora() {
           </table>
         </div>
         <div className={styles.paginacion}>
-          <button type="button" className={styles.btnTexto} disabled={pagina <= 1 || cargando} onClick={() => setPagina((p) => p - 1)}>
-            ‹ Anterior
+          <button type="button" className={styles.btnPagina} disabled={pagina <= 1 || cargando} onClick={() => setPagina((p) => p - 1)}>
+            Anterior
           </button>
           <span>Página {pagina} de {totalPaginas}</span>
-          <button type="button" className={styles.btnTexto} disabled={pagina >= totalPaginas || cargando} onClick={() => setPagina((p) => p + 1)}>
-            Siguiente ›
+          <button type="button" className={styles.btnPagina} disabled={pagina >= totalPaginas || cargando} onClick={() => setPagina((p) => p + 1)}>
+            Siguiente
           </button>
         </div>
       </div>

@@ -10,6 +10,7 @@ import { MarcoPagina } from "../../components/MarcoPagina";
 import { useNotificacion } from "../../components/Notificaciones";
 import { IconoAlerta, IconoCandado } from "../../components/Iconos";
 import { useAutenticacion } from "../../hooks/useAutenticacion";
+import { useTituloDocumento } from "../../hooks/useTituloDocumento";
 import { problemaContrasena, requisitosContrasena } from "../../utils/contrasena";
 import { mensajeDeError } from "../../utils/errores";
 import styles from "./PaginaCambiarContrasena.module.css";
@@ -19,6 +20,7 @@ export default function PaginaCambiarContrasena() {
   const { mostrar } = useNotificacion();
   const navegar = useNavigate();
   const obligatorio = !!usuario?.debe_cambiar_password;
+  useTituloDocumento("Cambiar contraseña");
 
   const [actual, setActual] = useState("");
   const [nueva, setNueva] = useState("");
@@ -34,7 +36,10 @@ export default function PaginaCambiarContrasena() {
   async function guardar(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (problemaContrasena(nueva, usuario?.username) || nueva !== confirmacion) return;
+    if (!actual) { setError("Escribe tu contraseña actual."); return; }
+    const problemaNueva = problemaContrasena(nueva, usuario?.username);
+    if (problemaNueva) { setError(problemaNueva); return; }
+    if (nueva !== confirmacion) { setError("La confirmación no coincide con la contraseña nueva."); return; }
     setGuardando(true);
     try {
       await cambiarContrasena(actual, nueva);
@@ -54,7 +59,7 @@ export default function PaginaCambiarContrasena() {
 
   if (usuario?.user_type === "ad") {
     return (
-      <MarcoPagina volverA="/dashboard">
+      <MarcoPagina volverA="/dashboard" ancho="angosto">
         <div className={styles.tarjeta}>
           <h1>Cambiar contraseña</h1>
           <p className={styles.ayuda}>
@@ -67,7 +72,7 @@ export default function PaginaCambiarContrasena() {
   }
 
   return (
-    <MarcoPagina volverA={obligatorio ? undefined : "/dashboard"}>
+    <MarcoPagina volverA={obligatorio ? undefined : "/dashboard"} ancho="angosto">
       <form className={styles.tarjeta} onSubmit={guardar} noValidate>
         <div className={styles.icono}><IconoCandado /></div>
         <h1>Cambiar contraseña</h1>
@@ -81,7 +86,7 @@ export default function PaginaCambiarContrasena() {
           <p className={styles.ayuda}>Elige una contraseña que no uses en otros sistemas.</p>
         )}
 
-        {error && <div className={styles.error}><IconoAlerta tamano={15} /> {error}</div>}
+        {error && <div className={styles.error} role="alert"><IconoAlerta tamano={15} /> {error}</div>}
 
         <label className={styles.campo}>
           <span>Contraseña actual</span>
@@ -112,7 +117,7 @@ export default function PaginaCambiarContrasena() {
             <button type="button" className={styles.btnTexto} onClick={salir}>Cerrar sesión</button>
           )}
           <button type="submit" className={styles.btnPrimario}
-            disabled={guardando || !actual || !nueva || !!problema || nueva !== confirmacion}>
+            disabled={guardando}>
             {guardando ? "Guardando…" : "Guardar contraseña"}
           </button>
         </div>

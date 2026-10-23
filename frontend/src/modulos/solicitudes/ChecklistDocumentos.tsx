@@ -51,7 +51,7 @@ export function ChecklistDocumentos({ casillas, nuevos, existentes, sinTripulant
                   <span className={styles.archivoNombre} title={nuevo.name}>
                     <IconoCheck tamano={12} /> {nuevo.name}
                   </span>
-                  <button type="button" className={styles.btnMini} onClick={() => onDescartar(c.clave)}
+                  <button type="button" className={styles.btnMiniQuitar} onClick={() => onDescartar(c.clave)}
                     title={cargados.length ? "Conservar el archivo ya cargado" : "Quitar archivo"}>
                     <IconoX tamano={12} />
                   </button>
@@ -61,7 +61,7 @@ export function ChecklistDocumentos({ casillas, nuevos, existentes, sinTripulant
                   <span className={styles.archivoCargado} title={cargados[0].nombre_original}>
                     Cargado: {cargados[0].nombre_original}
                   </span>
-                  <button type="button" className={styles.btnMini} onClick={() => onVer(cargados[0])}
+                  <button type="button" className={styles.btnMiniVer} onClick={() => onVer(cargados[0])}
                     title="Ver documento cargado">
                     <IconoOjo tamano={13} />
                   </button>
@@ -69,7 +69,10 @@ export function ChecklistDocumentos({ casillas, nuevos, existentes, sinTripulant
               ) : null}
               <label className={styles.btnArchivo}>
                 {nuevo || cargados.length ? "Reemplazar" : "Adjuntar"}
+                {/* Nombre completo para lectores de pantalla: «Adjuntar» solo no dice cuál. */}
                 <input type="file" hidden accept={TIPOS_ACEPTADOS}
+                  aria-label={`${nuevo || cargados.length ? "Reemplazar" : "Adjuntar"} ${c.documento_nombre}`
+                    + (c.nombre_tripulante ? ` de ${c.nombre_tripulante}` : "")}
                   onChange={(e) => {
                     const archivo = e.target.files?.[0];
                     if (archivo) onElegir(c.clave, archivo);

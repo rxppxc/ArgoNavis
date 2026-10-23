@@ -59,12 +59,12 @@ export function DocumentosSolicitud({ solicitud, onVer, tripulanteId }: Props) {
       <IconoArchivo tamano={13} />
       <span className={styles.archivoNombre} title={d.nombre_original}>{d.nombre_original}</span>
       <span className={styles.archivoPeso}>{formatBytes(d.tamano)}</span>
-      <button type="button" className={styles.btnIcono} onClick={() => onVer(d)}
-        title="Previsualizar" aria-label={`Previsualizar ${d.nombre_original}`}>
+      <button type="button" className={styles.btnIconoVer} onClick={() => onVer(d)}
+        title="Ver documento" aria-label={`Ver ${d.nombre_original}`}>
         <IconoOjo tamano={13} />
       </button>
-      <button type="button" className={styles.btnIcono} onClick={() => descargar(d)} disabled={descargando === d.id}
-        title="Descargar" aria-label={`Descargar ${d.nombre_original}`}>
+      <button type="button" className={styles.btnIconoVer} onClick={() => descargar(d)} disabled={descargando === d.id}
+        title="Descargar documento" aria-label={`Descargar ${d.nombre_original}`}>
         <IconoDescargar tamano={13} />
       </button>
     </div>

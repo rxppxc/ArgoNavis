@@ -9,7 +9,9 @@
  * Beneficios sobre `confirm()`:
  *   - No bloquea el event loop ni el render del navegador.
  *   - Estilo coherente con el resto de la UI.
- *   - Accesible (Esc cancela, Enter confirma).
+ *   - Accesible: Esc cancela y Enter activa el botón con el foco (al abrir,
+ *     el de confirmar). Antes Enter confirmaba siempre, aunque el foco
+ *     estuviera en "Cancelar": se podía eliminar algo queriendo cancelar.
  */
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
@@ -26,6 +28,17 @@ interface OpcionesConfirmacion {
   peligroso?:     boolean;
   /** Botón verde: para confirmar una aprobación (como el botón que la inició). */
   exito?:         boolean;
+  /** Otros colores de acción (Botones.module.css): verde azulado para
+   *  finalizar, morado para restablecer una contraseña. */
+  tono?:          "finalizar" | "clave";
+}
+
+function claseConfirmar(o: OpcionesConfirmacion): string {
+  if (o.peligroso) return styles.btnPeligro;
+  if (o.exito) return styles.btnExito;
+  if (o.tono === "finalizar") return styles.btnFinalizar;
+  if (o.tono === "clave") return styles.btnClave;
+  return styles.btnConfirmar;
 }
 
 type Resolver = (decision: boolean) => void;
@@ -58,7 +71,6 @@ export function ProveedorConfirmacion({ children }: { children: ReactNode }) {
     if (!estado) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") responder(false);
-      if (e.key === "Enter")  responder(true);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -76,7 +88,7 @@ export function ProveedorConfirmacion({ children }: { children: ReactNode }) {
             ref={refModal}
             className={styles.modal}
             onClick={e => e.stopPropagation()}
-            role="dialog"
+            role={estado.peligroso ? "alertdialog" : "dialog"}
             aria-modal="true"
             aria-labelledby={estado.titulo ? "confirmacion-titulo" : undefined}
             aria-describedby="confirmacion-mensaje"
@@ -84,11 +96,12 @@ export function ProveedorConfirmacion({ children }: { children: ReactNode }) {
             {estado.titulo && <h3 id="confirmacion-titulo" className={styles.titulo}>{estado.titulo}</h3>}
             <div id="confirmacion-mensaje" className={styles.mensaje}>{estado.mensaje}</div>
             <div className={styles.acciones}>
-              <button className={styles.btnCancelar} onClick={() => responder(false)}>
+              <button type="button" className={styles.btnCancelar} onClick={() => responder(false)}>
                 {estado.textoCancelar ?? "Cancelar"}
               </button>
               <button
-                className={estado.peligroso ? styles.btnPeligro : estado.exito ? styles.btnExito : styles.btnConfirmar}
+                type="button"
+                className={claseConfirmar(estado)}
                 onClick={() => responder(true)}
                 data-focus-inicial
               >

@@ -1,0 +1,89 @@
+/* Botones de toda la aplicación. Cada módulo los compone y agrega solo lo suyo
+   (ancho, margen):
+     .btnGuardar { composes: boton primario from "../../components/Botones.module.css"; }
+   Antes cada página definía los suyos y había diez tamaños de botón principal.
+   Jerarquía (revisión del 2026-10-19): principal amarillo, uno por pantalla;
+   secundario neutro con borde; aprobar en verde y denegar en rojo; texto para
+   lo terciario. Desactivado en gris, nunca amarillo a media opacidad. */
+
+.boton {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 38px; padding: 8px 16px; border-radius: var(--r-sm);
+  border: 1.5px solid transparent; background: transparent; color: var(--text);
+  font: inherit; font-size: .86rem; font-weight: 700; line-height: 1.2;
+  text-decoration: none; white-space: nowrap; cursor: pointer;
+  transition: background var(--t) var(--ease), border-color var(--t) var(--ease),
+    color var(--t) var(--ease), box-shadow var(--t) var(--ease), filter var(--t) var(--ease);
+}
+.boton:disabled {
+  background: var(--overlay-2); border-color: transparent; color: var(--muted);
+  box-shadow: none; filter: none; cursor: not-allowed;
+}
+
+.primario { background: var(--y); color: var(--on-accent); }
+.primario:hover:not(:disabled) {
+  background: var(--y-hover);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--y-dark) 28%, transparent);
+}
+
+.secundario { background: var(--card); border-color: var(--border-2); color: var(--text); }
+.secundario:hover:not(:disabled) { background: var(--hover); border-color: var(--input-border); }
+
+.texto { min-height: 0; padding: 8px 10px; color: var(--text-2); }
+.texto:hover:not(:disabled) { color: var(--text); background: var(--hover); }
+.texto:disabled { background: transparent; }
+
+/* Cada acción con su color (pedido del usuario del 2026-10-22: «colores
+   diferenciadores»). El color dice qué pasa al pulsar y, en las solicitudes,
+   es el de la insignia del estado al que lleva:
+     azul           consultar: ver, descargar, buscar, editar, asignar
+     verde          aprobar, activar, dar acceso
+     verde azulado  finalizar
+     naranja        devolver a corrección, corregir
+     gris           desactivar (la cuenta queda «Inactiva», insignia gris)
+     morado         restablecer una contraseña
+     rojo           denegar, eliminar, quitar
+   Relleno para la que decide (la del modal, la del panel); contorno teñido
+   para las de una lista o una fila. El amarillo sigue siendo el principal. */
+.exito     { background: var(--exito-fuerte);   color: var(--sobre-fuerte); }
+.peligro   { background: var(--peligro-fuerte); color: var(--sobre-fuerte); }
+.aviso     { background: var(--aviso-fuerte);   color: var(--sobre-fuerte); }
+.finalizar { background: var(--final-fuerte);   color: var(--sobre-fuerte); }
+.clave     { background: var(--clave-fuerte);   color: var(--sobre-fuerte); }
+.exito:hover:not(:disabled), .peligro:hover:not(:disabled), .aviso:hover:not(:disabled),
+.finalizar:hover:not(:disabled), .clave:hover:not(:disabled) { filter: brightness(1.1); }
+
+/* Contornos: texto y borde del color, fondo apenas teñido. Van después de
+   .secundario para ganarle; :disabled (más específico) los sigue dejando grises. */
+.tono {
+  color: var(--tono);
+  border-color: color-mix(in srgb, var(--tinte, var(--tono)) 55%, transparent);
+  background: color-mix(in srgb, var(--tinte, var(--tono)) 7%, var(--card));
+}
+.tono:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--tinte, var(--tono)) 12%, var(--card));
+  border-color: var(--tinte, var(--tono));
+}
+.consultar       { composes: tono; --tono: var(--acc-blue); }
+.activar         { composes: tono; --tono: var(--acc-green); }
+.finalizarContorno { composes: tono; --tono: var(--acc-teal); }
+/* Texto en --naranja-boton; borde y fondo en el tinte vivo (globals.css). */
+.advertir        { composes: tono; --tono: var(--naranja-boton); --tinte: var(--tinte-naranja); }
+.apagar          { composes: tono; --tono: var(--acc-gray); }
+.credencial      { composes: tono; --tono: var(--acc-purple); }
+.peligroContorno { composes: tono; --tono: var(--acc-red); }
+
+.chico { min-height: 32px; padding: 5px 12px; font-size: .8rem; }
+.grande { min-height: 46px; padding: 11px 24px; font-size: .94rem; }
+
+/* Solo ícono (lleva aria-label): cuadrado y neutro. */
+.icono { width: 32px; height: 32px; min-height: 0; padding: 0; border-color: var(--border-2); color: var(--text-2); }
+.icono:hover:not(:disabled) { color: var(--text); border-color: var(--input-border); background: var(--hover); }
+.icono:disabled { background: transparent; border-color: var(--border); opacity: .45; }
+.icono.chico { width: 28px; height: 28px; }
+/* Ícono que abre o descarga un documento: en azul, como el resto de consultar. */
+.iconoConsultar { color: var(--acc-blue); }
+.iconoConsultar:hover:not(:disabled) { color: var(--acc-blue); background: color-mix(in srgb, var(--acc-blue) 12%, transparent); border-color: color-mix(in srgb, var(--acc-blue) 45%, transparent); }
+/* Ícono que quita algo (tripulante, archivo): en rojo desde el principio. */
+.iconoPeligro { color: var(--acc-red); }
+.iconoPeligro:hover:not(:disabled) { color: var(--acc-red); background: var(--red-soft); border-color: color-mix(in srgb, var(--acc-red) 45%, transparent); }

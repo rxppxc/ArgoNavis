@@ -11,7 +11,6 @@
   background: var(--red-soft); border: 1px solid var(--red); border-radius: var(--r-sm);
   color: var(--acc-red); padding: 10px 14px; font-size: .86rem; margin-bottom: 14px;
 }
-.cargando { color: var(--text-2); font-size: .88rem; padding: 28px 0; }
 .atenuado { opacity: .55; transition: opacity var(--t); }
 
 /* ─── Indicadores (stat tiles) ─── */
@@ -23,12 +22,12 @@
 @media (max-width: 960px) { .indicadores { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .indicadores { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .indicador {
-  display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 10px;
+  display: grid; grid-template-columns: auto 1fr; grid-template-rows: 1fr auto; gap: 10px;
   padding: 14px 16px; border-radius: var(--r-md);
   background: var(--card); border: 1px solid var(--border);
 }
 .icono {
-  grid-row: span 2; align-self: center;
+  grid-row: 2; grid-column: 1; align-self: end;
   width: 36px; height: 36px; border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
   background: var(--overlay);
@@ -40,9 +39,9 @@
 .critico    { color: var(--acc-red); }
 .expirada   { color: var(--acc-gray); }
 .finalizada { color: var(--acc-teal); }
-.etiqueta { color: var(--text-2); font-size: .76rem; font-weight: 600; }
+.etiqueta { grid-row: 1; grid-column: 1 / -1; color: var(--text-2); font-size: .76rem; font-weight: 600; line-height: 1.35; }
 /* Cifras proporcionales en los valores grandes (tabulares solo en columnas). */
-.valor { color: var(--text); font-size: 1.45rem; font-weight: 700; line-height: 1.2; }
+.valor { grid-row: 2; grid-column: 2; align-self: center; color: var(--text); font-size: 1.45rem; font-weight: 700; line-height: 1.2; }
 
 .estadoActual {
   display: flex; flex-wrap: wrap; gap: 6px 18px;

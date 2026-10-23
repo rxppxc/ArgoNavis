@@ -112,7 +112,24 @@ constants/          → números mágicos.
   - El foco va en azul institucional en claro y en amarillo en oscuro y sobre la cabecera.
   - Sin colores fijos en los CSS: los tintes de estado se arman con `color-mix(in srgb, var(--acc-*) N%, transparent)`. Quedan fijos solo la bandera, la hoja del visor de documentos y la barra del navegador (`#1B252F`: `index.html`, `tema-inicial.js` y `ContextoTema.tsx`).
 - El amarillo de marca (`--y`) es solo **relleno**: el botón principal de cada pantalla, lo seleccionado (pestaña, filtro, tema) y el foco en oscuro. **Nunca como color de texto** (en claro da 1.6:1 y el dorado se ve oliva): textos con `--text` / `--text-2` / `--muted`, estados con `--acc-*`. Sobre el amarillo, texto marino (`--on-accent`), como los botones de la web.
-- Botones: principal amarillo; secundario neutro con borde; aprobar con `--exito-fuerte`, denegar/eliminar con `--peligro-fuerte` (o contorno rojo); "Volver" discreto. Desactivado en gris (`--overlay-2` + `--muted`), no amarillo a media opacidad. En `useConfirmar`, `peligroso` (rojo) o `exito` (verde) según la acción.
+- Cada acción con su color (pedido del usuario del 2026-10-22), definido en `Botones.module.css`. En las solicitudes, el color es el de la insignia del estado al que lleva:
+  - azul: consultar (ver, descargar, buscar, editar, asignar);
+  - verde: aprobar, activar;
+  - verde azulado: finalizar;
+  - naranja: devolver a corrección, corregir;
+  - gris: desactivar;
+  - morado: restablecer una contraseña;
+  - rojo: denegar, eliminar, quitar.
+  
+  Relleno para la acción que decide; contorno teñido (`.tono` con `--tono`) para las de una fila. Un naranja de contorno junto a uno rojo no se distingue en claro: por eso «Devolver» lleva relleno y «Desactivar» va en gris. El modal de confirmación toma el color con `tono`.
+- Botones: principal amarillo; secundario neutro con borde; aprobar con `--exito-fuerte`, denegar/eliminar con `--peligro-fuerte` (o contorno rojo); "Volver" sólido (`--card` con borde: sobre el fondo decorativo, transparente no se leía). Desactivado en gris (`--overlay-2` + `--muted`), no amarillo a media opacidad. En `useConfirmar`, `peligroso` (rojo) o `exito` (verde) según la acción.
+  - Un botón principal no se desactiva porque falten datos: al pulsarlo dice qué falta (gris y sin explicación no se entendía, 2026-10-22). Se desactiva solo mientras guarda, o cuando al lado dice por qué (revisión de UCVMM).
+- Fondo «carta celeste» entre la cabecera y el pie, en todas las vistas y el login (`FondoPagina`, elegido por el usuario el 2026-10-22). Es decorativo y tenue a propósito, porque cruza títulos y botones. `.medio` lleva `overflow: clip`, no `hidden`: con hidden deja de funcionar el panel fijo de la revisión.
+  - Solo en el login tiene movimiento (`animado`), con la variante «rutas vivas» que eligió el usuario el 2026-10-23: las rutas se trazan al entrar, las recorren luces doradas y las estrellas laten. En las pantallas de trabajo no se anima, para no distraer.
+  - Sin haz de faro ni giro del astrolabio: mueven capas del tamaño de la pantalla y, en equipos sin tarjeta gráfica, el login caía a 22 cuadros por segundo.
+  - Así va a 60 y usa ~13 % de un núcleo mientras está abierto (medido con `--disable-gpu`). Si se necesita menos, se pueden pasar estrellas y luces a elementos HTML que mueva la tarjeta gráfica.
+  - Se mueve aunque el equipo pida «reducir movimiento» (decisión del usuario del 2026-10-23: muchos equipos del SNM traen las animaciones de Windows apagadas y no se veía nada). Para eso, `data-movimiento` lo saca de la regla global de `globals.css`.
+  - A cambio, lleva el botón «Pausar animación» (WCAG 2.2.2), que se recuerda en `localStorage["fondo-pausado"]`. No lo quites.
 - "En corrección" va en naranja (`--acc-orange`): el ámbar se confundía con la marca.
 - Encabezado de página: `EncabezadoPagina` (título y descripción a la izquierda, acciones a la derecha); el expediente lleva el suyo.
 - Campos con `--input-border` / `--input-bg` (borde de 3:1). Las notas informativas, neutras con borde izquierdo `--acc-blue`.
@@ -175,11 +192,21 @@ Las agencias entran por la VPN, pero no son del SNM: se las trata como no confia
   - Los funcionarios también entran por la VPN: el login del AD no se restringe por red.
   - Segundo factor (TOTP) para las agencias: más adelante. Antivirus de los archivos: por ahora no.
 
+### Pruebas del frontend y formulario partido (2026-10-21)
+- Las reglas espejadas tienen casos compartidos en `backend/tests/espejo/*.json` (IMO, contraseñas, checklist, tripulantes). Los corren `test_espejo.py` (pytest) y los `*.test.ts` (Vitest); `test_constantes_iguales_en_el_frontend` compara las constantes (formatos, 2 MB, contraseñas, edad, anticipación, adicionales, rangos con libreta).
+  - Encontraron una diferencia real: el 29 de febrero el frontend daba 18 años a quien nació el 1 de marzo. Se corrigió en `desplazar` (`validacionFormulario.ts`).
+- Pruebas en el navegador (`frontend/e2e/`, Playwright):
+  - `flujo-completo.spec.ts`: envío, devolución, corrección, aprobación, PDF y QR, finalización y bitácora.
+  - `formulario.spec.ts`: el formulario sin enviar (cambiar de trámite, quitar un tripulante, adicionales).
+  - `backend/tests/servidor_e2e.py` levanta la API en 127.0.0.1:8001 con la BD `argonavis_e2e` y una cuenta local por rol que solo existe ahí. La BD se borra al terminar (`e2e/limpiar.ts`).
+  - Los `<input type="file">` del checklist llevan `aria-label` («Adjuntar / Reemplazar <documento> de <tripulante>»): los usan los lectores de pantalla y el E2E.
+- `PaginaSolicitud` (684 líneas) se partió sin cambiar lo que hace: carga (`useCargaFormulario`), formulario (`FormularioSolicitud`), estado (`useTripulantesFormulario`, `useDocumentosFormulario`), secciones (`DatosTramite`, `ChecklistSolicitud`) y la ida y vuelta sin React (`envioSolicitud.ts`, con sus pruebas: precarga y armado del envío).
+
 ### Lo que sigue pendiente (no urgente)
 1. **HTTPS y TLS con el AD** — la configuración está lista (README → "Producción"); falta el certificado del servidor y el del controlador de dominio (infraestructura).
 2. **JWT en cookie httpOnly** — actualmente en localStorage, con la CSP como barrera (regla 15). Plan en README → "Decisiones documentadas".
 3. **Redis para rate limit** si se escala a varios hosts (en un host con varios workers el límite es por proceso).
-4. **Refactor de componentes grandes** (`PaginaSolicitud` ~680 líneas) extrayendo subcomponentes y hooks. El expediente ya se partió (2026-10-19).
+4. **Refactor de componentes grandes** — el expediente (2026-10-19) y el formulario (2026-10-21) ya se partieron. Quedan las páginas de administración (`PaginaUsuarios`, `PaginaCatalogos`, ~440 líneas), sin urgencia.
 5. **Edición del catálogo de trámites desde la UI** — hoy se ajusta con migraciones.
 6. **Solicitud de Custodia y Solicitud de Transbordos** — el documento de UCVMM dice que faltan por levantar; no están modeladas.
 7. **Política de retención de datos personales** — decisión del equipo.
@@ -288,6 +315,7 @@ Desde el 2026-10-16 todo se llama ARGO NAVIS: la base `argonavis`, los documento
 1. Lee el módulo completo antes de editar. La estructura DDD no es opcional.
 2. Si vas a tocar el contrato HTTP (schemas o endpoints), busca primero quién los consume en el frontend con Grep.
 3. Si vas a tocar la BD, el esquema lo maneja Alembic (`backend/alembic/versions/`): crea una revisión nueva con su `downgrade`.
+4. Si cambias una regla espejada (backend y frontend), agrega su caso en `backend/tests/espejo/` y corre las dos suites (`pytest` y `npm test`).
 
 ### Antes de proponer un cambio grande
 Hacé una pregunta corta primero. El proyecto está en producción de un organismo gubernamental, los cambios silenciosos no son gratis.
@@ -303,6 +331,11 @@ cd backend && venv\Scripts\python -m pytest
 :: Frontend: typecheck y lint
 cd frontend && node node_modules/typescript/bin/tsc -b --noEmit
 cd frontend && npm run lint
+
+:: Frontend: pruebas unitarias (Vitest) y recorrido completo en el navegador (Playwright,
+:: con su propio backend en 8001 y la BD temporal argonavis_e2e; Chrome o PLAYWRIGHT_CHROMIUM=1)
+cd frontend && npm test
+cd frontend && npm run test:e2e
 
 :: Arranque dev (dos terminales separadas)
 start-backend.bat

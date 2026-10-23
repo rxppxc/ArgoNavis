@@ -10,10 +10,13 @@ import { Link, useParams } from "react-router-dom";
 import {
   apiSolicitudes, type DocumentoSolicitud, type SolicitudDetalle, type TripulanteSolicitud,
 } from "../../api/solicitudes";
+import { EstadoCarga } from "../../components/EstadoCarga";
 import { MarcoPagina } from "../../components/MarcoPagina";
 import { ModalPreview } from "../../components/ModalPreview";
 import { useNotificacion } from "../../components/Notificaciones";
 import { IconoAlerta, IconoDescargar, IconoEditar, IconoX } from "../../components/Iconos";
+import { useAtraparFoco } from "../../hooks/useAtraparFoco";
+import { useTituloDocumento } from "../../hooks/useTituloDocumento";
 import { mensajeDeError } from "../../utils/errores";
 import { DocumentosSolicitud } from "./DocumentosSolicitud";
 import { HistorialSolicitud } from "./HistorialSolicitud";
@@ -107,6 +110,38 @@ function BannerEstado({ s }: { s: SolicitudDetalle }) {
   }
 }
 
+/** Documentos de un tripulante. Como los demás modales: el foco queda adentro
+ *  (y vuelve al botón que lo abrió) y Escape lo cierra, salvo que encima esté
+ *  abierta la vista previa, que se cierra primero. */
+function ModalDocumentacion({ tripulante, tapado, onCerrar, children }: {
+  tripulante: TripulanteSolicitud; tapado: boolean; onCerrar: () => void; children: React.ReactNode;
+}) {
+  const refModal = useAtraparFoco(!tapado);
+  useEffect(() => {
+    if (tapado) return;
+    function alTeclear(e: KeyboardEvent) {
+      if (e.key === "Escape") onCerrar();
+    }
+    window.addEventListener("keydown", alTeclear);
+    return () => window.removeEventListener("keydown", alTeclear);
+  }, [tapado, onCerrar]);
+
+  return (
+    <div className={styles.modalFondo} onClick={onCerrar}>
+      <div ref={refModal} className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="titulo-documentacion"
+        onClick={(e) => e.stopPropagation()}>
+        <div className={styles.modalCabecera}>
+          <h2 id="titulo-documentacion" className={styles.panelTitulo}>Documentación de {tripulante.nombre_completo}</h2>
+          <button type="button" className={styles.btnIcono} onClick={onCerrar} aria-label="Cerrar" data-focus-inicial>
+            <IconoX tamano={14} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function Dato({ etiqueta, valor }: { etiqueta: string; valor: string | null | undefined }) {
   if (!valor) return null;
   return (
@@ -122,6 +157,7 @@ export default function PaginaDetalleSolicitud() {
   const solicitudId = Number(id);
   const [solicitud, setSolicitud] = useState<SolicitudDetalle | null>(null);
   const [error, setError] = useState<string | null>(null);
+  useTituloDocumento(solicitud ? `${solicitud.numero ?? `Solicitud ${solicitud.id}`} · ${solicitud.tipo_tramite_nombre}` : "Expediente");
 
   useEffect(() => {
     let cancelado = false;
@@ -134,12 +170,12 @@ export default function PaginaDetalleSolicitud() {
   if (error) {
     return (
       <MarcoPagina volverA="/dashboard">
-        <div className={styles.error}><IconoAlerta /> {error}</div>
+        <div className={styles.error} role="alert"><IconoAlerta /> {error}</div>
       </MarcoPagina>
     );
   }
   if (!solicitud) {
-    return <MarcoPagina volverA="/dashboard"><div className={styles.cargando}>Cargando expediente…</div></MarcoPagina>;
+    return <MarcoPagina volverA="/dashboard"><EstadoCarga texto="Cargando expediente…" pagina /></MarcoPagina>;
   }
   // key: al pasar a otro expediente se descarta lo que se estaba marcando o viendo en el anterior.
   return <Expediente key={solicitud.id} s={solicitud} onActualizada={setSolicitud} />;
@@ -192,7 +228,7 @@ function Expediente({ s, onActualizada }: { s: SolicitudDetalle; onActualizada: 
           )}
           {s.acciones.descargar_autorizacion && (
             // Para el puesto de control la acción principal es finalizar (en su panel): la descarga queda secundaria.
-            <button type="button" className={s.acciones.finalizar ? styles.btnSecundario : styles.btnPrimario}
+            <button type="button" className={s.acciones.finalizar ? styles.btnConsultar : styles.btnPrimario}
               onClick={descargarPdf} disabled={descargando}>
               <IconoDescargar tamano={15} /> {descargando ? "Generando…" : "Descargar autorización (PDF)"}
             </button>
@@ -275,20 +311,10 @@ function Expediente({ s, onActualizada }: { s: SolicitudDetalle; onActualizada: 
       </div>
 
       {documentacionDe && (
-        <div className={styles.modalFondo} onClick={() => setDocumentacionDe(null)}>
-          <div className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="titulo-documentacion"
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => { if (e.key === "Escape") setDocumentacionDe(null); }}>
-            <div className={styles.modalCabecera}>
-              <h2 id="titulo-documentacion" className={styles.panelTitulo}>Documentación de {documentacionDe.nombre_completo}</h2>
-              <button type="button" className={styles.btnIcono} onClick={() => setDocumentacionDe(null)}
-                aria-label="Cerrar" autoFocus>
-                <IconoX tamano={14} />
-              </button>
-            </div>
-            <DocumentosSolicitud solicitud={s} onVer={setVistaPrevia} tripulanteId={documentacionDe.id} />
-          </div>
-        </div>
+        <ModalDocumentacion tripulante={documentacionDe} onCerrar={() => setDocumentacionDe(null)}
+          tapado={vistaPrevia !== null}>
+          <DocumentosSolicitud solicitud={s} onVer={setVistaPrevia} tripulanteId={documentacionDe.id} />
+        </ModalDocumentacion>
       )}
       {vistaPrevia && (
         <ModalPreview solicitudId={s.id} documento={vistaPrevia} onCerrar={() => setVistaPrevia(null)} />

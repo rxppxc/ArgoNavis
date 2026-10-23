@@ -1,0 +1,11 @@
+[
+  {"caso": "con prefijo IMO", "valor": "IMO 9074729", "esperado": "9074729"},
+  {"caso": "solo los dígitos", "valor": "9074729", "esperado": "9074729"},
+  {"caso": "prefijo en minúsculas y sin espacio", "valor": "imo9074729", "esperado": "9074729"},
+  {"caso": "con espacios alrededor", "valor": "  IMO 9074729  ", "esperado": "9074729"},
+  {"caso": "dígito verificador incorrecto", "valor": "1234568", "esperado": null},
+  {"caso": "seis dígitos", "valor": "907472", "esperado": null},
+  {"caso": "ocho dígitos", "valor": "IMO 90747290", "esperado": null},
+  {"caso": "con guion", "valor": "IMO-9074729", "esperado": null},
+  {"caso": "vacío", "valor": "", "esperado": null}
+]

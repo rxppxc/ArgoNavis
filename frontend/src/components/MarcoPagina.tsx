@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { FondoPagina } from "./FondoPagina";
 import { BotonVolver } from "./BotonVolver";
 import { CabeceraInstitucional } from "./CabeceraInstitucional";
 import { MenuCabecera } from "./MenuCabecera";
@@ -11,21 +12,25 @@ interface Props {
   volverA?: string;
   /** Página pública (sin sesión): no muestra el menú. */
   publica?: boolean;
-  ancho?: "normal" | "amplio";
+  /** angosto: una sola tarjeta (cambiar contraseña); el "Volver" queda alineado con ella. */
+  ancho?: "angosto" | "normal" | "amplio";
 }
 
 /** Estructura común de página: la misma franja institucional y el mismo pie
  *  del login, con el menú del usuario a la derecha; "Volver" va arriba del contenido. */
 export function MarcoPagina({ children, volverA, publica = false, ancho = "normal" }: Props) {
-  const claseAncho = ancho === "amplio" ? styles.amplio : "";
+  const claseAncho = ancho === "amplio" ? styles.amplio : ancho === "angosto" ? styles.angosto : "";
   return (
     <div className={styles.pagina}>
-      <CabeceraInstitucional derecha={!publica && <MenuCabecera />} />
+      <CabeceraInstitucional derecha={!publica && <MenuCabecera />} inicio={publica ? undefined : "/dashboard"} />
 
-      <main className={`${styles.contenido} ${claseAncho}`}>
-        {volverA && <div className={styles.volver}><BotonVolver to={volverA} /></div>}
-        {children}
-      </main>
+      <div className={styles.medio}>
+        <FondoPagina />
+        <main className={`${styles.contenido} ${claseAncho}`}>
+          {volverA && <div className={styles.volver}><BotonVolver to={volverA} /></div>}
+          {children}
+        </main>
+      </div>
 
       <PieInstitucional />
     </div>

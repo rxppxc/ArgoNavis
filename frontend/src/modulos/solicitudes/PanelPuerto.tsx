@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiCatalogos, type PuestoMini } from "../../api/catalogos";
 import { apiSolicitudes, type SolicitudDetalle } from "../../api/solicitudes";
+import { IconoExito } from "../../components/Iconos";
 import { useConfirmar } from "../../components/ModalConfirmacion";
 import { useNotificacion } from "../../components/Notificaciones";
 import { mensajeDeError } from "../../utils/errores";
@@ -45,6 +46,7 @@ export function PanelPuerto({ solicitud, onActualizada }: Props) {
       mensaje: `Se registrará la operación con tu comentario como finalizada en ${nombrePuesto}`
         + `${otroPuesto ? ` (la autorización era para ${solicitud.puesto_nombre})` : ""} y la autorización quedará cerrada.`,
       textoOk: "Finalizar",
+      tono: "finalizar",
     });
     if (!ok) return;
     setTrabajando(true);
@@ -85,11 +87,10 @@ export function PanelPuerto({ solicitud, onActualizada }: Props) {
       {otroPuesto && (
         <p className={styles.ayuda}>La operación terminó en otro puesto: así quedará en el expediente y en la autorización.</p>
       )}
-      <div className={styles.filaBotones}>
-        <button type="button" className={styles.btnPrimario} onClick={finalizar} disabled={trabajando}>
-          {trabajando ? "Finalizando…" : "Finalizar"}
-        </button>
-      </div>
+      {/* A todo el ancho, como las decisiones de UCVMM: es la acción del panel. */}
+      <button type="button" className={`${styles.btnFinalizar} ${styles.anchoCompleto}`} onClick={finalizar} disabled={trabajando}>
+        <IconoExito tamano={15} /> {trabajando ? "Finalizando…" : "Finalizar"}
+      </button>
     </section>
   );
 }

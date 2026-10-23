@@ -7,7 +7,12 @@
 
 /* La cabecera y el pie son los del login (CabeceraInstitucional y PieInstitucional). */
 
+/* El área entre la cabecera y el pie: la decoración queda detrás del contenido. */
+/* overflow: clip y no hidden: hidden rompería el panel fijo (sticky) del expediente. */
+.medio { flex: 1; position: relative; overflow: clip; display: flex; }
+
 .contenido {
+  position: relative;
   flex: 1;
   width: 100%;
   max-width: 1040px;
@@ -16,6 +21,7 @@
 }
 
 .amplio { max-width: 1240px; }
+.angosto { max-width: 516px; }
 
 .volver { margin-bottom: 18px; }
 

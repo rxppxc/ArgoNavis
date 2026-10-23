@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useAtraparFoco } from "../hooks/useAtraparFoco";
+import { IconoReloj } from "./Iconos";
 import styles from "./ModalExpiracionSesion.module.css";
 
 interface Props {
@@ -36,17 +37,18 @@ export function ModalExpiracionSesion({ segundos, onContinuar, onCerrarSesion }:
         aria-labelledby="expiracion-titulo"
         aria-describedby="expiracion-texto"
       >
-        <div className={styles.icono}>⏱</div>
+        {/* El ícono de la aplicación y no un emoji, que cambia según el sistema. */}
+        <div className={styles.icono} aria-hidden="true"><IconoReloj tamano={30} /></div>
         <h2 id="expiracion-titulo" className={styles.titulo}>Sesión por expirar</h2>
         <p id="expiracion-texto" className={styles.texto}>
           Tu sesión se cerrará automáticamente por inactividad en:
         </p>
         <div className={styles.cuenta}>{cuenta}</div>
         <div className={styles.botones}>
-          <button className={styles.btnContinuar} onClick={onContinuar} data-focus-inicial>
+          <button type="button" className={styles.btnContinuar} onClick={onContinuar} data-focus-inicial>
             Continuar sesión
           </button>
-          <button className={styles.btnSalir} onClick={onCerrarSesion}>
+          <button type="button" className={styles.btnSalir} onClick={onCerrarSesion}>
             Cerrar sesión
           </button>
         </div>

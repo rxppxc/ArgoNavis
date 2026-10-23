@@ -4,6 +4,7 @@ import { useAutenticacion } from "./hooks/useAutenticacion";
 import { usePermisos } from "./hooks/usePermisos";
 import { RUTA_CAMBIAR_CONTRASENA, vencimientoDelToken } from "./api/client";
 import { CapturadorErrores } from "./components/CapturadorErrores";
+import { CargandoRuta } from "./components/EstadoCarga";
 import { ModalExpiracionSesion } from "./components/ModalExpiracionSesion";
 import { ProveedorNotificaciones } from "./components/Notificaciones";
 import { ProveedorConfirmacion } from "./components/ModalConfirmacion";
@@ -33,22 +34,6 @@ const PaginaEstadisticas    = lazy(() => import("./modulos/administracion/Pagina
 const PaginaTramites        = lazy(() => import("./modulos/administracion/PaginaTramites"));
 const PaginaCatalogos       = lazy(() => import("./modulos/administracion/PaginaCatalogos"));
 const PaginaBitacora        = lazy(() => import("./modulos/administracion/PaginaBitacora"));
-
-function CargandoRuta() {
-  return (
-    <div style={{
-      minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
-      background: "var(--bg)",
-    }}>
-      <div style={{
-        width: 32, height: 32, borderRadius: "50%",
-        border: "3px solid var(--y-border)", borderTopColor: "var(--y)",
-        animation: "girar .7s linear infinite",
-      }} />
-      <style>{"@keyframes girar { to { transform: rotate(360deg); } }"}</style>
-    </div>
-  );
-}
 
 /** Con sesión. Una cuenta con cambio de contraseña pendiente solo puede ir a cambiarla.
  *  Sin sesión, al login recordando la página pedida (p. ej. el enlace de un correo). */

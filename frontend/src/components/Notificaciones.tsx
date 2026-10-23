@@ -12,9 +12,10 @@
  *   mostrar("Procesando…", "info", 0);  // 0 = no auto-cierre
  */
 import {
-  createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
+  createContext, useCallback, useContext, useMemo, useRef, useState,
 } from "react";
 import type { ReactNode } from "react";
+import { IconoX } from "./Iconos";
 import styles from "./Notificaciones.module.css";
 
 export type TipoNotificacion = "exito" | "error" | "info" | "aviso";
@@ -72,12 +73,11 @@ export function ProveedorNotificaciones({ children }: { children: ReactNode }) {
 }
 
 function ItemNotificacion({ mensaje, onCerrar }: { mensaje: Mensaje; onCerrar: () => void }) {
-  useEffect(() => undefined, []);
   return (
     <div className={`${styles.toast} ${styles[mensaje.tipo]}`}>
       <span className={styles.texto}>{mensaje.texto}</span>
-      <button className={styles.cerrar} onClick={onCerrar} aria-label="Cerrar">
-        ×
+      <button type="button" className={styles.cerrar} onClick={onCerrar} aria-label="Cerrar aviso">
+        <IconoX tamano={14} />
       </button>
     </div>
   );

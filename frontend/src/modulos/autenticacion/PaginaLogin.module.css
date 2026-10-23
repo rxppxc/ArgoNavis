@@ -3,9 +3,10 @@
    (CabeceraInstitucional y PieInstitucional). Todo con los tokens de tema. */
 .pagina { min-height: 100vh; display: flex; flex-direction: column; background: var(--bg); color: var(--text); }
 
-/* ─── Cuerpo ─── */
+/* ─── Cuerpo: la carta celeste (FondoPagina) va detrás ─── */
+.medio { flex: 1; position: relative; overflow: clip; display: flex; }
 .cuerpo {
-  flex: 1; display: grid; grid-template-columns: 1fr 440px; gap: 56px; align-items: center;
+  position: relative; flex: 1; display: grid; grid-template-columns: 1fr 440px; gap: 56px; align-items: center;
   max-width: 1200px; width: 100%; margin: 0 auto; padding: 28px 24px;
 }
 /* El logo ya dice "ARGO NAVIS" y "Sistema Interno Marítimo - SNM": aquí no se repite en texto. */
@@ -45,16 +46,7 @@
 .campo input::placeholder { color: var(--muted); }
 .ojo { padding: 4px; color: var(--muted); font-size: .78rem; font-weight: 600; }
 .ojo:hover { color: var(--text); }
-.ingresar {
-  width: 100%; margin-top: 4px; padding: 12px; border-radius: var(--r-sm);
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  background: var(--y); color: var(--on-accent); font-size: .98rem; font-weight: 700; letter-spacing: .2px;
-  transition: filter var(--t) var(--ease);
-}
-.ingresar:hover:not(:disabled) { filter: brightness(1.05); }
-/* Desactivado en gris: el amarillo a media opacidad quedaba mostaza en oscuro y
-   casi ilegible en claro. */
-.ingresar:disabled { background: var(--overlay-2); color: var(--muted); cursor: not-allowed; }
+.ingresar { composes: boton primario grande from "../../components/Botones.module.css"; width: 100%; margin-top: 4px; }
 .spinner {
   width: 15px; height: 15px; border-radius: 50%;
   border: 2px solid color-mix(in srgb, var(--on-accent) 30%, transparent); border-top-color: var(--on-accent);
@@ -74,7 +66,8 @@
   .logoGrande { width: 290px; }
 }
 @media (max-width: 880px) {
-  .cuerpo { grid-template-columns: 1fr; gap: 20px; padding: 18px 16px; }
+  /* Abajo, lugar para «Pausar animación» (FondoPagina): si no, tapa la tarjeta. */
+  .cuerpo { grid-template-columns: 1fr; gap: 20px; padding: 18px 16px 64px; }
   .logoGrande { width: 150px; }
   .coordenadas { display: none; }
   .acceso { padding: 24px 20px; }

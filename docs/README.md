@@ -19,8 +19,9 @@ Línea base técnica y funcional de ARGO NAVIS (antes «NAVIS»), módulo **Auto
 | 06 | Arquitectura técnica y dependencias | [06-Arquitectura-tecnica-y-dependencias.docx](06-Arquitectura-tecnica-y-dependencias.docx) |
 | 07 | Inventario de integraciones | [07-Integraciones.docx](07-Integraciones.docx) |
 | 08 | Brechas, riesgos, pendientes y evidencias | [08-Brechas-riesgos-y-pendientes.docx](08-Brechas-riesgos-y-pendientes.docx) |
+| 09 | Guía de funcionamiento: cómo se usa, paso a paso y por papel | [09-Guia-de-funcionamiento.docx](09-Guia-de-funcionamiento.docx) |
 
-Se sugiere empezar por el 00 (procesos y mapa general) y terminar con el 08, que reúne los riesgos, los pendientes y la lista de puntos a validar con UCVMM.
+Para conocer el sistema sin entrar en lo técnico, empieza por el 09: explica en lenguaje sencillo qué hace cada papel (agencia, UCVMM, puesto de control y administración), con capturas. Para la línea base, se sugiere empezar por el 00 (procesos y mapa general) y terminar con el 08, que reúne los riesgos, los pendientes y la lista de puntos a validar con UCVMM.
 
 Cada documento trae portada institucional, una página de control (datos, revisión y firmas, historial de versiones y convenciones) y un índice. Si editas un documento, actualiza el índice en Word: clic derecho sobre él → **Actualizar campo**.
 

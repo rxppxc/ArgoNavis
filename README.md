@@ -60,8 +60,16 @@ Crean una base de datos temporal en el servidor de `DATABASE_URL` (o `TEST_DATAB
 cd frontend
 node node_modules/typescript/bin/tsc -b --noEmit
 npm run lint
+npm test
 npm run build
 ```
+`npm test` corre las pruebas unitarias (Vitest). Las reglas que se validan en pantalla y en el servidor (checklist, tripulantes, IMO, contraseñas, formatos y tamaño) comparten sus casos en `backend/tests/espejo/`: si una cambia de un lado y no del otro, falla pytest o Vitest.
+
+```bat
+cd frontend
+npm run test:e2e
+```
+Recorre en el navegador una autorización completa: la agencia la envía, UCVMM la devuelve, la agencia la corrige, UCVMM la aprueba, un tercero verifica el QR, el puesto la finaliza y el Administrador la ve en la bitácora. También prueba el formulario sin enviarlo: cambiar de trámite, quitar un tripulante y los documentos adicionales. Levanta su propio backend (`backend/tests/servidor_e2e.py`, puerto 8001, con la base temporal `argonavis_e2e`, que borra al terminar) y su propio Vite (puerto 5174): no choca con los de desarrollo. Usa el Chrome instalado; en un equipo sin Chrome, `npx playwright install chromium` y `set PLAYWRIGHT_CHROMIUM=1`.
 
 ### Producción
 **Docker** (`docker-compose-prod.yml`): copiar `.env.example` como `.env` en la raíz y completar. El backend aplica las migraciones al arrancar (`docker-entrypoint.sh`) y solo es accesible a través de nginx (`/api/`); su puerto no se publica.
@@ -122,10 +130,12 @@ ArgoNavis/
 │  │     ├─ tareas.py          # vencimientos, con un solo ejecutor entre workers
 │  │     └─ asignar_rol.py     # nombra el primer SysAdmin desde la consola
 │  ├─ alembic/versions/        # el esquema completo vive aquí
-│  ├─ tests/                   # pytest sobre BD temporal
+│  ├─ tests/                   # pytest sobre BD temporal; espejo/: casos compartidos con el frontend
 │  └─ storage/documentos/      # documentos de los expedientes (NO versionar)
 │
 ├─ docs/                       # línea base funcional y técnica: Word, BPMN y diagramas (ver docs/README.md)
+│
+├─ frontend/e2e/               # recorrido completo en el navegador (Playwright)
 │
 └─ frontend/src/
    ├─ App.tsx                  # rutas y proveedores (tema, sesión, permisos, avisos)
@@ -133,6 +143,7 @@ ArgoNavis/
    ├─ components/              # UI reutilizable (MarcoPagina, ModalPreview, Iconos...)
    ├─ context/                 # proveedores: tema, autenticación, permisos
    ├─ hooks/                   # useAutenticacion, usePermisos
+   ├─ pruebas/                 # ayudas de las pruebas unitarias (cada *.test.ts va junto a su módulo)
    └─ modulos/
       ├─ autenticacion/        # login y cambio de contraseña
       ├─ solicitudes/          # bandejas, formulario, expediente, verificación del QR

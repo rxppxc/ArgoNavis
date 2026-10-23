@@ -91,12 +91,6 @@
   background: #e8e8e8;
   padding: 20px;
 }
-.cargando {
-  padding: 56px 32px;
-  text-align: center;
-  color: var(--text-2);
-  font-size: .9rem;
-}
 .tablaExcel {
   border-collapse: collapse;
   font-size: .82rem;
@@ -140,19 +134,4 @@
   max-width: 380px;
 }
 .fallbackNombre { font-weight: 700; color: var(--text); }
-.btnDescargar {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
-  border-radius: var(--r-sm);
-  background: var(--y);
-  border: 1.5px solid var(--y);
-  color: var(--on-accent);
-  font-size: .88rem;
-  font-weight: 700;
-  text-decoration: none;
-  cursor: pointer;
-  transition: box-shadow var(--t);
-}
-.btnDescargar:hover { box-shadow: 0 4px 14px color-mix(in srgb, var(--y) 35%, transparent); }
+.btnDescargar { composes: boton primario from "./Botones.module.css"; }

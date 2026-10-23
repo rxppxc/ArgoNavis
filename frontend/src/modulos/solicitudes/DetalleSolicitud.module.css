@@ -1,4 +1,3 @@
-.cargando { text-align: center; color: var(--muted); padding: 60px 0; }
 .error {
   display: flex; align-items: center; gap: 10px;
   padding: 16px 18px; border-radius: 10px;
@@ -133,15 +132,8 @@
 .archivoNombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
 .archivoPeso { color: var(--muted); font-size: .72rem; flex-shrink: 0; }
 /* Ver / descargar / cerrar: neutros (se repiten en cada documento). */
-.btnIcono {
-  display: flex; align-items: center; justify-content: center;
-  width: 28px; height: 28px; flex-shrink: 0;
-  border-radius: 6px; border: 1px solid var(--border-2);
-  background: var(--card); color: var(--text-2);
-  transition: background var(--t), border-color var(--t), color var(--t);
-}
-.btnIcono:hover:not(:disabled) { background: var(--hover); border-color: var(--input-border); color: var(--text); }
-.btnIcono:disabled { opacity: .5; cursor: not-allowed; }
+.btnIcono { composes: boton icono chico from "../../components/Botones.module.css"; }
+.btnIconoVer { composes: boton icono chico iconoConsultar from "../../components/Botones.module.css"; }
 
 /* ─── Historial ─── */
 .historial { list-style: none; display: flex; flex-direction: column; }
@@ -241,52 +233,38 @@
 .filaBotones { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .filaBotones .ayuda { margin: 0 auto 0 0; }
 
-/* Aprobar es la acción principal (relleno verde), devolver es neutra y denegar
-   va en rojo de contorno. Antes eran tres contornos de color con el mismo peso. */
+/* Cada decisión con el color del estado al que lleva: aprobar en verde y
+   devolver en naranja, con relleno; denegar en rojo de contorno (es definitiva:
+   no se destaca). Devolver de contorno no se distinguía de denegar en claro. */
 .decisiones { display: grid; grid-template-columns: 1fr; gap: 7px; }
-.btnDecision {
-  padding: 10px 12px; border-radius: 8px; font-weight: 700; font-size: .85rem;
-  border: 1.5px solid var(--border-2); background: transparent; color: var(--text); text-align: left;
-  transition: background var(--t), border-color var(--t), box-shadow var(--t), filter var(--t);
-}
-.btnDecision:hover:not(:disabled) { background: var(--hover); border-color: var(--input-border); }
-.btnDecision:disabled { cursor: not-allowed; color: var(--muted); border-color: var(--border); background: transparent; }
+.btnDecision { composes: boton secundario from "../../components/Botones.module.css"; justify-content: flex-start; padding-inline: 12px; }
 .aprobar:not(:disabled),
 .aprobar:hover:not(:disabled) { background: var(--exito-fuerte); border-color: var(--exito-fuerte); color: var(--sobre-fuerte); }
 .aprobar:hover:not(:disabled) { filter: brightness(1.1); }
-.negar:not(:disabled) { color: var(--acc-red); border-color: var(--acc-red); }
-.negar:hover:not(:disabled) { background: var(--red-soft); border-color: var(--acc-red); }
+.devolver:not(:disabled),
+.devolver:hover:not(:disabled) { background: var(--aviso-fuerte); border-color: var(--aviso-fuerte); color: var(--sobre-fuerte); }
+.devolver:hover:not(:disabled) { filter: brightness(1.1); }
+.negar { composes: peligroContorno from "../../components/Botones.module.css"; }
 
-.btnPrimario, .btnSecundario, .btnExito, .btnPeligro {
-  display: inline-flex; align-items: center; gap: 7px;
-  padding: 9px 16px; border-radius: 8px;
-  font-weight: 800; font-size: .84rem; text-decoration: none;
-  transition: background var(--t), border-color var(--t), filter var(--t);
-}
-.btnPrimario { border: 0; background: var(--y); color: var(--on-accent); }
-.btnExito    { border: 0; background: var(--exito-fuerte); color: var(--sobre-fuerte); }
-.btnPeligro  { border: 0; background: var(--peligro-fuerte); color: var(--sobre-fuerte); }
-.btnPrimario:hover:not(:disabled), .btnExito:hover:not(:disabled), .btnPeligro:hover:not(:disabled) { filter: brightness(1.08); }
-/* Desactivado en gris: el amarillo a media opacidad quedaba mostaza y casi
-   igual al activo. */
-.btnPrimario:disabled, .btnExito:disabled, .btnPeligro:disabled {
-  background: var(--overlay-2); color: var(--muted); cursor: not-allowed;
-}
-.btnSecundario {
-  padding: 8px 14px; font-weight: 700; font-size: .82rem;
-  border: 1.5px solid var(--border-2); background: var(--card); color: var(--text);
-}
-.btnSecundario:hover:not(:disabled) { background: var(--hover); border-color: var(--input-border); }
-.btnSecundario:disabled { color: var(--muted); border-color: var(--border); background: transparent; cursor: not-allowed; }
+.btnPrimario { composes: boton primario from "../../components/Botones.module.css"; }
+.anchoCompleto { width: 100%; margin-top: 14px; }
+.btnSecundario { composes: boton secundario from "../../components/Botones.module.css"; }
+.btnConsultar { composes: boton consultar from "../../components/Botones.module.css"; }
+.btnCorregir { composes: boton advertir from "../../components/Botones.module.css"; }
+.btnExito { composes: boton exito from "../../components/Botones.module.css"; }
+.btnPeligro { composes: boton peligro from "../../components/Botones.module.css"; }
+.btnAviso { composes: boton aviso from "../../components/Botones.module.css"; }
+.btnFinalizar { composes: boton finalizar from "../../components/Botones.module.css"; }
+/* «Marcar todos sin impedimento»: en verde, como la opción «Sin» que marca. */
 .btnPequeno {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 5px 11px; border-radius: 999px;
-  border: 1px solid var(--border-2); background: var(--card);
-  color: var(--text); font-size: .76rem; font-weight: 600;
+  border: 1px solid color-mix(in srgb, var(--acc-green) 50%, transparent);
+  background: color-mix(in srgb, var(--acc-green) 6%, var(--card));
+  color: var(--acc-green); font-size: .76rem; font-weight: 700;
 }
-.btnPequeno:hover { background: var(--hover); border-color: var(--input-border); }
-.btnTexto { padding: 8px 10px; color: var(--text-2); font-size: .82rem; font-weight: 600; }
-.btnTexto:hover { color: var(--text); }
+.btnPequeno:hover { background: color-mix(in srgb, var(--acc-green) 14%, var(--card)); border-color: var(--acc-green); }
+.btnTexto { composes: boton texto from "../../components/Botones.module.css"; }
 
 @media (max-width: 980px) {
   .columnas { grid-template-columns: 1fr; }

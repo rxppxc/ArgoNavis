@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { apiAdmin, type Permiso, type Rol } from "../../api/admin";
 import { MarcoPagina } from "../../components/MarcoPagina";
 import { EncabezadoPagina } from "../../components/EncabezadoPagina";
+import { EstadoCarga } from "../../components/EstadoCarga";
 import { useNotificacion } from "../../components/Notificaciones";
 import { useConfirmar } from "../../components/ModalConfirmacion";
 import { mensajeDeError } from "../../utils/errores";
@@ -13,6 +14,8 @@ import styles from "./PaginaRoles.module.css";
 
 /** Roles fijos: se reconocen por el nombre, que no cambia, y sus permisos no se
  *  editan (el backend responde 400). */
+const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
+
 const NOTA_ROL_FIJO: Record<string, string> = {
   Administrador: "Tiene acceso a todo el sistema por su rol: sus permisos no se editan.",
   SysAdmin: "Administra usuarios, roles y la bitácora, y no ve solicitudes: sus permisos no se editan.",
@@ -65,15 +68,18 @@ export default function PaginaRoles() {
   async function alCrearRol(e: React.FormEvent) {
     e.preventDefault();
     const nombre = nuevoRNombre.trim();
-    if (!nombre) return;
+    if (!nombre) {
+      mostrarAviso("Escribe el nombre del rol.", "err");
+      return;
+    }
     setCreandoRol(true);
     try {
       const { data } = await apiAdmin.crearRol(nombre, nuevoRDesc.trim() || undefined);
       setRoles(prev => [...prev, data].sort((a, b) => a.nombre.localeCompare(b.nombre)));
       setNuevoRNombre(""); setNuevoRDesc("");
-      mostrarAviso("Rol creado correctamente.");
+      mostrarAviso("Rol creado.");
     } catch (err) {
-      mostrarAviso(mensajeDeError(err, "Error al crear el rol."), "err");
+      mostrarAviso(mensajeDeError(err, "No se pudo crear el rol."), "err");
     } finally {
       setCreandoRol(false);
     }
@@ -83,7 +89,7 @@ export default function PaginaRoles() {
     const ok = await confirmar({
       titulo: "Eliminar rol",
       mensaje: rol.total_usuarios > 0
-        ? `El rol "${rol.nombre}" tiene ${rol.total_usuarios} usuario(s): quedarán sin rol y sin acceso hasta que les asignes otro.`
+        ? `El rol "${rol.nombre}" tiene ${plural(rol.total_usuarios, "usuario", "usuarios")}: quedarán sin rol y sin acceso hasta que les asignes otro.`
         : `Se eliminará el rol "${rol.nombre}".`,
       textoOk: "Eliminar",
       peligroso: true,
@@ -96,7 +102,7 @@ export default function PaginaRoles() {
       if (rolAbierto === rol.id) setRolAbierto(null);
       mostrarAviso("Rol eliminado.");
     } catch (err) {
-      mostrarAviso(mensajeDeError(err, "Error al eliminar el rol."), "err");
+      mostrarAviso(mensajeDeError(err, "No se pudo eliminar el rol."), "err");
     } finally {
       setEliminandoR(null);
     }
@@ -128,7 +134,7 @@ export default function PaginaRoles() {
       setEdicion({ nombre: data.nombre, descripcion: data.descripcion ?? "" });
       mostrarAviso("Datos del rol guardados.");
     } catch (err) {
-      mostrarAviso(mensajeDeError(err, "Error al guardar el rol."), "err");
+      mostrarAviso(mensajeDeError(err, "No se pudo guardar el rol."), "err");
     } finally {
       setGuardandoDatos(null);
     }
@@ -150,7 +156,7 @@ export default function PaginaRoles() {
       setRoles(prev => prev.map(r => r.id === rolId ? data : r));
       mostrarAviso("Permisos del rol actualizados.");
     } catch (err) {
-      mostrarAviso(mensajeDeError(err, "Error al guardar los permisos."), "err");
+      mostrarAviso(mensajeDeError(err, "No se pudieron guardar los permisos."), "err");
     } finally {
       setGuardandoPermisosRol(null);
     }
@@ -182,7 +188,7 @@ export default function PaginaRoles() {
                 Los define el sistema: cada uno habilita una parte del flujo. Para dar acceso, asígnalos a un rol.
               </p>
               {cargandoPermisos ? (
-                <div className={styles.loading}><span className={styles.spinner} /> Cargando permisos…</div>
+                <EstadoCarga texto="Cargando permisos…" />
               ) : (
                 <div className={styles.permisoList}>
                   {permisosOrdenados.map(p => (
@@ -211,7 +217,8 @@ export default function PaginaRoles() {
                 <input
                   className={styles.input}
                   type="text"
-                  placeholder="Nombre del rol (ej: Operador)"
+                  placeholder="Nombre del rol (p. ej. Operador)"
+                  aria-label="Nombre del rol nuevo"
                   value={nuevoRNombre}
                   onChange={e => setNuevoRNombre(e.target.value)}
                   maxLength={100}
@@ -220,13 +227,14 @@ export default function PaginaRoles() {
                   className={styles.input}
                   type="text"
                   placeholder="Descripción (opcional)"
+                  aria-label="Descripción del rol nuevo"
                   value={nuevoRDesc}
                   onChange={e => setNuevoRDesc(e.target.value)}
                 />
                 <button
                   type="submit"
                   className={styles.btnCrear}
-                  disabled={creandoRol || !nuevoRNombre.trim()}
+                  disabled={creandoRol}
                 >
                   {creandoRol ? <span className={styles.spinner} /> : <IconoMas />}
                   Crear
@@ -234,7 +242,7 @@ export default function PaginaRoles() {
               </form>
 
               {cargandoRoles ? (
-                <div className={styles.loading}><span className={styles.spinner} /> Cargando roles…</div>
+                <EstadoCarga texto="Cargando roles…" />
               ) : roles.length === 0 ? (
                 <p className={styles.empty}>Aún no hay roles. Crea el primero arriba.</p>
               ) : (
@@ -268,8 +276,8 @@ export default function PaginaRoles() {
                               {r.descripcion && <div className={styles.rolDesc}>{r.descripcion}</div>}
                             </div>
                             <div className={styles.rolStats}>
-                              <span className={styles.statChip}><IconoLlave /> {r.permisos.length} permisos</span>
-                              <span className={styles.statChip}>{r.total_usuarios} usuarios</span>
+                              <span className={styles.statChip}><IconoLlave /> {plural(r.permisos.length, "permiso", "permisos")}</span>
+                              <span className={styles.statChip}>{plural(r.total_usuarios, "usuario", "usuarios")}</span>
                             </div>
                           </button>
                           {!r.es_sistema && (
@@ -345,6 +353,7 @@ export default function PaginaRoles() {
                                           key={p.id}
                                           type="button"
                                           className={`${styles.permisoChip} ${seleccionado ? styles.permisoChipOn : ""}`}
+                                          aria-pressed={seleccionado}
                                           onClick={() => togglePermiso(p.id)}
                                         >
                                           <span className={styles.chipCheck}>

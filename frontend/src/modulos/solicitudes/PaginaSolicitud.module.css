@@ -1,4 +1,3 @@
-.estadoCarga { text-align: center; color: var(--muted); padding: 60px 0; }
 .errorCarga {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   padding: 16px 18px; border-radius: 10px;
@@ -144,12 +143,7 @@
 }
 .chipDocsOk    { color: var(--acc-green); }
 .chipDocsFalta { color: var(--acc-amber); }
-.btnContraer {
-  display: flex; align-items: center; justify-content: center;
-  width: 30px; height: 30px; border-radius: 7px;
-  border: 1px solid var(--border); background: transparent; color: var(--text-2); cursor: pointer;
-}
-.btnContraer:hover { color: var(--text); border-color: var(--input-border); }
+.btnContraer { composes: boton icono from "../../components/Botones.module.css"; }
 .chevronAbierto, .chevronCerrado { display: flex; transition: transform .18s; }
 .chevronCerrado { transform: rotate(-90deg); }
 
@@ -177,21 +171,9 @@
 .resumenFalta { color: var(--acc-amber); font-weight: 700; }
 .ayudaSeccion { color: var(--text-2); font-size: .8rem; margin-bottom: 12px; }
 
-.btnQuitar {
-  background: transparent; border: 1px solid var(--border);
-  color: var(--acc-red); border-radius: 7px;
-  padding: 6px 8px; cursor: pointer;
-  display: flex; align-items: center;
-}
-.btnQuitar:hover { background: var(--red-soft); border-color: color-mix(in srgb, var(--acc-red) 40%, transparent); }
+.btnQuitar { composes: boton icono iconoPeligro from "../../components/Botones.module.css"; }
 
-.btnAgregar {
-  display: inline-flex; align-items: center; gap: 7px; align-self: flex-start;
-  padding: 9px 15px; border-radius: 8px;
-  border: 1px dashed var(--input-border);
-  background: transparent; color: var(--text);
-  font-size: .85rem; font-weight: 600; cursor: pointer;
-}
+.btnAgregar { composes: boton secundario from "../../components/Botones.module.css"; align-self: flex-start; border-style: dashed; border-color: var(--input-border); background: transparent; }
 .btnAgregar:hover { background: var(--hover); border-style: solid; }
 
 /* ─── Checklist ─── */
@@ -219,22 +201,12 @@
 }
 .archivoNombre  { color: var(--acc-green); }
 .archivoCargado { color: var(--text-2); }
-.btnMini {
-  display: flex; align-items: center; justify-content: center;
-  width: 28px; height: 28px; border-radius: 7px;
-  border: 1px solid var(--border-2); background: transparent; color: var(--text-2);
-}
-.btnMini:hover { color: var(--text); border-color: var(--input-border); }
+.btnMini { composes: boton icono chico from "../../components/Botones.module.css"; }
+.btnMiniVer { composes: boton icono chico iconoConsultar from "../../components/Botones.module.css"; }
+.btnMiniQuitar { composes: boton icono chico iconoPeligro from "../../components/Botones.module.css"; }
 /* "Adjuntar" se repite en cada documento: neutro, para que "Enviar solicitud"
    sea lo único amarillo. */
-.btnArchivo {
-  padding: 7px 14px; border-radius: 7px;
-  border: 1px solid var(--input-border);
-  background: var(--card); color: var(--text);
-  font-size: .8rem; font-weight: 600; cursor: pointer;
-  white-space: nowrap;
-}
-.btnArchivo:hover { background: var(--hover); }
+.btnArchivo { composes: boton secundario chico from "../../components/Botones.module.css"; }
 
 .sinDocs { color: var(--muted); font-size: .85rem; font-style: italic; }
 
@@ -254,14 +226,7 @@
 }
 .avisoFaltan { color: var(--acc-amber); font-size: .84rem; font-weight: 600; }
 
-.btnEnviar {
-  padding: 13px 30px; border-radius: 9px; border: 0;
-  background: var(--y); color: var(--on-accent);
-  font-size: .94rem; font-weight: 800; cursor: pointer;
-  transition: .18s;
-}
-.btnEnviar:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
-.btnEnviar:disabled { background: var(--overlay-2); color: var(--muted); cursor: not-allowed; }
+.btnEnviar { composes: boton primario grande from "../../components/Botones.module.css"; }
 
 @media (max-width: 900px) {
   .marinoGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

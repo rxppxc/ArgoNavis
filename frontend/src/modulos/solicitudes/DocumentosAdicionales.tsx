@@ -37,10 +37,10 @@ export function DocumentosAdicionales({
             <div className={styles.casillaAlcance}>Cargado · {formatBytes(d.tamano)}</div>
           </div>
           <div className={styles.casillaAccion}>
-            <button type="button" className={styles.btnMini} onClick={() => onVer(d)} title="Ver documento">
+            <button type="button" className={styles.btnMiniVer} onClick={() => onVer(d)} title="Ver documento">
               <IconoOjo tamano={13} />
             </button>
-            <button type="button" className={styles.btnMini} onClick={() => onQuitarExistente(d.id)}
+            <button type="button" className={styles.btnMiniQuitar} onClick={() => onQuitarExistente(d.id)}
               title="Quitar del expediente" aria-label={`Quitar ${d.nombre_original}`}>
               <IconoX tamano={12} />
             </button>
@@ -54,7 +54,7 @@ export function DocumentosAdicionales({
             <div className={styles.casillaAlcance}>Nuevo · {formatBytes(n.archivo.size)}</div>
           </div>
           <div className={styles.casillaAccion}>
-            <button type="button" className={styles.btnMini} onClick={() => onQuitarNuevo(n.clave)}
+            <button type="button" className={styles.btnMiniQuitar} onClick={() => onQuitarNuevo(n.clave)}
               title="Quitar" aria-label={`Quitar ${n.archivo.name}`}>
               <IconoX tamano={12} />
             </button>

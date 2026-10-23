@@ -1,17 +1,5 @@
 /* El encabezado (saludo y subtítulo) es el común de EncabezadoPagina. */
-.btnNuevo {
-  display: inline-flex; align-items: center; gap: 7px;
-  background: var(--y);
-  color: var(--on-accent);
-  border-radius: var(--r-sm);
-  padding: 11px 22px;
-  font-weight: 800; font-size: .86rem;
-  text-decoration: none; white-space: nowrap;
-  box-shadow: 0 2px 10px color-mix(in srgb, var(--y-dark) 22%, transparent);
-  transition: transform var(--t) var(--ease), box-shadow var(--t) var(--ease), background var(--t) var(--ease);
-}
-/* Plano, con el hover y la sombra dorada de los botones de la web. */
-.btnNuevo:hover { background: var(--y-hover); transform: translateY(-2px); box-shadow: 0 8px 22px color-mix(in srgb, var(--y-dark) 30%, transparent); }
+.btnNuevo { composes: boton primario grande from "../../components/Botones.module.css"; }
 
 /* ─── Selector de bandeja (rol): las mismas pestañas subrayadas de Catálogos ─── */
 .vistas {
@@ -88,21 +76,11 @@
 .lista { display: flex; flex-direction: column; gap: 10px; }
 
 .error {
+  display: flex; align-items: center; gap: 10px;
   background: var(--red-soft); border: 1px solid color-mix(in srgb, var(--acc-red) 35%, transparent);
   border-radius: 8px; color: var(--acc-red);
   padding: 11px 14px; margin-bottom: 16px; font-size: .87rem;
 }
-.cargando {
-  display: flex; align-items: center; justify-content: center; gap: 12px;
-  padding: 64px; color: var(--muted); font-size: .9rem;
-}
-.spinner {
-  width: 20px; height: 20px;
-  border: 2px solid var(--border); border-top-color: var(--y);
-  border-radius: 50%;
-  animation: girar .7s linear infinite;
-}
-@keyframes girar { to { transform: rotate(360deg); } }
 
 .vacio {
   background: var(--card); border: 1px solid var(--border);
@@ -124,10 +102,4 @@
   margin-top: 20px; flex-wrap: wrap;
 }
 .paginaInfo { color: var(--text-2); font-size: .82rem; font-weight: 600; }
-.btnPagina {
-  padding: 8px 16px; border-radius: var(--r-sm);
-  border: 1px solid var(--border); background: var(--card);
-  color: var(--text); font-size: .82rem; font-weight: 700; cursor: pointer;
-}
-.btnPagina:hover:not(:disabled) { border-color: var(--y); }
-.btnPagina:disabled { opacity: .45; cursor: not-allowed; }
+.btnPagina { composes: boton secundario from "../../components/Botones.module.css"; }

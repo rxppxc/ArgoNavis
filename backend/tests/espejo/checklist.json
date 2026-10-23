@@ -1,0 +1,49 @@
+[
+  {
+    "caso": "cada condición del catálogo",
+    "documentos": [
+      {"codigo": "LISTA", "alcance": "solicitud", "condicion": "siempre", "requiere_libreta": false, "orden": 1},
+      {"codigo": "PASAPORTE", "alcance": "marino", "condicion": "siempre", "requiere_libreta": false, "orden": 2},
+      {"codigo": "LIBRETA", "alcance": "marino", "condicion": "siempre", "requiere_libreta": true, "orden": 3},
+      {"codigo": "SOLO-PANAMENOS", "alcance": "marino", "condicion": "solo_panamenos", "requiere_libreta": false, "orden": 4},
+      {"codigo": "CUSTODIA", "alcance": "marino", "condicion": "nacionalidad_restringida", "requiere_libreta": false, "orden": 5},
+      {"codigo": "CUSTODIA-GLOBAL", "alcance": "solicitud", "condicion": "nacionalidad_restringida", "requiere_libreta": false, "orden": 6}
+    ],
+    "tripulantes": [
+      {"nombre": "Panameño marino", "es_panameno": true, "porta_libreta": true, "restringida": false},
+      {"nombre": "Panameño técnico", "es_panameno": true, "porta_libreta": false, "restringida": false},
+      {"nombre": "Cubano marino", "es_panameno": false, "porta_libreta": true, "restringida": true}
+    ],
+    "esperado": [
+      ["LISTA", null],
+      ["PASAPORTE", 0], ["PASAPORTE", 1], ["PASAPORTE", 2],
+      ["LIBRETA", 0], ["LIBRETA", 2],
+      ["SOLO-PANAMENOS", 0], ["SOLO-PANAMENOS", 1],
+      ["CUSTODIA", 2],
+      ["CUSTODIA-GLOBAL", null]
+    ]
+  },
+  {
+    "caso": "sin tripulantes restringidos no pide custodia",
+    "documentos": [
+      {"codigo": "CUSTODIA-GLOBAL", "alcance": "solicitud", "condicion": "nacionalidad_restringida", "requiere_libreta": false, "orden": 1},
+      {"codigo": "CUSTODIA", "alcance": "marino", "condicion": "nacionalidad_restringida", "requiere_libreta": false, "orden": 2}
+    ],
+    "tripulantes": [
+      {"nombre": "Ana", "es_panameno": false, "porta_libreta": true, "restringida": false}
+    ],
+    "esperado": []
+  },
+  {
+    "caso": "el orden es el del catálogo y, dentro de cada documento, el de los tripulantes",
+    "documentos": [
+      {"codigo": "B", "alcance": "marino", "condicion": "siempre", "requiere_libreta": false, "orden": 2},
+      {"codigo": "A", "alcance": "marino", "condicion": "siempre", "requiere_libreta": false, "orden": 1}
+    ],
+    "tripulantes": [
+      {"nombre": "Ana", "es_panameno": false, "porta_libreta": true, "restringida": false},
+      {"nombre": "Luis", "es_panameno": false, "porta_libreta": false, "restringida": false}
+    ],
+    "esperado": [["A", 0], ["A", 1], ["B", 0], ["B", 1]]
+  }
+]

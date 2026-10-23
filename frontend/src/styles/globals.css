@@ -75,8 +75,15 @@
      sirve en los dos temas: texto blanco a más de 4.5:1. */
   --exito-fuerte:   #15803D;
   --peligro-fuerte: #B91C1C;
-  --aviso-fuerte:   #B45309;
+  --aviso-fuerte:   #C2410C;   /* naranja de «En corrección»: 5.2:1 */
   --info-fuerte:    #003DA5;   /* --snm-blue */
+  --final-fuerte:   #0F766E;   /* verde azulado de «Finalizada»: 5.5:1 */
+  --clave-fuerte:   #7E22CE;   /* morado de las contraseñas: 6.9:1 */
+  /* Botones naranjas de contorno (Botones.module.css): borde y fondo en el
+     tinte vivo, texto en --naranja-boton. El --acc-orange del claro tira a
+     café y junto al rojo no se distinguía «Devolver» de «Denegar». */
+  --tinte-naranja:  #F97316;
+  --naranja-boton:  #FB923C;
   --sobre-fuerte:   #FFFFFF;
 
   --r-xs: 5px;
@@ -134,6 +141,7 @@
   --acc-gold:   #7A5F00;
   --acc-teal:   #0F766E;
   --acc-orange: #9A3412;
+  --naranja-boton: #C2410C;   /* 4.6:1 o más sobre el fondo teñido del botón */
   --acc-cyan:   #0E7490;
 
   /* Sombras teñidas de marino, como las de la web (rgba(23,36,58,.10)). */
@@ -174,8 +182,12 @@ html.sin-transiciones *,
 html.sin-transiciones *::before,
 html.sin-transiciones *::after { transition: none !important; }
 
+/* [data-movimiento]: el fondo animado del login se mueve igual y trae su propio
+   botón de pausa (FondoPagina, decisión del usuario del 2026-10-23). */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  :not([data-movimiento], [data-movimiento] *),
+  :not([data-movimiento], [data-movimiento] *)::before,
+  :not([data-movimiento], [data-movimiento] *)::after {
     animation-duration: .01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;

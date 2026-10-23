@@ -8,6 +8,9 @@
 }
 .interior { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; padding: 8px 24px; }
 .escudo { justify-self: start; height: 72px; width: auto; max-width: 100%; object-fit: contain; }
+.inicio { justify-self: start; display: flex; border-radius: var(--r-sm); }
+/* Sobre la cabecera oscura el foco va en amarillo, como el del menú. */
+.inicio:focus-visible { outline-color: var(--y); }
 .jerarquia { display: flex; flex-direction: column; align-items: center; text-align: center; }
 .jerarquia small {
   display: block; font-size: .66rem; line-height: 1.4; letter-spacing: 1.4px; text-transform: uppercase;

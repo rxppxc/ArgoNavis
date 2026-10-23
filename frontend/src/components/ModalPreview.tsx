@@ -22,6 +22,7 @@ import { apiSolicitudes } from "../api/solicitudes";
 import { infoTipo } from "../utils/tipoArchivo";
 import { useAtraparFoco } from "../hooks/useAtraparFoco";
 import { mensajeDeError } from "../utils/errores";
+import { EstadoCarga } from "./EstadoCarga";
 import { useNotificacion } from "./Notificaciones";
 import { IconoX, IconoDescargar, IconoArchivo } from "./Iconos";
 import styles from "./ModalPreview.module.css";
@@ -200,12 +201,12 @@ export function ModalPreview({ solicitudId, documento, onCerrar }: Props) {
               </button>
             </div>
           ) : categoria === "word" ? (
-            cargando ? <div className={styles.cargando}>Cargando documento…</div> : (
+            cargando ? <EstadoCarga texto="Cargando documento…" pagina /> : (
               // sandbox vacío: sin scripts, sin origen propio, sin formularios ni ventanas.
               <iframe sandbox="" srcDoc={carga?.html ?? ""} title={documento.nombre_original} className={styles.pdf} />
             )
           ) : cargando ? (
-            <div className={styles.cargando}>Cargando…</div>
+            <EstadoCarga texto="Cargando documento…" pagina />
           ) : categoria === "imagen" && carga?.url ? (
             <img src={carga.url} alt={documento.nombre_original} className={styles.img} />
           ) : categoria === "pdf" && carga?.url ? (

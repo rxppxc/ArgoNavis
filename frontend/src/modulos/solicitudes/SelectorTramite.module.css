@@ -74,15 +74,8 @@
 
 .cabecera { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: -6px 0 10px; }
 .ayuda { color: var(--text-2); font-size: .84rem; }
-.btnCambiar {
-  padding: 8px 14px; border-radius: 8px;
-  border: 1.5px solid var(--border-2); background: var(--card); color: var(--text);
-  font-size: .82rem; font-weight: 700;
-  transition: background var(--t), border-color var(--t);
-}
-.btnCambiar:hover { background: var(--hover); border-color: var(--input-border); }
-.btnTexto { padding: 6px 8px; color: var(--text-2); font-size: .82rem; font-weight: 600; }
-.btnTexto:hover { color: var(--text); }
+.btnCambiar { composes: boton secundario from "../../components/Botones.module.css"; }
+.btnTexto { composes: boton texto from "../../components/Botones.module.css"; }
 
 /* En el celular, una fila por trámite (ícono a la izquierda): ocho tarjetas
    apiladas eran mucho para bajar. */

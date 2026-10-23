@@ -16,17 +16,29 @@ export function MenuCabecera() {
   const navegar = useNavigate();
   const [abierto, setAbierto] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const refBoton = useRef<HTMLButtonElement>(null);
   const esPacifico = !esAdmin && tiene("T-PROCESAR-PACIFICO");
   // Quién está en la sesión y con qué rol: se ve junto al menú (escritorio) y arriba del panel.
   const nombre = usuario?.full_name?.trim() || usuario?.username || "";
   const detalle = [usuario?.rol_personalizado?.nombre, usuario?.agencia?.nombre].filter(Boolean).join(" · ");
 
   useEffect(() => {
+    if (!abierto) return;
     function clickFuera(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setAbierto(false);
     }
-    if (abierto) document.addEventListener("mousedown", clickFuera);
-    return () => document.removeEventListener("mousedown", clickFuera);
+    // Escape cierra y devuelve el foco al botón, como cualquier desplegable.
+    function alTeclear(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      setAbierto(false);
+      refBoton.current?.focus();
+    }
+    document.addEventListener("mousedown", clickFuera);
+    document.addEventListener("keydown", alTeclear);
+    return () => {
+      document.removeEventListener("mousedown", clickFuera);
+      document.removeEventListener("keydown", alTeclear);
+    };
   }, [abierto]);
 
   function salir() {
@@ -43,12 +55,18 @@ export function MenuCabecera() {
           {detalle && <span className={styles.identidadDetalle} title={detalle}>{detalle}</span>}
         </div>
       )}
-      <div className={styles.dropdown} ref={ref}>
+      {/* Al salir con Tab del menú, se cierra (relatedTarget nulo = clic en un
+          espacio del propio panel: sigue abierto). */}
+      <div className={styles.dropdown} ref={ref}
+        onBlur={(e) => { if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget)) setAbierto(false); }}>
+        {/* Un desplegable de enlaces (no un role="menu", que exige flechas). */}
         <button
+          ref={refBoton}
+          type="button"
           className={`${styles.menuBtn} ${abierto ? styles.menuBtnOpen : ""}`}
           onClick={() => setAbierto(v => !v)}
-          aria-haspopup="menu"
           aria-expanded={abierto}
+          aria-controls="menu-usuario"
         >
           Menú
           <span className={`${styles.chevron} ${abierto ? styles.chevronOpen : ""}`}>
@@ -57,7 +75,7 @@ export function MenuCabecera() {
         </button>
 
         {abierto && (
-          <div className={styles.panel}>
+          <div className={styles.panel} id="menu-usuario">
             {nombre && (
               <>
                 <div className={styles.cuenta}>
@@ -116,7 +134,7 @@ export function MenuCabecera() {
               <SelectorTema />
             </div>
             <div className={styles.sep} />
-            <button className={`${styles.item} ${styles.itemSalir}`} onClick={salir}>
+            <button type="button" className={`${styles.item} ${styles.itemSalir}`} onClick={salir}>
               <IconoSalir />Salir
             </button>
           </div>

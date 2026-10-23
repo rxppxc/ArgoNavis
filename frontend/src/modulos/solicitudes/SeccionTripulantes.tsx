@@ -178,7 +178,7 @@ function PieVerificacion({ solicitud: s, verificacion: v }: { solicitud: Solicit
             {v.corregida ? "Corregida" : "Registrada"} por {s.impedimentos_verificados_por ?? "—"} el{" "}
             {formatearFechaHora(s.impedimentos_verificados_en)}
           </p>
-          <button type="button" className={styles.btnSecundario} onClick={v.empezarCorreccion} disabled={v.trabajando}>
+          <button type="button" className={styles.btnCorregir} onClick={v.empezarCorreccion} disabled={v.trabajando}>
             Corregir verificación
           </button>
         </div>

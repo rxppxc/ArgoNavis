@@ -39,40 +39,13 @@
   gap: 8px;
 }
 
-.btnCancelar,
-.btnConfirmar,
-.btnExito,
-.btnPeligro {
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: .85rem;
-  font-weight: 700;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: filter .12s ease, transform .08s ease;
-}
-
-.btnCancelar {
-  background: transparent;
-  border-color: var(--border-2);
-  color: var(--text);
-}
-.btnCancelar:hover { background: var(--hover); }
-
-/* Mismo botón principal que el resto de la app (antes era el único azul). */
-.btnConfirmar {
-  background: var(--y);
-  color: var(--on-accent);
-}
-.btnExito {
-  background: var(--exito-fuerte);
-  color: var(--sobre-fuerte);
-}
-.btnPeligro {
-  background: var(--peligro-fuerte);
-  color: var(--sobre-fuerte);
-}
-.btnConfirmar:hover, .btnExito:hover, .btnPeligro:hover { filter: brightness(1.08); }
+/* Los botones son los de toda la aplicación (Botones.module.css). */
+.btnCancelar  { composes: boton secundario from "./Botones.module.css"; }
+.btnConfirmar { composes: boton primario from "./Botones.module.css"; }
+.btnExito     { composes: boton exito from "./Botones.module.css"; }
+.btnPeligro   { composes: boton peligro from "./Botones.module.css"; }
+.btnFinalizar { composes: boton finalizar from "./Botones.module.css"; }
+.btnClave     { composes: boton clave from "./Botones.module.css"; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes zoomIn { from { transform: scale(.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }

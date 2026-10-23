@@ -16,7 +16,7 @@ const TEXTOS: Record<Decision, { titulo: string; etiqueta: string; boton: string
   },
   devolver: {
     titulo: "Devolver a corrección", etiqueta: "¿Qué debe corregir la agencia? *",
-    boton: "Devolver", clase: styles.btnPrimario, hecho: "Solicitud devuelta a la agencia.",
+    boton: "Devolver", clase: styles.btnAviso, hecho: "Solicitud devuelta a la agencia.",
   },
   negar: {
     titulo: "Denegar solicitud", etiqueta: "Motivo de la denegación *",
@@ -114,7 +114,8 @@ export function ModalDecision({ decision, solicitud, conImpedimento, onCerrar, o
           <p className={styles.textoFalta} role="alert">Escribe el motivo (al menos 5 caracteres).</p>
         )}
         <div className={styles.filaBotones}>
-          <button type="button" className={styles.btnTexto} onClick={onCerrar} disabled={trabajando}>Cancelar</button>
+          {/* Como en el resto de los modales: cancelar es el botón secundario. */}
+          <button type="button" className={styles.btnSecundario} onClick={onCerrar} disabled={trabajando}>Cancelar</button>
           <button type="button" className={t.clase} onClick={confirmar} disabled={trabajando}>
             {trabajando ? "Procesando…" : t.boton}
           </button>

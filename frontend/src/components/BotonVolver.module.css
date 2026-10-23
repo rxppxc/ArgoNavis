@@ -1,26 +1,27 @@
-/* Discreto a propósito: antes era amarillo sólido y competía con la acción
-   principal de cada página (corregir, finalizar, enviar). */
+/* Secundario y no amarillo: no compite con la acción principal de la página
+   (corregir, finalizar, enviar). Con fondo sólido y sombra: transparente se
+   perdía sobre la carta celeste del fondo. */
 .btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   justify-self: start;
-  color: var(--text-2);
-  font-size: .8rem;
-  font-weight: 600;
-  padding: 6px 12px 6px 8px;
+  color: var(--text);
+  font-size: .84rem;
+  font-weight: 700;
+  padding: 7px 14px 7px 10px;
   border-radius: var(--r-sm);
-  border: 1px solid var(--border-2);
-  background: transparent;
+  border: 1.5px solid var(--border-2);
+  background: var(--card);
+  box-shadow: var(--sh-xs);
   text-decoration: none;
   cursor: pointer;
   font-family: inherit;
   line-height: 1;
   white-space: nowrap;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition: background var(--t), border-color var(--t), color var(--t);
 }
 .btn:hover {
-  color: var(--text);
-  background: var(--hover);
+  background: var(--card-2);
   border-color: var(--input-border);
 }

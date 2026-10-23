@@ -34,10 +34,14 @@ export const EDAD_MINIMA = 18;
 export const NACIMIENTO_MINIMO = "1900-01-01";
 export const DIAS_MAXIMOS_ANTICIPACION = 365;
 
-/** Suma años o días a una fecha ISO (AAAA-MM-DD), sin pasar por la zona horaria. */
+/** Suma años o días a una fecha ISO (AAAA-MM-DD), sin pasar por la zona horaria.
+ *  Si el día no existe en el año de destino (29 de febrero), queda el último del
+ *  mes, como cuenta la edad el backend: el 29/02/2028 no tiene 18 años quien nació
+ *  el 01/03/2010. */
 function desplazar(iso: string, { anios = 0, dias = 0 }: { anios?: number; dias?: number }): string {
   const [a, m, d] = iso.split("-").map(Number);
-  const fecha = new Date(Date.UTC(a + anios, m - 1, d + dias));
+  const ultimoDelMes = new Date(Date.UTC(a + anios, m, 0)).getUTCDate();
+  const fecha = new Date(Date.UTC(a + anios, m - 1, Math.min(d, ultimoDelMes) + dias));
   return fecha.toISOString().slice(0, 10);
 }
 
