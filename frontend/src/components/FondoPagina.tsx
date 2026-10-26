@@ -1,5 +1,3 @@
-import { useState } from "react";
-import { IconoPausa, IconoReproducir } from "./Iconos";
 import styles from "./FondoPagina.module.css";
 
 /** Fondo de todas las páginas, entre la cabecera y el pie: la «carta celeste»
@@ -36,17 +34,6 @@ const MERIDIANOS = Array.from({ length: 12 }, (_, i) => {
   return { clave: i, x: 800 + 900 * Math.sin(a), y: 450 - 900 * Math.cos(a) };
 });
 
-/** La pausa se recuerda en el navegador (como el tema). */
-const CLAVE_PAUSA = "fondo-pausado";
-
-function leerPausa(): boolean {
-  try {
-    return localStorage.getItem(CLAVE_PAUSA) === "1";
-  } catch {
-    return false; // Almacenamiento bloqueado: arranca en movimiento.
-  }
-}
-
 interface Props {
   /** El login ya las muestra bajo el logo: ahí no se repiten. */
   coordenadas?: boolean;
@@ -58,30 +45,18 @@ interface Props {
    *  (con las rutas vivas, 60; ~13 % de un núcleo mientras está abierto).
    *  Se mueve aunque el equipo pida «reducir movimiento» (decisión del usuario
    *  del 2026-10-23: muchos equipos del SNM traen las animaciones de Windows
-   *  apagadas por rendimiento). A cambio lleva un botón para pausarlo, que pide
-   *  la WCAG 2.2.2 para lo que se mueve solo más de 5 segundos. */
+   *  apagadas por rendimiento). Sin botón de pausa: el usuario lo quitó el
+   *  mismo día (la WCAG 2.2.2 pide uno para lo que se mueve solo más de 5 s;
+   *  se acepta porque es solo el login, que se ve unos segundos). */
   animado?: boolean;
 }
 
 export function FondoPagina({ coordenadas = true, animado = false }: Props) {
-  const [pausado, setPausado] = useState(leerPausa);
-
-  function alternarPausa() {
-    const nuevo = !pausado;
-    setPausado(nuevo);
-    try {
-      if (nuevo) localStorage.setItem(CLAVE_PAUSA, "1");
-      else localStorage.removeItem(CLAVE_PAUSA);
-    } catch {
-      // Sin almacenamiento: la pausa dura mientras la página esté abierta.
-    }
-  }
-
   return (
     <>
       <div className={styles.franja} />
       {/* data-movimiento: globals.css no lo frena con «reducir movimiento». */}
-      <div className={`${styles.capa} ${pausado ? styles.pausado : ""}`} data-movimiento={animado ? "" : undefined}>
+      <div className={styles.capa} data-movimiento={animado ? "" : undefined}>
         <svg className={`${styles.carta} ${animado ? styles.animado : ""}`} viewBox="0 0 1600 900"
           preserveAspectRatio="xMidYMid slice" aria-hidden="true">
           <g className={styles.astrolabio} fill="none" stroke="currentColor">
@@ -102,12 +77,6 @@ export function FondoPagina({ coordenadas = true, animado = false }: Props) {
         </svg>
       </div>
       {coordenadas && <div className={styles.coordenadas} aria-hidden="true">09° 01′ N<br />079° 32′ O</div>}
-      {animado && (
-        <button type="button" className={styles.pausa} onClick={alternarPausa}>
-          {pausado ? <IconoReproducir /> : <IconoPausa />}
-          {pausado ? "Reanudar animación" : "Pausar animación"}
-        </button>
-      )}
     </>
   );
 }

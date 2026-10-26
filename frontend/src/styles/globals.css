@@ -182,8 +182,8 @@ html.sin-transiciones *,
 html.sin-transiciones *::before,
 html.sin-transiciones *::after { transition: none !important; }
 
-/* [data-movimiento]: el fondo animado del login se mueve igual y trae su propio
-   botón de pausa (FondoPagina, decisión del usuario del 2026-10-23). */
+/* [data-movimiento]: el fondo animado del login se mueve igual (FondoPagina,
+   decisión del usuario del 2026-10-23). */
 @media (prefers-reduced-motion: reduce) {
   :not([data-movimiento], [data-movimiento] *),
   :not([data-movimiento], [data-movimiento] *)::before,

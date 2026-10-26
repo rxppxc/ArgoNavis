@@ -452,22 +452,6 @@ export const IconoPoder = crearIcono({
   ),
 });
 
-// ── Animación del fondo (pausar / reanudar) ─────────────────────────────────
-export const IconoPausa = crearIcono({
-  ancho: 13, alto: 13,
-  children: (
-    <>
-      <line x1="9" y1="5" x2="9" y2="19" />
-      <line x1="15" y1="5" x2="15" y2="19" />
-    </>
-  ),
-});
-
-export const IconoReproducir = crearIcono({
-  ancho: 13, alto: 13,
-  children: <polygon points="7 4 19 12 7 20 7 4" />,
-});
-
 // ── Tema (claro/oscuro) ──────────────────────────────────────────────────────
 export const IconoSol = crearIcono({
   ancho: 15, alto: 15,

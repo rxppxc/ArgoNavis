@@ -129,7 +129,7 @@ constants/          → números mágicos.
   - Sin haz de faro ni giro del astrolabio: mueven capas del tamaño de la pantalla y, en equipos sin tarjeta gráfica, el login caía a 22 cuadros por segundo.
   - Así va a 60 y usa ~13 % de un núcleo mientras está abierto (medido con `--disable-gpu`). Si se necesita menos, se pueden pasar estrellas y luces a elementos HTML que mueva la tarjeta gráfica.
   - Se mueve aunque el equipo pida «reducir movimiento» (decisión del usuario del 2026-10-23: muchos equipos del SNM traen las animaciones de Windows apagadas y no se veía nada). Para eso, `data-movimiento` lo saca de la regla global de `globals.css`.
-  - A cambio, lleva el botón «Pausar animación» (WCAG 2.2.2), que se recuerda en `localStorage["fondo-pausado"]`. No lo quites.
+  - Sin botón de pausa: el usuario lo quitó el 2026-10-23. La WCAG 2.2.2 pide uno para lo que se mueve solo más de 5 s; se aceptó porque es solo el login. Si el movimiento pasa a otras pantallas, el botón vuelve.
 - "En corrección" va en naranja (`--acc-orange`): el ámbar se confundía con la marca.
 - Encabezado de página: `EncabezadoPagina` (título y descripción a la izquierda, acciones a la derecha); el expediente lleva el suyo.
 - Campos con `--input-border` / `--input-bg` (borde de 3:1). Las notas informativas, neutras con borde izquierdo `--acc-blue`.

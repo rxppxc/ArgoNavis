@@ -66,8 +66,7 @@
   .logoGrande { width: 290px; }
 }
 @media (max-width: 880px) {
-  /* Abajo, lugar para «Pausar animación» (FondoPagina): si no, tapa la tarjeta. */
-  .cuerpo { grid-template-columns: 1fr; gap: 20px; padding: 18px 16px 64px; }
+  .cuerpo { grid-template-columns: 1fr; gap: 20px; padding: 18px 16px; }
   .logoGrande { width: 150px; }
   .coordenadas { display: none; }
   .acceso { padding: 24px 20px; }

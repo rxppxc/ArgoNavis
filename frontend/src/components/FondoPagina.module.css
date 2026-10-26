@@ -65,20 +65,3 @@
   0%, 100% { opacity: .55; transform: scale(1); }
   50%      { opacity: 1;   transform: scale(1.9); }
 }
-
-/* Pausado: todo se detiene donde estaba, con las rutas ya trazadas. Se mueve
-   aunque el equipo pida «reducir movimiento» (data-movimiento en globals.css):
-   este botón es la forma de detenerlo. */
-.pausado * { animation-play-state: paused !important; }
-.pausado .constelacion polyline { animation: none; stroke-dashoffset: 0; }
-
-.pausa {
-  composes: boton secundario chico from "./Botones.module.css";
-  position: absolute; left: 20px; bottom: 16px; z-index: 2;
-  background: color-mix(in srgb, var(--card) 88%, transparent);
-  color: var(--text-2);
-}
-
-@media (max-width: 720px) {
-  .pausa { left: 16px; bottom: 12px; }
-}
