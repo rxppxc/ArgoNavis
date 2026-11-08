@@ -38,6 +38,21 @@ psql_bd() { docker exec snm_postgres sh -c "psql -U \"\$POSTGRES_USER\" -d \"\$P
 py_backend() { docker exec -i snm_backend python -; }
 
 # ── Contenedores ─────────────────────────────────────────────────────────────
+# Recién desplegado, el backend tarda unos segundos en arrancar (aplica las
+# migraciones y levanta sus procesos): mientras Docker lo marque «starting», se
+# espera, hasta 2 minutos. Sin esto, la revisión justo después del `up -d` daba
+# 502 en todo lo que pasa por el backend.
+for intento in $(seq 1 24); do
+  arrancando=""
+  for c in snm_postgres snm_backend snm_frontend; do
+    if [ "$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$c" 2>/dev/null)" = starting ]; then
+      arrancando="$arrancando $c"
+    fi
+  done
+  [ -z "$arrancando" ] && break
+  [ "$intento" -eq 1 ] && echo "Esperando a que terminen de arrancar:$arrancando…"
+  sleep 5
+done
 seccion "Contenedores"
 for c in snm_postgres snm_backend snm_frontend; do
   estado=$(docker inspect -f '{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}sin chequeo{{end}}|{{.RestartCount}}|{{.HostConfig.RestartPolicy.Name}}' "$c" 2>/dev/null)
