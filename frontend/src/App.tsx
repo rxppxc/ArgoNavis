@@ -10,24 +10,31 @@ import { ProveedorNotificaciones } from "./components/Notificaciones";
 import { ProveedorConfirmacion } from "./components/ModalConfirmacion";
 import { ProveedorTema } from "./context/ContextoTema";
 import { ProveedorAutenticacion } from "./context/ProveedorAutenticacion";
+import { ProveedorPendientes } from "./context/ProveedorPendientes";
 import { ProveedorPermisos } from "./context/ProveedorPermisos";
 import PaginaLogin                from "./modulos/autenticacion/PaginaLogin";
 import PaginaCambiarContrasena    from "./modulos/autenticacion/PaginaCambiarContrasena";
 import PaginaPanel                from "./modulos/solicitudes/PaginaPanel";
-import PaginaSolicitud            from "./modulos/solicitudes/PaginaSolicitud";
-import PaginaDetalleSolicitud     from "./modulos/solicitudes/PaginaDetalleSolicitud";
 import PaginaVerificacion         from "./modulos/solicitudes/PaginaVerificacion";
 import {
   AVISO_INACTIVIDAD_MS as AVISO_MS,
   LOGOUT_INACTIVIDAD_MS as LOGOUT_MS,
-  CUENTA_REGRESIVA_SEG as CUENTA_SEG,
+  ANOTAR_ACTIVIDAD_MS,
   MARGEN_RENOVACION_MS,
   REVISION_RENOVACION_MS,
 } from "./constants/sesion";
+import { CLAVE_ACTIVIDAD, anotarActividad, leerActividad } from "./utils/actividad";
 import "./styles/globals.css";
 
-// Solo admin (y UCVMM, las estadísticas) visita estas — se cargan en un chunk
-// aparte para no pesarle el bundle inicial a quien nunca las ve.
+// El login, las bandejas y las páginas chicas van en el paquete inicial. La
+// verificación del QR la abre el público en el teléfono: sin un archivo más
+// que pedir. El formulario y el expediente, los más pesados (~40 KB cada uno),
+// se cargan al entrar, para que el login no espere lo que todavía no usa (por
+// la VPN, el paquete inicial pesaba 440 KB). Si falta un archivo tras un
+// despliegue, main.tsx recarga la página (vite:preloadError).
+const PaginaSolicitud         = lazy(() => import("./modulos/solicitudes/PaginaSolicitud"));
+const PaginaDetalleSolicitud  = lazy(() => import("./modulos/solicitudes/PaginaDetalleSolicitud"));
+// Solo admin (y UCVMM, las estadísticas) visita estas.
 const PaginaUsuarios        = lazy(() => import("./modulos/administracion/PaginaUsuarios"));
 const PaginaRoles           = lazy(() => import("./modulos/administracion/PaginaRoles"));
 const PaginaEstadisticas    = lazy(() => import("./modulos/administracion/PaginaEstadisticas"));
@@ -80,45 +87,22 @@ function RutaStats({ children }: { children: React.ReactNode }) {
 }
 
 /** Cierre de sesión por inactividad (con aviso y cuenta regresiva) y renovación
- *  del token mientras el usuario trabaja. */
+ *  del token mientras el usuario trabaja. Solo existe con la sesión abierta: al
+ *  cerrarse (también desde otra pestaña) se desmonta, y no queda un aviso de
+ *  la sesión anterior esperando a la siguiente. */
 function GestorSesion({ children }: { children: React.ReactNode }) {
-  const { estaAutenticado, cerrarSesion, extenderSesion } = useAutenticacion();
-  // Hora a la que vence la sesión mientras se muestra el aviso (null = sin aviso).
+  const { estaAutenticado } = useAutenticacion();
+  return <>{children}{estaAutenticado && <VigilanteSesion />}</>;
+}
+
+/** La inactividad es la de todas las pestañas (utils/actividad.ts): mientras se
+ *  trabaja en una, las demás no avisan ni cierran la sesión. */
+function VigilanteSesion() {
+  const { cerrarSesion, extenderSesion } = useAutenticacion();
+  // Hora a la que se cierra la sesión mientras se muestra el aviso (null = sin aviso).
   const [venceEn, setVenceEn] = useState<number | null>(null);
-  const [ahora, setAhora] = useState(() => Date.now());
-
-  const timers = useRef<{
-    aviso:  ReturnType<typeof setTimeout>  | null;
-    logout: ReturnType<typeof setTimeout>  | null;
-    reloj:  ReturnType<typeof setInterval> | null;
-  }>({ aviso: null, logout: null, reloj: null });
-  const mostrandoRef = useRef(false);
-
-  const limpiar = useCallback(() => {
-    const t = timers.current;
-    if (t.aviso)  { clearTimeout(t.aviso);   t.aviso  = null; }
-    if (t.logout) { clearTimeout(t.logout);  t.logout = null; }
-    if (t.reloj)  { clearInterval(t.reloj);  t.reloj  = null; }
-  }, []);
-
-  /** Reprograma el aviso y el cierre desde ahora (solo timers: el estado
-   *  visible cambia dentro de sus callbacks o de los manejadores). */
-  const programar = useCallback(() => {
-    limpiar();
-    mostrandoRef.current = false;
-    timers.current.aviso = setTimeout(() => {
-      mostrandoRef.current = true;
-      setAhora(Date.now());
-      setVenceEn(Date.now() + CUENTA_SEG * 1000);
-      timers.current.reloj = setInterval(() => setAhora(Date.now()), 1000);
-    }, AVISO_MS);
-    timers.current.logout = setTimeout(() => {
-      limpiar();
-      mostrandoRef.current = false;
-      setVenceEn(null);
-      cerrarSesion(true, true);
-    }, LOGOUT_MS);
-  }, [cerrarSesion, limpiar]);
+  // Lo mismo para los manejadores de eventos, que no esperan al siguiente render.
+  const conAviso = useRef(false);
 
   // Renueva el token mientras el usuario trabaja: sin esto, quien no hacía
   // pausas perdía la sesión (y lo que estuviera llenando) al vencer el token.
@@ -136,49 +120,65 @@ function GestorSesion({ children }: { children: React.ReactNode }) {
       .finally(() => { r.enCurso = false; });
   }, [extenderSesion]);
 
-  const enActividad = useCallback(() => {
-    if (mostrandoRef.current) return;
-    programar();
-    renovarSiVence();
-  }, [programar, renovarSiVence]);
-
   useEffect(() => {
-    if (!estaAutenticado) { limpiar(); return; }
-    programar();
+    let revision: ReturnType<typeof setTimeout> | undefined;
+
+    /** Según la última actividad, de cualquier pestaña: sigue, avisa o cierra;
+     *  y deja programada la próxima revisión. */
+    function revisar() {
+      clearTimeout(revision);
+      const ahora = Date.now();
+      const ultima = leerActividad();
+      if (ahora - ultima >= LOGOUT_MS) {
+        conAviso.current = false;
+        setVenceEn(null);
+        cerrarSesion(true, true);
+        return;
+      }
+      conAviso.current = ahora - ultima >= AVISO_MS;
+      setVenceEn(conAviso.current ? ultima + LOGOUT_MS : null);
+      revision = setTimeout(revisar, ultima + (conAviso.current ? LOGOUT_MS : AVISO_MS) - ahora);
+    }
+
+    function enActividad() {
+      if (conAviso.current) return;   // con el aviso abierto, solo cuenta «Continuar sesión»
+      if (Date.now() - leerActividad() >= ANOTAR_ACTIVIDAD_MS) anotarActividad();
+      renovarSiVence();
+    }
+
+    // Actividad en otra pestaña (o «Continuar sesión» allá): se revisa ya, y el
+    // aviso de esta, si lo había, se quita.
+    function enOtraPestana(e: StorageEvent) {
+      if (e.key === CLAVE_ACTIVIDAD) revisar();
+    }
+
+    anotarActividad();   // entrar o abrir una página también es actividad
+    revision = setTimeout(revisar, AVISO_MS);
     const eventos = ["mousemove", "mousedown", "keydown", "scroll", "touchstart"];
     eventos.forEach(ev => window.addEventListener(ev, enActividad, { passive: true }));
+    window.addEventListener("storage", enOtraPestana);
     return () => {
-      limpiar();
+      clearTimeout(revision);
       eventos.forEach(ev => window.removeEventListener(ev, enActividad));
+      window.removeEventListener("storage", enOtraPestana);
     };
-  }, [estaAutenticado, programar, limpiar, enActividad]);
+  }, [cerrarSesion, renovarSiVence]);
 
   const alContinuar = useCallback(async () => {
+    conAviso.current = false;
     setVenceEn(null);
+    anotarActividad();   // las demás pestañas quitan su aviso
     try { await extenderSesion(); } catch { /* el interceptor cerrará sesión si el token expiró */ }
-    programar();
-  }, [extenderSesion, programar]);
+  }, [extenderSesion]);
 
   const alSalir = useCallback(() => {
-    limpiar();
-    mostrandoRef.current = false;
+    conAviso.current = false;
     setVenceEn(null);
     cerrarSesion(true, false);
-  }, [cerrarSesion, limpiar]);
+  }, [cerrarSesion]);
 
-  const segundos = venceEn === null ? CUENTA_SEG : Math.max(0, Math.ceil((venceEn - ahora) / 1000));
-
-  return (
-    <>
-      {children}
-      {estaAutenticado && venceEn !== null && (
-        <ModalExpiracionSesion
-          segundos={segundos}
-          onContinuar={alContinuar}
-          onCerrarSesion={alSalir}
-        />
-      )}
-    </>
+  return venceEn === null ? null : (
+    <ModalExpiracionSesion venceEn={venceEn} onContinuar={alContinuar} onCerrarSesion={alSalir} />
   );
 }
 
@@ -191,24 +191,28 @@ export default function App() {
             <ProveedorAutenticacion>
               <ProveedorPermisos>
                 <BrowserRouter>
-                  <GestorSesion>
-                    <Routes>
-                      <Route path="/login"             element={<PaginaLogin />} />
-                      <Route path="/verificar/:codigo" element={<PaginaVerificacion />} />
-                      <Route path={RUTA_CAMBIAR_CONTRASENA} element={<RutaPrivada><PaginaCambiarContrasena /></RutaPrivada>} />
-                      <Route path="/dashboard"         element={<RutaSolicitudes><PaginaPanel /></RutaSolicitudes>} />
-                      <Route path="/new"               element={<RutaSolicitudes><PaginaSolicitud /></RutaSolicitudes>} />
-                      <Route path="/solicitudes/:id"          element={<RutaSolicitudes><PaginaDetalleSolicitud /></RutaSolicitudes>} />
-                      <Route path="/solicitudes/:id/corregir" element={<RutaSolicitudes><PaginaSolicitud /></RutaSolicitudes>} />
-                      <Route path="/admin"             element={<RutaRol roles={["admin", "sysadmin"]}><PaginaUsuarios /></RutaRol>} />
-                      <Route path="/admin/roles"       element={<RutaRol roles={["admin", "sysadmin"]}><PaginaRoles /></RutaRol>} />
-                      <Route path="/admin/stats"       element={<RutaStats><PaginaEstadisticas /></RutaStats>} />
-                      <Route path="/admin/tramites"    element={<RutaRol roles={["admin"]}><PaginaTramites /></RutaRol>} />
-                      <Route path="/admin/catalogos"   element={<RutaRol roles={["admin"]}><PaginaCatalogos /></RutaRol>} />
-                      <Route path="/admin/bitacora"    element={<RutaRol roles={["admin", "sysadmin"]}><PaginaBitacora /></RutaRol>} />
-                      <Route path="*"                  element={<Navigate to="/dashboard" replace />} />
-                    </Routes>
-                  </GestorSesion>
+                  <ProveedorPendientes>
+                    <GestorSesion>
+                      <Suspense fallback={<CargandoRuta />}>
+                        <Routes>
+                          <Route path="/login"             element={<PaginaLogin />} />
+                          <Route path="/verificar/:codigo" element={<PaginaVerificacion />} />
+                          <Route path={RUTA_CAMBIAR_CONTRASENA} element={<RutaPrivada><PaginaCambiarContrasena /></RutaPrivada>} />
+                          <Route path="/dashboard"         element={<RutaSolicitudes><PaginaPanel /></RutaSolicitudes>} />
+                          <Route path="/new"               element={<RutaSolicitudes><PaginaSolicitud /></RutaSolicitudes>} />
+                          <Route path="/solicitudes/:id"          element={<RutaSolicitudes><PaginaDetalleSolicitud /></RutaSolicitudes>} />
+                          <Route path="/solicitudes/:id/corregir" element={<RutaSolicitudes><PaginaSolicitud /></RutaSolicitudes>} />
+                          <Route path="/admin"             element={<RutaRol roles={["admin", "sysadmin"]}><PaginaUsuarios /></RutaRol>} />
+                          <Route path="/admin/roles"       element={<RutaRol roles={["admin", "sysadmin"]}><PaginaRoles /></RutaRol>} />
+                          <Route path="/admin/stats"       element={<RutaStats><PaginaEstadisticas /></RutaStats>} />
+                          <Route path="/admin/tramites"    element={<RutaRol roles={["admin"]}><PaginaTramites /></RutaRol>} />
+                          <Route path="/admin/catalogos"   element={<RutaRol roles={["admin"]}><PaginaCatalogos /></RutaRol>} />
+                          <Route path="/admin/bitacora"    element={<RutaRol roles={["admin", "sysadmin"]}><PaginaBitacora /></RutaRol>} />
+                          <Route path="*"                  element={<Navigate to="/dashboard" replace />} />
+                        </Routes>
+                      </Suspense>
+                    </GestorSesion>
+                  </ProveedorPendientes>
                 </BrowserRouter>
               </ProveedorPermisos>
             </ProveedorAutenticacion>

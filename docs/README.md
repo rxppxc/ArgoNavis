@@ -2,9 +2,20 @@
 
 Línea base técnica y funcional de ARGO NAVIS (antes «NAVIS»), módulo **Autorizaciones Marítimas** de UCVMM. Es un borrador generado desde el código fuente y está pendiente de dos revisiones: la del equipo de desarrollo y, donde se indica, la validación del área usuaria (UCVMM).
 
-- **Versión:** 0.1, borrador para revisión (20/10/2026).
-- **Base:** rama `main`, esquema de base de datos en la revisión Alembic `a3d9c6e1f584`.
-- **Pruebas citadas:** 115 casos del backend aprobados (20/10/2026).
+- **Versión del juego:** 0.6, borrador para revisión (08/11/2026). Trae la auditoría de rendimiento y disponibilidad de ese día: conexiones con la base de datos acotadas y con topes, respuestas 503 con motivo, chequeo de salud con la base, índices nuevos y Docker sin privilegios.
+  - **Versiones anteriores:** la 0.5 (06/11/2026) trajo la verificación de impedimentos del puesto, los plazos de 72 horas, el horario contado con la aprobación de UCVMM y las estadísticas por día, mes y año; la 0.4 (02/11/2026), las estadísticas rediseñadas y la revisión del código; la 0.3 (30/10/2026), los puntos de la reunión de ese día.
+  - El historial de cada documento dice qué cambió.
+- **Versión de cada documento:** cada uno que cambia sube un número sobre el que tenía.
+  - El 06 y el 08 están en la 0.6.
+  - El 01, el 04 y el 09, en la 0.5. También el 00, que trae la tabla de versiones al día.
+  - El 03, en la 0.4.
+  - El 02, el 05 y el 07, en la 0.3.
+- **Base:** rama `main`, esquema de base de datos en la revisión Alembic `e7b2d5a9c4f1`.
+- **Pruebas citadas:** 212 casos del backend, 116 pruebas unitarias del frontend y 4 recorridos en el navegador, todos aprobados (08/11/2026).
+- **Capturas:**
+  - Las del 01 y la 09 son de la interfaz del 30/10/2026.
+  - Las de las estadísticas y la del puesto de control son del 06/11/2026.
+  - Todas usan datos ficticios.
 
 ## Documentos
 

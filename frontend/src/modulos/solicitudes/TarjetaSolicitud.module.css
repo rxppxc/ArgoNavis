@@ -21,13 +21,15 @@
 .filaSuperior { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .numero { color: var(--text-2); font-weight: 800; font-size: .86rem; letter-spacing: .3px; }
 
-.chipAlerta, .chipRestringida {
+.chipAlerta, .chipRestringida, .chipHorario {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: .68rem; font-weight: 700;
   padding: 2px 8px; border-radius: 100px; border: 1px solid currentColor;
 }
 .chipAlerta      { color: var(--acc-red); }
 .chipRestringida { color: var(--acc-orange); }
+/* Morado: no es el color de ningún estado (finalizada va en verde azulado). */
+.chipHorario     { color: var(--acc-purple); }
 
 .titulo {
   display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;

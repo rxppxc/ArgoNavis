@@ -17,7 +17,8 @@
   color: var(--cabecera-texto-2); font-weight: 600;
 }
 .jerarquia strong { display: block; margin-top: 1px; font-size: .95rem; letter-spacing: .5px; text-transform: uppercase; color: var(--cabecera-texto); }
-.derecha { justify-self: end; display: flex; align-items: center; }
+/* La campana y el menú: el número de la campana sobresale a la derecha, de ahí el espacio. */
+.derecha { justify-self: end; display: flex; align-items: center; gap: 18px; }
 /* Los colores de la bandera de Panamá: no son de la paleta. */
 .bandera { height: 4px; background: linear-gradient(90deg, #005293 0 50%, #D21034 50% 100%); }
 
@@ -29,6 +30,7 @@
 /* Teléfonos: escudo y texto más chicos para que la jerarquía no se parta. */
 @media (max-width: 520px) {
   .interior { gap: 8px; }
+  .derecha { gap: 12px; }
   .escudo { height: 42px; }
   .jerarquia small { font-size: .56rem; letter-spacing: .8px; }
   .jerarquia strong { font-size: .72rem; letter-spacing: .2px; }

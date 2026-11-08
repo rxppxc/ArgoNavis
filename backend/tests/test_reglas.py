@@ -72,8 +72,8 @@ def test_checklist_condiciones():
         ("CUSTODIA-GLOBAL", "solicitud", "nacionalidad_restringida", False),
     )
     tripulantes = [
-        TripulanteChecklist(nombre="Panameño marino", es_panameno=True, porta_libreta=True),
-        TripulanteChecklist(nombre="Panameño técnico", es_panameno=True, porta_libreta=False),
+        TripulanteChecklist(nombre="Panameño marino", es_panameno=True, rango="marino"),
+        TripulanteChecklist(nombre="Panameño técnico", es_panameno=True, rango="tecnico"),
         TripulanteChecklist(nombre="Cubano", nacionalidad_restringida=True),
     ]
     casillas = ServicioTramite().construir_casillas(tipo, tripulantes)

@@ -40,27 +40,31 @@
 .animado .constelacion polyline:nth-child(4) { animation-delay: 1.2s; }
 .animado .constelacion polyline:nth-child(5) { animation-delay: .7s; }
 
-/* Dos luces por ruta, cada ruta a su ritmo. */
-.estelas { color: var(--y); opacity: .85; }
-.estelas polyline {
-  stroke-dasharray: .05 .45; stroke-dashoffset: 1;
-  animation: viajar 4s linear infinite;
-}
-.estelas polyline:nth-child(2) { animation-duration: 3s; animation-delay: -2s; }
-.estelas polyline:nth-child(3) { animation-duration: 4.6s; animation-delay: -3s; }
-.estelas polyline:nth-child(4) { animation-duration: 3.4s; animation-delay: -1s; }
-.estelas polyline:nth-child(5) { animation-duration: 3.8s; animation-delay: -2.5s; }
+/* Estrellas y luces: elementos HTML sobre un lienzo de 1600×900, con el mismo
+   encuadre que el SVG (lo escala FondoPagina). Solo se animan transform y
+   opacity, que mueve la tarjeta gráfica sin redibujar la carta: dentro del
+   SVG, el login usaba más de un núcleo entero (medido el 2026-10-26). */
+.marcoVivo { position: absolute; inset: 0; pointer-events: none; }
+.lienzo { position: absolute; left: 0; top: 0; width: 1600px; height: 900px; transform-origin: 0 0; }
 
-/* Las estrellas laten y crecen, desfasadas. */
-.animado .estrella {
-  transform-box: fill-box; transform-origin: center;
+/* Las estrellas laten y crecen, desfasadas. Posición en línea (left/top). */
+.estrellaViva {
+  position: absolute; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--y); opacity: .55;
   animation: titilar 3.6s ease-in-out infinite;
 }
-.animado .estrella:nth-of-type(3n + 1) { animation-delay: -1.2s; animation-duration: 4.4s; }
-.animado .estrella:nth-of-type(3n + 2) { animation-delay: -2.5s; animation-duration: 3s; }
+.estrellaViva:nth-child(3n + 1) { animation-delay: -1.2s; animation-duration: 4.4s; }
+.estrellaViva:nth-child(3n + 2) { animation-delay: -2.5s; animation-duration: 3s; }
+
+/* Dos luces por ruta, cada ruta a su ritmo: las mueve FondoPagina (Web
+   Animations) con cuadros clave en cada vértice. Ancho: ANCHO_LUZ. Invisibles
+   hasta que arranca la animación. */
+.luz {
+  position: absolute; left: 0; top: 0; height: 3px; border-radius: 1.5px;
+  background: var(--y); opacity: 0; transform-origin: 0 0;
+}
 
 @keyframes trazar { to { stroke-dashoffset: 0; } }
-@keyframes viajar { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 @keyframes titilar {
   0%, 100% { opacity: .55; transform: scale(1); }
   50%      { opacity: 1;   transform: scale(1.9); }

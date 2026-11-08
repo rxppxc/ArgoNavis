@@ -4,7 +4,7 @@ import type { RangoMarino, TripulanteEntrada } from "../../api/solicitudes";
 import { tramiteDePrueba } from "../../pruebas/datos";
 import { leerEspejo, type Caso } from "../../pruebas/espejo";
 import {
-  CABECERA_VACIA, fechaReferencia, nacimientoMaximo, operacionMaxima, validarFormulario,
+  CABECERA_VACIA, MAX_TRIPULANTES, fechaReferencia, nacimientoMaximo, operacionMaxima, validarFormulario,
   type CabeceraFormulario, type FichaTripulante,
 } from "./validacionFormulario";
 
@@ -87,6 +87,14 @@ describe("datos del trámite", () => {
 
   it("al menos un tripulante", () => {
     expect(validarFormulario(tramiteDePrueba(), completa, [], paises, hoy)).toEqual(["Registra al menos un tripulante."]);
+  });
+
+  it(`hasta ${MAX_TRIPULANTES} tripulantes`, () => {
+    const tripulacion = (n: number) => Array.from({ length: n }, (_, i) => ficha({ pasaporte: `P${1000 + i}` }, `n${i}`));
+    expect(validarFormulario(tramiteDePrueba(), completa, tripulacion(MAX_TRIPULANTES), paises, hoy)).toEqual([]);
+    expect(validarFormulario(tramiteDePrueba(), completa, tripulacion(MAX_TRIPULANTES + 2), paises, hoy)).toEqual([
+      `Una solicitud admite hasta ${MAX_TRIPULANTES} tripulantes: quita 2 y preséntalos en otra solicitud.`,
+    ]);
   });
 });
 

@@ -2,7 +2,8 @@
 
 Solo orquestan: las reglas viven en ServicioSolicitud y el armado de los
 correos en ServicioNotificacion. Acá se registra la bitácora de cada acción y
-se programan los avisos (salen después del commit, en segundo plano).
+se encolan los avisos, en la misma transacción (salen después del commit, en
+segundo plano).
 """
 import asyncio
 from datetime import date
@@ -14,7 +15,7 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencias import usuario_actual
-from app.core.email import Aviso, enviar_aviso
+from app.core.email import Aviso
 from app.core.http_utils import obtener_agente, obtener_ip
 from app.core.pdf_autorizacion import generar_pdf_autorizacion
 from app.core.permisos import PERMISO_PUERTO, PERMISO_REVISAR, PERMISO_SOLICITAR, requerir_permiso
@@ -29,6 +30,8 @@ from app.domain.schemas.solicitud import (
 )
 from app.domain.services.notificacion_service import ServicioNotificacion
 from app.domain.services.solicitud_service import ContextoAcceso, ServicioSolicitud
+from app.infrastructure import almacenamiento
+from app.infrastructure.cola_correos import despachar_correos, encolar_avisos
 from app.infrastructure.database import obtener_sesion_bd
 
 enrutador = APIRouter(prefix="/solicitudes", tags=["solicitudes"])
@@ -111,9 +114,12 @@ async def _auditar(
     )
 
 
-def _programar(background_tasks: BackgroundTasks, avisos: list[Aviso]) -> None:
-    for aviso in avisos:
-        background_tasks.add_task(enviar_aviso, aviso)
+async def _programar(sesion: AsyncSession, background_tasks: BackgroundTasks, avisos: list[Aviso]) -> None:
+    """Los avisos entran a la cola en la transacción de la operación (si no se
+    confirma, no salen) y se envían apenas termina la respuesta. Si el correo
+    falla, los reintenta la tarea de correos (infrastructure/cola_correos.py)."""
+    if await encolar_avisos(sesion, avisos):
+        background_tasks.add_task(despachar_correos)
 
 
 # ── Bandejas ─────────────────────────────────────────────────────────────────
@@ -184,7 +190,7 @@ async def crear_solicitud(
         sesion, request, ctx.usuario, AccionAuditoria.SOLICITUD_CREADA, s,
         tramite=datos.codigo_tramite, tripulantes=s.cantidad_tripulantes, documentos=len(s.documentos),
     )
-    _programar(background_tasks, ServicioNotificacion(sesion).recibida(s, corregida=False))
+    await _programar(sesion, background_tasks, ServicioNotificacion(sesion).recibida(s, corregida=False))
     return await svc.construir_detalle(ctx, s)
 
 
@@ -208,7 +214,7 @@ async def corregir_solicitud(
         sesion, request, ctx.usuario, AccionAuditoria.SOLICITUD_CORREGIDA, s,
         tripulantes=s.cantidad_tripulantes, documentos_nuevos=len(files),
     )
-    _programar(background_tasks, ServicioNotificacion(sesion).recibida(s, corregida=True))
+    await _programar(sesion, background_tasks, ServicioNotificacion(sesion).recibida(s, corregida=True))
     return await svc.construir_detalle(ctx, s)
 
 
@@ -247,7 +253,8 @@ async def obtener_documento(
     )
     return FileResponse(
         ruta,
-        media_type=documento.tipo_mime or "application/octet-stream",
+        # El tipo del formato verificado al subirlo, nunca otro (ver almacenamiento.mime_del_formato).
+        media_type=almacenamiento.mime_del_formato(documento.nombre_almacenado),
         filename=documento.nombre_original,
         content_disposition_type="attachment" if descargar else "inline",
         headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
@@ -262,17 +269,20 @@ async def descargar_autorizacion(
     svc:     ServicioSolicitud = Depends(_servicio),
     sesion:  AsyncSession   = Depends(obtener_sesion_bd, scope="function"),
 ):
-    """PDF de la autorización aprobada, verificable con su código QR."""
+    """PDF de la autorización aprobada, verificable con su código QR. El
+    personal del SNM recibe la copia interna (con el nombre de quien aprobó)."""
     s = await svc.obtener(ctx, solicitud_id)
     datos = await svc.preparar_pdf(ctx, s)
     contenido = await asyncio.to_thread(generar_pdf_autorizacion, datos)
 
-    await _auditar(sesion, request, ctx.usuario, AccionAuditoria.AUTORIZACION_DESCARGADA, s)
+    await _auditar(sesion, request, ctx.usuario, AccionAuditoria.AUTORIZACION_DESCARGADA, s,
+                   copia_interna=datos.copia_interna)
+    nombre = f"Autorizacion-{datos.numero}{'-interna' if datos.copia_interna else ''}.pdf"
     return Response(
         content=contenido,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f'attachment; filename="Autorizacion-{datos.numero}.pdf"',
+            "Content-Disposition": f'attachment; filename="{nombre}"',
             "Cache-Control": "no-store",
         },
     )
@@ -313,7 +323,7 @@ async def aprobar_solicitud(
     """Aprueba la autorización: avisa a la agencia y al puesto de control."""
     s = await svc.aprobar(ctx, solicitud_id, datos.observacion)
     await _auditar(sesion, request, ctx.usuario, AccionAuditoria.SOLICITUD_APROBADA, s, observacion=datos.observacion)
-    _programar(background_tasks, await ServicioNotificacion(sesion).aprobada(s))
+    await _programar(sesion, background_tasks, await ServicioNotificacion(sesion).aprobada(s))
     return await svc.construir_detalle(ctx, s)
 
 
@@ -330,7 +340,7 @@ async def devolver_solicitud(
     """Devuelve la solicitud a la agencia para que la corrija dentro del plazo."""
     s = await svc.devolver(ctx, solicitud_id, datos.motivo)
     await _auditar(sesion, request, ctx.usuario, AccionAuditoria.SOLICITUD_DEVUELTA, s, motivo=datos.motivo)
-    _programar(background_tasks, await ServicioNotificacion(sesion).devuelta(s))
+    await _programar(sesion, background_tasks, await ServicioNotificacion(sesion).devuelta(s))
     return await svc.construir_detalle(ctx, s)
 
 
@@ -346,11 +356,34 @@ async def negar_solicitud(
 ):
     s = await svc.negar(ctx, solicitud_id, datos.motivo)
     await _auditar(sesion, request, ctx.usuario, AccionAuditoria.SOLICITUD_NEGADA, s, motivo=datos.motivo)
-    _programar(background_tasks, await ServicioNotificacion(sesion).negada(s))
+    await _programar(sesion, background_tasks, await ServicioNotificacion(sesion).negada(s))
     return await svc.construir_detalle(ctx, s)
 
 
 # ── Puesto de control ────────────────────────────────────────────────────────
+
+@enrutador.post("/{solicitud_id}/impedimentos-puesto", response_model=SalidaSolicitud)
+async def registrar_impedimentos_puesto(
+    solicitud_id: int,
+    datos:   DatosImpedimentos,
+    request: Request,
+    ctx:     ContextoAcceso = Depends(_contexto),
+    svc:     ServicioSolicitud = Depends(_servicio),
+    sesion:  AsyncSession   = Depends(obtener_sesion_bd, scope="function"),
+):
+    """El puesto de control registra (o corrige) su verificación de impedimentos
+    en SIMPLUS, obligatoria antes de finalizar. Va aparte de la de UCVMM."""
+    s = await svc.registrar_impedimentos_puesto(ctx, solicitud_id, datos)
+    # La misma acción de la bitácora que la de UCVMM; `etapa` dice que fue en el puesto.
+    await _auditar(
+        sesion, request, ctx.usuario, AccionAuditoria.IMPEDIMENTOS_REGISTRADOS, s,
+        etapa="puesto de control",
+        con_impedimento=[d.tripulante_id for d in datos.tripulantes if d.con_impedimento],
+        comentario=datos.comentario,
+        motivo_correccion=datos.motivo_correccion,
+    )
+    return await svc.construir_detalle(ctx, s)
+
 
 @enrutador.post("/{solicitud_id}/finalizar", response_model=SalidaSolicitud)
 async def finalizar_solicitud(
@@ -361,8 +394,8 @@ async def finalizar_solicitud(
     svc:     ServicioSolicitud = Depends(_servicio),
     sesion:  AsyncSession   = Depends(obtener_sesion_bd, scope="function"),
 ):
-    """El puesto de control registra la operación y cierra la autorización,
-    indicando en qué puesto terminó (por defecto, el autorizado)."""
+    """El puesto de control registra la operación y cierra la autorización en
+    el puesto autorizado (no en otro: eso es una solicitud nueva)."""
     s = await svc.finalizar(ctx, solicitud_id, datos.comentario, datos.puesto_finalizacion_id)
     await _auditar(sesion, request, ctx.usuario, AccionAuditoria.SOLICITUD_FINALIZADA, s,
                    comentario=datos.comentario, puesto_finalizacion=s.puesto_finalizacion_nombre)

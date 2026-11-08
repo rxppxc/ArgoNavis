@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { FondoPagina } from "./FondoPagina";
 import { BotonVolver } from "./BotonVolver";
 import { CabeceraInstitucional } from "./CabeceraInstitucional";
+import { CampanaPendientes } from "./CampanaPendientes";
 import { MenuCabecera } from "./MenuCabecera";
 import { PieInstitucional } from "./PieInstitucional";
 import styles from "./MarcoPagina.module.css";
@@ -17,16 +18,20 @@ interface Props {
 }
 
 /** Estructura común de página: la misma franja institucional y el mismo pie
- *  del login, con el menú del usuario a la derecha; "Volver" va arriba del contenido. */
+ *  del login, con la campana de notificaciones y el menú del usuario a la
+ *  derecha; "Volver" va arriba del contenido. */
 export function MarcoPagina({ children, volverA, publica = false, ancho = "normal" }: Props) {
   const claseAncho = ancho === "amplio" ? styles.amplio : ancho === "angosto" ? styles.angosto : "";
   return (
     <div className={styles.pagina}>
-      <CabeceraInstitucional derecha={!publica && <MenuCabecera />} inicio={publica ? undefined : "/dashboard"} />
+      {/* Con el teclado, el primer Tab ofrece saltar la cabecera (globals.css). */}
+      <a href="#contenido" className="saltar-contenido">Saltar al contenido</a>
+      <CabeceraInstitucional derecha={!publica && <><CampanaPendientes /><MenuCabecera /></>}
+        inicio={publica ? undefined : "/dashboard"} />
 
       <div className={styles.medio}>
         <FondoPagina />
-        <main className={`${styles.contenido} ${claseAncho}`}>
+        <main id="contenido" tabIndex={-1} className={`${styles.contenido} ${claseAncho}`}>
           {volverA && <div className={styles.volver}><BotonVolver to={volverA} /></div>}
           {children}
         </main>

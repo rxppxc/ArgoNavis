@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { apiSolicitudes, type SolicitudDetalle } from "../../api/solicitudes";
+import { apiSolicitudes, releerSiCambio, type SolicitudDetalle } from "../../api/solicitudes";
 import { useNotificacion } from "../../components/Notificaciones";
 import { useAtraparFoco } from "../../hooks/useAtraparFoco";
 import { mensajeDeError } from "../../utils/errores";
@@ -96,6 +96,8 @@ export function ModalDecision({ decision, solicitud, conImpedimento, onCerrar, o
     } catch (error) {
       mostrar(mensajeDeError(error, "No se pudo completar la acción."), "error");
       setTrabajando(false);
+      // Otra persona ya la decidió (409): el expediente muestra cómo quedó.
+      await releerSiCambio(error, solicitud.id, (s) => { onCerrar(); onActualizada(s); });
     }
   }
 

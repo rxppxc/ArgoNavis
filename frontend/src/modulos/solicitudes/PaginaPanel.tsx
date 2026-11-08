@@ -10,7 +10,7 @@
  * abre el expediente (/solicitudes/:id).
  */
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   apiSolicitudes, type Bandeja, type ConsultaBandeja, type EstadoSolicitud, type PaginaSolicitudes,
 } from "../../api/solicitudes";
@@ -69,7 +69,20 @@ interface Resultado {
   error:  string | null;
 }
 
+const esBandeja = (valor: string | null): valor is Bandeja => valor !== null && valor in VISTAS;
+
+/** Un enlace con `?bandeja=&estado=` (los de la campana de notificaciones)
+ *  abre esa bandeja en esa pestaña, también si el panel ya estaba abierto. */
 export default function PaginaPanel() {
+  const [parametros] = useSearchParams();
+  const bandeja = parametros.get("bandeja");
+  return (
+    <Panel key={parametros.toString()} bandejaPedida={esBandeja(bandeja) ? bandeja : null}
+      estadoPedido={parametros.get("estado")} />
+  );
+}
+
+function Panel({ bandejaPedida, estadoPedido }: { bandejaPedida: Bandeja | null; estadoPedido: string | null }) {
   const { usuario } = useAutenticacion();
   const { tiene, esAdmin, cargando: cargandoPermisos } = usePermisos();
 
@@ -88,10 +101,11 @@ export default function PaginaPanel() {
     return lista;
   }, [puedeRevisar, esPuerto, puedeCrear]);
 
-  const [vistaElegida, setVistaElegida] = useState<Bandeja | null>(null);
+  const [vistaElegida, setVistaElegida] = useState<Bandeja | null>(bandejaPedida);
   const vista: Bandeja = vistaElegida && vistas.includes(vistaElegida) ? vistaElegida : vistas[0];
-  const [filtroElegido, setFiltroElegido] = useState<FiltroEstado | null>(null);
-  const filtro: FiltroEstado = filtroElegido ?? PESTANAS[vista][0].id;
+  const [filtroElegido, setFiltroElegido] = useState<string | null>(estadoPedido);
+  // Solo una pestaña que tenga esta bandeja (p. ej. un enlace viejo o de otro rol).
+  const filtro: FiltroEstado = PESTANAS[vista].find((p) => p.id === filtroElegido)?.id ?? PESTANAS[vista][0].id;
 
   const [busqueda, setBusqueda] = useState("");
   const [texto, setTexto] = useState("");

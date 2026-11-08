@@ -29,10 +29,12 @@ export const CABECERA_VACIA: CabeceraFormulario = {
   observaciones: "",
 };
 
-/** Mismos límites que el backend (tramite_service.py y DIAS_MAXIMOS_ANTICIPACION). */
+/** Mismos límites que el backend (tramite_service.py, DIAS_MAXIMOS_ANTICIPACION
+ *  y MAX_TRIPULANTES de solicitud_service.py). */
 export const EDAD_MINIMA = 18;
 export const NACIMIENTO_MINIMO = "1900-01-01";
 export const DIAS_MAXIMOS_ANTICIPACION = 365;
+export const MAX_TRIPULANTES = 30;
 
 /** Suma años o días a una fecha ISO (AAAA-MM-DD), sin pasar por la zona horaria.
  *  Si el día no existe en el año de destino (29 de febrero), queda el último del
@@ -91,6 +93,11 @@ export function validarFormulario(
   if (tipo.requiere_clinica && !c.clinica_hospital.trim()) errores.push("Indica la clínica u hospital.");
 
   if (tripulantes.length === 0) errores.push("Registra al menos un tripulante.");
+  // Solo pasa al corregir una solicitud enviada antes del tope: el botón no deja agregar más.
+  if (tripulantes.length > MAX_TRIPULANTES) {
+    errores.push(`Una solicitud admite hasta ${MAX_TRIPULANTES} tripulantes: quita ${tripulantes.length - MAX_TRIPULANTES} `
+      + "y preséntalos en otra solicitud.");
+  }
 
   const referencia = fechaReferencia(c.fecha_operacion, hoy);
   const pasaportes = new Map<string, number>();

@@ -8,6 +8,12 @@ RangoMarino = Literal["marino", "militar", "tecnico", "supernumerario", "superin
 Sexo        = Literal["M", "F", "X"]
 Estado      = Literal["review", "returned", "approved", "denied", "finalized", "expired"]
 
+# Tope genérico de archivos por envío: evita listas absurdas antes de llegar al
+# servicio. El tope real de tripulantes es MAX_TRIPULANTES (30, en
+# solicitud_service.py); estos 2000 alcanzan aun con los 300 del esquema × 4
+# documentos + 1 de la solicitud + 20 adicionales.
+MAX_ARCHIVOS_POR_ENVIO = 2000
+
 
 def _texto_o_nada(valor: str | None) -> str | None:
     if valor is None:
@@ -57,7 +63,7 @@ class AsignacionArchivo(BaseModel):
     - `documento_codigo` nulo = documento adicional (fuera del checklist).
     - `indice_tripulante` (posición en `tripulantes`) solo para documentos de
       alcance "marino"; nulo para los de la solicitud y los adicionales."""
-    documento_codigo:  str | None = None
+    documento_codigo:  str | None = Field(default=None, max_length=50)
     indice_tripulante: int | None = None
 
 
@@ -84,7 +90,7 @@ class _DatosFormularioSolicitud(BaseModel):
     observaciones: str | None = Field(default=None, max_length=2000)
 
     tripulantes:  list[DatosTripulanteEntrada] = Field(default_factory=list, max_length=300)
-    asignaciones: list[AsignacionArchivo]      = Field(default_factory=list)
+    asignaciones: list[AsignacionArchivo]      = Field(default_factory=list, max_length=MAX_ARCHIVOS_POR_ENVIO)
 
     @field_validator(
         "nombre_buque", "imo", "bandera", "nombre_puerto", "puerto_desembarque",
@@ -96,7 +102,7 @@ class _DatosFormularioSolicitud(BaseModel):
 
 
 class DatosCrearSolicitud(_DatosFormularioSolicitud):
-    codigo_tramite: str
+    codigo_tramite: str = Field(max_length=50)
 
 
 class DatosCorregirSolicitud(_DatosFormularioSolicitud):
@@ -104,7 +110,7 @@ class DatosCorregirSolicitud(_DatosFormularioSolicitud):
 
     `documentos_conservados` son los ids de los documentos ya cargados que se
     mantienen; los que no vengan en la lista se eliminan."""
-    documentos_conservados: list[int] = Field(default_factory=list)
+    documentos_conservados: list[int] = Field(default_factory=list, max_length=MAX_ARCHIVOS_POR_ENVIO)
 
 
 class DatosImpedimentoTripulante(BaseModel):
@@ -120,7 +126,7 @@ class DatosImpedimentos(BaseModel):
     `motivo_correccion`."""
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    tripulantes:       list[DatosImpedimentoTripulante] = Field(min_length=1)
+    tripulantes:       list[DatosImpedimentoTripulante] = Field(min_length=1, max_length=300)
     comentario:        str | None = Field(default=None, max_length=2000)
     motivo_correccion: str | None = Field(default=None, max_length=2000)
 
@@ -150,8 +156,10 @@ class DatosAprobacion(BaseModel):
 
 class DatosFinalizar(BaseModel):
     """Cierre en el puesto de control, con el comentario de la operación.
-    `puesto_finalizacion_id` es donde terminó la operación (puede ser otro que
-    el autorizado); vacío = el autorizado."""
+
+    Se finaliza siempre en el puesto autorizado (desde el 2026-10-30). El
+    campo `puesto_finalizacion_id` ya no lo manda la interfaz: queda para que
+    una página abierta antes del cambio reciba el motivo si elige otro puesto."""
     model_config = ConfigDict(str_strip_whitespace=True)
 
     comentario:             str = Field(min_length=3, max_length=2000)
@@ -194,9 +202,10 @@ class SalidaTripulante(BaseModel):
     ocupacion:        str
     es_panameno:      bool
     nacionalidad_restringida: bool
-    # Verificación de impedimentos de la persona. Solo para personal SNM
-    # (a la agencia le llega None): None = sin verificar.
+    # Verificación de impedimentos de la persona, la de UCVMM y la del puesto de
+    # control. Solo para personal SNM (a la agencia le llega None): None = sin verificar.
     con_impedimento:  bool | None = None
+    con_impedimento_puesto: bool | None = None
     porta_libreta:    bool
     orden:            int
 
@@ -281,6 +290,8 @@ class SalidaSolicitudResumen(BaseModel):
     tripulantes_con_alerta:         int = 0
     # Solo en los trámites con aviso de custodia (los demás procesos no la mencionan).
     tiene_nacionalidad_restringida: bool = False
+    # Aprobada por UCVMM fuera del horario laboral. Solo para el SNM: a la agencia le llega None.
+    fuera_de_horario:               bool | None = None
 
 
 class PaginaSolicitudes(BaseModel):
@@ -318,13 +329,18 @@ class SalidaSolicitud(SalidaSolicitudResumen):
     comentario_impedimentos:      str | None = None
     impedimentos_verificados_en:  datetime | None = None
     impedimentos_verificados_por: str | None = None
+    # La del puesto de control antes de finalizar (2026-11-06), aparte de la de UCVMM.
+    impedimentos_puesto_verificados: bool = False
+    comentario_impedimentos_puesto:  str | None = None
+    impedimentos_puesto_en:          datetime | None = None
+    impedimentos_puesto_por:         str | None = None
     motivo_devolucion:       str | None = None
     observacion_aprobacion:  str | None = None
     aprobada_por:            str | None = None
     motivo_negacion:         str | None = None
     comentario_finalizacion: str | None = None
     finalizada_por:          str | None = None
-    # Dónde terminó la operación (puede ser otro puesto que el autorizado).
+    # Dónde se finalizó: el autorizado (antes del 2026-10-30 podía ser otro).
     puesto_finalizacion_id:     int | None = None
     puesto_finalizacion_nombre: str | None = None
 
@@ -373,19 +389,40 @@ class FilaEstadisticaTipo(BaseModel):
     expiradas: int
 
 
-class FilaEstadisticaMes(BaseModel):
-    mes:       str   # "2026-10"
-    recibidas: int
-    aprobadas: int
-    negadas:   int
-    expiradas: int
+class FilaEstadisticaSerie(BaseModel):
+    """Lo que pasó en un día, un mes o un año (hora de Panamá): cada cifra
+    cuenta cuando ocurrió (la llegada, la aprobación, la finalización…)."""
+    periodo:       str   # "2026-10-05", "2026-10" o "2026"
+    recibidas:     int = 0
+    aprobadas:     int = 0
+    negadas:       int = 0
+    expiradas:     int = 0
+    finalizadas:   int = 0
+    fuera_horario: int = 0   # aprobadas fuera del horario laboral
 
 
 class FilaEstadisticaPuesto(BaseModel):
-    puesto:      str
-    aprobadas:   int
-    finalizadas: int
-    expiradas:   int
+    puesto:        str
+    aprobadas:     int
+    finalizadas:   int
+    expiradas:     int
+
+
+class FilaFueraHorario(BaseModel):
+    """Una autorización aprobada fuera del horario laboral."""
+    id:           int
+    numero:       str | None = None
+    tipo_tramite: str
+    puesto:       str
+    aprobada_en:  datetime
+    aprobada_por: str | None = None
+
+
+class FilaPorHora(BaseModel):
+    """Aprobadas un día de la semana a una hora, en hora de Panamá."""
+    dia:   int   # 1 = lunes … 7 = domingo
+    hora:  int   # 0–23
+    total: int
 
 
 class SalidaEstadisticasSolicitudes(BaseModel):
@@ -396,8 +433,17 @@ class SalidaEstadisticasSolicitudes(BaseModel):
     expiradas:   int
     finalizadas: int
     horas_promedio_resolucion: float | None = None
-    por_tipo:    list[FilaEstadisticaTipo]   = Field(default_factory=list)
-    por_mes:     list[FilaEstadisticaMes]    = Field(default_factory=list)
+    # Aprobadas por UCVMM fuera del horario laboral (core/horario.py) y las más recientes.
+    aprobadas_fuera_horario:   int = 0
+    horario_laboral:           str = ""
+    operaciones_fuera_horario: list[FilaFueraHorario] = Field(default_factory=list)
+    # El mapa de horas de las estadísticas: solo las celdas con alguna aprobada.
+    aprobadas_por_hora:        list[FilaPorHora] = Field(default_factory=list)
+    por_tipo:   list[FilaEstadisticaTipo]   = Field(default_factory=list)
+    # La misma serie por día (los últimos 31 del periodo), por mes (hasta 12) y por año (hasta 10).
+    por_dia:     list[FilaEstadisticaSerie]  = Field(default_factory=list)
+    por_mes:     list[FilaEstadisticaSerie]  = Field(default_factory=list)
+    por_anio:    list[FilaEstadisticaSerie]  = Field(default_factory=list)
     por_puesto:  list[FilaEstadisticaPuesto] = Field(default_factory=list)
 
 

@@ -16,12 +16,17 @@ export const NOMBRE_REVISOR = "Ricardo Revisor";
 /** Una sesión propia por rol: cada contexto del navegador tiene su localStorage. */
 export async function entrar(navegador: Browser, usuario: string): Promise<Page> {
   const pagina = await (await navegador.newContext()).newPage();
+  await iniciarSesion(pagina, usuario);
+  return pagina;
+}
+
+/** Entra en esa página; las demás pestañas de su contexto comparten la sesión. */
+export async function iniciarSesion(pagina: Page, usuario: string): Promise<void> {
   await pagina.goto("/login");
   await pagina.getByLabel("Usuario").fill(usuario);
   await pagina.getByLabel("Contraseña", { exact: true }).fill(CLAVE);
   await pagina.getByRole("button", { name: "Iniciar sesión" }).click();
   await pagina.waitForURL(/\/(dashboard|admin)$/);
-  return pagina;
 }
 
 /** Fecha AAAA-MM-DD en Panamá, desplazada `dias` desde hoy. */

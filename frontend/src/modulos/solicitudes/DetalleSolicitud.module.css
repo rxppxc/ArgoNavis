@@ -16,6 +16,13 @@
   color: var(--text-2); font-weight: 800; font-size: .95rem; letter-spacing: .4px;
 }
 .encabezado h1 { color: var(--text); font-size: 1.55rem; font-weight: 800; margin-top: 6px; }
+/* Morado, como en las bandejas: no es el color de ningún estado. */
+.chipHorario {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: .72rem; font-weight: 700; letter-spacing: 0;
+  padding: 2px 9px; border-radius: 100px; border: 1px solid currentColor;
+  color: var(--acc-purple);
+}
 .subtitulo { color: var(--text-2); font-size: .88rem; margin-top: 4px; }
 .encabezadoAcciones { display: flex; gap: 10px; flex-wrap: wrap; }
 
@@ -158,6 +165,8 @@
 .evento_corregida .eventoPunto  { background: var(--acc-blue); }
 .evento_impedimentos .eventoPunto { background: var(--acc-purple); }
 .evento_impedimentos_corregidos .eventoPunto { background: var(--acc-purple); }
+.evento_impedimentos_puesto .eventoPunto,
+.evento_impedimentos_puesto_corregidos .eventoPunto { background: var(--acc-purple); }
 .evento_devuelta .eventoPunto   { background: var(--acc-orange); }
 .evento_aprobada .eventoPunto   { background: var(--acc-green); }
 .evento_negada .eventoPunto     { background: var(--acc-red); }
@@ -165,7 +174,10 @@
 .evento_finalizada .eventoPunto { background: var(--acc-teal); }
 .evento_expirada .eventoPunto   { background: var(--acc-gray); }
 
-/* ─── Verificación de impedimentos (UCVMM), en la tabla de tripulantes ─── */
+/* El resumen lateral de las verificaciones registradas (UCVMM y puesto), una debajo de la otra. */
+.etapaImpedimentos + .etapaImpedimentos { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+
+/* ─── Verificación de impedimentos (UCVMM y puesto), en la tabla de tripulantes ─── */
 .verifCabecera {
   display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; flex-wrap: wrap;
   margin: 2px 0 10px;
@@ -210,7 +222,7 @@
 .modalAngosto { width: min(500px, 100%); }
 .modalMensaje { color: var(--text-2); font-size: .86rem; line-height: 1.55; margin-bottom: 14px; }
 .chipImpedimento {
-  display: inline-block; margin-top: 4px; padding: 1px 8px; border-radius: 999px;
+  display: inline-block; margin: 4px 4px 0 0; padding: 1px 8px; border-radius: 999px; white-space: nowrap;
   font-size: .68rem; font-weight: 700; color: var(--acc-red); border: 1px solid var(--acc-red);
 }
 .etiqueta { display: block; color: var(--text-2); font-size: .78rem; font-weight: 600; margin-bottom: 6px; }

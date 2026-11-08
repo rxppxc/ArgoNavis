@@ -26,7 +26,9 @@ import { TarjetaTripulante } from "./TarjetaTripulante";
 import type { DatosFormulario } from "./useCargaFormulario";
 import { useDocumentosFormulario } from "./useDocumentosFormulario";
 import { useTripulantesFormulario } from "./useTripulantesFormulario";
-import { CABECERA_VACIA, fechaReferencia, validarFormulario, type CabeceraFormulario } from "./validacionFormulario";
+import {
+  CABECERA_VACIA, MAX_TRIPULANTES, fechaReferencia, validarFormulario, type CabeceraFormulario,
+} from "./validacionFormulario";
 import styles from "./PaginaSolicitud.module.css";
 
 const SIN_CASILLAS: CasillaFormulario[] = [];
@@ -229,10 +231,17 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
                   onVer={setVistaPrevia}
                 />
               ))}
-              <button type="button" className={styles.btnAgregar}
-                onClick={() => fichas.agregar(tipo.rangos_permitidos?.[0])}>
-                <IconoMas /> Agregar tripulante
-              </button>
+              {tripulantes.length < MAX_TRIPULANTES ? (
+                <button type="button" className={styles.btnAgregar}
+                  onClick={() => fichas.agregar(tipo.rangos_permitidos?.[0])}>
+                  <IconoMas /> Agregar tripulante
+                </button>
+              ) : (
+                <p className={styles.ayudaSeccion}>
+                  Llegaste al máximo de {MAX_TRIPULANTES} tripulantes por solicitud. Si son más, preséntalos en otra
+                  solicitud.
+                </p>
+              )}
             </section>
 
             {/* ── 4. Documentos de la solicitud + estado por tripulante ── */}
@@ -263,8 +272,10 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
 
             {/* ── 6. Observaciones ── */}
             <section className={styles.bloque}>
-              <div className={styles.bloqueTitulo}><span className={styles.paso}>6</span> Observaciones para UCVMM (opcional)</div>
+              <div className={styles.bloqueTitulo}><span className={styles.paso}>6</span> Observaciones (opcional)</div>
               <label className={styles.campo}>
+                {/* El título de la sección no está asociado al campo: este lo nombra para el lector de pantalla. */}
+                <span className="sr-only">Observaciones</span>
                 <textarea rows={3} maxLength={2000} value={cabecera.observaciones}
                   placeholder={corrigiendo ? "Explica qué corregiste" : "Información adicional para la revisión"}
                   onChange={(e) => cambiar("observaciones", e.target.value)} />

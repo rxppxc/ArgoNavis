@@ -45,6 +45,9 @@ class TipoEventoSolicitud(str, enum.Enum):
     CORREGIDA    = "corregida"
     IMPEDIMENTOS = "impedimentos"
     IMPEDIMENTOS_CORREGIDOS = "impedimentos_corregidos"
+    # La verificación del puesto de control antes de finalizar (2026-11-06).
+    IMPEDIMENTOS_PUESTO = "impedimentos_puesto"
+    IMPEDIMENTOS_PUESTO_CORREGIDOS = "impedimentos_puesto_corregidos"   # 30 caracteres: el tope de `tipo`
     DEVUELTA     = "devuelta"
     APROBADA     = "aprobada"
     NEGADA       = "negada"
@@ -101,6 +104,11 @@ class Solicitud(Base):
     comentario_impedimentos:         Mapped[str | None]      = mapped_column(Text)
     impedimentos_verificados_en:     Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     impedimentos_verificados_por_id: Mapped[int | None]      = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    # La del puesto de control, aparte de la de UCVMM: se exige antes de finalizar.
+    impedimentos_puesto_verificados: Mapped[bool]            = mapped_column(Boolean, default=False, server_default="false")
+    comentario_impedimentos_puesto:  Mapped[str | None]      = mapped_column(Text)
+    impedimentos_puesto_en:          Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    impedimentos_puesto_por_id:      Mapped[int | None]      = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
 
     motivo_devolucion: Mapped[str | None]      = mapped_column(Text)
     plazo_correccion:  Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
@@ -119,14 +127,14 @@ class Solicitud(Base):
     finalizada_en:           Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finalizada_por_id:       Mapped[int | None]      = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     comentario_finalizacion: Mapped[str | None]      = mapped_column(Text)
-    # La operación puede empezar en un puerto y terminar en otro: el puesto de
-    # control indica dónde terminó al finalizar (el nombre, como foto).
-    puesto_finalizacion_id:     Mapped[int | None] = mapped_column(ForeignKey("puestos_control.id", ondelete="RESTRICT"))
+    # Dónde se finalizó (el nombre, como foto). Desde la reunión del 2026-10-30
+    # es siempre el puesto autorizado; las finalizadas antes pueden tener otro.
+    puesto_finalizacion_id:     Mapped[int | None] = mapped_column(ForeignKey("puestos_control.id", ondelete="RESTRICT"), index=True)
     puesto_finalizacion_nombre: Mapped[str | None] = mapped_column(String(200))
 
     expirada_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # `foreign_keys` explícito: la tabla tiene varias FK hacia users.
@@ -191,8 +199,9 @@ class TripulanteSolicitud(Base):
     es_panameno:      Mapped[bool]        = mapped_column(Boolean, default=False, server_default="false")
     nacionalidad_restringida: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # Verificación de impedimentos (SIMPLUS) de esta persona: None = sin verificar.
-    # Es información interna del SNM: la agencia no la ve.
+    # Es información interna del SNM: la agencia no la ve. La de UCVMM y la del puesto de control.
     con_impedimento:  Mapped[bool | None] = mapped_column(Boolean)
+    con_impedimento_puesto: Mapped[bool | None] = mapped_column(Boolean)
     orden:            Mapped[int]         = mapped_column(Integer, default=0, server_default="0")
     created_at:       Mapped[datetime]    = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -277,6 +286,7 @@ class EventoSolicitud(Base):
     comentario:      Mapped[str | None] = mapped_column(Text)
     usuario_id:      Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
     usuario_nombre:  Mapped[str | None] = mapped_column(String(255))
-    creado_en:       Mapped[datetime]   = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Con índice: las novedades de las notificaciones internas se buscan por fecha.
+    creado_en:       Mapped[datetime]   = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     solicitud: Mapped["Solicitud"] = relationship(back_populates="eventos")

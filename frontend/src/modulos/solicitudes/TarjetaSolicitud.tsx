@@ -26,6 +26,8 @@ export function TarjetaSolicitud({ s, vista }: { s: SolicitudResumen; vista: Ban
           </span>
         )}
         {s.tiene_nacionalidad_restringida && <span className={styles.chipRestringida}>Nacionalidad restringida</span>}
+        {/* Aprobada por UCVMM fuera del horario laboral (solo le llega al SNM). */}
+        {s.fuera_de_horario && <span className={styles.chipHorario}><IconoReloj tamano={11} /> Aprobada fuera del horario</span>}
       </div>
 
       <div className={styles.titulo}>

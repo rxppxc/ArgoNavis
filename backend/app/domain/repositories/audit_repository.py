@@ -2,6 +2,8 @@ from datetime import date
 
 from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.horario import entre_fechas_panama
 from app.domain.models.audit_log import RegistroAuditoria, AccionAuditoria
 
 
@@ -40,19 +42,15 @@ class RepositorioAuditoria:
         filtros = []
         if accion:
             filtros.append(RegistroAuditoria.accion == accion)
+        # autoescape: un «_» (p. ej. de «usuario_1») o un «%» se buscan tal cual, no como comodín.
         if usuario:
-            filtros.append(RegistroAuditoria.username.ilike(f"%{usuario}%"))
+            filtros.append(RegistroAuditoria.username.icontains(usuario, autoescape=True))
         if texto:
-            patron = f"%{texto}%"
             filtros.append(or_(
-                cast(RegistroAuditoria.detalle, String).ilike(patron),
-                RegistroAuditoria.ip.ilike(patron),
+                cast(RegistroAuditoria.detalle, String).icontains(texto, autoescape=True),
+                RegistroAuditoria.ip.icontains(texto, autoescape=True),
             ))
-        fecha = func.date(func.timezone("America/Panama", RegistroAuditoria.creado_en))
-        if desde:
-            filtros.append(fecha >= desde)
-        if hasta:
-            filtros.append(fecha <= hasta)
+        filtros += entre_fechas_panama(RegistroAuditoria.creado_en, desde, hasta)
 
         total = (await self.sesion.execute(
             select(func.count()).select_from(RegistroAuditoria).where(*filtros)

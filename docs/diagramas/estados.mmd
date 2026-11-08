@@ -7,11 +7,11 @@ stateDiagram-v2
     state "Finalizada (finalized)" as finalized
     state "Expirada (expired)" as expired
     [*] --> review: La agencia envía
-    review --> returned: UCVMM devuelve con motivo y plazo de 2 días
+    review --> returned: UCVMM devuelve con motivo y plazo de 72 horas
     returned --> review: La agencia corrige dentro del plazo
     review --> approved: UCVMM aprueba (verificación completa)
     review --> denied: UCVMM deniega (motivo)
-    approved --> finalized: El puesto de control finaliza
+    approved --> finalized: El puesto verifica impedimentos y finaliza
     returned --> expired: Vence el plazo de corrección
     approved --> expired: Vence la vigencia sin finalizar
     denied --> [*]

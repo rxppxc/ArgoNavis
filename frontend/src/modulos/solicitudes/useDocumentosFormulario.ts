@@ -13,7 +13,7 @@ import { validarArchivos } from "../../utils/archivos";
 import { claveCasilla, construirCasillas, type CasillaFormulario } from "./checklist";
 import { MAX_ADICIONALES, type AdicionalNuevo } from "./DocumentosAdicionales";
 import { nuevaClave, type DocumentosElegidos, type Precarga } from "./envioSolicitud";
-import { portaLibreta, type FichaTripulante } from "./validacionFormulario";
+import type { FichaTripulante } from "./validacionFormulario";
 
 const SIN_EXISTENTES: Record<string, DocumentoSolicitud[]> = {};
 
@@ -58,7 +58,7 @@ export function useDocumentosFormulario(
         clave: t.clave,
         nombre: `${t.nombre} ${t.apellido}`.trim() || "Tripulante sin nombre",
         es_panameno: t.nacionalidad === "PAN",
-        porta_libreta: portaLibreta(t),
+        rango: t.rango,
         restringida: paisesPorCodigo.get(t.nacionalidad)?.nacionalidad_restringida ?? false,
       })),
     );

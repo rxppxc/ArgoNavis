@@ -32,6 +32,10 @@ interface ContextoNotificaciones {
 
 const Contexto = createContext<ContextoNotificaciones | null>(null);
 
+/** Errores y avisos quedan más tiempo: hay que alcanzar a leerlos (y, con
+ *  lector de pantalla, a oírlos). Se pueden cerrar antes con la X. */
+const DURACION_MS: Record<TipoNotificacion, number> = { exito: 4000, info: 4000, error: 10000, aviso: 10000 };
+
 // eslint-disable-next-line react-refresh/only-export-components -- el hook va junto a su proveedor; separarlos solo cambiaría las rutas de import
 export function useNotificacion(): ContextoNotificaciones {
   const ctx = useContext(Contexto);
@@ -48,7 +52,7 @@ export function ProveedorNotificaciones({ children }: { children: ReactNode }) {
   }, []);
 
   const mostrar = useCallback(
-    (texto: string, tipo: TipoNotificacion = "info", duracionMs = 4000) => {
+    (texto: string, tipo: TipoNotificacion = "info", duracionMs = DURACION_MS[tipo]) => {
       const id = idRef.current++;
       setItems(prev => [...prev, { id, texto, tipo }]);
       if (duracionMs > 0) {

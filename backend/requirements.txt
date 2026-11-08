@@ -22,7 +22,7 @@ pydantic-settings==2.14.2
 python-dotenv==1.2.2
 
 # ── Seguridad / Auth ────────────────────────────────────────────────────────
-python-jose[cryptography]==3.5.0
+PyJWT==2.15.1
 bcrypt==5.0.0
 ldap3==2.9.1
 
@@ -48,5 +48,5 @@ aiosmtplib==5.1.2
 # No se usan directo: el mínimo hace que `pip install -r requirements.txt`
 # actualice también una instalación existente.
 pyasn1>=0.6.4          # ldap3: decodifica las respuestas del Active Directory
-cryptography>=50.0.0   # python-jose
+cryptography>=50.0.0   # oletools (msoffcrypto-tool)
 anyio>=4.14.2          # starlette

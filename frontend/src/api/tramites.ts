@@ -17,6 +17,9 @@ export interface TramiteDocumento {
   orden: number;
   /** Solo se exige a quien porta seamanbook (rango Marino). */
   requiere_libreta: boolean;
+  /** Rangos a los que se pide (null = a todos). Desde el 30/10/2026, a los
+   *  rangos distintos de Marino solo se les piden Generales y boleto aéreo. */
+  rangos: RangoMarino[] | null;
 }
 
 export interface TipoTramite {
@@ -56,9 +59,12 @@ export const apiTramites = {
 };
 
 /** Etiquetas legibles para mostrar en la interfaz. */
+/** "marino" es el valor de la API para lo que va por cada tripulante, sea del
+ *  rango que sea: en pantalla, "Por tripulante" (con "Por marino", un documento
+ *  solo para técnicos o militares se leía contradictorio). */
 export const ETIQUETA_ALCANCE: Record<AlcanceDocumento, string> = {
   solicitud: "Por solicitud",
-  marino: "Por marino",
+  marino: "Por tripulante",
 };
 
 export const ETIQUETA_CONDICION: Record<CondicionDocumento, string> = {

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { apiAutenticacion } from "../api/auth";
 import { ContextoAutenticacion, type ValorAutenticacion } from "../hooks/useAutenticacion";
 import type { Usuario } from "../types";
@@ -12,6 +12,17 @@ function leerUsuarioGuardado(): Usuario | null {
  *  componente leía localStorage por su cuenta). */
 export function ProveedorAutenticacion({ children }: { children: ReactNode }) {
   const [usuario, setUsuario] = useState<Usuario | null>(leerUsuarioGuardado);
+
+  // Otra pestaña cerró la sesión o entró con otra cuenta: esta la sigue al
+  // instante (antes seguía mostrando la sesión hasta su siguiente pedido al
+  // servidor). key null = se vació el localStorage.
+  useEffect(() => {
+    function alCambiarEnOtraPestana(e: StorageEvent) {
+      if (e.key === "user" || e.key === null) setUsuario(leerUsuarioGuardado());
+    }
+    window.addEventListener("storage", alCambiarEnOtraPestana);
+    return () => window.removeEventListener("storage", alCambiarEnOtraPestana);
+  }, []);
 
   const guardarUsuario = useCallback((u: Usuario) => {
     localStorage.setItem("user", JSON.stringify(u));

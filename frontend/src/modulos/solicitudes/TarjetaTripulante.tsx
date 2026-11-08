@@ -4,11 +4,9 @@ import type { DocumentoSolicitud, RangoMarino, TripulanteEntrada } from "../../a
 import { IconoAlerta, IconoBasura, IconoChevronAbajo } from "../../components/Iconos";
 import type { CasillaFormulario } from "./checklist";
 import { ChecklistDocumentos } from "./ChecklistDocumentos";
-import { ETIQUETA_RANGO, ETIQUETA_SEXO, formatearFecha, hoyISO } from "./presentacion";
+import { ETIQUETA_RANGO, ETIQUETA_SEXO, TODOS_LOS_RANGOS, formatearFecha, hoyISO } from "./presentacion";
 import { NACIMIENTO_MINIMO, nacimientoMaximo, portaLibreta, type FichaTripulante } from "./validacionFormulario";
 import styles from "./PaginaSolicitud.module.css";
-
-const TODOS_LOS_RANGOS = Object.keys(ETIQUETA_RANGO) as RangoMarino[];
 
 interface Props {
   ficha:            FichaTripulante;

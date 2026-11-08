@@ -1,15 +1,23 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAtraparFoco } from "../hooks/useAtraparFoco";
 import { IconoReloj } from "./Iconos";
 import styles from "./ModalExpiracionSesion.module.css";
 
 interface Props {
-  segundos: number;
+  /** Hora (ms desde epoch) a la que se cierra la sesión. */
+  venceEn: number;
   onContinuar: () => void;
   onCerrarSesion: () => void;
 }
 
-export function ModalExpiracionSesion({ segundos, onContinuar, onCerrarSesion }: Props) {
+export function ModalExpiracionSesion({ venceEn, onContinuar, onCerrarSesion }: Props) {
+  const [ahora, setAhora] = useState(() => Date.now());
+  useEffect(() => {
+    const reloj = setInterval(() => setAhora(Date.now()), 1000);
+    return () => clearInterval(reloj);
+  }, []);
+
+  const segundos = Math.max(0, Math.ceil((venceEn - ahora) / 1000));
   const min = Math.floor(segundos / 60);
   const seg = segundos % 60;
   const cuenta = min > 0

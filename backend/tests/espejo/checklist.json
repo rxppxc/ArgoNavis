@@ -10,9 +10,9 @@
       {"codigo": "CUSTODIA-GLOBAL", "alcance": "solicitud", "condicion": "nacionalidad_restringida", "requiere_libreta": false, "orden": 6}
     ],
     "tripulantes": [
-      {"nombre": "Panameño marino", "es_panameno": true, "porta_libreta": true, "restringida": false},
-      {"nombre": "Panameño técnico", "es_panameno": true, "porta_libreta": false, "restringida": false},
-      {"nombre": "Cubano marino", "es_panameno": false, "porta_libreta": true, "restringida": true}
+      {"nombre": "Panameño marino", "es_panameno": true, "rango": "marino", "restringida": false},
+      {"nombre": "Panameño técnico", "es_panameno": true, "rango": "tecnico", "restringida": false},
+      {"nombre": "Cubano marino", "es_panameno": false, "rango": "marino", "restringida": true}
     ],
     "esperado": [
       ["LISTA", null],
@@ -30,7 +30,7 @@
       {"codigo": "CUSTODIA", "alcance": "marino", "condicion": "nacionalidad_restringida", "requiere_libreta": false, "orden": 2}
     ],
     "tripulantes": [
-      {"nombre": "Ana", "es_panameno": false, "porta_libreta": true, "restringida": false}
+      {"nombre": "Ana", "es_panameno": false, "rango": "marino", "restringida": false}
     ],
     "esperado": []
   },
@@ -41,9 +41,44 @@
       {"codigo": "A", "alcance": "marino", "condicion": "siempre", "requiere_libreta": false, "orden": 1}
     ],
     "tripulantes": [
-      {"nombre": "Ana", "es_panameno": false, "porta_libreta": true, "restringida": false},
-      {"nombre": "Luis", "es_panameno": false, "porta_libreta": false, "restringida": false}
+      {"nombre": "Ana", "es_panameno": false, "rango": "marino", "restringida": false},
+      {"nombre": "Luis", "es_panameno": false, "rango": "militar", "restringida": false}
     ],
     "esperado": [["A", 0], ["A", 1], ["B", 0], ["B", 1]]
+  },
+  {
+    "caso": "los rangos distintos de Marino solo presentan Generales y boleto aéreo",
+    "documentos": [
+      {"codigo": "VISA", "alcance": "marino", "condicion": "siempre", "requiere_libreta": false, "orden": 1, "rangos": ["marino"]},
+      {"codigo": "GENERALES", "alcance": "marino", "condicion": "siempre", "requiere_libreta": false, "orden": 2},
+      {"codigo": "LIBRETA", "alcance": "marino", "condicion": "siempre", "requiere_libreta": true, "orden": 3},
+      {"codigo": "CUSTODIA", "alcance": "marino", "condicion": "nacionalidad_restringida", "requiere_libreta": false, "orden": 4, "rangos": ["marino"]},
+      {"codigo": "BOLETO", "alcance": "marino", "condicion": "siempre", "requiere_libreta": false, "orden": 5,
+       "rangos": ["militar", "tecnico", "supernumerario", "superintendente"]}
+    ],
+    "tripulantes": [
+      {"nombre": "Marino cubano", "es_panameno": false, "rango": "marino", "restringida": true},
+      {"nombre": "Técnico cubano", "es_panameno": false, "rango": "tecnico", "restringida": true},
+      {"nombre": "Superintendente", "es_panameno": false, "rango": "superintendente", "restringida": false}
+    ],
+    "esperado": [
+      ["VISA", 0],
+      ["GENERALES", 0], ["GENERALES", 1], ["GENERALES", 2],
+      ["LIBRETA", 0],
+      ["CUSTODIA", 0],
+      ["BOLETO", 1], ["BOLETO", 2]
+    ]
+  },
+  {
+    "caso": "un documento de la solicitud con rangos se pide si algún tripulante es de esos rangos",
+    "documentos": [
+      {"codigo": "SOLO-MILITARES", "alcance": "solicitud", "condicion": "siempre", "requiere_libreta": false, "orden": 1, "rangos": ["militar"]},
+      {"codigo": "SOLO-TECNICOS", "alcance": "solicitud", "condicion": "siempre", "requiere_libreta": false, "orden": 2, "rangos": ["tecnico"]}
+    ],
+    "tripulantes": [
+      {"nombre": "Ana", "es_panameno": false, "rango": "marino", "restringida": false},
+      {"nombre": "Luis", "es_panameno": false, "rango": "tecnico", "restringida": false}
+    ],
+    "esperado": [["SOLO-TECNICOS", null]]
   }
 ]

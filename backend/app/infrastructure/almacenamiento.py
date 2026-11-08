@@ -186,17 +186,28 @@ def _sanear_nombre(nombre: str) -> str:
 
 
 def _detectar_mime(ruta: Path, ext: str) -> str:
-    """MIME por contenido (python-magic). Si magic no está o no precisa el tipo
-    (para algunas versiones de libmagic un Office es solo un ZIP u OLE2), el del
-    formato, que ya se verificó por su estructura."""
+    """El MIME del formato, que ya se verificó por su estructura; python-magic
+    queda como control cruzado. Antes se guardaba lo que dijera libmagic, y un
+    «PDF» que empezaba con HTML (se admite contenido antes de %PDF-, como hace
+    Acrobat) quedaba como text/html: el visor lo pintaba como una página del
+    mismo origen. Si libmagic ve otra cosa que no sea un genérico (un Office
+    puede ser para él solo un ZIP u OLE2), queda en el log."""
+    esperado = _MIME_POR_EXTENSION[ext]
     if _MAGIC_DISPONIBLE:
         try:
             mime = magic.from_file(str(ruta), mime=True)
-            if mime and mime not in _MIME_GENERICOS:
-                return mime
+            if mime and mime != esperado and mime not in _MIME_GENERICOS:
+                logger.warning("[mime] '%s' pasó la validación de %s pero libmagic lo ve como %s.", ruta.name, ext, mime)
         except Exception as exc:  # pragma: no cover
             logger.warning("[mime] Detección por contenido falló: %s", exc)
-    return _MIME_POR_EXTENSION[ext]
+    return esperado
+
+
+def mime_del_formato(nombre_almacenado: str) -> str:
+    """Con qué tipo se sirve un documento: el de su formato verificado (la
+    extensión del nombre con que se guardó), no el de la BD, que en documentos
+    subidos antes de esta regla puede ser el de libmagic."""
+    return _MIME_POR_EXTENSION.get(Path(nombre_almacenado).suffix.lower(), "application/octet-stream")
 
 
 def _tiene_macros_sync(ruta: Path) -> bool:
@@ -319,7 +330,7 @@ async def guardar_archivos(destino: Path, archivos_subidos: list[UploadFile]) ->
                 nombre_original=nombre_original,
                 nombre_almacenado=nombre_almacenado,
                 ruta=str(ruta_archivo),
-                tipo_mime=_detectar_mime(ruta_archivo, ext),
+                tipo_mime=await asyncio.to_thread(_detectar_mime, ruta_archivo, ext),   # libmagic lee el archivo
                 tamano=tamano,
             ))
     except Exception:

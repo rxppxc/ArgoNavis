@@ -13,12 +13,13 @@ import logging
 from sqlalchemy import text
 
 from app.core.config import obtener_configuracion
-from app.core.email import Aviso, enviar_aviso
+from app.core.email import Aviso
 from app.domain.models.audit_log import AccionAuditoria
 from app.domain.repositories.audit_repository import RepositorioAuditoria
 from app.domain.services.notificacion_service import ServicioNotificacion
 from app.domain.services.solicitud_service import ServicioSolicitud
 from app.infrastructure import almacenamiento
+from app.infrastructure.cola_correos import despachar_correos, encolar_avisos
 from app.infrastructure.database import SesionLocal
 
 logger        = logging.getLogger(__name__)
@@ -35,6 +36,7 @@ async def expirar_solicitudes() -> int:
     avisa a la agencia por correo y limpia carpetas temporales abandonadas.
     Devuelve cuántas solicitudes expiró."""
     avisos: list[Aviso] = []
+    encolados = 0
     try:
         async with SesionLocal() as sesion:
             tomado = (await sesion.execute(
@@ -56,22 +58,28 @@ async def expirar_solicitudes() -> int:
                     },
                 )
                 avisos += await notificaciones.expirada(v.solicitud, v.estado_anterior, v.motivo)
+            encolados = await encolar_avisos(sesion, avisos)   # en la misma transacción que las expiraciones
             await sesion.commit()   # libera el candado
-            almacenamiento.limpiar_temporales()
+            await asyncio.to_thread(almacenamiento.limpiar_temporales)   # recorre el disco: fuera del bucle de eventos
     except Exception:
         logger.exception("[vencimientos] Error al expirar solicitudes")
         return 0
 
-    # En paralelo: con el correo caído, los reintentos de un aviso no esperan a los demás.
-    await asyncio.gather(*(enviar_aviso(aviso) for aviso in avisos))
+    if encolados:
+        await despachar_correos()
     return len(vencidas)
 
 
 async def tarea_vencimientos() -> None:
-    """Revisa plazos vencidos al arrancar y luego cada VENCIMIENTOS_INTERVALO_MINUTOS."""
+    """Revisa plazos vencidos al arrancar y luego cada VENCIMIENTOS_INTERVALO_MINUTOS.
+    Un error en una vuelta queda en el log y no corta las siguientes: si la tarea
+    se cayera, nada volvería a vencer hasta reiniciar el backend."""
     intervalo = max(configuracion.VENCIMIENTOS_INTERVALO_MINUTOS, 1) * 60
     while True:
-        n = await expirar_solicitudes()
-        if n:
-            logger.info("[vencimientos] %d solicitud(es) expirada(s).", n)
+        try:
+            n = await expirar_solicitudes()
+            if n:
+                logger.info("[vencimientos] %d solicitud(es) expirada(s).", n)
+        except Exception:
+            logger.exception("[vencimientos] Error en la vuelta; se reintenta en la siguiente")
         await asyncio.sleep(intervalo)

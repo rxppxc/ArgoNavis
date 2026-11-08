@@ -5,7 +5,7 @@ import { usePermisos } from "../hooks/usePermisos";
 import { RUTA_CAMBIAR_CONTRASENA } from "../api/client";
 import {
   IconoUsuarios, IconoEstadisticas, IconoEscudo, IconoArchivo, IconoAncla, IconoActividad,
-  IconoSalir, IconoChevronAbajo, IconoLlave,
+  IconoSalir, IconoChevronAbajo, IconoLlave, IconoMenu,
 } from "./Iconos";
 import { SelectorTema } from "./SelectorTema";
 import styles from "./MenuCabecera.module.css";
@@ -60,6 +60,8 @@ export function MenuCabecera() {
       <div className={styles.dropdown} ref={ref}
         onBlur={(e) => { if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget)) setAbierto(false); }}>
         {/* Un desplegable de enlaces (no un role="menu", que exige flechas). */}
+        {/* En los teléfonos el texto no cabe junto a la campana: queda el ícono
+            (y el nombre, para los lectores de pantalla, en aria-label). */}
         <button
           ref={refBoton}
           type="button"
@@ -67,8 +69,10 @@ export function MenuCabecera() {
           onClick={() => setAbierto(v => !v)}
           aria-expanded={abierto}
           aria-controls="menu-usuario"
+          aria-label="Menú"
         >
-          Menú
+          <span className={styles.iconoMenu}><IconoMenu /></span>
+          <span className={styles.textoMenu}>Menú</span>
           <span className={`${styles.chevron} ${abierto ? styles.chevronOpen : ""}`}>
             <IconoChevronAbajo />
           </span>

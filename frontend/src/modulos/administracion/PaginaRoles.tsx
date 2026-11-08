@@ -230,6 +230,7 @@ export default function PaginaRoles() {
                   aria-label="Descripción del rol nuevo"
                   value={nuevoRDesc}
                   onChange={e => setNuevoRDesc(e.target.value)}
+                  maxLength={255}
                 />
                 <button
                   type="submit"

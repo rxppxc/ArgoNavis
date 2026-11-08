@@ -24,6 +24,7 @@ def _mapear_documento(td: TramiteDocumento) -> SalidaTramiteDocumento:
         condicion=td.condicion,
         orden=td.orden or 0,
         requiere_libreta=td.documento.requiere_libreta,
+        rangos=td.rangos,
     )
 
 

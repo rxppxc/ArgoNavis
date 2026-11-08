@@ -54,6 +54,15 @@
 }
 .chevronOpen { transform: rotate(180deg); }
 
+/* Teléfonos: solo el ícono, para que la jerarquía de la cabecera no se parta
+   con la campana al lado. */
+.iconoMenu { display: none; }
+@media (max-width: 520px) {
+  .iconoMenu { display: flex; }
+  .textoMenu, .chevron { display: none; }
+  .menuBtn { padding: 7px 9px; }
+}
+
 /* ── Panel desplegable ── */
 .panel {
   position: absolute;

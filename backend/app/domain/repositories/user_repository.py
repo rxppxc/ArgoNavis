@@ -15,6 +15,15 @@ class RepositorioUsuario:
         resultado = await self.sesion.execute(select(Usuario).where(Usuario.username == nombre_usuario))
         return resultado.scalar_one_or_none()
 
+    async def nombre_en_uso(self, nombre_usuario: str) -> bool:
+        """Si ya hay una cuenta con ese nombre, sin distinguir mayúsculas: el login
+        no las distingue (como el AD), así que «Agencia.Uno» y «agencia.uno» serían
+        la misma para quien entra y el login elegiría una según el orden."""
+        resultado = await self.sesion.execute(
+            select(Usuario.id).where(func.lower(Usuario.username) == nombre_usuario.strip().lower()).limit(1)
+        )
+        return resultado.scalar_one_or_none() is not None
+
     async def buscar_para_login(self, nombre_usuario: str) -> Usuario | None:
         """La cuenta con ese nombre sin distinguir mayúsculas (como el AD), con su
         fila bloqueada (SELECT ... FOR UPDATE) hasta el fin de la transacción:

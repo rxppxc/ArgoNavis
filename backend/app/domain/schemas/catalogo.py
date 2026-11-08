@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
-def _validar_correo(v: str | None) -> str | None:
+def validar_correo(v: str | None) -> str | None:
     if v is None:
         return None
     v = v.strip()
@@ -59,7 +59,7 @@ class _DatosCrearConCorreo(BaseModel):
     @field_validator("correo")
     @classmethod
     def _v_correo(cls, v: str | None) -> str | None:
-        return _validar_correo(v)
+        return validar_correo(v)
 
 
 class _DatosActualizarConCorreo(BaseModel):
@@ -72,7 +72,7 @@ class _DatosActualizarConCorreo(BaseModel):
     @field_validator("correo")
     @classmethod
     def _v_correo(cls, v: str | None) -> str | None:
-        return _validar_correo(v)
+        return validar_correo(v)
 
 
 class DatosCrearPuesto(_DatosCrearConCorreo):
@@ -92,7 +92,7 @@ class DatosActualizarAgencia(_DatosActualizarConCorreo):
 
 
 class DatosAsignarUsuarios(BaseModel):
-    usuario_ids: list[int] = Field(default_factory=list)
+    usuario_ids: list[int] = Field(default_factory=list, max_length=500)
 
 
 # ── Países ───────────────────────────────────────────────────────────────────

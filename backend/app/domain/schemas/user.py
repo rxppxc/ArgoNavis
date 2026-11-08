@@ -1,8 +1,8 @@
 import unicodedata
 
-from pydantic import BaseModel, ValidationInfo, field_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 from app.domain.models.user import TipoUsuario, EstadoUsuario
-from app.domain.schemas.catalogo import SalidaCatalogoMini
+from app.domain.schemas.catalogo import SalidaCatalogoMini, validar_correo
 from app.domain.schemas.rol import RolMini
 
 LARGO_MINIMO_CONTRASENA = 12
@@ -72,13 +72,15 @@ class RespuestaToken(BaseModel):
 
 
 class SolicitudLogin(BaseModel):
-    username: str
-    password: str
+    # El usuario va a la bitácora (VARCHAR 100): sin el tope, uno más largo
+    # hacía fallar el guardado (500) y el intento no quedaba registrado.
+    username: str = Field(max_length=100)
+    password: str = Field(max_length=256)
 
 
 class DatosCrearUsuario(BaseModel):
     """Alta de un usuario a partir de su cuenta de Active Directory."""
-    username: str
+    username: str = Field(max_length=100)
 
     @field_validator("username")
     @classmethod
@@ -98,11 +100,12 @@ class DatosCrearUsuarioLocal(BaseModel):
     """Alta de un usuario LOCAL (sin Active Directory): cuentas para usuarios
     externos, como los de las agencias navieras. Requiere PERMITIR_LOGIN_LOCAL.
     Entra con la contraseña inicial y el sistema le pide cambiarla."""
-    username:  str
+    # Topes de las columnas de users (username 100, name/last_name 150, email 255).
+    username:  str = Field(max_length=100)
     password:  str
-    name:      str | None = None
-    last_name: str | None = None
-    email:     str | None = None
+    name:      str | None = Field(default=None, max_length=150)
+    last_name: str | None = Field(default=None, max_length=150)
+    email:     str | None = Field(default=None, max_length=255)
     rol_id:    int | None = None
 
     @field_validator("username")
@@ -118,10 +121,15 @@ class DatosCrearUsuarioLocal(BaseModel):
     def _v_password(cls, v: str, info: ValidationInfo) -> str:
         return validar_politica_contrasena(v, info.data.get("username"))
 
+    @field_validator("email")
+    @classmethod
+    def _v_email(cls, v: str | None) -> str | None:
+        return validar_correo(v)
+
 
 class DatosCambiarContrasena(BaseModel):
     """Cambio de contraseña de la propia cuenta local."""
-    actual: str
+    actual: str = Field(max_length=256)
     nueva:  str
 
     @field_validator("nueva")

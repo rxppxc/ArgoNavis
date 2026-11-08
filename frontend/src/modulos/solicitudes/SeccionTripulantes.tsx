@@ -7,15 +7,16 @@ import styles from "./DetalleSolicitud.module.css";
 
 interface Props {
   solicitud: SolicitudDetalle;
-  /** Solo para quien revisa (UCVMM): agrega la columna de impedimentos. */
+  /** Solo para quien verifica (UCVMM al revisar, el puesto antes de finalizar):
+   *  agrega la columna de impedimentos. */
   verificacion: VerificacionImpedimentos | null;
   onVerDocumentacion: (tripulante: TripulanteSolicitud) => void;
 }
 
-/** Tripulantes del expediente. Para UCVMM lleva además la verificación de
- *  impedimentos en SIMPLUS, tripulante por tripulante: antes se marcaba en un
- *  panel aparte que repetía la lista y, con tripulaciones grandes, dejaba la
- *  decisión muy abajo. */
+/** Tripulantes del expediente. Para UCVMM y para el puesto de control lleva
+ *  además la verificación de impedimentos en SIMPLUS, tripulante por
+ *  tripulante: antes se marcaba en un panel aparte que repetía la lista y, con
+ *  tripulaciones grandes, dejaba la decisión muy abajo. */
 export function SeccionTripulantes({ solicitud: s, verificacion: v, onVerDocumentacion }: Props) {
   const total = s.tripulantes.length;
   const marcados = v ? total - v.pendientes : 0;
@@ -34,6 +35,7 @@ export function SeccionTripulantes({ solicitud: s, verificacion: v, onVerDocumen
           <div>
             <div className={styles.verifTitulo}>
               {v.corrigiendo ? "Corrección de la verificación de impedimentos" : "Verificación de impedimentos en SIMPLUS"}
+              {v.etapa === "puesto" && " · puesto de control"}
             </div>
             <div className={styles.progreso}>
               <div className={styles.progresoBarra}>
@@ -70,7 +72,7 @@ export function SeccionTripulantes({ solicitud: s, verificacion: v, onVerDocumen
               const faltan = s.checklist.filter((c) => c.tripulante_id === m.id && !c.cubierta).length;
               const adjuntos = s.documentos.filter((d) => d.tripulante_id === m.id).length;
               // Mientras se marca, lo que se va eligiendo; ya registrada, lo guardado.
-              const resultado = v ? (v.editable ? v.resultados[m.id] : m.con_impedimento) : null;
+              const resultado = v ? (v.editable ? v.resultados[m.id] : v.resultadoGuardado(m)) : null;
               // data-etiqueta: el título de cada dato cuando la tabla pasa a fichas en el celular.
               return (
                 <tr key={m.id} className={resultado === true ? styles.filaConImpedimento : undefined}>
@@ -83,8 +85,14 @@ export function SeccionTripulantes({ solicitud: s, verificacion: v, onVerDocumen
                       {m.pais_nacimiento_nombre && <> · {m.pais_nacimiento_nombre}</>}
                     </div>
                     {/* Solo llega al personal del SNM: a la agencia el backend le manda null.
-                        Quien revisa lo ve en su columna. */}
-                    {!v && m.con_impedimento && <span className={styles.chipImpedimento}>Con impedimento</span>}
+                        Quien verifica ve lo suyo en su columna; el puesto ve además lo de UCVMM,
+                        como referencia (marca lo suyo desde cero). */}
+                    {v?.etapa !== "ucvmm" && m.con_impedimento && (
+                      <span className={styles.chipImpedimento}>Con impedimento (UCVMM)</span>
+                    )}
+                    {!v && m.con_impedimento_puesto && (
+                      <span className={styles.chipImpedimento}>Con impedimento (puesto)</span>
+                    )}
                   </td>
                   <td data-etiqueta="Nacionalidad">
                     {m.nacionalidad_nombre ?? m.nacionalidad}
@@ -155,28 +163,28 @@ export function SeccionTripulantes({ solicitud: s, verificacion: v, onVerDocumen
         </table>
       </div>
 
-      {v && <PieVerificacion solicitud={s} verificacion={v} />}
+      {v && <PieVerificacion verificacion={v} />}
     </section>
   );
 }
 
 /** Debajo de la tabla: comentario y guardar mientras se marca; ya registrada,
  *  quién la hizo y la opción de corregirla. */
-function PieVerificacion({ solicitud: s, verificacion: v }: { solicitud: SolicitudDetalle; verificacion: VerificacionImpedimentos }) {
+function PieVerificacion({ verificacion: v }: { verificacion: VerificacionImpedimentos }) {
   if (!v.editable) {
     return (
       <div className={styles.verifPie}>
-        {s.comentario_impedimentos && (
+        {v.comentarioGuardado && (
           <div className={styles.observaciones}>
             <span>Comentario de la verificación</span>
-            {s.comentario_impedimentos}
+            {v.comentarioGuardado}
           </div>
         )}
         <div className={styles.filaBotones}>
           <p className={styles.verificacionRegistrada}>
             <IconoCheck tamano={13} />
-            {v.corregida ? "Corregida" : "Registrada"} por {s.impedimentos_verificados_por ?? "—"} el{" "}
-            {formatearFechaHora(s.impedimentos_verificados_en)}
+            {v.corregida ? "Corregida" : "Registrada"} por {v.registradaPor ?? "—"} el{" "}
+            {formatearFechaHora(v.registradaEn)}
           </p>
           <button type="button" className={styles.btnCorregir} onClick={v.empezarCorreccion} disabled={v.trabajando}>
             Corregir verificación

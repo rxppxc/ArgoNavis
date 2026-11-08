@@ -185,6 +185,22 @@ async def test_word_y_excel_se_validan_por_su_contenido(tmp_path):
 
 
 @asincrona
+async def test_un_pdf_con_html_delante_se_guarda_y_sirve_como_pdf(tmp_path, monkeypatch):
+    """Se admite contenido antes de %PDF- (como Acrobat), pero el tipo es siempre
+    el del formato verificado: con el que adivinaba libmagic, este archivo
+    quedaba como text/html y el visor lo pintaba como una página de ARGO NAVIS."""
+    html = b"<html><body><script>alert(document.domain)</script>"
+    [guardado] = await almacenamiento.guardar_archivos(
+        tmp_path / "a", [_subida("informe.pdf", html + b"%PDF-1.4\n%%EOF\n")])
+    assert guardado.tipo_mime == "application/pdf"
+
+    # Al servirlo manda el formato del nombre almacenado, aunque la BD diga otra cosa.
+    assert almacenamiento.mime_del_formato(guardado.nombre_almacenado) == "application/pdf"
+    assert almacenamiento.mime_del_formato("abc.docx").endswith("wordprocessingml.document")
+    assert almacenamiento.mime_del_formato("abc.html") == "application/octet-stream"
+
+
+@asincrona
 async def test_office_con_macros_se_rechaza(tmp_path, monkeypatch):
     from ayudas import docx
 
@@ -278,6 +294,49 @@ def test_produccion_no_arranca_con_una_clave_debil():
     assert Configuracion(APP_ENV="production", SECRET_KEY="x" * 48).es_produccion
 
 
+def test_correo_con_un_solo_tipo_de_tls():
+    from app.core.config import Configuracion
+
+    with pytest.raises(ValueError):
+        Configuracion(MAIL_USAR_SSL=True, MAIL_STARTTLS=True)
+    assert Configuracion(MAIL_STARTTLS=True).MAIL_STARTTLS
+
+
+def test_algoritmo_del_token_solo_hmac():
+    """Con ALGORITHM=none, PyJWT emitiría y aceptaría tokens sin firma."""
+    from app.core.config import Configuracion
+
+    for algoritmo in ("none", "RS256"):
+        with pytest.raises(ValueError):
+            Configuracion(ALGORITHM=algoritmo)
+
+
+@asincrona
+@pytest.mark.filterwarnings("ignore::jwt.warnings.InsecureKeyLengthWarning")   # el HS512 de mentira
+async def test_token_solo_con_el_algoritmo_y_la_clave_del_servidor(cliente, admin):
+    """Un token con datos válidos no vale si está vencido, firmado con otro
+    algoritmo o con otra clave, o sin firma: todos dan 401, ninguno 500."""
+    import jwt
+
+    clave = obtener_configuracion().SECRET_KEY
+    ahora = time.time()
+    carga = {"sub": str(admin.id), "iat": ahora, "ini": int(ahora), "exp": int(ahora) + 600}
+
+    async def me(token: str) -> int:
+        return (await cliente.get("/auth/me", headers={"Authorization": f"Bearer {token}"})).status_code
+
+    assert await me(jwt.encode(carga, clave, algorithm="HS256")) == 200
+    rechazados = {
+        "vencido": jwt.encode({**carga, "exp": int(ahora) - 10}, clave, algorithm="HS256"),
+        "sin firma": jwt.encode(carga, None, algorithm="none"),
+        "otro algoritmo": jwt.encode(carga, clave, algorithm="HS512"),
+        "otra clave": jwt.encode(carga, "x" * 48, algorithm="HS256"),
+        "basura": "no.es.un-token",
+    }
+    for caso, token in rechazados.items():
+        assert await me(token) == 401, caso
+
+
 def test_solo_estas_rutas_responden_sin_sesion():
     """Si alguien agrega un endpoint sin exigir el token, esta prueba lo frena."""
     from fastapi.routing import APIRoute
@@ -301,3 +360,16 @@ def test_solo_estas_rutas_responden_sin_sesion():
                   "GET /{ruta_completa:path}"}   # la última solo existe si hay frontend compilado
     assert publicas - permitidas == set(), publicas - permitidas
     assert {"POST /api/v1/auth/login", "GET /api/v1/verificacion/{codigo}"} <= publicas
+
+
+@asincrona
+async def test_login_con_usuario_muy_largo(cliente, admin):
+    """El usuario va a la bitácora (VARCHAR 100). Uno más largo se rechaza al
+    validar (422); antes hacía fallar el guardado del intento (500) y el
+    intento no quedaba registrado."""
+    r = await _entrar(cliente, "x" * 101, "cualquiera")
+    assert r.status_code == 422
+    usuario = "x" * 100
+    r = await _entrar(cliente, usuario, "cualquiera")
+    assert r.status_code == 401 and r.json()["detail"] == GENERICO
+    assert await _motivo_en_bitacora(cliente, admin, usuario), "el intento queda en la bitácora"

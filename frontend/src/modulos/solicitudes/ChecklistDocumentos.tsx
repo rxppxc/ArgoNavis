@@ -52,7 +52,8 @@ export function ChecklistDocumentos({ casillas, nuevos, existentes, sinTripulant
                     <IconoCheck tamano={12} /> {nuevo.name}
                   </span>
                   <button type="button" className={styles.btnMiniQuitar} onClick={() => onDescartar(c.clave)}
-                    title={cargados.length ? "Conservar el archivo ya cargado" : "Quitar archivo"}>
+                    title={cargados.length ? "Conservar el archivo ya cargado" : "Quitar archivo"}
+                    aria-label={cargados.length ? `Conservar el archivo ya cargado de ${c.documento_nombre}` : `Quitar ${nuevo.name}`}>
                     <IconoX tamano={12} />
                   </button>
                 </>
@@ -62,7 +63,7 @@ export function ChecklistDocumentos({ casillas, nuevos, existentes, sinTripulant
                     Cargado: {cargados[0].nombre_original}
                   </span>
                   <button type="button" className={styles.btnMiniVer} onClick={() => onVer(cargados[0])}
-                    title="Ver documento cargado">
+                    title="Ver documento cargado" aria-label={`Ver ${cargados[0].nombre_original}`}>
                     <IconoOjo tamano={13} />
                   </button>
                 </>

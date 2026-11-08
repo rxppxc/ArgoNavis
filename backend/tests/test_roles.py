@@ -120,3 +120,24 @@ async def test_permisos_son_de_solo_lectura(cliente):
         assert r.status_code in (404, 405), metodo
     r = await cliente.get("/admin/permisos", headers=sysadmin.headers)
     assert any(p["codigo"] == "T-PROCESAR-PACIFICO" for p in r.json())
+
+
+async def test_limites_de_entrada_en_usuarios_y_roles(cliente, admin):
+    """Topes de las columnas: sin ellos, un valor más largo llegaba a la BD
+    (error 500) o se guardaba un correo que no es correo."""
+    r = await cliente.post("/admin/usuarios/local", json=_cuenta_local() | {"email": "no-es-un-correo"},
+                           headers=admin.headers)
+    assert r.status_code == 422 and "correo" in r.text
+    r = await cliente.post("/admin/usuarios/local", json=_cuenta_local() | {"name": "N" * 151}, headers=admin.headers)
+    assert r.status_code == 422
+
+    r = await cliente.post("/admin/roles", json={"nombre": f"Rol {secrets.token_hex(3)}"}, headers=admin.headers)
+    assert r.status_code == 201, r.text
+    rol = r.json()
+    r = await cliente.patch(f"/admin/roles/{rol['id']}", json={"nombre": "R" * 101}, headers=admin.headers)
+    assert r.status_code == 422, "roles.nombre es VARCHAR(100): antes era un 500"
+    r = await cliente.patch(f"/admin/roles/{rol['id']}", json={"descripcion": "d" * 501}, headers=admin.headers)
+    assert r.status_code == 422
+    r = await cliente.put(f"/admin/roles/{rol['id']}/permisos", json={"permiso_ids": list(range(1, 102))},
+                          headers=admin.headers)
+    assert r.status_code == 422

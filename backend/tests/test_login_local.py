@@ -49,6 +49,9 @@ async def test_cambio_obligatorio(cliente, admin, sysadmin):
     assert r.status_code == 201 and r.json()["debe_cambiar_password"]
     r = await cliente.post("/admin/usuarios/local", json={"username": "clave.debil", "password": "abc12"}, headers=sysadmin.headers)
     assert r.status_code == 422, "la política exige 12 caracteres con mayúscula, minúscula, número y especial"
+    r = await cliente.post("/admin/usuarios/local", json={"username": "Agencia.NUEVA", "password": CLAVE},
+                           headers=sysadmin.headers)
+    assert r.status_code == 409, "el login no distingue mayúsculas: sería la misma cuenta"
 
     r = await login(cliente, "agencia.nueva", CLAVE)
     token = {"Authorization": f"Bearer {r.json()['access_token']}"}

@@ -1,4 +1,4 @@
-from sqlalchemy import String, Integer, DateTime, ForeignKey, Enum as SAEnum, JSON
+from sqlalchemy import String, Integer, DateTime, ForeignKey, Enum as SAEnum, Index, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 from app.infrastructure.database import Base
@@ -61,6 +61,10 @@ class AccionAuditoria(str, enum.Enum):
 
 class RegistroAuditoria(Base):
     __tablename__ = "audit_logs"
+    __table_args__ = (
+        # La bitácora filtrada por acción, lo más reciente primero (revisión e7b2d5a9c4f1).
+        Index("ix_audit_logs_accion_creado_en", "accion", "creado_en"),
+    )
 
     id:        Mapped[int]             = mapped_column(Integer, primary_key=True, index=True)
     user_id:   Mapped[int | None]      = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)

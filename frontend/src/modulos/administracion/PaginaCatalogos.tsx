@@ -170,7 +170,7 @@ function TarjetaCatalogo({
               </div>
             </div>
             <label className={styles.interruptor} title={entidad.activo ? "Desactivar" : "Activar"}>
-              <input type="checkbox" checked={entidad.activo} onChange={alternarActivo} />
+              <input type="checkbox" checked={entidad.activo} onChange={alternarActivo} aria-label={`Activo: ${entidad.nombre}`} />
               <span>{entidad.activo ? "Activo" : "Inactivo"}</span>
             </label>
             <button type="button" className={styles.btnIcono} onClick={() => setEditando(true)} title="Editar" aria-label={`Editar ${entidad.nombre}`}>

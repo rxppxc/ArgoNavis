@@ -43,7 +43,15 @@ export default function PaginaUsuarios() {
   const [creandoLocal,   setCreandoLocal]   = useState(false);
   const [errorLocal,     setErrorLocal]     = useState<string | null>(null);
 
-  const cargarUsuarios = useCallback(() => apiAdmin.listarUsuarios().then(({ data }) => setUsuarios(data)), []);
+  /** Relee la lista tras una acción que ya se hizo: si falla, no la da por
+   *  fallida (antes decía «No se pudo agregar» de una cuenta que sí se creó). */
+  const cargarUsuarios = useCallback(async () => {
+    try {
+      setUsuarios((await apiAdmin.listarUsuarios()).data);
+    } catch {
+      mostrarToast("Listo, pero la lista no se pudo actualizar: recarga la página para verla al día.", "aviso");
+    }
+  }, [mostrarToast]);
 
   useEffect(() => {
     let cancelado = false;
@@ -238,6 +246,7 @@ export default function PaginaUsuarios() {
                 type="text"
                 placeholder="Nombre, usuario o correo…"
                 aria-label="Buscar en Active Directory"
+                maxLength={100}
                 value={busqueda}
                 onChange={e => setBusqueda(e.target.value)}
                 autoFocus
@@ -322,12 +331,12 @@ export default function PaginaUsuarios() {
                 <label className={styles.campoLocal}>
                   <span>Usuario *</span>
                   <input className={styles.searchInput} autoComplete="off" spellCheck={false}
-                    value={localUsername} onChange={e => setLocalUsername(e.target.value)} required />
+                    value={localUsername} onChange={e => setLocalUsername(e.target.value)} maxLength={100} required />
                 </label>
                 <label className={styles.campoLocal}>
                   <span>Contraseña inicial *</span>
                   <input className={styles.searchInput} type="password" autoComplete="new-password"
-                    value={localPassword} onChange={e => setLocalPassword(e.target.value)} required />
+                    value={localPassword} onChange={e => setLocalPassword(e.target.value)} maxLength={64} required />
                 </label>
                 <label className={styles.campoLocal}>
                   <span>Rol</span>
@@ -339,15 +348,15 @@ export default function PaginaUsuarios() {
                 </label>
                 <label className={styles.campoLocal}>
                   <span>Nombre</span>
-                  <input className={styles.searchInput} value={localNombre} onChange={e => setLocalNombre(e.target.value)} />
+                  <input className={styles.searchInput} value={localNombre} onChange={e => setLocalNombre(e.target.value)} maxLength={150} />
                 </label>
                 <label className={styles.campoLocal}>
                   <span>Apellido</span>
-                  <input className={styles.searchInput} value={localApellido} onChange={e => setLocalApellido(e.target.value)} />
+                  <input className={styles.searchInput} value={localApellido} onChange={e => setLocalApellido(e.target.value)} maxLength={150} />
                 </label>
                 <label className={styles.campoLocal}>
                   <span>Correo <em>(recibe los avisos)</em></span>
-                  <input className={styles.searchInput} type="email" value={localEmail} onChange={e => setLocalEmail(e.target.value)} />
+                  <input className={styles.searchInput} type="email" value={localEmail} onChange={e => setLocalEmail(e.target.value)} maxLength={255} />
                 </label>
                 <div className={styles.formLocalAcciones}>
                   <button type="submit" className={styles.btnCrear} disabled={creandoLocal}>
@@ -419,6 +428,7 @@ export default function PaginaUsuarios() {
                               onChange={e => alAsignarRol(u.id, e.target.value ? Number(e.target.value) : null)}
                               disabled={trabajando || esYo}
                               title={esYo ? "Tu propio rol lo cambia otra persona" : undefined}
+                              aria-label={`Rol de ${u.full_name}`}
                             >
                               <option value="">— Sin rol —</option>
                               {roles.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}

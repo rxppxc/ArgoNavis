@@ -109,6 +109,10 @@ class TramiteDocumento(Base):
     alcance:   Mapped[str] = mapped_column(String(20), nullable=False, default=AlcanceDocumento.SOLICITUD.value)
     condicion: Mapped[str] = mapped_column(String(30), nullable=False, default=CondicionDocumento.SIEMPRE.value)
     orden:     Mapped[int] = mapped_column(Integer, default=0)
+    # Rangos de tripulante a los que se pide (nulo = a todos). Va por fila y no
+    # por documento: el boleto aéreo lo pide Desembarque a todos y el resto de
+    # los trámites solo a los rangos distintos de Marino (reunión del 2026-10-30).
+    rangos:    Mapped[list[str] | None] = mapped_column(ARRAY(String(20)))
 
     tipo_tramite: Mapped["TipoTramite"]         = relationship("TipoTramite", back_populates="documentos")
     documento:    Mapped["DocumentoRequerido"]  = relationship("DocumentoRequerido", back_populates="tramites")

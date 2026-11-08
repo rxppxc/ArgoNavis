@@ -22,6 +22,7 @@ import { apiSolicitudes } from "../api/solicitudes";
 import { infoTipo } from "../utils/tipoArchivo";
 import { useAtraparFoco } from "../hooks/useAtraparFoco";
 import { mensajeDeError } from "../utils/errores";
+import { celdaTexto } from "../utils/celdaExcel";
 import { EstadoCarga } from "./EstadoCarga";
 import { useNotificacion } from "./Notificaciones";
 import { IconoX, IconoDescargar, IconoArchivo } from "./Iconos";
@@ -67,22 +68,6 @@ function documentoAislado(estilos: HTMLElement, cuerpo: HTMLElement): string {
 
 const MAX_FILAS_EXCEL = 300;
 
-// Las celdas de exceljs pueden traer string, número, fecha, fórmula
-// ({result}) o texto enriquecido ({richText}) — nunca HTML, así que se
-// vuelca como texto plano y React lo escapa solo al renderizarlo.
-function celdaTexto(valor: unknown): string {
-  if (valor === null || valor === undefined) return "";
-  if (valor instanceof Date) return valor.toLocaleDateString();
-  if (typeof valor === "object") {
-    const v = valor as { result?: unknown; text?: unknown; richText?: { text?: string }[] };
-    if (Array.isArray(v.richText)) return v.richText.map(r => r.text ?? "").join("");
-    if (v.result !== undefined) return celdaTexto(v.result);
-    if (v.text !== undefined) return celdaTexto(v.text);
-    return "";
-  }
-  return String(valor);
-}
-
 export function ModalPreview({ solicitudId, documento, onCerrar }: Props) {
   const refModal = useAtraparFoco(true);
   const { mostrar } = useNotificacion();
@@ -111,7 +96,9 @@ export function ModalPreview({ solicitudId, documento, onCerrar }: Props) {
         const blob = await apiSolicitudes.obtenerDocumento(solicitudId, documento.id);
         if (cancelado) return;
         if (categoria === "imagen" || categoria === "pdf") {
-          urlCreada = URL.createObjectURL(blob);
+          // El PDF va al marco siempre como PDF: con el tipo que trajera la
+          // respuesta, un «PDF» con HTML delante se pintaba como una página.
+          urlCreada = URL.createObjectURL(categoria === "pdf" ? new Blob([blob], { type: "application/pdf" }) : blob);
           setCarga({ ...VACIA, url: urlCreada });
         } else if (categoria === "word") {
           const { renderAsync } = await import("docx-preview");

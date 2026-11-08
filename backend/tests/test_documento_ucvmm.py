@@ -14,11 +14,16 @@ propio; si el catálogo o las reglas se apartan de ella, estas pruebas fallan:
     aplique"); los procesos de Desembarque, Urgencias, Renovación y Shore Pass
     piden avisar al aprobar que se debe tramitar la custodia.
 
-Dos reglas van más allá de la lectura literal, por decisión del usuario:
+Tres reglas van más allá de la lectura literal, por decisión del usuario:
   - Ningún documento vencido: la vigencia bloquea en los 8 trámites (la Nota
     de la pág. 9 la pedía solo en Embarque, Visita médica y Shore Pass).
   - La Libreta de Marino en Embarque se pide a todo tripulante de rango
     Marino, sin importar la nacionalidad (el Form. 3 dice "Panameños").
+  - A los rangos distintos de Marino (militar, técnico, supernumerario y
+    superintendente) se les piden solo las Generales de pasaporte y el boleto
+    aéreo, en todos los trámites (reunión del 2026-10-30). Por eso el resto de
+    los documentos por tripulante es solo del Marino, el boleto se agrega para
+    los demás rangos y el trámite de Técnico ya no lleva la Carta Form. 7.
 """
 import secrets
 
@@ -29,13 +34,18 @@ from conftest import Actor, crear_actor
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
-CUSTODIA = ("DOC-FORM6-CUSTODIA", "marino", "nacionalidad_restringida")   # Form. 3: solo Desembarque
-GENERALES = ("DOC-GENERALES-PASAPORTE", "marino", "siempre")
-VISA = ("DOC-VISA-MARINO", "marino", "siempre")
-LIBRETA = ("DOC-LIBRETA-MARINO", "marino", "siempre")
-LISTA = ("DOC-LISTA-TRIPULANTES", "solicitud", "siempre")            # "debe subirse al trámite"
-CARTA = ("DOC-FORM7-RESPONSABILIDAD", "marino", "siempre")            # "para cada tripulante"
-REPORTE = ("DOC-REPORTE-MEDICO", "marino", "siempre")                 # "para cada tripulante"
+# (código, alcance, condición, rangos a los que se pide: None = a todos)
+MARINO = ("marino",)
+NO_MARINOS = ("militar", "superintendente", "supernumerario", "tecnico")
+CUSTODIA = ("DOC-FORM6-CUSTODIA", "marino", "nacionalidad_restringida", MARINO)   # Form. 3: solo Desembarque
+GENERALES = ("DOC-GENERALES-PASAPORTE", "marino", "siempre", None)
+VISA = ("DOC-VISA-MARINO", "marino", "siempre", MARINO)
+LIBRETA = ("DOC-LIBRETA-MARINO", "marino", "siempre", None)           # solo el Marino: requiere_libreta
+LISTA = ("DOC-LISTA-TRIPULANTES", "solicitud", "siempre", None)       # "debe subirse al trámite"
+CARTA = ("DOC-FORM7-RESPONSABILIDAD", "marino", "siempre", MARINO)    # "para cada tripulante"
+REPORTE = ("DOC-REPORTE-MEDICO", "marino", "siempre", MARINO)         # "para cada tripulante"
+CITA = ("DOC-CITA-CONSULADO", "marino", "siempre", MARINO)
+BOLETO = ("DOC-BOLETO-AEREO", "marino", "siempre", NO_MARINOS)        # reunión del 2026-10-30
 
 # campos: los propios del trámite (además de la cabecera común del Formulario 3)
 # vigencia: si el pasaporte y el seamanbook vencidos impiden enviar (Nota de la pág. 9)
@@ -43,36 +53,38 @@ REPORTE = ("DOC-REPORTE-MEDICO", "marino", "siempre")                 # "para ca
 DOCUMENTO = {
     "F3-EMBARQUE": {
         "campos": [], "vigencia": True, "aviso_custodia": False,
-        "documentos": {VISA, GENERALES, LIBRETA},
+        "documentos": {VISA, GENERALES, LIBRETA, BOLETO},
     },
     "F3-DESEMBARQUE": {
         "campos": [], "vigencia": True, "aviso_custodia": True,
-        "documentos": {("DOC-BOLETO-AEREO", "marino", "siempre"), GENERALES, LIBRETA, LISTA, CUSTODIA},
+        # El boleto aéreo lo pide el Form. 3 a todos (también al Marino).
+        "documentos": {("DOC-BOLETO-AEREO", "marino", "siempre", None), GENERALES, LIBRETA, LISTA, CUSTODIA},
     },
     "F3-URGENCIA-MEDICA": {
         "campos": ["puerto_desembarque", "clinica_hospital"], "vigencia": True, "aviso_custodia": True,
-        "documentos": {CARTA, REPORTE, GENERALES, LIBRETA},
+        "documentos": {CARTA, REPORTE, GENERALES, LIBRETA, BOLETO},
     },
     "F3-RENOV-PASAPORTE": {
         "campos": ["puerto_desembarque"], "vigencia": True, "aviso_custodia": True,
-        "documentos": {GENERALES, CARTA, LISTA, LIBRETA, ("DOC-CITA-CONSULADO", "marino", "siempre")},
+        "documentos": {GENERALES, CARTA, LISTA, LIBRETA, CITA, BOLETO},
     },
     "F3-SHORE-PASS": {
         "campos": ["motivo"], "vigencia": True, "aviso_custodia": True,
-        "documentos": {GENERALES, LISTA, LIBRETA},
+        "documentos": {GENERALES, LISTA, LIBRETA, BOLETO},
     },
     "F3-TECNICO": {
         "campos": [], "vigencia": True, "aviso_custodia": False,
         "rangos": {"tecnico", "superintendente", "supernumerario"},
-        "documentos": {CARTA, GENERALES},
+        # El Form. 3 pide la Carta Form. 7; desde el 2026-10-30, estos rangos presentan Generales y boleto.
+        "documentos": {GENERALES, BOLETO},
     },
     "F3-CAMBIO-NAVE": {
         "campos": [], "vigencia": True, "aviso_custodia": False,
-        "documentos": {VISA, GENERALES},
+        "documentos": {VISA, GENERALES, BOLETO},
     },
     "F3-CAMBIO-PUERTO": {
         "campos": ["nombre_puerto"], "vigencia": True, "aviso_custodia": False,
-        "documentos": {VISA, GENERALES},
+        "documentos": {VISA, GENERALES, BOLETO},
     },
 }
 
@@ -87,8 +99,10 @@ ETIQUETAS = {
 LIBRETA_DOCS = {"DOC-LIBRETA-MARINO"}   # solo a quien porta seamanbook (rango Marino)
 
 
-def _aplica(documento: tuple[str, str, str], t: dict) -> bool:
-    codigo, _, condicion = documento
+def _aplica(documento: tuple, t: dict) -> bool:
+    codigo, _, condicion, rangos = documento
+    if rangos and t["rango"] not in rangos:
+        return False
     if codigo in LIBRETA_DOCS and t["rango"] != "marino":
         return False
     if condicion == "solo_panamenos":
@@ -102,7 +116,7 @@ def _asignaciones(codigo_tramite: str, tripulantes: list[dict], *, sin: set[str]
     """Asignaciones y archivos que el documento exige para estos tripulantes."""
     asignaciones, archivos = [], []
     for documento in sorted(DOCUMENTO[codigo_tramite]["documentos"]):
-        codigo, alcance, condicion = documento
+        codigo, alcance, condicion, _ = documento
         if codigo in sin:
             continue
         if alcance == "solicitud":
@@ -149,7 +163,8 @@ async def test_catalogo_igual_al_documento(cliente, agencia):
     assert set(tipos) == set(DOCUMENTO), "los 8 trámites del documento"
     for codigo, esperado in DOCUMENTO.items():
         tipo = tipos[codigo]
-        documentos = {(d["codigo"], d["alcance"], d["condicion"]) for d in tipo["documentos"]}
+        documentos = {(d["codigo"], d["alcance"], d["condicion"], tuple(sorted(d["rangos"])) if d["rangos"] else None)
+                      for d in tipo["documentos"]}
         assert documentos == esperado["documentos"], codigo
         assert tipo["valida_vigencia"] == esperado["vigencia"], codigo
         assert tipo["requiere_buque"], codigo   # nombre, IMO y bandera en todos
@@ -214,15 +229,17 @@ async def test_custodia_segun_el_formulario(cliente, agencia, codigo):
 
 async def test_aviso_de_custodia_al_aprobar(cliente, admin, monkeypatch):
     """Al aprobar, el aviso a la agencia dice que debe tramitar la custodia
-    solo en los trámites cuyo proceso lo indica; en los demás no la menciona."""
-    import app.api.v1.solicitudes as rutas_solicitudes
+    solo en los trámites cuyo proceso lo indica; en los demás no la menciona.
+    Recorre el camino real: la cola de salida y el envío (con un SMTP falso)."""
+    from app.core import email
 
-    avisos = []
+    mensajes = []
 
-    async def capturar(aviso):
-        avisos.append(aviso)
+    async def smtp_falso(mensaje, **_):
+        mensajes.append(mensaje)
 
-    monkeypatch.setattr(rutas_solicitudes, "enviar_aviso", capturar)
+    monkeypatch.setattr(email.configuracion, "MAIL_HOST", "smtp.prueba.local")
+    monkeypatch.setattr(email.aiosmtplib, "send", smtp_falso)
 
     sufijo = secrets.token_hex(2)
     r = await cliente.post("/admin/agencias", json={"nombre": f"Agencia Custodia {sufijo}", "correo": "custodia@prueba.pa"},
@@ -245,14 +262,15 @@ async def test_aviso_de_custodia_al_aprobar(cliente, admin, monkeypatch):
         r = await cliente.post(f"/solicitudes/{sid}/impedimentos", json=impedimentos, headers=revisor.headers)
         assert r.status_code == 200, r.text
 
-        avisos.clear()
+        mensajes.clear()
         r = await cliente.post(f"/solicitudes/{sid}/aprobar", json={}, headers=revisor.headers)
         assert r.status_code == 200, (codigo, r.text)
         assert r.json()["tipo_tramite_aviso_custodia"] == esperado["aviso_custodia"], codigo
-        a_la_agencia = next(a for a in avisos if "custodia@prueba.pa" in a.destinatarios)
-        assert a_la_agencia.asunto == f"Autorizaciones Marítimas · {r.json()['numero']} · Aprobada"
-        assert ("solicitud de custodia" in (a_la_agencia.destacado or "")) == esperado["aviso_custodia"], codigo
-        assert any("puesto@prueba.pa" in a.destinatarios for a in avisos), "el puerto recibe su aviso"
+        a_la_agencia = next(m for m in mensajes if "custodia@prueba.pa" in m["To"])
+        assert a_la_agencia["Subject"] == f"Autorizaciones Marítimas · {r.json()['numero']} · Aprobada"
+        texto = a_la_agencia.get_body(preferencelist=("plain",)).get_content()
+        assert ("solicitud de custodia" in texto) == esperado["aviso_custodia"], codigo
+        assert any("puesto@prueba.pa" in m["To"] for m in mensajes), "el puerto recibe su aviso"
 
 
 async def test_seamanbook_solo_rango_marino(cliente, agencia):
@@ -301,6 +319,23 @@ async def test_tramite_tecnico_solo_sus_rangos(cliente, agencia):
     assert r.status_code == 400 and "rango debe ser Técnico, Superintendente, Supernumerario" in r.json()["detail"]
 
 
+@pytest.mark.parametrize("codigo", sorted(DOCUMENTO))
+async def test_rangos_no_marinos_generales_y_boleto(cliente, agencia, codigo):
+    """Reunión del 2026-10-30: a un rango distinto de Marino solo se le piden
+    las Generales de pasaporte y el boleto aéreo, en todos los trámites."""
+    naviera, puesto_id = agencia
+    tripulantes = [tripulante("Hans", "DEU", rango="tecnico")]
+    datos, archivos = _datos(codigo, puesto_id, tripulantes, sin={"DOC-BOLETO-AEREO"})
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 400 and "Boleto" in r.json()["detail"], (codigo, r.text)
+
+    datos, archivos = _datos(codigo, puesto_id, tripulantes)
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 201, (codigo, r.text)
+    del_tripulante = {c["documento_codigo"] for c in r.json()["checklist"] if c["tripulante_id"] is not None}
+    assert del_tripulante == {"DOC-GENERALES-PASAPORTE", "DOC-BOLETO-AEREO"}, codigo
+
+
 async def test_cambio_de_catalogo_no_altera_solicitudes_enviadas(cliente, agencia):
     """El expediente se juzga con el checklist con el que se envió la solicitud:
     si después el catálogo cambia (un documento pasa a ser "por solicitud" y se
@@ -319,7 +354,7 @@ async def test_cambio_de_catalogo_no_altera_solicitudes_enviadas(cliente, agenci
     antes = {(c["documento_codigo"], c["tripulante_id"]) for c in s["checklist"]}
     assert antes and all(c["cubierta"] for c in s["checklist"])
 
-    cambio = {"tramite": codigo, "reporte": "DOC-REPORTE-MEDICO", "nuevo": "DOC-BOLETO-AEREO"}
+    cambio = {"tramite": codigo, "reporte": "DOC-REPORTE-MEDICO", "nuevo": "DOC-CITA-CONSULADO"}
     sql_ids = ("(SELECT id FROM tipos_tramite WHERE codigo = :tramite)",
                "(SELECT id FROM documentos_requeridos WHERE codigo = :reporte)",
                "(SELECT id FROM documentos_requeridos WHERE codigo = :nuevo)")
@@ -349,15 +384,15 @@ async def test_cambio_de_catalogo_no_altera_solicitudes_enviadas(cliente, agenci
         correccion["asignaciones"] = []
         ruta = f"/solicitudes/{s['id']}"
         r = await enviar(cliente, naviera, correccion, [], metodo="PUT", ruta=ruta)
-        assert r.status_code == 400 and "Boleto" in r.json()["detail"], "al corregir rigen las reglas de hoy"
+        assert r.status_code == 400 and "cita del Consulado" in r.json()["detail"], "al corregir rigen las reglas de hoy"
 
         correccion["asignaciones"] = [{"documento_codigo": "DOC-REPORTE-MEDICO"},
-                                      {"documento_codigo": "DOC-BOLETO-AEREO", "indice_tripulante": 0}]
-        r = await enviar(cliente, naviera, correccion, [pdf("reporte-solicitud"), pdf("boleto-0")], metodo="PUT", ruta=ruta)
+                                      {"documento_codigo": "DOC-CITA-CONSULADO", "indice_tripulante": 0}]
+        r = await enviar(cliente, naviera, correccion, [pdf("reporte-solicitud"), pdf("cita-0")], metodo="PUT", ruta=ruta)
         assert r.status_code == 200, r.text
         corregida = r.json()
         codigos = {(c["documento_codigo"], c["tripulante_id"]) for c in corregida["checklist"]}
-        assert ("DOC-BOLETO-AEREO", t["id"]) in codigos and ("DOC-REPORTE-MEDICO", None) in codigos
+        assert ("DOC-CITA-CONSULADO", t["id"]) in codigos and ("DOC-REPORTE-MEDICO", None) in codigos
         assert all(c["cubierta"] for c in corregida["checklist"]), "la foto nueva sale de las reglas de hoy"
     finally:
         async with SesionLocal() as sesion:
@@ -382,8 +417,9 @@ async def test_word_y_excel_ademas_de_pdf(cliente, agencia):
     assert all(c["cubierta"] for c in r.json()["checklist"])
 
 
-async def test_pdf_sin_nombres_de_funcionarios(cliente, agencia):
-    """El PDF lo recibe la agencia: "Aprobada por" dice UCVMM, no el nombre de quien aprobó."""
+async def test_pdf_sin_nombres_para_la_agencia(cliente, agencia):
+    """En el PDF de la agencia, "Aprobada por" dice UCVMM; el nombre de quien
+    aprobó va solo en la copia interna del SNM (reunión del 2026-10-30)."""
     from app.domain.repositories.user_repository import RepositorioUsuario
     from app.domain.services.solicitud_service import ServicioSolicitud
     from app.infrastructure.database import SesionLocal
@@ -401,6 +437,9 @@ async def test_pdf_sin_nombres_de_funcionarios(cliente, agencia):
 
     async with SesionLocal() as sesion:
         svc = ServicioSolicitud(sesion)
-        ctx = await svc.contexto(await RepositorioUsuario(sesion).buscar_por_id(naviera.id))
-        pdf_datos = await svc.preparar_pdf(ctx, await svc.obtener(ctx, sid))
-    assert pdf_datos.aprobada_por == "UCVMM"
+        datos = {}
+        for clave, actor in (("agencia", naviera), ("snm", revisor)):
+            ctx = await svc.contexto(await RepositorioUsuario(sesion).buscar_por_id(actor.id))
+            datos[clave] = await svc.preparar_pdf(ctx, await svc.obtener(ctx, sid))
+    assert datos["agencia"].aprobada_por == "UCVMM" and not datos["agencia"].copia_interna
+    assert datos["snm"].aprobada_por == "Revisor Prueba (UCVMM)" and datos["snm"].copia_interna

@@ -60,9 +60,10 @@ def test_checklist(caso):
         documento = DocumentoRequerido(id=i, codigo=d["codigo"], nombre=d["codigo"], requiere_libreta=d["requiere_libreta"])
         tipo.documentos.append(TramiteDocumento(
             documento_id=i, documento=documento, alcance=d["alcance"], condicion=d["condicion"], orden=d["orden"],
+            rangos=d.get("rangos"),
         ))
     tripulantes = [
-        TripulanteChecklist(nombre=t["nombre"], es_panameno=t["es_panameno"], porta_libreta=t["porta_libreta"],
+        TripulanteChecklist(nombre=t["nombre"], es_panameno=t["es_panameno"], rango=t["rango"],
                             nacionalidad_restringida=t["restringida"])
         for t in caso["tripulantes"]
     ]
@@ -120,6 +121,7 @@ def _constante_ts(archivo: str, nombre: str):
 
 
 def test_constantes_iguales_en_el_frontend():
+    from app.core import horario
     from app.core.config import Configuracion
     from app.domain.models.solicitud import RANGOS_CON_LIBRETA
     from app.domain.schemas import user
@@ -138,4 +140,12 @@ def test_constantes_iguales_en_el_frontend():
         == Configuracion.model_fields["DIAS_MAXIMOS_ANTICIPACION"].default
     assert _constante_ts("modulos/solicitudes/DocumentosAdicionales.tsx", "MAX_ADICIONALES") \
         == solicitud_service.MAX_DOCUMENTOS_ADICIONALES
+    assert _constante_ts("modulos/solicitudes/validacionFormulario.ts", "MAX_TRIPULANTES") \
+        == solicitud_service.MAX_TRIPULANTES
     assert set(_constante_ts("modulos/solicitudes/presentacion.ts", "RANGOS_CON_LIBRETA")) == RANGOS_CON_LIBRETA
+    # El mapa de horas de las estadísticas marca el horario laboral por horas enteras.
+    assert horario.INICIO_LABORAL.minute == horario.FIN_LABORAL.minute == 0
+    assert _constante_ts("modulos/administracion/estadisticas/calculos.ts", "HORA_INICIO_LABORAL") \
+        == horario.INICIO_LABORAL.hour
+    assert _constante_ts("modulos/administracion/estadisticas/calculos.ts", "HORA_FIN_LABORAL") \
+        == horario.FIN_LABORAL.hour

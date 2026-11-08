@@ -38,9 +38,23 @@ export function vencimientoDelToken(): number | null {
   }
 }
 
+/** Las descargas (documentos, PDF) piden un Blob, y el error también llega
+ *  como Blob: se reemplaza por su JSON para que mensajeDeError muestre el
+ *  motivo real del servidor y no el texto genérico de la pantalla. */
+export async function leerErrorDeBlob(error: unknown): Promise<void> {
+  const respuesta = (error as { response?: { data?: unknown } } | null)?.response;
+  if (!respuesta || !(respuesta.data instanceof Blob) || !respuesta.data.type.includes("json")) return;
+  try {
+    respuesta.data = JSON.parse(await respuesta.data.text());
+  } catch {
+    // Cuerpo ilegible: queda el mensaje genérico de cada pantalla.
+  }
+}
+
 clienteApi.interceptors.response.use(
   (respuesta) => respuesta,
-  (error) => {
+  async (error) => {
+    await leerErrorDeBlob(error);
     const estado = error?.response?.status;
     // Cualquier 401 implica token inválido/revocado → forzar re-login y, al
     // entrar de nuevo, volver a la página donde estaba.

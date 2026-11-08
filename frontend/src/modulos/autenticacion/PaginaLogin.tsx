@@ -56,11 +56,12 @@ export default function PaginaLogin() {
 
   return (
     <div className={styles.pagina}>
+      <a href="#contenido" className="saltar-contenido">Saltar al contenido</a>
       <CabeceraInstitucional />
 
       <div className={styles.medio}>
       <FondoPagina coordenadas={false} animado />
-      <main className={styles.cuerpo}>
+      <main id="contenido" tabIndex={-1} className={styles.cuerpo}>
         <section className={styles.insignia}>
           <h1 className={styles.titulo}>
             <img src="/images/logo-argo-navis.webp" alt="ARGO NAVIS · Sistema Interno Marítimo - SNM" className={styles.logoGrande} />
@@ -91,6 +92,7 @@ export default function PaginaLogin() {
                 onChange={(e) => setNombreUsuario(e.target.value)}
                 autoComplete="username"
                 spellCheck={false}
+                maxLength={100}
                 required
                 autoFocus
               />
@@ -106,6 +108,7 @@ export default function PaginaLogin() {
                 value={contrasena}
                 onChange={(e) => setContrasena(e.target.value)}
                 autoComplete="current-password"
+                maxLength={256}
                 required
               />
               <button

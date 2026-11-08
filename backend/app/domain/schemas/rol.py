@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 
 
@@ -34,7 +34,7 @@ class SalidaRol(BaseModel):
 
 class DatosCrearRol(BaseModel):
     nombre:      str
-    descripcion: str | None = None
+    descripcion: str | None = Field(default=None, max_length=500)
 
     @field_validator("nombre")
     @classmethod
@@ -48,12 +48,14 @@ class DatosCrearRol(BaseModel):
 
 
 class DatosActualizarRol(BaseModel):
-    nombre:      str | None = None
-    descripcion: str | None = None
+    # roles.nombre es VARCHAR(100): sin el tope, uno más largo daba error 500.
+    # El nombre vacío lo rechaza el endpoint (400), como antes.
+    nombre:      str | None = Field(default=None, max_length=100)
+    descripcion: str | None = Field(default=None, max_length=500)
 
 
 class DatosAsignarPermisos(BaseModel):
-    permiso_ids: list[int]
+    permiso_ids: list[int] = Field(max_length=100)
 
 
 class DatosAsignarRol(BaseModel):

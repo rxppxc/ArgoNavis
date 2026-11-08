@@ -4,7 +4,8 @@ import {
   IconoAncla, IconoArchivo, IconoCaminar, IconoCheck, IconoCruzMedica, IconoDesembarque, IconoEmbarque,
   IconoHerramienta, IconoIntercambio, IconoPasaporte,
 } from "../../components/Iconos";
-import { AYUDA_CAMPOS_TRAMITE } from "./presentacion";
+import { aplicaAlRango } from "./checklist";
+import { AYUDA_CAMPOS_TRAMITE, TODOS_LOS_RANGOS } from "./presentacion";
 import styles from "./SelectorTramite.module.css";
 
 /** Ícono y color de cada trámite del Form. 3, para distinguir las tarjetas de
@@ -26,11 +27,16 @@ const GENERICA = { icono: IconoArchivo, tono: styles.tonoGris };
 /** Qué pide el trámite, en una línea, sacado del checklist del catálogo
  *  (p. ej. "Hasta 4 documentos por tripulante · Lista de Tripulantes"). "Hasta"
  *  cuando alguno depende del tripulante: el seamanbook solo lo porta el
- *  Marino y el Form. No. 6 es para los de nacionalidad restringida. */
+ *  Marino, el Form. No. 6 es para los de nacionalidad restringida y a los
+ *  demás rangos solo se les piden Generales y boleto aéreo. */
 function resumenRequisitos(t: TipoTramite): string {
   const porTripulante = t.documentos.filter((d) => d.alcance === "marino");
-  const fijos = porTripulante.filter((d) => d.condicion === "siempre" && !d.requiere_libreta).length;
-  const n = porTripulante.length;
+  const porRango = (t.rangos_permitidos ?? TODOS_LOS_RANGOS).map((rango) => {
+    const aplican = porTripulante.filter((d) => aplicaAlRango(d, rango));
+    return { todos: aplican.length, fijos: aplican.filter((d) => d.condicion === "siempre").length };
+  });
+  const n = Math.max(0, ...porRango.map((r) => r.todos));
+  const fijos = Math.min(n, ...porRango.map((r) => r.fijos));
   const partes = [
     n > 0 && `${fijos < n ? "Hasta " : ""}${n} documento${n === 1 ? "" : "s"} por tripulante`,
     ...t.documentos.filter((d) => d.alcance === "solicitud" && d.condicion === "siempre").map((d) => d.nombre),

@@ -15,13 +15,15 @@
     con plazo (PLAZO_CORRECCION_DIAS) o niega. Nadie revisa una solicitud que
     creó o que es de su propia agencia (separación de funciones).
   - El puesto de control (T-FINALIZAR-PUERTO + asignación en
-    `usuarios_puestos`) ve las aprobadas de sus puestos y las finaliza.
+    `usuarios_puestos`) ve las aprobadas de sus puestos, verifica los
+    impedimentos (obligatoria para finalizar) y las finaliza.
   - Cada transición bloquea la fila (SELECT ... FOR UPDATE): dos usuarios no
     pueden, por ejemplo, aprobar y negar la misma solicitud a la vez.
   - Cada paso queda en `solicitud_eventos` (historial con usuario y hora).
 """
 import logging
 import secrets
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
@@ -31,6 +33,7 @@ from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import obtener_configuracion
+from app.core.horario import TEXTO_HORARIO, fuera_de_horario
 from app.core.pdf_autorizacion import DatosPdfAutorizacion, TripulantePdf
 from app.core.permisos import (
     PERMISO_PUERTO, PERMISO_REVISAR, PERMISO_SOLICITAR, codigos_permiso, es_admin_efectivo,
@@ -47,8 +50,9 @@ from app.domain.repositories.solicitud_repository import FiltrosBandeja, Reposit
 from app.domain.repositories.tramite_repository import RepositorioTramite
 from app.domain.schemas.solicitud import (
     AccionesSolicitud, AsignacionArchivo, ConsultaBandeja, DatosCorregirSolicitud,
-    DatosCrearSolicitud, DatosImpedimentos, DatosTripulanteEntrada, FilaEstadisticaMes,
-    FilaEstadisticaPuesto, FilaEstadisticaTipo, PaginaSolicitudes, SalidaCasilla,
+    DatosCrearSolicitud, DatosImpedimentos, DatosTripulanteEntrada, FilaEstadisticaPuesto,
+    FilaEstadisticaSerie, FilaEstadisticaTipo, FilaFueraHorario, FilaPorHora, PaginaSolicitudes,
+    SalidaCasilla,
     SalidaDocumentoSolicitud, SalidaEstadisticasSolicitudes, SalidaEvento, SalidaSolicitud,
     SalidaSolicitudResumen, SalidaTripulante, SalidaTripulanteVerificacion, SalidaVerificacion,
     _DatosFormularioSolicitud,
@@ -68,14 +72,22 @@ CODIGO_PANAMA = "PAN"
 Estado        = EstadoSolicitud
 MAX_ERRORES_MOSTRADOS      = 8
 MAX_DOCUMENTOS_ADICIONALES = 20
+MAX_TRIPULANTES            = 30   # por solicitud (reunión del 2026-10-30); espejo en el frontend
+MAX_FUERA_HORARIO_LISTADAS = 50   # estadísticas: las aprobadas fuera del horario que se listan
+# Estadísticas: cuántos días, meses y años muestra la serie, como mucho (los últimos del periodo).
+DIAS_EN_SERIE  = 31
+MESES_EN_SERIE = 12
+ANIOS_EN_SERIE = 10
 
 # (casilla del checklist o None si es un documento adicional, índice del tripulante)
 Asignacion = tuple[TramiteDocumento | None, int | None]
 
-# Historial que ve la agencia (ver ServicioSolicitud._evento_para).
+# Historial que ve la agencia (ver ServicioSolicitud.evento_para).
 _EVENTOS_INTERNOS = {
     TipoEventoSolicitud.IMPEDIMENTOS.value,
     TipoEventoSolicitud.IMPEDIMENTOS_CORREGIDOS.value,
+    TipoEventoSolicitud.IMPEDIMENTOS_PUESTO.value,
+    TipoEventoSolicitud.IMPEDIMENTOS_PUESTO_CORREGIDOS.value,
     TipoEventoSolicitud.COMENTARIO.value,   # ya no se registran: quedan los de antes
 }
 _SIN_TEXTO_PARA_AGENCIA = {TipoEventoSolicitud.APROBADA.value, TipoEventoSolicitud.FINALIZADA.value}
@@ -111,6 +123,42 @@ def _con_punto(texto: str) -> str:
 
 def _error(codigo: int, detalle: str) -> HTTPException:
     return HTTPException(status_code=codigo, detail=detalle)
+
+
+def _meses_antes(dia: date, meses: int) -> date:
+    """El primer día del mes que queda `meses` meses antes del de `dia` (negativo: después)."""
+    total = dia.year * 12 + dia.month - 1 - meses
+    return date(total // 12, total % 12 + 1, 1)
+
+
+def _periodos_dia(inicio: date, fin: date) -> list[date]:
+    return [inicio + timedelta(days=i) for i in range((fin - inicio).days + 1)]
+
+
+def _periodos_mes(inicio: date, fin: date) -> list[date]:
+    """El primer día de cada mes, del de `inicio` al de `fin`."""
+    meses: list[date] = []
+    mes = inicio.replace(day=1)
+    while mes <= fin:
+        meses.append(mes)
+        mes = _meses_antes(mes, -1)
+    return meses
+
+
+def _periodos_anio(inicio: date, fin: date) -> list[date]:
+    return [date(anio, 1, 1) for anio in range(inicio.year, fin.year + 1)]
+
+
+def _serie(
+    diaria: dict[date, dict[str, int]], periodos: list[date], clave_de: Callable[[date], str],
+) -> list[FilaEstadisticaSerie]:
+    """La serie diaria sumada en los `periodos` (días, meses o años, según `clave_de`)."""
+    cifras: dict[str, dict[str, int]] = {}
+    for dia, del_dia in diaria.items():
+        destino = cifras.setdefault(clave_de(dia), {})
+        for hito, total in del_dia.items():
+            destino[hito] = destino.get(hito, 0) + total
+    return [FilaEstadisticaSerie(periodo=clave_de(p), **cifras.get(clave_de(p), {})) for p in periodos]
 
 
 @dataclass
@@ -153,9 +201,38 @@ class _TripulanteResuelto:
         return TripulanteChecklist(
             nombre=f"{self.entrada.nombre} {self.entrada.apellido}",
             es_panameno=self.entrada.nacionalidad == CODIGO_PANAMA,
-            porta_libreta=self.porta_libreta,
+            rango=self.entrada.rango,
             nacionalidad_restringida=self.restringido,
         )
+
+
+@dataclass(frozen=True)
+class _EtapaVerificacion:
+    """Dónde guarda su verificación de impedimentos cada etapa: UCVMM al
+    revisar y el puesto de control antes de finalizar (2026-11-06). Son
+    columnas aparte, para que una verificación no pise a la otra."""
+    tripulante:       str   # columna de solicitud_tripulantes con el resultado
+    verificados:      str   # columnas de solicitudes
+    comentario:       str
+    en:               str
+    por_id:           str
+    evento:           TipoEventoSolicitud
+    evento_corregido: TipoEventoSolicitud
+
+
+_VERIFICACION_UCVMM = _EtapaVerificacion(
+    tripulante="con_impedimento", verificados="impedimentos_verificados",
+    comentario="comentario_impedimentos", en="impedimentos_verificados_en",
+    por_id="impedimentos_verificados_por_id",
+    evento=TipoEventoSolicitud.IMPEDIMENTOS, evento_corregido=TipoEventoSolicitud.IMPEDIMENTOS_CORREGIDOS,
+)
+_VERIFICACION_PUESTO = _EtapaVerificacion(
+    tripulante="con_impedimento_puesto", verificados="impedimentos_puesto_verificados",
+    comentario="comentario_impedimentos_puesto", en="impedimentos_puesto_en",
+    por_id="impedimentos_puesto_por_id",
+    evento=TipoEventoSolicitud.IMPEDIMENTOS_PUESTO,
+    evento_corregido=TipoEventoSolicitud.IMPEDIMENTOS_PUESTO_CORREGIDOS,
+)
 
 
 @dataclass
@@ -255,13 +332,17 @@ class ServicioSolicitud:
 
     # ── Bandejas ─────────────────────────────────────────────────────────────
 
-    async def _pagina(self, filtros: FiltrosBandeja, consulta: ConsultaBandeja, orden: str) -> PaginaSolicitudes:
+    async def _pagina(
+        self, ctx: ContextoAcceso, filtros: FiltrosBandeja, consulta: ConsultaBandeja, orden: str,
+    ) -> PaginaSolicitudes:
         total, conteos, items = await self.repo.listar(
             filtros, pagina=consulta.pagina, por_pagina=consulta.por_pagina, orden=orden,
         )
+        alertas = await self.repo.alertas_de([s.id for s in items])
         return PaginaSolicitudes(
             total=total, pagina=consulta.pagina, por_pagina=consulta.por_pagina, conteos=conteos,
-            items=[self.construir_resumen(s) for s in items],
+            items=[self.construir_resumen(s, interno=ctx.es_personal_snm, alertas=alertas.get(s.id, (0, False)))
+                   for s in items],
         )
 
     @staticmethod
@@ -278,7 +359,7 @@ class ServicioSolicitud:
                 status.HTTP_409_CONFLICT,
                 "Tu usuario no tiene una agencia naviera asignada. Pide al administrador que te asigne a la tuya.",
             )
-        return await self._pagina(self._filtros(consulta, agencia_id=ctx.agencia_id), consulta, "recientes")
+        return await self._pagina(ctx, self._filtros(consulta, agencia_id=ctx.agencia_id), consulta, "recientes")
 
     async def bandeja_revision(self, ctx: ContextoAcceso, consulta: ConsultaBandeja) -> PaginaSolicitudes:
         """Todas las solicitudes, para UCVMM. Las pendientes salen en orden de
@@ -286,7 +367,7 @@ class ServicioSolicitud:
         if not ctx.puede_revisar:
             raise _error(status.HTTP_403_FORBIDDEN, f"No tienes el permiso requerido: {PERMISO_REVISAR}.")
         orden = "cola" if consulta.estado == Estado.EN_REVISION.value else "recientes"
-        return await self._pagina(self._filtros(consulta), consulta, orden)
+        return await self._pagina(ctx, self._filtros(consulta), consulta, orden)
 
     async def bandeja_puerto(self, ctx: ContextoAcceso, consulta: ConsultaBandeja) -> PaginaSolicitudes:
         """Autorizaciones aprobadas de los puestos del usuario (el admin ve
@@ -297,7 +378,7 @@ class ServicioSolicitud:
             consulta, puestos_ids=None if ctx.es_admin else ctx.puestos_ids, solo_aprobadas_alguna_vez=True,
         )
         orden = "operacion" if consulta.estado == Estado.APROBADA.value else "recientes"
-        return await self._pagina(filtros, consulta, orden)
+        return await self._pagina(ctx, filtros, consulta, orden)
 
     # ── Validación del formulario ────────────────────────────────────────────
 
@@ -335,6 +416,11 @@ class ServicioSolicitud:
 
         if not datos.tripulantes:
             raise _error(status.HTTP_400_BAD_REQUEST, "Debes registrar al menos un tripulante en la solicitud.")
+        if len(datos.tripulantes) > MAX_TRIPULANTES:
+            raise _error(
+                status.HTTP_400_BAD_REQUEST,
+                f"Una solicitud admite hasta {MAX_TRIPULANTES} tripulantes. Si son más, presenta otra solicitud.",
+            )
 
         codigos = {t.nacionalidad for t in datos.tripulantes} | {t.pais_nacimiento for t in datos.tripulantes}
         bandera = datos.bandera.upper() if datos.bandera else None
@@ -365,9 +451,12 @@ class ServicioSolicitud:
         tipo: TipoTramite, asignaciones: list[AsignacionArchivo], total_tripulantes: int,
     ) -> list[Asignacion]:
         """Traduce cada asignación a (casilla del checklist, índice del
-        tripulante). Sin código de documento es un documento adicional."""
+        tripulante). Sin código de documento es un documento adicional.
+        Cada casilla recibe un solo archivo: el formulario manda uno por casilla
+        y, sin este control, un envío podía colgar varios en la misma."""
         por_codigo = {td.documento.codigo: td for td in tipo.documentos}
         resueltas: list[Asignacion] = []
+        ocupadas: set[tuple[str, int | None]] = set()
         for asignacion in asignaciones:
             if asignacion.documento_codigo is None:
                 resueltas.append((None, None))
@@ -379,14 +468,22 @@ class ServicioSolicitud:
                     f"El documento '{asignacion.documento_codigo}' no pertenece a este trámite.",
                 )
             if td.alcance == AlcanceDocumento.SOLICITUD.value:
-                resueltas.append((td, None))
-                continue
-            indice = asignacion.indice_tripulante
-            if indice is None or not 0 <= indice < total_tripulantes:
+                indice = None
+            else:
+                indice = asignacion.indice_tripulante
+                if indice is None or not 0 <= indice < total_tripulantes:
+                    raise _error(
+                        status.HTTP_400_BAD_REQUEST,
+                        f"Tripulante inválido para el documento '{td.documento.nombre}'.",
+                    )
+            casilla = (td.documento.codigo, indice)
+            if casilla in ocupadas:
+                de_quien = f" del tripulante {indice + 1}" if indice is not None else ""
                 raise _error(
                     status.HTTP_400_BAD_REQUEST,
-                    f"Tripulante inválido para el documento '{td.documento.nombre}'.",
+                    f"Llegó más de un archivo para «{td.documento.nombre}»{de_quien}: adjunta uno solo por documento.",
                 )
+            ocupadas.add(casilla)
             resueltas.append((td, indice))
         return resueltas
 
@@ -712,6 +809,12 @@ class ServicioSolicitud:
         cambiarla es una corrección: exige motivo y el historial dice qué
         cambió. Sin cambios no se registra nada."""
         s = await self._para_revision(ctx, solicitud_id)
+        return await self._verificar_impedimentos(ctx, s, datos, _VERIFICACION_UCVMM)
+
+    async def _verificar_impedimentos(
+        self, ctx: ContextoAcceso, s: Solicitud, datos: DatosImpedimentos, etapa: _EtapaVerificacion,
+    ) -> Solicitud:
+        """Registra o corrige la verificación de una etapa (UCVMM o puesto de control)."""
         por_id = {t.id: t for t in s.tripulantes}
         recibidos = {d.tripulante_id: d.con_impedimento for d in datos.tripulantes}
         if len(recibidos) != len(datos.tripulantes) or set(recibidos) != set(por_id):
@@ -720,12 +823,12 @@ class ServicioSolicitud:
                 "Indica el resultado de la verificación de cada tripulante de la solicitud (una vez cada uno).",
             )
 
-        correccion = s.impedimentos_verificados
+        correccion = getattr(s, etapa.verificados)
         cambios = [
-            f"{por_id[i].nombre_completo} pasa de {_resultado(por_id[i].con_impedimento)} a {_resultado(c)}"
-            for i, c in recibidos.items() if por_id[i].con_impedimento != c
+            f"{por_id[i].nombre_completo} pasa de {_resultado(getattr(por_id[i], etapa.tripulante))} a {_resultado(c)}"
+            for i, c in recibidos.items() if getattr(por_id[i], etapa.tripulante) != c
         ]
-        cambia_comentario = datos.comentario != s.comentario_impedimentos
+        cambia_comentario = datos.comentario != getattr(s, etapa.comentario)
         if correccion:
             if not cambios and not cambia_comentario:
                 raise _error(status.HTTP_409_CONFLICT, "La verificación de impedimentos no tiene cambios.")
@@ -733,20 +836,20 @@ class ServicioSolicitud:
                 raise _error(status.HTTP_400_BAD_REQUEST, "Indica el motivo de la corrección (al menos 5 caracteres).")
 
         for tripulante_id, con_impedimento in recibidos.items():
-            por_id[tripulante_id].con_impedimento = con_impedimento
+            setattr(por_id[tripulante_id], etapa.tripulante, con_impedimento)
         con = [por_id[i].nombre_completo for i, c in recibidos.items() if c]
 
-        s.impedimentos_verificados        = True
-        s.comentario_impedimentos         = datos.comentario
-        s.impedimentos_verificados_en     = ahora_utc()
-        s.impedimentos_verificados_por_id = ctx.usuario.id
+        setattr(s, etapa.verificados, True)
+        setattr(s, etapa.comentario, datos.comentario)
+        setattr(s, etapa.en, ahora_utc())
+        setattr(s, etapa.por_id, ctx.usuario.id)
         if correccion:
             partes = ["; ".join(cambios) + "." if cambios else "Se actualiza el comentario."]
             if cambia_comentario and datos.comentario:
                 partes.append(f"Comentario: {_con_punto(datos.comentario)}")
             partes.append(f"Motivo: {_con_punto(datos.motivo_correccion or '')}")
             texto = " ".join(partes)
-            tipo = TipoEventoSolicitud.IMPEDIMENTOS_CORREGIDOS
+            tipo = etapa.evento_corregido
         else:
             # El título del evento ya dice "Verificación de impedimentos": aquí solo el resultado.
             total = len(recibidos)
@@ -757,7 +860,7 @@ class ServicioSolicitud:
                 texto += f" ({len(con)} de {total} tripulantes)." if total > 1 else "."
             if datos.comentario:
                 texto += f" {datos.comentario}"
-            tipo = TipoEventoSolicitud.IMPEDIMENTOS
+            tipo = etapa.evento
         self._registrar_evento(s, ctx.usuario, tipo, None, None, texto)
         await self.repo.guardar()
         return await self._recargar(s.id)
@@ -818,24 +921,50 @@ class ServicioSolicitud:
             raise _error(status.HTTP_409_CONFLICT, "La autorización venció sin finalizarse.")
         return s
 
+    async def registrar_impedimentos_puesto(
+        self, ctx: ContextoAcceso, solicitud_id: int, datos: DatosImpedimentos,
+    ) -> Solicitud:
+        """El puesto de control verifica los impedimentos en SIMPLUS antes de
+        finalizar (2026-11-06): al momento de la operación pudo aparecer uno
+        que no estaba cuando UCVMM aprobó. Funciona como la de UCVMM (por
+        tripulante, comentario opcional, corrección con motivo) y se guarda
+        aparte. Con impedimento igual se puede finalizar: lo ocurrido con esa
+        persona va en el comentario de la operación."""
+        s = await self._para_puerto(ctx, solicitud_id)
+        return await self._verificar_impedimentos(ctx, s, datos, _VERIFICACION_PUESTO)
+
     async def finalizar(
         self, ctx: ContextoAcceso, solicitud_id: int, comentario: str, puesto_finalizacion_id: int | None = None,
     ) -> Solicitud:
-        """Cierra la autorización. La operación puede terminar en otro puesto
-        que el autorizado: se registra dónde terminó (por defecto, el autorizado)."""
+        """Cierra la autorización en el puesto autorizado, con la verificación
+        de impedimentos del puesto ya registrada (desde el 2026-11-06). Desde el
+        2026-10-30 no se finaliza en otro puesto: si la operación se hace en
+        otro, la agencia presenta una nueva solicitud y esta vence sola.
+        `puesto_finalizacion_id` solo llega de una página abierta antes del
+        cambio: si es otro puesto, se rechaza con el motivo en vez de cerrarla
+        donde no fue."""
         s = await self._para_puerto(ctx, solicitud_id)
-        puesto = await self.repo_catalogos.buscar_puesto(puesto_finalizacion_id or s.puesto_control_id)
-        if not puesto or not puesto.activo:
-            raise _error(status.HTTP_400_BAD_REQUEST, "El puesto de control donde finalizó la operación no existe o está inactivo.")
+        if puesto_finalizacion_id is not None and puesto_finalizacion_id != s.puesto_control_id:
+            raise _error(
+                status.HTTP_400_BAD_REQUEST,
+                f"La autorización es solo para {s.puesto_nombre}: no se finaliza en otro puesto. Si la operación "
+                "se realizó en otro, la agencia debe presentar una nueva solicitud.",
+            )
+        if not s.impedimentos_puesto_verificados or any(t.con_impedimento_puesto is None for t in s.tripulantes):
+            raise _error(
+                status.HTTP_409_CONFLICT,
+                "Antes de finalizar registra la verificación de impedimentos de cada tripulante en SIMPLUS.",
+            )
         anterior = s.estado
         s.estado                     = Estado.FINALIZADA.value
         s.finalizada_en              = ahora_utc()
         s.finalizada_por_id          = ctx.usuario.id
         s.comentario_finalizacion    = comentario
-        s.puesto_finalizacion_id     = puesto.id
-        s.puesto_finalizacion_nombre = puesto.nombre
+        # Se sigue registrando (es el autorizado) para las estadísticas por puesto y las finalizadas de antes.
+        s.puesto_finalizacion_id     = s.puesto_control_id
+        s.puesto_finalizacion_nombre = s.puesto_nombre
         self._registrar_evento(s, ctx.usuario, TipoEventoSolicitud.FINALIZADA, anterior, s.estado,
-                               f"Finalizada en {puesto.nombre}. {comentario}")
+                               f"Finalizada en {s.puesto_nombre}. {comentario}")
         await self.repo.guardar()
         return await self._recargar(s.id)
 
@@ -853,7 +982,7 @@ class ServicioSolicitud:
             else:
                 motivo = (
                     "La agencia no corrigió la solicitud dentro del plazo de "
-                    f"{configuracion.PLAZO_CORRECCION_DIAS} día(s)."
+                    f"{configuracion.PLAZO_CORRECCION_DIAS * 24} horas."
                 )
             s.estado      = Estado.EXPIRADA.value
             s.expirada_en = ahora
@@ -872,13 +1001,22 @@ class ServicioSolicitud:
         libreta   = bool(t.porta_libreta and t.libreta_expira and t.libreta_expira < referencia)
         return pasaporte, libreta
 
-    def construir_resumen(self, s: Solicitud) -> SalidaSolicitudResumen:
-        return SalidaSolicitudResumen(**self._campos_resumen(s))
+    def construir_resumen(
+        self, s: Solicitud, *, interno: bool, alertas: tuple[int, bool] | None = None,
+    ) -> SalidaSolicitudResumen:
+        return SalidaSolicitudResumen(**self._campos_resumen(s, interno=interno, alertas=alertas))
 
-    def _campos_resumen(self, s: Solicitud) -> dict:
-        con_alerta = sum(
-            1 for t in s.tripulantes if any(self._vencimientos_tripulante(t, s.fecha_operacion))
-        )
+    def _campos_resumen(self, s: Solicitud, *, interno: bool, alertas: tuple[int, bool] | None = None) -> dict:
+        """`interno`: quien consulta es del SNM. Lo interno no le llega a la agencia.
+        `alertas` = (tripulantes con documento vencido, ¿alguno restringido?), ya
+        contados por la BD (bandejas, RepositorioSolicitud.alertas_de); sin ellas
+        se cuentan aquí, con los tripulantes cargados (el expediente)."""
+        if alertas is None:
+            alertas = (
+                sum(1 for t in s.tripulantes if any(self._vencimientos_tripulante(t, s.fecha_operacion))),
+                any(t.nacionalidad_restringida for t in s.tripulantes),
+            )
+        con_alerta, alguno_restringido = alertas
         return dict(
             id=s.id, numero=s.numero, titulo=s.titulo, estado=s.estado,
             tipo_tramite_codigo=s.tipo_tramite.codigo, tipo_tramite_nombre=s.tipo_tramite.nombre,
@@ -892,9 +1030,9 @@ class ServicioSolicitud:
             finalizada_en=s.finalizada_en, expirada_en=s.expirada_en,
             veces_devuelta=s.veces_devuelta or 0,
             tripulantes_con_alerta=con_alerta,
-            tiene_nacionalidad_restringida=(
-                s.tipo_tramite.aviso_custodia and any(t.nacionalidad_restringida for t in s.tripulantes)
-            ),
+            tiene_nacionalidad_restringida=s.tipo_tramite.aviso_custodia and alguno_restringido,
+            # Aprobada por UCVMM fuera del horario laboral (2026-11-06; antes, por la finalización).
+            fuera_de_horario=fuera_de_horario(s.aprobada_en) if interno and s.aprobada_en else None,
         )
 
     @staticmethod
@@ -903,11 +1041,12 @@ class ServicioSolicitud:
         return next((e.usuario_nombre for e in reversed(s.eventos) if e.tipo in valores), None)
 
     @staticmethod
-    def _evento_para(e, interno: bool) -> SalidaEvento | None:
+    def evento_para(e, interno: bool) -> SalidaEvento | None:
         """Un evento del historial tal como lo ve quien consulta. La agencia no ve
         lo interno del SNM (impedimentos, comentarios del puesto, la observación
         de aprobación ni el texto de cierre) ni el nombre del funcionario: ve los
-        estados y los motivos que le corresponden (devolución y negación)."""
+        estados y los motivos que le corresponden (devolución y negación). Lo usan
+        el expediente y las novedades de las notificaciones internas."""
         salida = SalidaEvento.model_validate(e)
         if interno:
             return salida
@@ -946,13 +1085,16 @@ class ServicioSolicitud:
                 rango=t.rango, ocupacion=t.ocupacion, es_panameno=t.es_panameno,
                 nacionalidad_restringida=t.nacionalidad_restringida,
                 con_impedimento=t.con_impedimento if ctx.es_personal_snm else None,
+                con_impedimento_puesto=t.con_impedimento_puesto if ctx.es_personal_snm else None,
                 porta_libreta=t.porta_libreta, orden=t.orden,
                 pasaporte_vencido=pasaporte_vencido, libreta_vencida=libreta_vencida,
             ))
 
         documentos = [
             SalidaDocumentoSolicitud(
-                id=d.id, nombre_original=d.nombre_original, tamano=d.tamano, tipo_mime=d.tipo_mime,
+                # El tipo del formato verificado, el mismo con que se sirve el archivo.
+                id=d.id, nombre_original=d.nombre_original, tamano=d.tamano,
+                tipo_mime=almacenamiento.mime_del_formato(d.nombre_almacenado),
                 documento_id=d.documento_id,
                 documento_codigo=d.documento.codigo if d.documento else None,
                 documento_nombre=d.documento.nombre if d.documento else None,
@@ -976,10 +1118,10 @@ class ServicioSolicitud:
             ))
 
         interno = ctx.es_personal_snm
-        eventos = [ev for ev in (self._evento_para(e, interno) for e in s.eventos) if ev is not None]
+        eventos = [ev for ev in (self.evento_para(e, interno) for e in s.eventos) if ev is not None]
 
         return SalidaSolicitud(
-            **self._campos_resumen(s),
+            **self._campos_resumen(s, interno=interno),
             tipo_tramite_nota=tipo.nota,
             tipo_tramite_aviso_custodia=tipo.aviso_custodia,
             requiere_buque=tipo.requiere_buque, requiere_puerto=tipo.requiere_puerto,
@@ -995,6 +1137,12 @@ class ServicioSolicitud:
             impedimentos_verificados_en=s.impedimentos_verificados_en if interno else None,
             impedimentos_verificados_por=self._autor_ultimo(
                 s, TipoEventoSolicitud.IMPEDIMENTOS, TipoEventoSolicitud.IMPEDIMENTOS_CORREGIDOS,
+            ) if interno else None,
+            impedimentos_puesto_verificados=s.impedimentos_puesto_verificados if interno else False,
+            comentario_impedimentos_puesto=s.comentario_impedimentos_puesto if interno else None,
+            impedimentos_puesto_en=s.impedimentos_puesto_en if interno else None,
+            impedimentos_puesto_por=self._autor_ultimo(
+                s, TipoEventoSolicitud.IMPEDIMENTOS_PUESTO, TipoEventoSolicitud.IMPEDIMENTOS_PUESTO_CORREGIDOS,
             ) if interno else None,
             motivo_devolucion=s.motivo_devolucion,
             observacion_aprobacion=s.observacion_aprobacion if interno else None,
@@ -1019,6 +1167,11 @@ class ServicioSolicitud:
         if not self.acciones(ctx, s).descargar_autorizacion or not s.codigo_verificacion:
             raise _error(status.HTTP_409_CONFLICT, "La autorización solo se descarga cuando la solicitud está aprobada o finalizada.")
         assert s.aprobada_en is not None
+        # La agencia recibe "UCVMM", como en su vista del expediente (decisión del
+        # usuario, 2026-10-15). El personal del SNM, una copia interna con el
+        # nombre de quien aprobó (reunión del 2026-10-30), tomado del historial.
+        interno   = ctx.es_personal_snm
+        aprobador = self._autor_ultimo(s, TipoEventoSolicitud.APROBADA) if interno else None
         return DatosPdfAutorizacion(
             numero=s.numero or str(s.id),
             estado=s.estado,
@@ -1032,9 +1185,8 @@ class ServicioSolicitud:
             clinica_hospital=s.clinica_hospital, motivo=s.motivo,
             fecha_solicitud=s.enviada_en.astimezone(TZ_PANAMA),
             aprobada_en=s.aprobada_en.astimezone(TZ_PANAMA),
-            # El PDF lo recibe la agencia: como en su vista del expediente, no lleva
-            # nombres de funcionarios (decisión del usuario, 2026-10-15).
-            aprobada_por="UCVMM",
+            aprobada_por=f"{aprobador} (UCVMM)" if aprobador else "UCVMM",
+            copia_interna=interno,
             vigente_hasta=s.vigente_hasta.astimezone(TZ_PANAMA) if s.vigente_hasta else None,
             finalizada_en=s.finalizada_en.astimezone(TZ_PANAMA) if s.finalizada_en else None,
             puesto_finalizacion=s.puesto_finalizacion_nombre,
@@ -1086,19 +1238,19 @@ class ServicioSolicitud:
     # ── Estadísticas ─────────────────────────────────────────────────────────
 
     async def estadisticas(self, desde: date | None, hasta: date | None) -> SalidaEstadisticasSolicitudes:
+        """Lo que pasó con las solicitudes recibidas en el periodo: por día, por
+        mes y por año, más las aprobadas fuera del horario laboral (las 50 más
+        recientes) y las aprobadas por día de la semana y hora (el mapa de horas)."""
         hitos = await self.repo.contar_hitos(desde, hasta)
 
-        # Últimos 6 meses, incluido el actual
+        # La serie se cuenta por día y se agrupa aquí: los últimos días, meses y
+        # años del periodo (con «Todo», hasta hoy).
         hoy = hoy_panama()
-        anio, mes = hoy.year, hoy.month
-        meses: list[str] = []
-        for _ in range(6):
-            meses.append(f"{anio:04d}-{mes:02d}")
-            mes -= 1
-            if mes == 0:
-                anio, mes = anio - 1, 12
-        meses.reverse()
-        serie = await self.repo.serie_mensual(date(int(meses[0][:4]), int(meses[0][5:]), 1), desde, hasta)
+        fin = min(hasta, hoy) if hasta else hoy
+        diaria = await self.repo.serie_diaria(desde, hasta)
+        inicio_dias = max(desde or date.min, fin - timedelta(days=DIAS_EN_SERIE - 1))
+        inicio_meses = max(desde or date.min, _meses_antes(fin, MESES_EN_SERIE - 1))
+        inicio_anios = max(desde or min(diaria, default=fin), date(fin.year - ANIOS_EN_SERIE + 1, 1, 1))
 
         return SalidaEstadisticasSolicitudes(
             recibidas=int(hitos["recibidas"] or 0),
@@ -1110,6 +1262,17 @@ class ServicioSolicitud:
             horas_promedio_resolucion=(
                 round(float(hitos["horas"]), 1) if hitos["horas"] is not None else None
             ),
+            aprobadas_fuera_horario=int(hitos["fuera_horario"] or 0),
+            horario_laboral=TEXTO_HORARIO,
+            operaciones_fuera_horario=[
+                FilaFueraHorario(id=f.id, numero=f.numero, tipo_tramite=f.tipo_tramite, puesto=f.puesto,
+                                 aprobada_en=f.aprobada_en, aprobada_por=f.aprobada_por)
+                for f in await self.repo.listar_fuera_horario(desde, hasta, MAX_FUERA_HORARIO_LISTADAS)
+            ],
+            aprobadas_por_hora=[
+                FilaPorHora(dia=int(f.dia), hora=int(f.hora), total=f.total)
+                for f in await self.repo.aprobadas_por_hora(desde, hasta)
+            ],
             por_tipo=[
                 FilaEstadisticaTipo(
                     codigo=f.codigo, nombre=f.nombre,
@@ -1117,18 +1280,12 @@ class ServicioSolicitud:
                 )
                 for f in await self.repo.contar_por_tipo(desde, hasta)
             ],
-            por_mes=[
-                FilaEstadisticaMes(
-                    mes=m,
-                    recibidas=serie.get(m, {}).get("recibidas", 0),
-                    aprobadas=serie.get(m, {}).get("aprobadas", 0),
-                    negadas=serie.get(m, {}).get("negadas", 0),
-                    expiradas=serie.get(m, {}).get("expiradas", 0),
-                )
-                for m in meses
-            ],
+            por_dia=_serie(diaria, _periodos_dia(inicio_dias, fin), lambda d: d.isoformat()),
+            por_mes=_serie(diaria, _periodos_mes(inicio_meses, fin), lambda d: f"{d.year:04d}-{d.month:02d}"),
+            por_anio=_serie(diaria, _periodos_anio(inicio_anios, fin), lambda d: f"{d.year:04d}"),
             por_puesto=[
-                FilaEstadisticaPuesto(puesto=f.nombre, aprobadas=f.aprobadas, finalizadas=f.finalizadas, expiradas=f.expiradas)
+                FilaEstadisticaPuesto(puesto=f.nombre, aprobadas=f.aprobadas, finalizadas=f.finalizadas,
+                                      expiradas=f.expiradas)
                 for f in await self.repo.contar_por_puesto(desde, hasta)
             ],
         )

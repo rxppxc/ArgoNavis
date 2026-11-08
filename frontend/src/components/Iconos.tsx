@@ -38,6 +38,9 @@ function crearIcono({ ancho, alto, strokeWidth = 2, fill = "none", children }: F
         strokeLinejoin="round"
         className={className}
         style={style}
+        // Decorativos: el nombre lo da el botón o el texto de al lado.
+        aria-hidden="true"
+        focusable="false"
       >
         {children}
       </svg>
@@ -179,6 +182,18 @@ export const IconoGrafico = crearIcono({
   ),
 });
 
+export const IconoTabla = crearIcono({
+  ancho: 15, alto: 15,
+  children: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+      <line x1="3" y1="15" x2="21" y2="15" />
+      <line x1="10" y1="10" x2="10" y2="20" />
+    </>
+  ),
+});
+
 export const IconoEstadisticas = crearIcono({
   ancho: 15, alto: 15,
   children: (
@@ -200,6 +215,29 @@ export const IconoReloj = crearIcono({
     <>
       <circle cx="12" cy="12" r="10" />
       <polyline points="12 6 12 12 16 14" />
+    </>
+  ),
+});
+
+/** El botón «Menú» en los teléfonos, donde no cabe el texto junto a la campana. */
+export const IconoMenu = crearIcono({
+  ancho: 18, alto: 18,
+  children: (
+    <>
+      <line x1="4" y1="7" x2="20" y2="7" />
+      <line x1="4" y1="12" x2="20" y2="12" />
+      <line x1="4" y1="17" x2="20" y2="17" />
+    </>
+  ),
+});
+
+/** Notificaciones internas (la campana de la cabecera). */
+export const IconoCampana = crearIcono({
+  ancho: 18, alto: 18,
+  children: (
+    <>
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
     </>
   ),
 });

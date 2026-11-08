@@ -78,6 +78,8 @@ export interface SolicitudResumen {
   veces_devuelta: number;
   tripulantes_con_alerta: number;
   tiene_nacionalidad_restringida: boolean;
+  /** Aprobada por UCVMM fuera del horario laboral (solo personal SNM: a la agencia le llega null). */
+  fuera_de_horario: boolean | null;
 }
 
 export interface PaginaSolicitudes {
@@ -117,8 +119,10 @@ export interface TripulanteSolicitud {
   ocupacion: string;
   es_panameno: boolean;
   nacionalidad_restringida: boolean;
-  /** Verificación de impedimentos de la persona (solo personal SNM; null = sin verificar). */
+  /** Verificación de impedimentos de la persona (solo personal SNM; null = sin verificar):
+   *  la de UCVMM y la del puesto de control antes de finalizar. */
   con_impedimento: boolean | null;
+  con_impedimento_puesto: boolean | null;
   porta_libreta: boolean;
   orden: number;
   pasaporte_vencido: boolean;
@@ -150,7 +154,8 @@ export interface CasillaSolicitud {
 
 export interface EventoSolicitud {
   id: number;
-  tipo: "creada" | "corregida" | "impedimentos" | "impedimentos_corregidos" | "devuelta" | "aprobada" | "negada"
+  tipo: "creada" | "corregida" | "impedimentos" | "impedimentos_corregidos"
+    | "impedimentos_puesto" | "impedimentos_puesto_corregidos" | "devuelta" | "aprobada" | "negada"
     | "comentario" | "finalizada" | "expirada";
   estado_anterior: EstadoSolicitud | null;
   estado_nuevo: EstadoSolicitud | null;
@@ -190,13 +195,18 @@ export interface SolicitudDetalle extends SolicitudResumen {
   comentario_impedimentos: string | null;
   impedimentos_verificados_en: string | null;
   impedimentos_verificados_por: string | null;
+  /** La del puesto de control, aparte de la de UCVMM: se exige antes de finalizar. */
+  impedimentos_puesto_verificados: boolean;
+  comentario_impedimentos_puesto: string | null;
+  impedimentos_puesto_en: string | null;
+  impedimentos_puesto_por: string | null;
   motivo_devolucion: string | null;
   observacion_aprobacion: string | null;
   aprobada_por: string | null;
   motivo_negacion: string | null;
   comentario_finalizacion: string | null;
   finalizada_por: string | null;
-  /** Dónde terminó la operación (puede ser otro puesto que el autorizado). */
+  /** Dónde se finalizó: el autorizado (antes del 30/10/2026 podía ser otro). */
   puesto_finalizacion_id: number | null;
   puesto_finalizacion_nombre: string | null;
   tripulantes: TripulanteSolicitud[];
@@ -229,6 +239,29 @@ export interface VerificacionAutorizacion {
   tripulantes: { nombre_completo: string; nacionalidad: string | null; pasaporte: string | null; rango: RangoMarino | null }[];
 }
 
+/** Una autorización aprobada por UCVMM fuera del horario laboral (estadísticas). */
+export interface OperacionFueraHorario {
+  id: number;
+  numero: string | null;
+  tipo_tramite: string;
+  puesto: string;
+  aprobada_en: string;
+  aprobada_por: string | null;
+}
+
+/** Lo que pasó en un día ("2026-10-05"), un mes ("2026-10") o un año ("2026"):
+ *  cada cifra cuenta cuando ocurrió. */
+export interface FilaSerie {
+  periodo: string;
+  recibidas: number;
+  aprobadas: number;
+  negadas: number;
+  expiradas: number;
+  finalizadas: number;
+  /** Aprobadas fuera del horario laboral. */
+  fuera_horario: number;
+}
+
 export interface EstadisticasSolicitudes {
   recibidas: number;
   por_estado: Partial<Record<EstadoSolicitud, number>>;
@@ -237,8 +270,20 @@ export interface EstadisticasSolicitudes {
   expiradas: number;
   finalizadas: number;
   horas_promedio_resolucion: number | null;
+  /** Aprobadas por UCVMM fuera del horario laboral. */
+  aprobadas_fuera_horario: number;
+  /** El horario laboral, en palabras ("lunes a viernes, de 07:00 a 15:00"). */
+  horario_laboral: string;
+  /** Las más recientes (hasta 50). */
+  operaciones_fuera_horario: OperacionFueraHorario[];
+  /** Aprobadas por día de la semana (1 = lunes … 7 = domingo) y hora, en hora
+   *  de Panamá: el mapa de horas. Solo las casillas con alguna. */
+  aprobadas_por_hora: { dia: number; hora: number; total: number }[];
   por_tipo: { codigo: string; nombre: string; recibidas: number; aprobadas: number; negadas: number; expiradas: number }[];
-  por_mes: { mes: string; recibidas: number; aprobadas: number; negadas: number; expiradas: number }[];
+  /** La misma serie por día (los últimos 31 del periodo), por mes (hasta 12) y por año (hasta 10). */
+  por_dia: FilaSerie[];
+  por_mes: FilaSerie[];
+  por_anio: FilaSerie[];
   por_puesto: { puesto: string; aprobadas: number; finalizadas: number; expiradas: number }[];
 }
 
@@ -298,11 +343,16 @@ export const apiSolicitudes = {
     clienteApi.post<SolicitudDetalle>(`/solicitudes/${id}/negar`, { motivo }).then((r) => r.data),
 
 
-  /** Cierra la autorización indicando en qué puesto terminó la operación. */
-  finalizar: (id: number, comentario: string, puestoFinalizacionId: number | null) =>
-    clienteApi.post<SolicitudDetalle>(`/solicitudes/${id}/finalizar`, {
-      comentario, puesto_finalizacion_id: puestoFinalizacionId,
-    }).then((r) => r.data),
+  /** La verificación de impedimentos del puesto de control, obligatoria antes de finalizar. */
+  registrarImpedimentosPuesto: (id: number, tripulantes: ResultadoImpedimento[], comentario: string | null,
+    motivoCorreccion: string | null = null) =>
+    clienteApi.post<SolicitudDetalle>(`/solicitudes/${id}/impedimentos-puesto`,
+      { tripulantes, comentario, motivo_correccion: motivoCorreccion })
+      .then((r) => r.data),
+
+  /** Cierra la autorización en el puesto autorizado (no se finaliza en otro). */
+  finalizar: (id: number, comentario: string) =>
+    clienteApi.post<SolicitudDetalle>(`/solicitudes/${id}/finalizar`, { comentario }).then((r) => r.data),
 
   /** Un documento del expediente como blob: exige la sesión (un <a href>
    *  directo saldría sin la cabecera Authorization). Cada consulta queda en
@@ -320,11 +370,13 @@ export const apiSolicitudes = {
   },
 
   async descargarAutorizacion(id: number, numero: string | null): Promise<void> {
-    const { data } = await clienteApi.get<Blob>(`/solicitudes/${id}/autorizacion.pdf`, {
+    const { data, headers } = await clienteApi.get<Blob>(`/solicitudes/${id}/autorizacion.pdf`, {
       responseType: "blob",
       timeout: 120_000,
     });
-    guardarComoArchivo(data, `Autorizacion-${numero ?? id}.pdf`);
+    // El nombre lo da el servidor: el personal del SNM recibe la copia interna ("-interna.pdf").
+    const nombre = /filename="([^"]+)"/.exec(String(headers["content-disposition"] ?? ""))?.[1];
+    guardarComoArchivo(data, nombre ?? `Autorizacion-${numero ?? id}.pdf`);
   },
 
   estadisticas: (desde?: string | null, hasta?: string | null) =>
@@ -336,3 +388,15 @@ export const apiSolicitudes = {
   verificar: (codigo: string) =>
     clienteApi.get<VerificacionAutorizacion>(`/verificacion/${encodeURIComponent(codigo)}`).then((r) => r.data),
 };
+
+/** Si una acción chocó con un cambio de estado (409: otra persona ya la decidió o
+ *  la finalizó, venció el plazo…), vuelve a pedir el expediente para mostrar cómo
+ *  quedó, en vez de dejar en pantalla botones que ya no corresponden. */
+export async function releerSiCambio(error: unknown, id: number, alReleer: (s: SolicitudDetalle) => void): Promise<void> {
+  if ((error as { response?: { status?: number } } | null)?.response?.status !== 409) return;
+  try {
+    alReleer(await apiSolicitudes.obtener(id));
+  } catch {
+    // Queda lo que hay en pantalla: el aviso del error ya se mostró.
+  }
+}

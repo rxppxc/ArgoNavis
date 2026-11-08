@@ -5,7 +5,7 @@
  * que se aprueba— el puesto de control asignado. Las acciones disponibles
  * las decide el backend (`acciones`) según el rol y el estado.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   apiSolicitudes, type DocumentoSolicitud, type SolicitudDetalle, type TripulanteSolicitud,
@@ -14,8 +14,9 @@ import { EstadoCarga } from "../../components/EstadoCarga";
 import { MarcoPagina } from "../../components/MarcoPagina";
 import { ModalPreview } from "../../components/ModalPreview";
 import { useNotificacion } from "../../components/Notificaciones";
-import { IconoAlerta, IconoDescargar, IconoEditar, IconoX } from "../../components/Iconos";
+import { IconoAlerta, IconoDescargar, IconoEditar, IconoReloj, IconoX } from "../../components/Iconos";
 import { useAtraparFoco } from "../../hooks/useAtraparFoco";
+import { usePendientes } from "../../hooks/usePendientes";
 import { useTituloDocumento } from "../../hooks/useTituloDocumento";
 import { mensajeDeError } from "../../utils/errores";
 import { DocumentosSolicitud } from "./DocumentosSolicitud";
@@ -63,6 +64,14 @@ function BannerEstado({ s }: { s: SolicitudDetalle }) {
             {formatearFechaHora(s.vigente_hasta)}: el puesto de control debe finalizarla antes de esa fecha.
           </div>
           {s.observacion_aprobacion && <div className={styles.bannerPie}>Observación interna: {s.observacion_aprobacion}</div>}
+          {s.fuera_de_horario && <div className={styles.bannerPie}>Aprobada por UCVMM fuera del horario laboral.</div>}
+          {/* Al puesto que la finaliza se lo dice su panel. */}
+          {!s.acciones.finalizar && (
+            <div className={styles.bannerPie}>
+              Vale solo para {s.puesto_nombre}: si la operación se realiza en otro puesto, la agencia debe presentar
+              una nueva solicitud.
+            </div>
+          )}
           {restringidos.length > 0 && (
             <div className={styles.bannerPie}>
               Nacionalidad restringida: {restringidos.join(", ")}. La agencia debe realizar el trámite de
@@ -83,6 +92,7 @@ function BannerEstado({ s }: { s: SolicitudDetalle }) {
           {s.puesto_finalizacion_nombre && s.puesto_finalizacion_nombre !== s.puesto_nombre && (
             <div className={styles.bannerPie}>La autorización era para {s.puesto_nombre}.</div>
           )}
+          {s.fuera_de_horario && <div className={styles.bannerPie}>Aprobada por UCVMM fuera del horario laboral.</div>}
         </div>
       );
     case "denied":
@@ -142,6 +152,50 @@ function ModalDocumentacion({ tripulante, tapado, onCerrar, children }: {
   );
 }
 
+/** Las verificaciones de impedimentos ya registradas: la de UCVMM y la del
+ *  puesto de control. Solo le llegan al personal del SNM (el backend no las
+ *  envía a la agencia); quien está verificando ve la suya en la tabla. */
+function ResumenImpedimentos({ s }: { s: SolicitudDetalle }) {
+  const etapas: {
+    titulo: string; verificada: boolean; por: string | null; en: string; comentario: string | null;
+    con: TripulanteSolicitud[];
+  }[] = [];
+  if (!s.acciones.revisar && s.impedimentos_verificados_en) {
+    etapas.push({
+      titulo: "UCVMM", verificada: s.impedimentos_verificados, por: s.impedimentos_verificados_por,
+      en: s.impedimentos_verificados_en, comentario: s.comentario_impedimentos,
+      con: s.tripulantes.filter((t) => t.con_impedimento),
+    });
+  }
+  if (!s.acciones.finalizar && s.impedimentos_puesto_en) {
+    etapas.push({
+      titulo: "Puesto de control", verificada: s.impedimentos_puesto_verificados, por: s.impedimentos_puesto_por,
+      en: s.impedimentos_puesto_en, comentario: s.comentario_impedimentos_puesto,
+      con: s.tripulantes.filter((t) => t.con_impedimento_puesto),
+    });
+  }
+  if (!etapas.length) return null;
+
+  return (
+    <section className={styles.panel}>
+      <h2 className={styles.panelTitulo}>Impedimentos</h2>
+      {etapas.map((e) => (
+        <div key={e.titulo} className={styles.etapaImpedimentos}>
+          <p className={styles.ayuda}>
+            <strong>{e.titulo}:</strong> {e.verificada ? "verificación realizada" : "verificación pendiente"}
+            {e.por && ` — ${e.por}`}
+            {e.en && `, ${formatearFechaHora(e.en)}`}
+          </p>
+          {e.con.length > 0 && (
+            <p className={styles.ayuda}>Con impedimento: {e.con.map((t) => t.nombre_completo).join(", ")}.</p>
+          )}
+          {e.comentario && <div className={styles.observaciones}>{e.comentario}</div>}
+        </div>
+      ))}
+    </section>
+  );
+}
+
 function Dato({ etiqueta, valor }: { etiqueta: string; valor: string | null | undefined }) {
   if (!valor) return null;
   return (
@@ -158,6 +212,12 @@ export default function PaginaDetalleSolicitud() {
   const [solicitud, setSolicitud] = useState<SolicitudDetalle | null>(null);
   const [error, setError] = useState<string | null>(null);
   useTituloDocumento(solicitud ? `${solicitud.numero ?? `Solicitud ${solicitud.id}`} · ${solicitud.tipo_tramite_nombre}` : "Expediente");
+  // Tras aprobar, devolver o finalizar, la campana se pone al día sin esperar su próxima consulta.
+  const { refrescar } = usePendientes();
+  const actualizar = useCallback((s: SolicitudDetalle) => {
+    setSolicitud(s);
+    refrescar();
+  }, [refrescar]);
 
   useEffect(() => {
     let cancelado = false;
@@ -178,14 +238,18 @@ export default function PaginaDetalleSolicitud() {
     return <MarcoPagina volverA="/dashboard"><EstadoCarga texto="Cargando expediente…" pagina /></MarcoPagina>;
   }
   // key: al pasar a otro expediente se descarta lo que se estaba marcando o viendo en el anterior.
-  return <Expediente key={solicitud.id} s={solicitud} onActualizada={setSolicitud} />;
+  return <Expediente key={solicitud.id} s={solicitud} onActualizada={actualizar} />;
 }
 
 function Expediente({ s, onActualizada }: { s: SolicitudDetalle; onActualizada: (s: SolicitudDetalle) => void }) {
   const { mostrar } = useNotificacion();
   // La verificación de impedimentos se marca en la tabla de tripulantes y la
-  // resume el panel de decisión: el estado vive aquí, compartido por los dos.
-  const verificacion = useVerificacionImpedimentos(s, onActualizada);
+  // resume el panel de decisión (UCVMM) o el del puesto: el estado vive aquí,
+  // compartido por los dos. Una por etapa, para que quien aprueba y luego
+  // finaliza (el Administrador) no arrastre lo marcado de una a la otra.
+  const verificacion = useVerificacionImpedimentos(s, onActualizada, "ucvmm");
+  const verificacionPuesto = useVerificacionImpedimentos(s, onActualizada, "puesto");
+  const verificacionTabla = s.acciones.revisar ? verificacion : s.acciones.finalizar ? verificacionPuesto : null;
   const [vistaPrevia, setVistaPrevia] = useState<DocumentoSolicitud | null>(null);
   const [documentacionDe, setDocumentacionDe] = useState<TripulanteSolicitud | null>(null);
   const [descargando, setDescargando] = useState(false);
@@ -213,6 +277,7 @@ function Expediente({ s, onActualizada }: { s: SolicitudDetalle; onActualizada: 
           <div className={styles.numero}>
             <span>{s.numero ?? `Solicitud ${s.id}`}</span>
             <InsigniaEstado estado={s.estado} grande />
+            {s.fuera_de_horario && <span className={styles.chipHorario}><IconoReloj tamano={12} /> Aprobada fuera del horario</span>}
           </div>
           <h1>{s.tipo_tramite_nombre}</h1>
           <div className={styles.subtitulo}>
@@ -238,7 +303,7 @@ function Expediente({ s, onActualizada }: { s: SolicitudDetalle; onActualizada: 
 
       <BannerEstado s={s} />
 
-      <div className={`${styles.columnas} ${s.acciones.revisar ? styles.columnasRevision : ""}`}>
+      <div className={`${styles.columnas} ${verificacionTabla ? styles.columnasRevision : ""}`}>
         <div className={styles.principal}>
           <section className={styles.panel}>
             <h2 className={styles.panelTitulo}>Datos del trámite</h2>
@@ -265,8 +330,7 @@ function Expediente({ s, onActualizada }: { s: SolicitudDetalle; onActualizada: 
             )}
           </section>
 
-          <SeccionTripulantes solicitud={s} verificacion={s.acciones.revisar ? verificacion : null}
-            onVerDocumentacion={setDocumentacionDe} />
+          <SeccionTripulantes solicitud={s} verificacion={verificacionTabla} onVerDocumentacion={setDocumentacionDe} />
 
           {hayDocumentosDeLaSolicitud && (
             <section className={styles.panel}>
@@ -276,8 +340,8 @@ function Expediente({ s, onActualizada }: { s: SolicitudDetalle; onActualizada: 
           )}
         </div>
 
-        {/* Para UCVMM la columna queda fija al bajar por la tabla: la decisión siempre a la vista. */}
-        <aside className={`${styles.lateral} ${s.acciones.revisar ? styles.lateralFijo : ""}`}>
+        {/* Para UCVMM y el puesto la columna queda fija al bajar por la tabla: la decisión siempre a la vista. */}
+        <aside className={`${styles.lateral} ${verificacionTabla ? styles.lateralFijo : ""}`}>
           {s.acciones.revisar && <PanelRevision solicitud={s} verificacion={verificacion} onActualizada={onActualizada} />}
           {s.acciones.conflicto_revision && (
             <section className={styles.panel}>
@@ -288,24 +352,11 @@ function Expediente({ s, onActualizada }: { s: SolicitudDetalle; onActualizada: 
               </p>
             </section>
           )}
-          {s.acciones.finalizar && <PanelPuerto solicitud={s} onActualizada={onActualizada} />}
-          {/* Solo llega al personal del SNM: el backend no lo envía a la agencia */}
-          {!s.acciones.revisar && s.impedimentos_verificados_en && (
-            <section className={styles.panel}>
-              <h2 className={styles.panelTitulo}>Impedimentos</h2>
-              <p className={styles.ayuda}>
-                {s.impedimentos_verificados ? "Verificación realizada" : "Verificación pendiente"}
-                {s.impedimentos_verificados_por && ` — ${s.impedimentos_verificados_por}`}
-                {s.impedimentos_verificados_en && `, ${formatearFechaHora(s.impedimentos_verificados_en)}`}
-              </p>
-              {s.tripulantes.some((t) => t.con_impedimento) && (
-                <p className={styles.ayuda}>
-                  Con impedimento: {s.tripulantes.filter((t) => t.con_impedimento).map((t) => t.nombre_completo).join(", ")}.
-                </p>
-              )}
-              {s.comentario_impedimentos && <div className={styles.observaciones}>{s.comentario_impedimentos}</div>}
-            </section>
+          {s.acciones.finalizar && (
+            <PanelPuerto solicitud={s} verificacion={verificacionPuesto} onActualizada={onActualizada} />
           )}
+          <ResumenImpedimentos s={s} />
+
           <HistorialSolicitud eventos={s.eventos} puestoFinalizacion={s.puesto_finalizacion_nombre} />
         </aside>
       </div>

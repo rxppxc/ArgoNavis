@@ -81,7 +81,7 @@
     <bpmn:sequenceFlow id="Flujo_Limpiar_Fin" sourceRef="Limpiar" targetRef="Fin" />
     <bpmn:textAnnotation id="N_Candado"><bpmn:text>Con varios procesos del servidor, solo uno trabaja en cada vuelta (candado de PostgreSQL).</bpmn:text></bpmn:textAnnotation>
     <bpmn:association id="Asoc_N_Candado" sourceRef="Candado" targetRef="N_Candado" />
-    <bpmn:textAnnotation id="N_Buscar"><bpmn:text>Devueltas sin corregir al vencer el plazo (2 días) y aprobadas sin finalizar al terminar el día de la operación + 1. Cada fila se toma una sola vez.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:textAnnotation id="N_Buscar"><bpmn:text>Devueltas sin corregir al vencer el plazo (72 h) y aprobadas sin finalizar al terminar el día de la operación + 2. Cada fila se toma una sola vez.</bpmn:text></bpmn:textAnnotation>
     <bpmn:association id="Asoc_N_Buscar" sourceRef="Buscar" targetRef="N_Buscar" />
     <bpmn:textAnnotation id="N_Avisar"><bpmn:text>Solo si el correo está configurado; si el envío falla, queda en el log y la tarea sigue.</bpmn:text></bpmn:textAnnotation>
     <bpmn:association id="Asoc_N_Avisar" sourceRef="Avisar" targetRef="N_Avisar" />

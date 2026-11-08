@@ -57,6 +57,12 @@ class ErrorAcceso(HTTPException):
 
 
 
+async def _contrasena_correcta(contrasena: str, password_hash: str | None) -> bool:
+    """bcrypt en un hilo: tarda ~0,25 s a propósito y, en el bucle de eventos,
+    cada intento de login congelaba todas las peticiones del worker."""
+    return bool(password_hash) and await asyncio.to_thread(verificar_password, contrasena, password_hash)
+
+
 def _frenado(falta: timedelta, motivo: str) -> ErrorAcceso:
     """Login de una cuenta del AD frenado por intentos fallidos."""
     minutos = max(1, math.ceil(falta.total_seconds() / 60))
@@ -95,7 +101,7 @@ class ServicioAutenticacion:
                 "o pide al administrador que restablezca tu contraseña.",
             )
 
-        if not usuario.password_hash or not verificar_password(contrasena, usuario.password_hash):
+        if not await _contrasena_correcta(contrasena, usuario.password_hash):
             usuario.intentos_fallidos = (usuario.intentos_fallidos or 0) + 1
             if usuario.intentos_fallidos >= configuracion.LOGIN_MAX_INTENTOS:
                 usuario.intentos_fallidos = 0
@@ -137,14 +143,14 @@ class ServicioAutenticacion:
                 status.HTTP_400_BAD_REQUEST,
                 "Tu cuenta es del Active Directory: la contraseña se cambia en Windows o con TI.",
             )
-        if not usuario.password_hash or not verificar_password(actual, usuario.password_hash):
+        if not await _contrasena_correcta(actual, usuario.password_hash):
             raise _error(status.HTTP_400_BAD_REQUEST, "La contraseña actual no es correcta.")
         if actual == nueva:
             raise _error(status.HTTP_400_BAD_REQUEST, "La contraseña nueva debe ser distinta de la actual.")
         problema = problema_de_contrasena(nueva, usuario.username)
         if problema:
             raise _error(status.HTTP_400_BAD_REQUEST, problema)
-        usuario.password_hash = hashear_password(nueva)
+        usuario.password_hash = await asyncio.to_thread(hashear_password, nueva)
         usuario.debe_cambiar_password = False
         usuario.intentos_fallidos = 0
         usuario.bloqueado_hasta = None

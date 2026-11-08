@@ -1,8 +1,9 @@
 """Avisos por correo de cada paso del flujo.
 
-Arma los correos con texto plano mientras la sesión de BD sigue abierta; el
-envío ocurre después, en segundo plano (`enviar_aviso`), para que un SMTP
-lento o caído no frene ni rompa la operación.
+Arma los correos con texto plano mientras la sesión de BD sigue abierta. Van a
+la cola de salida en la misma transacción y se envían después, en segundo plano
+(infrastructure/cola_correos.py), para que un SMTP lento o caído no frene ni
+rompa la operación, ni se pierda el aviso.
 
 El asunto es "Autorizaciones Marítimas · {número} · {estado}" (lo arma
 `Aviso`); la vista previa de la bandeja lleva el dato clave de cada paso.
@@ -115,6 +116,8 @@ class ServicioNotificacion:
         # La observación de aprobación es interna de UCVMM: no va a la agencia.
         nota_agencia = "\n".join(filter(None, [
             vigencia,
+            f"Vale solo para {s.puesto_nombre}: si la operación se realiza en otro puesto, "
+            "la agencia debe presentar una nueva solicitud.",
             ("Nacionalidad restringida: la agencia debe realizar el trámite de solicitud de custodia para "
              + ", ".join(restringidos) + ".")
             if restringidos else None,

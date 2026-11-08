@@ -1,0 +1,12 @@
+# Fin de línea. En el repositorio, todo el texto va en LF; en la copia de
+# trabajo, el del sistema (core.autocrlf), salvo estas excepciones.
+* text=auto
+
+# Lo que corre en Linux (el contenedor del backend, el respaldo del servidor) va
+# siempre en LF: un clon en Windows lo dejaba en CRLF, «#!/usr/bin/env bash\r»
+# no existe y el contenedor no arranca.
+*.sh text eol=lf
+
+# Los .bat, siempre en CRLF: cmd.exe espera ese fin de línea (con LF falla, por
+# ejemplo, al saltar a una etiqueta).
+*.bat text eol=crlf

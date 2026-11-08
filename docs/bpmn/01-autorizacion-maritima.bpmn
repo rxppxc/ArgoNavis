@@ -118,7 +118,7 @@
       <bpmn:incoming>Flujo_AvisoDevolucion_Corregir</bpmn:incoming>
       <bpmn:outgoing>Flujo_Corregir_UnirEnvio</bpmn:outgoing>
     </bpmn:userTask>
-    <bpmn:boundaryEvent id="VencePlazoCorreccion" name="Vence el plazo de corrección (2 días)" attachedToRef="Corregir" cancelActivity="true">
+    <bpmn:boundaryEvent id="VencePlazoCorreccion" name="Vence el plazo de corrección (72 h)" attachedToRef="Corregir" cancelActivity="true">
       <bpmn:documentation>PLAZO_CORRECCION_DIAS.</bpmn:documentation>
       <bpmn:outgoing>Flujo_VencePlazoCorreccion_ExpiradaSinCorregir</bpmn:outgoing>
       <bpmn:timerEventDefinition id="Def_VencePlazoCorreccion"><bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P2D</bpmn:timeDuration></bpmn:timerEventDefinition>
@@ -153,12 +153,12 @@
     <bpmn:endEvent id="AgenciaConAutorizacion" name="Agencia con la autorización">
       <bpmn:incoming>Flujo_Descargar_AgenciaConAutorizacion</bpmn:incoming>
     </bpmn:endEvent>
-    <bpmn:userTask id="Finalizar" name="Atender la operación y finalizar">
-      <bpmn:documentation>Comentario obligatorio y puesto donde terminó la operación (por defecto, el autorizado).</bpmn:documentation>
+    <bpmn:userTask id="Finalizar" name="Verificar impedimentos y finalizar">
+      <bpmn:documentation>Comentario obligatorio; se finaliza en el puesto autorizado.</bpmn:documentation>
       <bpmn:incoming>Flujo_EnParalelo_Finalizar</bpmn:incoming>
       <bpmn:outgoing>Flujo_Finalizar_Finalizada</bpmn:outgoing>
     </bpmn:userTask>
-    <bpmn:boundaryEvent id="VenceFinalizacion" name="Vence: fecha de operación + 1 día" attachedToRef="Finalizar" cancelActivity="true">
+    <bpmn:boundaryEvent id="VenceFinalizacion" name="Vence: fecha de operación + 2 días" attachedToRef="Finalizar" cancelActivity="true">
       <bpmn:documentation>DIAS_GRACIA_FINALIZACION. Lo revisa la tarea de vencimientos cada 15 minutos.</bpmn:documentation>
       <bpmn:outgoing>Flujo_VenceFinalizacion_ExpiradaSinFinalizar</bpmn:outgoing>
       <bpmn:timerEventDefinition id="Def_VenceFinalizacion" />
@@ -223,7 +223,7 @@
     <bpmn:association id="Asoc_Nota_Impedimentos" associationDirection="None" sourceRef="Nota_Impedimentos" targetRef="Impedimentos" />
     <bpmn:textAnnotation id="Nota_Custodia"><bpmn:text>Desembarque, Urgencias, Renovación y Shore Pass: si hay nacionalidad restringida, el aviso pide tramitar la custodia.</bpmn:text></bpmn:textAnnotation>
     <bpmn:association id="Asoc_Nota_Custodia" associationDirection="None" sourceRef="Nota_Custodia" targetRef="AvisoAprobacion" />
-    <bpmn:textAnnotation id="Nota_OtroPuesto"><bpmn:text>Puede terminar en otro puesto: queda en el expediente, el PDF y la verificación.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:textAnnotation id="Nota_OtroPuesto"><bpmn:text>En otro puesto no se finaliza: la agencia presenta una nueva solicitud.</bpmn:text></bpmn:textAnnotation>
     <bpmn:association id="Asoc_Nota_OtroPuesto" associationDirection="None" sourceRef="Nota_OtroPuesto" targetRef="Finalizar" />
     <bpmn:textAnnotation id="Nota_Bitacora"><bpmn:text>Cada paso queda en el historial y en la bitácora. Lo interno (impedimentos, observaciones, nombres de funcionarios) no le llega a la agencia.</bpmn:text></bpmn:textAnnotation>
   </bpmn:process>

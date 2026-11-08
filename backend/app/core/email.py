@@ -10,10 +10,11 @@ igual de claro).
   - El logo va incrustado en el mensaje (Content-ID): se ve aunque el cliente
     bloquee las imágenes externas.
   - Lleva versión en texto plano y una vista previa para la bandeja.
+
+Aquí se arma y se envía cada mensaje, en un solo intento. Los avisos pasan antes
+por la cola de salida (infrastructure/cola_correos.py), que los reintenta.
 """
-import asyncio
 import html
-import logging
 from dataclasses import dataclass, field
 from email.message import EmailMessage
 from email.utils import formataddr
@@ -23,7 +24,6 @@ import aiosmtplib
 
 from app.core.config import obtener_configuracion
 
-logger        = logging.getLogger(__name__)
 configuracion = obtener_configuracion()
 
 # Paleta del SNM (la de frontend/src/styles/globals.css): marino y amarillo de marca.
@@ -54,10 +54,6 @@ _DESTACADO = {
     "gris":    ("#EEEFF1", "#526176"),
     "azul":    ("#E6ECF6", "#003DA5"),
 }
-
-# Si el servidor de correo falla, el aviso se reintenta a los 30 s y a los 2 min.
-# Los reintentos viven en memoria: si el backend se reinicia en medio, se pierde.
-_ESPERAS_REINTENTO = (30, 120)
 
 
 @dataclass
@@ -229,35 +225,19 @@ def construir_mensaje(aviso: Aviso, destinatarios: list[str]) -> EmailMessage:
     return mensaje
 
 
-async def enviar_aviso(aviso: Aviso) -> None:
-    """Envía un aviso del flujo (se llama como tarea en segundo plano: un
-    fallo de SMTP se reintenta y, si sigue, se registra sin romper la operación)."""
-    asunto = _sanear_subject(aviso.asunto)
-    destinatarios = list(dict.fromkeys(d.strip() for d in aviso.destinatarios if d and d.strip()))
-    if not destinatarios:
-        return
-    if not configuracion.MAIL_HOST:
-        logger.warning("SMTP no configurado — se omite el aviso '%s'.", asunto)
-        return
-
-    mensaje = construir_mensaje(aviso, destinatarios)
-    intentos = 1 + len(_ESPERAS_REINTENTO)
-    for intento, espera in enumerate((0, *_ESPERAS_REINTENTO), start=1):
-        if espera:
-            await asyncio.sleep(espera)
-        try:
-            await aiosmtplib.send(
-                mensaje,
-                hostname=configuracion.MAIL_HOST,
-                port=configuracion.MAIL_PORT,
-                use_tls=False,
-                start_tls=False,
-                username=configuracion.MAIL_USERNAME or None,
-                password=configuracion.MAIL_PASSWORD or None,
-            )
-            logger.info("Aviso '%s' enviado a %d destinatario(s) (intento %d).",
-                        asunto, len(destinatarios), intento)
-            return
-        except Exception as e:
-            logger.warning("Intento %d de %d del aviso '%s' falló: %s", intento, intentos, asunto, e)
-    logger.error("No se pudo enviar el aviso '%s' tras %d intentos.", asunto, intentos)
+async def enviar_mensaje(mensaje: EmailMessage) -> None:
+    """Un intento de envío; si falla, lanza la excepción. Los reintentos los
+    maneja la cola de salida (infrastructure/cola_correos.py)."""
+    await aiosmtplib.send(
+        mensaje,
+        hostname=configuracion.MAIL_HOST,
+        port=configuracion.MAIL_PORT,
+        # Sin MAIL_STARTTLS, False y no None: aiosmtplib intentaría STARTTLS
+        # por su cuenta y, con un certificado que no reconoce, no saldría nada.
+        use_tls=configuracion.MAIL_USAR_SSL,
+        start_tls=configuracion.MAIL_STARTTLS,
+        cert_bundle=configuracion.MAIL_CA_CERT or None,
+        username=configuracion.MAIL_USERNAME or None,
+        password=configuracion.MAIL_PASSWORD or None,
+        timeout=configuracion.MAIL_TIEMPO_ESPERA,
+    )

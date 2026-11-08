@@ -17,7 +17,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
 import bcrypt
-from jose import JWTError, jwt
+import jwt
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy import select
@@ -102,8 +102,9 @@ def cerrar_sesiones(usuario: Usuario) -> None:
 
 def decodificar_token(token: str) -> dict:
     try:
+        # Solo el algoritmo configurado: un token firmado con otro, o sin firma, no vale.
         return jwt.decode(token, configuracion.SECRET_KEY, algorithms=[configuracion.ALGORITHM])
-    except JWTError:
+    except jwt.InvalidTokenError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido o expirado.",

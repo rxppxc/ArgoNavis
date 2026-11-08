@@ -69,7 +69,9 @@ npm run build
 cd frontend
 npm run test:e2e
 ```
-Recorre en el navegador una autorización completa: la agencia la envía, UCVMM la devuelve, la agencia la corrige, UCVMM la aprueba, un tercero verifica el QR, el puesto la finaliza y el Administrador la ve en la bitácora. También prueba el formulario sin enviarlo: cambiar de trámite, quitar un tripulante y los documentos adicionales. Levanta su propio backend (`backend/tests/servidor_e2e.py`, puerto 8001, con la base temporal `argonavis_e2e`, que borra al terminar) y su propio Vite (puerto 5174): no choca con los de desarrollo. Usa el Chrome instalado; en un equipo sin Chrome, `npx playwright install chromium` y `set PLAYWRIGHT_CHROMIUM=1`.
+Recorre en el navegador una autorización completa: la agencia la envía, UCVMM la devuelve, la agencia la corrige, UCVMM la aprueba, un tercero verifica el QR, el puesto la finaliza y el Administrador la ve en la bitácora. También prueba el formulario sin enviarlo: cambiar de trámite, quitar un tripulante y los documentos adicionales. Levanta su propio backend (`backend/tests/servidor_e2e.py`, puerto 8001, con la base temporal `argonavis_e2e`, que borra al terminar) y su propio Vite (puerto 5174): no choca con los de desarrollo. Usa el Chrome instalado; en un equipo sin Chrome, `npx playwright install chromium` y `set PLAYWRIGHT_CHROMIUM=1`. Además prueba con el teclado el enlace «Saltar al contenido» y que los controles tengan nombre (`accesibilidad.spec.ts`), y la sesión con dos pestañas abiertas, adelantando el reloj del navegador (`sesion.spec.ts`).
+
+En GitHub, `.github/workflows/ci.yml` corre todo lo anterior en cada push a main, más un análisis de vulnerabilidades en las dependencias, que se repite cada lunes. Una vulnerabilidad nueva deja ese análisis en rojo. Para correrlo en el equipo: en `backend`, `venv\Scripts\python -m pip_audit -r requirements.txt` (con `set PYTHONUTF8=1`), y en `frontend`, `npm audit --omit=dev`.
 
 ### Producción
 **Docker** (`docker-compose-prod.yml`): copiar `.env.example` como `.env` en la raíz y completar. El backend aplica las migraciones al arrancar (`docker-entrypoint.sh`) y solo es accesible a través de nginx (`/api/`); su puerto no se publica.
@@ -77,7 +79,14 @@ Recorre en el navegador una autorización completa: la agencia la envía, UCVMM 
 docker compose -f docker-compose-prod.yml up -d --build
 ```
 
-**Windows**: `APP_ENV=production` en `backend\.env`, `migrate.bat`, compilar el frontend (`npm run build`) y `start-backend-prod.bat` (sirve también `frontend/dist`).
+El backend corre con `UVICORN_WORKERS` procesos (2 por defecto) y con un usuario sin privilegios (`argonavis`, uid 10001), sin las herramientas de compilación en la imagen. El volumen `documentos` de una instalación anterior al 08/11/2026 se creó cuando el contenedor corría como root: pásaselo al usuario una vez, antes de levantar la versión nueva (si no, las subidas fallan por permisos):
+```bash
+docker compose -f docker-compose-prod.yml run --rm --no-deps --user root --entrypoint chown backend -R 10001:10001 /app/storage/documentos
+```
+
+**Windows**: `APP_ENV=production` y `LOG_CARPETA=logs` en `backend\.env`, `migrate.bat`, compilar el frontend (`npm run build`) y `start-backend-prod.bat` (sirve también `frontend/dist`). Con `LOG_CARPETA`, los logs quedan en `backend\logs\argonavis-AAAA-MM-DD.log`, uno por día, y se borran a los `LOG_DIAS` días (30); sin ella, solo se ven en la consola y se pierden al cerrarla. En Docker no hace falta: Docker guarda y rota la salida.
+
+> **Al actualizar en Windows**, antes de `migrate.bat`: `venv\Scripts\python -m pip install -r requirements.txt` en `backend` y `npm ci` en `frontend` (luego `npm run build`). Docker lo hace solo al reconstruir. Desde el 27/10/2026 el backend usa PyJWT en lugar de python-jose: sin ese paso no arranca (`No module named 'jwt'`). Lo viejo se puede quitar después: `venv\Scripts\python -m pip uninstall python-jose ecdsa rsa`. Las sesiones abiertas siguen valiendo.
 
 > **Servidores instalados antes de ARGO NAVIS** (una sola vez). Antes la base se llamaba `filetransfer` y los documentos vivían en `storage/transfers`. La revisión `b5c2e8f4a713` deja las rutas de los documentos relativas, así que solo cambian los nombres:
 > - **Docker:** el proyecto ahora se llama `argonavis` (`name:` en `docker-compose-prod.yml`) y sus volúmenes son nuevos. Con todo detenido (`docker compose -f docker-compose-prod.yml down` desde la carpeta vieja), copia los datos; `docker volume ls` muestra el prefijo viejo:
@@ -98,6 +107,7 @@ docker compose -f docker-compose-prod.yml up -d --build
 > **HTTPS y TLS con el AD** (pendiente de infraestructura). Sin esto, la contraseña de cada login viaja en claro: del navegador al servidor (HTTP, puerto 80) y del backend al controlador de dominio (LDAP 389).
 > - **Active Directory:** con el certificado del controlador de dominio, `LDAP_USAR_SSL=true` y `LDAP_PORT=636` (o `LDAP_STARTTLS=true` sobre el 389). `LDAP_HOST` debe ser el nombre que trae el certificado (no la IP) y `LDAP_CA_CERT`, la ruta al PEM de la CA interna (en Docker, montarlo con un volumen). Probarlo primero en desarrollo.
 > - **Navegador:** un certificado para el servidor; en nginx, un `server` en el 443 (`ssl_certificate` / `ssl_certificate_key`) y el 80 redirigiendo al 443. Ya con HTTPS, agregar `Strict-Transport-Security`. En Windows, lo mismo en el proxy que esté delante de uvicorn.
+> - **Correo:** si el SMTP pide usuario y contraseña (`MAIL_USERNAME` / `MAIL_PASSWORD`), activar `MAIL_STARTTLS=true` (587 o 25) o `MAIL_USAR_SSL=true` (465); si no, viajan en claro, y el backend lo advierte al arrancar. Como con el AD: `MAIL_HOST` con el nombre del certificado y `MAIL_CA_CERT` con el PEM de la CA interna. Sin TLS (lo de siempre), ni siquiera se intenta STARTTLS.
 
 > **Al migrar un servidor que venía del storage** (revisión `d4f1a8c27e90`): las transferencias sueltas que existan se **eliminan**, en la base y en disco. Si alguna hace falta, descárgala antes de actualizar.
 
@@ -123,7 +133,7 @@ ArgoNavis/
 │  │  │  ├─ models/            # ORM: solicitud, tramite, catalogo, user, rol, audit_log
 │  │  │  ├─ schemas/           # contratos Pydantic de la API
 │  │  │  ├─ repositories/      # acceso a BD, uno por agregado
-│  │  │  └─ services/          # reglas: solicitud, tramite (checklist), notificacion, auth
+│  │  │  └─ services/          # reglas: solicitud, tramite (checklist), notificacion (correos), pendientes (la campana), auth
 │  │  └─ infrastructure/
 │  │     ├─ database.py        # motor async y sesión por request
 │  │     ├─ almacenamiento.py  # validación y guardado de documentos (carpeta por solicitud)
@@ -141,8 +151,8 @@ ArgoNavis/
    ├─ App.tsx                  # rutas y proveedores (tema, sesión, permisos, avisos)
    ├─ api/                     # cliente axios + un módulo por dominio
    ├─ components/              # UI reutilizable (MarcoPagina, ModalPreview, Iconos...)
-   ├─ context/                 # proveedores: tema, autenticación, permisos
-   ├─ hooks/                   # useAutenticacion, usePermisos
+   ├─ context/                 # proveedores: tema, autenticación, permisos, notificaciones (pendientes)
+   ├─ hooks/                   # useAutenticacion, usePermisos, usePendientes
    ├─ pruebas/                 # ayudas de las pruebas unitarias (cada *.test.ts va junto a su módulo)
    └─ modulos/
       ├─ autenticacion/        # login y cambio de contraseña
@@ -158,13 +168,13 @@ ArgoNavis/
 |---|---|---|
 | **Naviera** (usuario de una agencia) | `T-CREAR-BASICA` | Envía solicitudes de su agencia y las corrige cuando UCVMM las devuelve. Todos los usuarios de la agencia comparten sus solicitudes. |
 | **Sector Pacífico** (UCVMM) | `T-PROCESAR-PACIFICO` | Verifica impedimentos tripulante por tripulante (obligatorio para aprobar), aprueba, devuelve a corrección o deniega. |
-| **Puesto de Control** | `T-FINALIZAR-PUERTO` + puestos asignados | Ve las aprobadas de sus puestos y las finaliza con un comentario, indicando en qué puesto terminó la operación. |
+| **Puesto de Control** | `T-FINALIZAR-PUERTO` + puestos asignados | Ve las aprobadas de sus puestos, verifica impedimentos tripulante por tripulante (obligatorio para finalizar, aparte de la de UCVMM) y las finaliza con un comentario. Se finaliza en el puesto autorizado: si la operación se hace en otro, la agencia presenta una nueva solicitud. |
 | **Administrador** | todos los `T-*` | Acceso total: bandejas y expedientes, catálogo de trámites, agencias, puestos, nacionalidades restringidas, estadísticas, bitácora, usuarios y roles. |
 | **SysAdmin** | ninguno | Rol técnico: usuarios, roles (con los permisos fijos del sistema) y bitácora. No ve solicitudes ni expedientes. |
 
 Administrador y SysAdmin se reconocen por el nombre del rol (`rol_personalizado.nombre`): no se pueden renombrar y sus permisos son fijos. Nadie cambia su propio rol. El último SysAdmin activo no se puede desactivar, borrar ni cambiar de rol.
 
-**Estados:** `review` → `approved` → `finalized`; `review` → `returned` → (corrige) `review`; `review` → `denied`. Una aprobada sin finalizar a tiempo, o una devuelta sin corregir en el plazo (`PLAZO_CORRECCION_DIAS`), pasa a `expired`.
+**Estados:** `review` → `approved` → `finalized`; `review` → `returned` → (corrige) `review`; `review` → `denied`. Una aprobada sin finalizar a tiempo (`DIAS_GRACIA_FINALIZACION`: hasta las 23:59 del segundo día después de la operación, 72 h desde que empieza ese día), o una devuelta sin corregir en el plazo (`PLAZO_CORRECCION_DIAS`: 72 h desde la devolución), pasa a `expired`.
 
 **Reglas que conviene conocer:**
 - El checklist de documentos de cada trámite vive en BD (`tipos_tramite`, `documentos_requeridos`, `tramite_documentos`). Las condiciones se resuelven en `ServicioTramite.construir_casillas`, espejado en `frontend/src/modulos/solicitudes/checklist.ts`.
@@ -176,6 +186,8 @@ Administrador y SysAdmin se reconocen por el nombre del rol (`rol_personalizado.
 - El catálogo sigue tal cual los documentos:
   - Los documentos de cada trámite son los del Formulario No. 3 oficial.
   - Todos se suben por tripulante, salvo la Lista de Tripulantes, que va a la solicitud.
+  - Excepción (30/10/2026): a los rangos distintos de Marino solo se les piden las Generales de pasaporte y el boleto aéreo (`tramite_documentos.rangos`).
+- Una solicitud admite hasta 30 tripulantes.
 - Nacionalidad restringida:
   - En Desembarque se exige el Formulario No. 6 de custodia por tripulante.
   - En Desembarque, Urgencias, Renovación y Shore Pass, al aprobar se avisa a la agencia que debe realizar el trámite de solicitud de custodia (`tipos_tramite.aviso_custodia`).
@@ -189,13 +201,15 @@ Administrador y SysAdmin se reconocen por el nombre del rol (`rol_personalizado.
   - El comentario de cierre del puesto de control.
   - Los nombres de los funcionarios: en su historial ve "UCVMM" o "Puesto de control".
   - Sí ve los motivos de devolución y de negación.
-- El PDF de la autorización no lleva observaciones. Una vez finalizada, dice en qué puesto terminó la operación, que puede ser distinto del autorizado.
+- El PDF de la autorización no lleva observaciones. El de la agencia dice "Aprobada por: UCVMM"; el personal del SNM descarga una copia interna con el nombre de quien aprobó.
+- Las operaciones finalizadas antes de las 07:00, desde las 15:00 o en fin de semana (hora de Panamá) cuentan como fuera del horario laboral: lo muestran las estadísticas y, solo al SNM, una insignia en el expediente.
+- **Notificaciones internas:** la campana de la cabecera muestra lo que le toca hacer a cada rol (por revisar, por corregir, por finalizar) y las novedades de sus solicitudes. Consulta `GET /api/v1/pendientes` cada minuto con la pestaña a la vista.
 - **Separación de funciones:** nadie revisa una solicitud que creó o que es de su propia agencia.
 - Cada transición bloquea la fila de la solicitud: dos revisores no pueden aprobar y negar la misma a la vez.
 - Las solicitudes no se borran. Un usuario, agencia o puesto con solicitudes se desactiva en lugar de eliminarse.
 - El QR del PDF lleva a `/verificar/{codigo}`, una página pública que solo muestra lo necesario para verificar la autorización (pasaportes enmascarados).
 
-**Avisos por correo** (en segundo plano, después de guardar): a UCVMM (`CORREO_UCVMM`) cuando llega o se corrige una solicitud; a la agencia (su buzón y sus usuarios) cuando se aprueba, devuelve, deniega o expira; al puesto de control (su buzón y sus funcionarios) cuando se aprueba. El asunto es `Autorizaciones Marítimas · AM-2026-000011 · Aprobada`; el cuerpo es un "pase marítimo" con el logo de ARGO NAVIS incrustado (se ve aunque el cliente bloquee las imágenes externas), y el correo lleva versión en texto plano. El remitente sale de `MAIL_FROM_NAME`.
+**Avisos por correo** (en segundo plano, después de guardar): a UCVMM (`CORREO_UCVMM`) cuando llega o se corrige una solicitud; a la agencia (su buzón y sus usuarios) cuando se aprueba, devuelve, deniega o expira; al puesto de control (su buzón y sus funcionarios) cuando se aprueba. El asunto es `Autorizaciones Marítimas · AM-2026-000011 · Aprobada`; el cuerpo es un "pase marítimo" con el logo de ARGO NAVIS incrustado (se ve aunque el cliente bloquee las imágenes externas), y el correo lleva versión en texto plano. El remitente sale de `MAIL_FROM_NAME`. Cada aviso se guarda en una cola (tabla `correos_salida`) junto con la operación: si el servidor de correo falla, se reintenta durante unas 24 horas, aunque el backend se reinicie; agotados los intentos, queda como fallido en el log.
 
 **Documentos del expediente:** se ven y descargan solo con sesión y acceso a la solicitud (`GET /api/v1/solicitudes/{id}/documentos/{doc}`). Cada vista y cada descarga queda en la bitácora con el usuario. **Se aceptan PDF, Word y Excel** (.pdf, .doc, .docx, .xls y .xlsx). Al subirse se validan:
 - la extensión y el tamaño;
@@ -218,6 +232,7 @@ La vista previa muestra PDF, .docx y .xlsx; los .doc y .xls del formato viejo se
 - El login responde lo mismo si el usuario no existe y si la contraseña está mal (no revela qué cuentas hay en el AD); el motivo real queda en la bitácora.
 - El JWT se verifica contra la BD en cada request: desactivar una cuenta la saca de inmediato.
 - Mientras el usuario trabaja, el token se renueva solo; tras 15 minutos sin actividad se cierra la sesión (con aviso). Ninguna sesión dura más de `SESION_MAXIMA_HORAS` (12) desde el login.
+- Con varias pestañas abiertas, la inactividad es la de todas: mientras se trabaja en una, las demás no avisan ni cierran la sesión. Salir en una pestaña saca a las demás.
 - Cerrar sesión, cambiar la contraseña o que un Administrador o SysAdmin la restablezca invalida los tokens ya emitidos de esa cuenta (en cualquier navegador).
 - Si se pide una página sin sesión (p. ej. el enlace de un correo), tras el login se vuelve a ella.
 
@@ -230,7 +245,15 @@ Las agencias entran por la VPN, pero no son del SNM: ARGO NAVIS las trata como u
 - **Producción:** no arranca con una `SECRET_KEY` corta o de ejemplo.
 
 ### Tareas de fondo
-Cada `VENCIMIENTOS_INTERVALO_MINUTOS` se expiran las solicitudes con plazos vencidos y se avisa a la agencia. Con varios workers, un *advisory lock* de PostgreSQL deja que una sola vuelta haga el trabajo.
+Cada `VENCIMIENTOS_INTERVALO_MINUTOS` se expiran las solicitudes con plazos vencidos y se avisa a la agencia. Con varios workers, un *advisory lock* de PostgreSQL deja que una sola vuelta haga el trabajo. Si una vuelta falla, el error queda en el log y la tarea sigue con la siguiente.
+
+### Capacidad y disponibilidad
+- **Conexiones con PostgreSQL:** cada proceso abre hasta `BD_POOL` + `BD_POOL_EXTRA` (5 + 10). Con los 4 workers de `start-backend-prod.bat` son 60, por debajo de las 100 que admite PostgreSQL por defecto. Si se suben los workers, hay que bajar el pool (o subir `max_connections`).
+- **Topes por conexión:** una consulta se cancela a los `BD_TIEMPO_MAXIMO_CONSULTA` segundos (60) y una transacción abierta sin actividad se cierra a los `BD_TIEMPO_MAXIMO_INACTIVA` (300). Así una petición colgada no retiene la conexión ni los bloqueos de fila.
+- **Con la base caída, lenta o sin conexiones libres** (más de `BD_POOL_ESPERA` segundos esperando), la API responde 503 con el motivo, y el frontend lo muestra; antes era un 500 sin explicación.
+- **`/api/health`** comprueba la base: con la base caída responde 503 y Docker marca el servicio como no sano. Reusa la respuesta 5 segundos, para no cargar la base.
+- **Correos:** un solo despacho a la vez en cada proceso, y cada envío espera al servidor de correo como mucho `MAIL_TIEMPO_ESPERA` segundos (20).
+- **nginx** resuelve el nombre del backend en cada petición (el DNS de Docker): si el contenedor del backend se recrea con otra IP, sigue funcionando sin reiniciar nginx.
 
 ---
 
@@ -266,11 +289,12 @@ Frontend (opcionales):
 ---
 
 ## Pendiente (decisiones del equipo)
-- HTTPS en el servidor y TLS con el Active Directory (la configuración ya está; ver *Producción*).
+- HTTPS en el servidor, y TLS con el Active Directory y con el correo (la configuración ya está; ver *Producción*).
 - Edición del catálogo de trámites desde la interfaz.
 - Envío por partes para tripulaciones muy grandes (nginx corta en 200 MB por envío).
 - Política de retención de datos personales (Ley 81 de 2019) y copia de los respaldos fuera del servidor.
 - Solicitud de Custodia y Solicitud de Transbordos (el documento de UCVMM dice que faltan por levantar).
 - Segundo factor (código TOTP) para las cuentas de las agencias: decidido para más adelante.
 - Antivirus (ClamAV) para los archivos que suben las agencias: por ahora no; necesita el servicio en el servidor.
-- Cambio de puerto de una autorización ya aprobada: en consulta con UCVMM (el trámite «Cambio de Puerto» del Form. 3 o una reasignación del puesto). Mientras tanto, la agencia presenta el «Cambio de Puerto» citando el número de la autorización original en las observaciones, o el puesto autorizado la finaliza indicando dónde terminó.
+- Feriados en el horario laboral de las estadísticas y notificación de Windows en la campana: decididos para más adelante (reunión del 30/10/2026).
+- Confirmar con UCVMM si el aviso de custodia al aprobar aplica también a los rangos distintos de Marino.

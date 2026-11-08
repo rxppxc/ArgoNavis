@@ -4,6 +4,10 @@ Recibe datos planos (no objetos ORM) porque se genera en un hilo aparte
 (`asyncio.to_thread`): armar el PDF es CPU-bound y no debe frenar el loop.
 El QR apunta a /verificar/{codigo}, una página pública que confirma que la
 autorización existe y si sigue vigente — sin exponer el expediente.
+
+Hay dos versiones: la de la agencia ("Aprobada por: UCVMM") y la copia
+interna del personal del SNM, con el nombre de quien aprobó y una leyenda que
+la distingue si alguien la reenvía (reunión del 2026-10-30).
 """
 import logging
 from dataclasses import dataclass, field
@@ -48,6 +52,7 @@ VERDE    = colors.HexColor("#15803D")
 TURQUESA = colors.HexColor("#0F766E")
 BORDE    = colors.HexColor("#CAD5E1")
 FONDO    = colors.HexColor("#F6F9FC")
+CREMA    = colors.HexColor("#FFF8D8")
 
 RANGOS = {
     "marino": "Marino", "militar": "Militar", "tecnico": "Técnico",
@@ -86,12 +91,14 @@ class DatosPdfAutorizacion:
     motivo:              str | None
     fecha_solicitud:     datetime
     aprobada_en:         datetime
-    aprobada_por:        str | None
+    aprobada_por:        str | None    # "UCVMM" para la agencia; el nombre, en la copia interna
     vigente_hasta:       datetime | None
     finalizada_en:       datetime | None
-    puesto_finalizacion: str | None   # donde terminó la operación (puede no ser el autorizado)
+    # Donde se finalizó: desde el 2026-10-30, siempre el autorizado (antes podía ser otro).
+    puesto_finalizacion: str | None
     url_verificacion:    str
     codigo_verificacion: str
+    copia_interna:       bool = False  # la descarga el personal del SNM
     tripulantes:         list[TripulantePdf] = field(default_factory=list)
 
 
@@ -212,6 +219,20 @@ def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
     ]))
     historia += [estado, Spacer(1, 2 * mm)]
 
+    if d.copia_interna:
+        interna = Table(
+            [[Paragraph("COPIA INTERNA DEL SNM — NO ENTREGAR A LA AGENCIA",
+                        estilo("interna", fontName=negrita, fontSize=8, leading=10, alignment=TA_CENTER))]],
+            colWidths=[ancho],
+        )
+        interna.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), CREMA),
+            ("BOX", (0, 0), (-1, -1), 0.8, AMARILLO),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        historia += [interna, Spacer(1, 2 * mm)]
+
     # ── Datos del trámite (rejilla de dos columnas) ──
     pares: list[tuple[str, str]] = [
         ("AGENCIA NAVIERA", _t(d.agencia_naviera)),
@@ -259,6 +280,17 @@ def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
         ("LEFTPADDING", (0, 0), (-1, -1), 7),
     ]))
     historia.append(datos)
+    # Desde el 2026-10-30 no se finaliza en otro puesto: la operación en otro
+    # puerto es una solicitud nueva.
+    if d.estado != "finalized":
+        historia += [
+            Spacer(1, 2 * mm),
+            Paragraph(
+                "Esta autorización vale únicamente para el puesto de control indicado. Si la operación se "
+                "realiza en otro puesto, la agencia naviera debe presentar una nueva solicitud.",
+                e_nota,
+            ),
+        ]
 
     # ── Tripulantes ──
     historia.append(Paragraph("TRIPULANTES", e_subtit))
@@ -317,6 +349,7 @@ def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
     ]
 
     generado = datetime.now(_TZ_PANAMA).strftime("%d/%m/%Y %I:%M %p")
+    marca = " — copia interna del SNM" if d.copia_interna else ""
 
     def pie(canvas, documento) -> None:
         canvas.saveState()
@@ -327,7 +360,7 @@ def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
         canvas.setFillColor(GRIS)
         canvas.drawString(
             documento.leftMargin, 9 * mm,
-            f"Autorización Marítima N° {d.numero} — generada el {generado} — código {d.codigo_verificacion[:12]}…",
+            f"Autorización Marítima N° {d.numero} — generada el {generado} — código {d.codigo_verificacion[:12]}…{marca}",
         )
         canvas.drawRightString(documento.leftMargin + documento.width, 9 * mm, f"Página {documento.page}")
         canvas.restoreState()

@@ -150,6 +150,12 @@ export default function PaginaTramites() {
                                     {d.requiere_libreta && (
                                       <div className={styles.docDesc}>Solo a tripulantes que portan seamanbook (rango Marino).</div>
                                     )}
+                                    {d.rangos && (
+                                      <div className={styles.docDesc}>
+                                        Solo {d.rangos.length === 1 ? "al rango" : "a los rangos"}{" "}
+                                        {d.rangos.map((r) => ETIQUETA_RANGO[r]).join(", ")}.
+                                      </div>
+                                    )}
                                   </td>
                                   <td>
                                     <span

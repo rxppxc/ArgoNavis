@@ -2,6 +2,7 @@ from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, String, Integer, Enum as SAEnum, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql import func
 from app.infrastructure.database import Base
 import enum
 import typing
@@ -51,6 +52,12 @@ class Usuario(Base):
     # Los tokens emitidos antes de este momento ya no valen (cierre de sesión,
     # cambio o restablecimiento de contraseña). NULL = ningún cierre registrado.
     sesiones_validas_desde: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    # Notificaciones internas: las novedades anteriores a este momento ya las vio
+    # (abrió la campana). Las cuentas nuevas empiezan sin novedades sin leer.
+    novedades_vistas_hasta: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
 
     rol_personalizado: Mapped["Rol | None"]            = relationship("Rol", lazy="selectin")
     agencia:           Mapped["AgenciaNaviera | None"] = relationship(

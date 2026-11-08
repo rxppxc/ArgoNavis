@@ -26,14 +26,14 @@ export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos,
     <section className={styles.bloque}>
       <div className={styles.bloqueTitulo}><span className={styles.paso}>2</span> Datos del trámite</div>
       <div className={styles.grid}>
-        <div className={styles.campo}>
+        <label className={styles.campo}>
           <span>Agencia naviera</span>
           <input type="text" value={agencia} readOnly disabled />
-        </div>
-        <div className={styles.campo}>
+        </label>
+        <label className={styles.campo}>
           <span>Fecha y hora de solicitud</span>
           <input type="text" value={formatearFechaHora(fechaSolicitud)} readOnly disabled />
-        </div>
+        </label>
         <label className={styles.campo}>
           <span>Puesto de Control Migratorio *</span>
           <select value={cabecera.puesto_control_id}
@@ -97,6 +97,10 @@ export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos,
               onChange={(e) => onCambiar("motivo", e.target.value)} />
           </label>
         )}
+      </div>
+      <div className={styles.nota}>
+        La autorización vale solo para el puesto de control que elijas. Si la operación se realiza en otro puesto,
+        deberás presentar una nueva solicitud.
       </div>
     </section>
   );

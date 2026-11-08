@@ -18,6 +18,8 @@ export const ETIQUETA_RANGO: Record<RangoMarino, string> = {
   superintendente: "Superintendente",
 };
 
+export const TODOS_LOS_RANGOS = Object.keys(ETIQUETA_RANGO) as RangoMarino[];
+
 export const ETIQUETA_SEXO: Record<Sexo, string> = {
   M: "Masculino",
   F: "Femenino",
@@ -30,6 +32,8 @@ export const ETIQUETA_EVENTO: Record<EventoSolicitud["tipo"], string> = {
   corregida:    "Corregida · En revisión",
   impedimentos: "Verificación de impedimentos",
   impedimentos_corregidos: "Corrección de impedimentos",
+  impedimentos_puesto: "Verificación de impedimentos en el puesto",
+  impedimentos_puesto_corregidos: "Corrección de impedimentos en el puesto",
   devuelta:     "Devuelta a corrección",
   aprobada:     "Aprobada",
   negada:       "Denegada",

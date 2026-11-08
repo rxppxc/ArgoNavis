@@ -1,7 +1,7 @@
 /**
  * El formulario de «Nueva solicitud», sin enviarlo: lo que hace con los
- * documentos al quitar un tripulante o cambiar de trámite, el resumen de lo
- * que falta, los adicionales y el aviso de lo que hay que revisar.
+ * documentos al quitar un tripulante, cambiarle el rango o cambiar de trámite,
+ * el resumen de lo que falta, los adicionales y el aviso de lo que hay que revisar.
  */
 import { expect, test, type Page } from "@playwright/test";
 import { CUENTAS, entrar, pdf } from "./datos";
@@ -33,6 +33,17 @@ test("el formulario cuida los documentos al quitar un tripulante o cambiar de tr
     await agencia.getByRole("button", { name: "Quitar tripulante 2" }).click();
     await expect(agencia.getByText("Faltan 2 documentos por adjuntar")).toBeVisible();
     await expect(agencia.getByText("visa-beto.pdf")).toHaveCount(0);
+  });
+
+  await test.step("a un rango distinto de Marino solo se le piden Generales y boleto", async () => {
+    await tarjeta(agencia, 0).getByLabel("Rango *").selectOption("tecnico");
+    await expect(agencia.getByLabel("Adjuntar Copia de Boleto Aéreo de Ana")).toBeAttached();
+    await expect(agencia.getByText("visa-ana.pdf")).toHaveCount(0);
+    await expect(agencia.getByText("Faltan 2 documentos por adjuntar")).toBeVisible();
+    // La visa no se pierde: vuelve a su casilla al volver a Marino.
+    await tarjeta(agencia, 0).getByLabel("Rango *").selectOption("marino");
+    await expect(agencia.getByText("visa-ana.pdf")).toBeVisible();
+    await expect(agencia.getByLabel("Adjuntar Copia de Boleto Aéreo de Ana")).toHaveCount(0);
   });
 
   await test.step("el resumen lleva a la tarjeta y la expande", async () => {

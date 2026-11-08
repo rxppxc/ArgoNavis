@@ -55,7 +55,7 @@ async def _impedir_quedar_sin_sysadmin(sesion: AsyncSession, usuario: Usuario) -
 
 @enrutador.get("/usuarios/buscar-ad")
 async def buscar_en_ad(
-    q: str = Query(..., min_length=2, description="Nombre, usuario o email a buscar"),
+    q: str = Query(..., min_length=2, max_length=100, description="Nombre, usuario o email a buscar"),
     _: int = Depends(requerir_admin_o_sysadmin),
 ):
     try:
@@ -96,8 +96,7 @@ async def crear_usuario(
         raise HTTPException(status_code=404, detail="Usuario no encontrado en Active Directory.")
 
     repo = RepositorioUsuario(sesion)
-    existente = await repo.buscar_por_nombre_usuario(ldap_usuario["username"])
-    if existente:
+    if await repo.nombre_en_uso(ldap_usuario["username"]):
         raise HTTPException(status_code=409, detail="El usuario ya existe en el sistema.")
 
     usuario = await repo.crear_desde_ldap(ldap_usuario)
@@ -122,9 +121,8 @@ async def crear_usuario_local(
         raise HTTPException(status_code=403, detail="Las cuentas locales están deshabilitadas (PERMITIR_LOGIN_LOCAL).")
 
     repo = RepositorioUsuario(sesion)
-    existente = await repo.buscar_por_nombre_usuario(datos.username)
-    if existente:
-        raise HTTPException(status_code=409, detail="Ya existe un usuario con ese nombre.")
+    if await repo.nombre_en_uso(datos.username):
+        raise HTTPException(status_code=409, detail="Ya existe un usuario con ese nombre (sin distinguir mayúsculas).")
 
     if datos.rol_id is not None:
         rol_q = await sesion.execute(select(Rol).where(Rol.id == datos.rol_id))
@@ -133,7 +131,7 @@ async def crear_usuario_local(
 
     usuario = await repo.crear_local(
         username=datos.username,
-        password_hash=hashear_password(datos.password),
+        password_hash=await asyncio.to_thread(hashear_password, datos.password),   # bcrypt: fuera del bucle de eventos
         name=datos.name, last_name=datos.last_name, email=datos.email,
         rol_id=datos.rol_id,
     )
@@ -166,7 +164,7 @@ async def restablecer_contrasena(
         raise HTTPException(status_code=400, detail="Es una cuenta del Active Directory: su contraseña la gestiona TI.")
 
     temporal = generar_contrasena_temporal()
-    usuario.password_hash = hashear_password(temporal)
+    usuario.password_hash = await asyncio.to_thread(hashear_password, temporal)
     usuario.debe_cambiar_password = True
     usuario.intentos_fallidos = 0
     usuario.bloqueado_hasta = None

@@ -1,5 +1,5 @@
 """Correo de los avisos (diseño "pase marítimo"): asunto, partes del mensaje,
-logo incrustado, escape de lo que escribe el usuario y reintentos. No envía nada."""
+logo incrustado, escape de lo que escribe el usuario y TLS. No envía nada."""
 import pytest
 
 from app.core import email
@@ -77,23 +77,24 @@ def test_vista_previa_en_una_linea_y_corta():
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_reintenta_si_el_servidor_de_correo_falla(monkeypatch):
-    llamadas: list[str] = []
-    fallas = {"quedan": 2}
+async def test_tls_del_correo_segun_la_configuracion(monkeypatch):
+    """Los reintentos y los errores al armar los prueba test_cola_correos.py."""
+    opciones: list[dict] = []
 
-    async def enviar_falso(mensaje, **_):
-        llamadas.append(mensaje["Subject"])
-        if fallas["quedan"]:
-            fallas["quedan"] -= 1
-            raise OSError("SMTP caído")
+    async def enviar_falso(mensaje, **kwargs):
+        opciones.append(kwargs)
 
     monkeypatch.setattr(email.configuracion, "MAIL_HOST", "smtp.prueba.local")
     monkeypatch.setattr(email.aiosmtplib, "send", enviar_falso)
-    monkeypatch.setattr(email, "_ESPERAS_REINTENTO", (0, 0))
-    await email.enviar_aviso(_aviso())
-    assert len(llamadas) == 3, "dos fallas y al tercer intento sale"
+    mensaje = construir_mensaje(_aviso(), ["agencia@prueba.local"])
+    await email.enviar_mensaje(mensaje)
+    assert opciones[-1]["use_tls"] is False and opciones[-1]["start_tls"] is False, \
+        "por defecto, como siempre: sin TLS y sin STARTTLS oportunista"
+    assert opciones[-1]["timeout"] == email.configuracion.MAIL_TIEMPO_ESPERA, \
+        "con tope propio: el de aiosmtplib (60 s) retenía una conexión de la BD"
 
-    llamadas.clear()
-    fallas["quedan"] = 99
-    await email.enviar_aviso(_aviso())   # no lanza: lo deja en el log
-    assert len(llamadas) == 3, "se rinde tras tres intentos"
+    monkeypatch.setattr(email.configuracion, "MAIL_STARTTLS", True)
+    monkeypatch.setattr(email.configuracion, "MAIL_CA_CERT", "/certs/ca-interna.pem")
+    await email.enviar_mensaje(mensaje)
+    assert opciones[-1]["start_tls"] is True and opciones[-1]["use_tls"] is False
+    assert opciones[-1]["cert_bundle"] == "/certs/ca-interna.pem"

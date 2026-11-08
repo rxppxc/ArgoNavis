@@ -1,7 +1,8 @@
 /**
  * Recorrido completo de una autorización, como en la demo: la agencia envía,
- * UCVMM verifica y devuelve, la agencia corrige, UCVMM aprueba, la agencia
- * descarga el PDF, un tercero verifica el QR, el puesto finaliza y el
+ * UCVMM la ve en su campana, la verifica y la devuelve, la agencia lo ve en la
+ * suya y corrige, UCVMM aprueba, la agencia descarga el PDF, un tercero
+ * verifica el QR, el puesto verifica los impedimentos y finaliza, y el
  * Administrador lo ve en la bitácora.
  */
 import { readFileSync } from "node:fs";
@@ -13,7 +14,7 @@ const TRIPULANTE = "Juan Carlos Pérez Gómez";
 /** La insignia de estado del expediente. */
 const estado = (pagina: Page, texto: string) => pagina.getByText(texto, { exact: true }).first();
 
-/** Marca al tripulante «Sin impedimento» y guarda la verificación. */
+/** Marca al tripulante «Sin impedimento» y guarda la verificación (de UCVMM o del puesto). */
 async function verificarSinImpedimento(pagina: Page) {
   await pagina.getByRole("radiogroup", { name: `Impedimento de ${TRIPULANTE} en SIMPLUS` })
     .getByText("Sin", { exact: true }).click();
@@ -59,6 +60,16 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     await expect(estado(agencia, "En revisión")).toBeVisible();
   });
 
+  await test.step("UCVMM la ve en su campana y el enlace abre «Por revisar»", async () => {
+    await ucvmm.goto("/dashboard");
+    await expect(ucvmm).toHaveTitle(/^\(\d+\) /);   // los pendientes, también en la pestaña del navegador
+    await ucvmm.getByRole("button", { name: /^Notificaciones:/ }).click();
+    await expect(ucvmm.locator(`#panel-notificaciones a[href="/solicitudes/${id}"]`)).toContainText("Enviada · En revisión");
+    await ucvmm.locator("#panel-notificaciones").getByRole("link", { name: /^Por revisar/ }).click();
+    await expect(ucvmm).toHaveURL(/bandeja=revision&estado=review/);
+    await expect(ucvmm.getByRole("tab", { name: /^Por revisar/ })).toHaveAttribute("aria-selected", "true");
+  });
+
   await test.step("UCVMM verifica los impedimentos y la devuelve", async () => {
     await ucvmm.goto(`/solicitudes/${id}`);
     await verificarSinImpedimento(ucvmm);
@@ -67,6 +78,21 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     await modal.locator("textarea").fill("La visa especial de marino está ilegible.");
     await modal.getByRole("button", { name: "Devolver" }).click();
     await expect(estado(ucvmm, "En corrección")).toBeVisible();
+  });
+
+  await test.step("la agencia ve la devolución en su campana y, al abrirla, queda leída", async () => {
+    await agencia.goto("/dashboard");
+    const campana = agencia.getByRole("button", { name: /^Notificaciones:/ });
+    await expect(campana).toHaveAccessibleName(/sin leer/);
+    await campana.click();
+    const panel = agencia.locator("#panel-notificaciones");
+    await expect(panel.getByRole("link", { name: /^Por corregir/ })).toBeVisible();
+    const novedad = panel.locator(`a[href="/solicitudes/${id}"]`);
+    await expect(novedad).toContainText("Devuelta a corrección");
+    await expect(novedad).toContainText("La visa especial de marino está ilegible.");
+    await expect(campana).not.toHaveAccessibleName(/sin leer/);
+    await agencia.keyboard.press("Escape");
+    await expect(panel).toHaveCount(0);
   });
 
   await test.step("la agencia corrige: reemplaza la visa y reenvía", async () => {
@@ -111,10 +137,13 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     await expect(tercero.getByText("Autorización no encontrada")).toBeVisible();
   });
 
-  await test.step("el puesto de control finaliza", async () => {
+  await test.step("el puesto de control verifica los impedimentos y finaliza", async () => {
     const puesto = await entrar(browser, CUENTAS.puesto);
     await puesto.goto(`/solicitudes/${id}`);
     await puesto.getByLabel("Comentario de la operación *").fill("Embarque realizado sin novedad.");
+    // Sin la verificación del puesto no se finaliza (la de UCVMM no cuenta).
+    await expect(puesto.getByRole("button", { name: "Finalizar", exact: true })).toBeDisabled();
+    await verificarSinImpedimento(puesto);
     await puesto.getByRole("button", { name: "Finalizar", exact: true }).click();
     await puesto.getByRole("dialog").getByRole("button", { name: "Finalizar" }).click();
     await expect(estado(puesto, "Finalizada")).toBeVisible();

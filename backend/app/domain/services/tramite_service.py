@@ -11,6 +11,10 @@ varias condiciones dependen de los datos de esa solicitud:
                                Desembarque, como en el Form. 3).
   - Documentos con `requiere_libreta` → solo a quien porta seamanbook (rango
     Marino); militares, técnicos, supernumerarios y superintendentes no.
+  - `rangos` de la fila → solo a esos rangos (nulo = a todos). Desde la
+    reunión del 2026-10-30, a los rangos distintos de Marino solo se les piden
+    las Generales de pasaporte y el boleto aéreo. Un documento de la solicitud
+    con rangos se pide si algún tripulante es de esos rangos.
 
 `construir_casillas` está espejado en el frontend
 (`modulos/solicitudes/checklist.ts`): si cambias uno, cambia el otro.
@@ -23,7 +27,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from app.domain.models.solicitud import RANGOS_CON_LIBRETA, RangoMarino
-from app.domain.models.tramite import AlcanceDocumento, CondicionDocumento, TipoTramite
+from app.domain.models.tramite import AlcanceDocumento, CondicionDocumento, TipoTramite, TramiteDocumento
 from app.domain.schemas.solicitud import DatosTripulanteEntrada
 
 _IMO_RE = re.compile(r"^(?:IMO)?\s*(\d{7})$", re.IGNORECASE)
@@ -65,8 +69,19 @@ class TripulanteChecklist:
     """Datos de un tripulante que intervienen en el checklist."""
     nombre:                   str
     es_panameno:              bool = False
-    porta_libreta:            bool = True
+    rango:                    str  = RangoMarino.MARINO.value
     nacionalidad_restringida: bool = False
+
+    @property
+    def porta_libreta(self) -> bool:
+        return self.rango in RANGOS_CON_LIBRETA
+
+
+def aplica_al_rango(td: TramiteDocumento, rango: str) -> bool:
+    """Si la fila del catálogo se le pide a un tripulante de ese rango."""
+    if td.rangos and rango not in td.rangos:
+        return False
+    return not td.documento.requiere_libreta or rango in RANGOS_CON_LIBRETA
 
 
 @dataclass
@@ -118,6 +133,8 @@ class ServicioTramite:
                 if (td.condicion == CondicionDocumento.NACIONALIDAD_RESTRINGIDA.value
                         and not any(t.nacionalidad_restringida for t in tripulantes)):
                     continue
+                if td.rangos and not any(t.rango in td.rangos for t in tripulantes):
+                    continue
                 casillas.append(CasillaChecklist(
                     documento_id=td.documento_id,
                     codigo_documento=td.documento.codigo,
@@ -133,7 +150,7 @@ class ServicioTramite:
                 if (td.condicion == CondicionDocumento.NACIONALIDAD_RESTRINGIDA.value
                         and not tripulante.nacionalidad_restringida):
                     continue
-                if td.documento.requiere_libreta and not tripulante.porta_libreta:
+                if not aplica_al_rango(td, tripulante.rango):
                     continue
                 casillas.append(CasillaChecklist(
                     documento_id=td.documento_id,

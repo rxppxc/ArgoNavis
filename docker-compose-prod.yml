@@ -40,6 +40,12 @@ services:
     environment:
       - APP_NAME=ARGO NAVIS - SNM
       - APP_ENV=production
+      # Los logs van a la salida de Docker, que los guarda y rota (ver "logging");
+      # LOG_CARPETA no hace falta aquí.
+      - LOG_NIVEL=${LOG_NIVEL:-INFO}
+      # Procesos de la API. Cada uno abre hasta 15 conexiones a PostgreSQL (BD_POOL +
+      # BD_POOL_EXTRA), y el servidor admite 100: con más de 4, bajar BD_POOL_EXTRA.
+      - UVICORN_WORKERS=${UVICORN_WORKERS:-2}
       - SECRET_KEY=${SECRET_KEY}
       - ACCESS_TOKEN_EXPIRE_MINUTES=60
       - SESION_MAXIMA_HORAS=${SESION_MAXIMA_HORAS:-12}
@@ -57,7 +63,12 @@ services:
       - LDAP_ALLOWED_OU=
       - STORAGE_PATH=/app/storage/documentos
       - MAIL_HOST=${MAIL_HOST}
-      - MAIL_PORT=25
+      - MAIL_PORT=${MAIL_PORT:-25}
+      - MAIL_USERNAME=${MAIL_USERNAME:-}
+      - MAIL_PASSWORD=${MAIL_PASSWORD:-}
+      - MAIL_USAR_SSL=${MAIL_USAR_SSL:-false}
+      - MAIL_STARTTLS=${MAIL_STARTTLS:-false}
+      - MAIL_CA_CERT=${MAIL_CA_CERT:-}
       - MAIL_FROM=${MAIL_FROM}
       - MAIL_FROM_NAME=ARGO NAVIS - SNM
       - FRONTEND_URL=${APP_URL}
@@ -66,8 +77,8 @@ services:
       - LIMITE_ENVIOS_POR_HORA=30
       # Autorizaciones Marítimas
       - CORREO_UCVMM=${CORREO_UCVMM:-}
-      - PLAZO_CORRECCION_DIAS=2
-      - DIAS_GRACIA_FINALIZACION=1
+      - PLAZO_CORRECCION_DIAS=3        # 72 h para corregir
+      - DIAS_GRACIA_FINALIZACION=2     # 72 h desde que empieza el día de la operación
       - VENCIMIENTOS_INTERVALO_MINUTOS=15
       # Cuentas locales (sin AD), p. ej. para los usuarios de las agencias navieras.
       - PERMITIR_LOGIN_LOCAL=${PERMITIR_LOGIN_LOCAL:-false}

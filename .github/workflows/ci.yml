@@ -1,0 +1,156 @@
+# Integración continua de ARGO NAVIS (revisión del 2026-10-27).
+#
+#   backend    pytest sobre una BD PostgreSQL temporal (tests/conftest.py)
+#   frontend   tipos, lint, Vitest y build de producción
+#   e2e        el recorrido completo en el navegador (Playwright)
+#   auditoria  vulnerabilidades conocidas en las dependencias
+#
+# Corre en cada push a main y en los pull request. La auditoría corre además
+# cada lunes, para avisar de vulnerabilidades nuevas aunque no haya cambios.
+# Versiones como en producción: Python 3.12 y Node 24 (los Dockerfile),
+# PostgreSQL 15 (docker-compose-prod.yml).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 12 * * 1"   # lunes 07:00 en Panamá
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Las pruebas y el backend del E2E crean y borran su propia BD en este servidor.
+  TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/postgres
+
+jobs:
+  backend:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - name: Paquetes del sistema (como el Dockerfile)
+        run: sudo apt-get update && sudo apt-get install -y libmagic1 fonts-dejavu-core
+      - name: Dependencias
+        working-directory: backend
+        run: |
+          python -m venv venv
+          venv/bin/pip install -r requirements-dev.txt
+      - name: Pruebas
+        working-directory: backend
+        run: venv/bin/python -m pytest -q
+
+  frontend:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Tipos
+        run: node node_modules/typescript/bin/tsc -b --noEmit
+      - name: Lint
+        run: npm run lint
+      - name: Pruebas (Vitest)
+        run: npm test
+      - name: Build de producción
+        run: npm run build
+
+  e2e:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - name: Paquetes del sistema (como el Dockerfile)
+        run: sudo apt-get update && sudo apt-get install -y libmagic1 fonts-dejavu-core
+      - name: Backend (en backend/venv, donde lo busca playwright.config.ts)
+        working-directory: backend
+        run: |
+          python -m venv venv
+          venv/bin/pip install -r requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Frontend y Chromium
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Recorrido completo
+        working-directory: frontend
+        env:
+          PLAYWRIGHT_CHROMIUM: "1"   # el Chromium de Playwright (en el equipo se usa Chrome)
+        run: npm run test:e2e
+      - name: Rastros del recorrido si falla
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: frontend/test-results/
+          retention-days: 7
+
+  auditoria:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # Un aviso nuevo deja el job en rojo: hay que actualizar o, si no aplica,
+      # omitirlo aquí (--ignore-vuln <id>) explicando por qué, y anotarlo en CLAUDE.md.
+      - name: Backend (pip-audit)
+        run: |
+          python -m pip install --quiet pip-audit
+          pip-audit -r backend/requirements.txt --desc on
+      - name: Frontend (npm audit)
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high

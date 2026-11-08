@@ -41,6 +41,7 @@ os.environ.update({
     "LDAP_HOST": "ldap.invalido", "LDAP_BASE_DN": "DC=prueba", "LDAP_BIND_USER": "x", "LDAP_BIND_PASSWORD": "x",
     "MAIL_HOST": "",
     "CORREO_UCVMM": "",
+    "LOG_CARPETA": "",   # los logs de las pruebas no van a la carpeta del .env
     "PERMITIR_LOGIN_LOCAL": "true",
     "LIMITE_VERIFICACIONES_POR_MINUTO": "0",
 })

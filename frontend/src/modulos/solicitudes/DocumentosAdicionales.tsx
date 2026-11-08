@@ -37,7 +37,8 @@ export function DocumentosAdicionales({
             <div className={styles.casillaAlcance}>Cargado · {formatBytes(d.tamano)}</div>
           </div>
           <div className={styles.casillaAccion}>
-            <button type="button" className={styles.btnMiniVer} onClick={() => onVer(d)} title="Ver documento">
+            <button type="button" className={styles.btnMiniVer} onClick={() => onVer(d)} title="Ver documento"
+              aria-label={`Ver ${d.nombre_original}`}>
               <IconoOjo tamano={13} />
             </button>
             <button type="button" className={styles.btnMiniQuitar} onClick={() => onQuitarExistente(d.id)}
