@@ -8,9 +8,10 @@
 #   2. Los documentos de los expedientes (volumen documentos).
 #
 # Instalación en el servidor (una sola vez):
-#   chmod +x backup.sh
-#   crontab -e   →  agregar esta línea (corre todos los días a las 2 AM):
-#   0 2 * * * /home/vperez/argo-navis/backup.sh >> /home/vperez/backups/backup.log 2>&1
+#   sudo crontab -e   →  agregar esta línea (corre todos los días a las 2 AM):
+#   0 2 * * * DIR_BACKUPS=/home/vperez/backups bash /home/vperez/argonavis/backup.sh >> /home/vperez/backups/backup.log 2>&1
+# En el crontab de root: docker lo pide. DIR_BACKUPS explícito porque el $HOME
+# de root es /root; "bash ..." porque el clon puede no traer el permiso de ejecución.
 #
 # IMPORTANTE: esto deja los respaldos en el MISMO servidor. Para protección
 # real ante pérdida del disco, copiar periódicamente DIR_BACKUPS a otra
