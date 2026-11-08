@@ -53,10 +53,17 @@ test("la inactividad y el cierre de sesión valen para todas las pestañas", asy
     await iniciarSesion(a, CUENTAS.agencia);
     await b.goto("/dashboard");
     await expect(b.getByRole("button", { name: "Menú" })).toBeVisible();
+    // Ningún pedido con el token ya revocado: antes, la campana consultaba
+    // /pendientes al cambiar de ruta mientras salía el aviso del cierre (401).
+    const rechazados: string[] = [];
+    for (const p of [a, b]) p.on("response", (r) => { if (r.status() === 401) rechazados.push(r.url()); });
     await a.getByRole("button", { name: "Menú" }).click();
     await a.getByRole("button", { name: "Salir" }).click();
     // Sin «?siguiente=»: la sacó el aviso de la otra pestaña, no un 401 de un pedido suyo.
     await expect(b).toHaveURL(/\/login$/);
+    await expect(a).toHaveURL(/\/login$/);
+    await a.waitForTimeout(1000);   // por si un pedido rezagado vuelve después
+    expect(rechazados, "pedidos rechazados al cerrar sesión").toEqual([]);
   });
 
   await contexto.close();

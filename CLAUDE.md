@@ -364,6 +364,7 @@ Pedido del usuario: revisar todo en busca de fallos, saturación y lo que estorb
 - **Frontend:**
   - El formulario y el expediente (~40 KB cada uno) se cargan al entrar a su página (`lazy` en `App.tsx`, con un `Suspense` alrededor de las rutas). El paquete inicial bajó de 440 KB a 357 KB; lo que queda es sobre todo React, el router y axios.
   - La verificación del QR y el cambio de contraseña siguen en el paquete inicial: son chicas, y la primera la abre el público en el teléfono (diferida, además, el E2E pulsaba Tab antes de que apareciera).
+  - **Cerrar sesión** borra primero la sesión del navegador y después avisa al servidor con el token que tenía (`cerrarSesion`, `ProveedorAutenticacion`). Al revés, «Cerrar sesión» navegaba a /login con el usuario todavía cargado y la campana consultaba /pendientes con el token ya revocado (401 en la consola). Lo prueba `e2e/sesion.spec.ts`, que falla con el código anterior.
   - `mensajeDeError` (`utils/errores.ts`) dice «No hay conexión con el servidor…» sin respuesta (red o VPN caída), «tardó demasiado» con el tiempo agotado y «no está disponible» con un 502/503/504 sin motivo. Antes cada pantalla mostraba su texto genérico.
 - **Docker:**
   - Imagen del backend en dos etapas, sin compiladores (todas las dependencias traen binario para Linux; instalar build-essential detrás del proxy del SNM trancaba el build más de 13 min): la final corre como `argonavis` (uid 10001). Un volumen `documentos` creado antes hay que pasárselo una vez (README → Producción).

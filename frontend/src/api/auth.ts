@@ -8,11 +8,12 @@ export const apiAutenticacion = {
   refrescarSesion: () =>
     clienteApi.post<RespuestaToken>("/auth/refresh").then((r) => r.data),
 
-  cerrarSesion: () =>
-    clienteApi.post("/auth/logout").catch(() => {}),
+  /** Con el token de la sesión que se cierra: cuando sale, ya se borró del navegador. */
+  cerrarSesion: (token: string) =>
+    clienteApi.post("/auth/logout", null, { headers: { Authorization: `Bearer ${token}` } }).catch(() => {}),
 
-  notificarExpiracion: () =>
-    clienteApi.post("/auth/session-expired").catch(() => {}),
+  notificarExpiracion: (token: string) =>
+    clienteApi.post("/auth/session-expired", null, { headers: { Authorization: `Bearer ${token}` } }).catch(() => {}),
 
   perfilActual: () =>
     clienteApi.get<Usuario>("/auth/me").then((r) => r.data),

@@ -40,21 +40,22 @@ export function ProveedorAutenticacion({ children }: { children: ReactNode }) {
   }, [guardarUsuario]);
 
   const cerrarSesion = useCallback(async (reportar = true, expirada = false) => {
-    // Reportar ANTES de borrar el token: si no, la llamada sale sin
-    // Authorization y el backend la rechaza con 401 sin dejar registro de
-    // auditoría del cierre de sesión.
-    if (reportar) {
-      try {
-        if (expirada) await apiAutenticacion.notificarExpiracion();
-        else await apiAutenticacion.cerrarSesion();
-      } catch {
-        // Si el token ya no es válido o falla la red, igual cerramos localmente.
-      }
-    }
+    // Primero se cierra aquí, en el acto, y después se avisa al servidor con el
+    // token de esta sesión (sin él, el backend respondería 401 y no quedaría el
+    // cierre en la bitácora). Al revés, mientras esperaba ese aviso la página
+    // seguía con el usuario: «Cerrar sesión» navega a /login, y con el cambio de
+    // ruta la campana consultaba /pendientes con el token ya revocado (un 401 en
+    // la consola).
+    const token = localStorage.getItem("access_token");
     localStorage.removeItem("access_token");
     localStorage.removeItem("user");
     localStorage.removeItem("permisos");
     setUsuario(null);
+    if (reportar && token) {
+      // Si el token ya no es válido o falla la red, la sesión ya quedó cerrada aquí.
+      if (expirada) await apiAutenticacion.notificarExpiracion(token);
+      else await apiAutenticacion.cerrarSesion(token);
+    }
   }, []);
 
   const extenderSesion = useCallback(async () => {
