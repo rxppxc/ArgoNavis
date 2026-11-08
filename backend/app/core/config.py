@@ -30,6 +30,10 @@ class Configuracion(BaseSettings):
     SESION_MAXIMA_HORAS:          int = 12
 
     DATABASE_URL: str
+    # Cuenta dueña de las tablas, solo para las migraciones (alembic/env.py) y para
+    # crear la de la aplicación (infrastructure/permisos_bd.py). Vacía = las migraciones
+    # usan DATABASE_URL. En Docker, el entrypoint la borra antes de levantar uvicorn.
+    MIGRACIONES_DATABASE_URL: str = ""
     # Conexiones con la base de datos, POR PROCESO: con N workers el máximo es
     # N × (BD_POOL + BD_POOL_EXTRA), y tiene que quedar por debajo de max_connections
     # de PostgreSQL (100 por defecto). Con los 4 de start-backend-prod.bat: 4 × 15 = 60.

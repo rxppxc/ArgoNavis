@@ -2,7 +2,13 @@
 set -euo pipefail
 
 echo "==> Aplicando migraciones Alembic..."
+# Con la cuenta dueña de las tablas (MIGRACIONES_DATABASE_URL, alembic/env.py).
 alembic upgrade head
+# La cuenta de la aplicación (DATABASE_URL), con lo justo: la crea o la pone al
+# día, también sobre las tablas nuevas (app/infrastructure/permisos_bd.py).
+python -m app.infrastructure.permisos_bd
+# uvicorn no necesita la clave de la cuenta dueña: no la hereda.
+unset MIGRACIONES_DATABASE_URL
 
 echo "==> Iniciando uvicorn con ${UVICORN_WORKERS:-1} proceso(s)..."
 # --proxy-headers: la IP del cliente sale de X-Forwarded-For (la pone nginx).

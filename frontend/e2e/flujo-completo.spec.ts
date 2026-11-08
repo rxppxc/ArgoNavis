@@ -11,9 +11,32 @@ import { expect, test } from "./base";
 import { CUENTAS, NOMBRE_REVISOR, PUESTO, entrar, fechaPanama, pdf } from "./datos";
 
 const TRIPULANTE = "Juan Carlos Pérez Gómez";
+/** Una «palabra» más larga que cualquier caja, como el «pruebasssss…» que se
+ *  salía de las observaciones y del historial (2026-11-08). */
+const SIN_ESPACIOS = `prueba${"s".repeat(300)}`;
 
 /** La insignia de estado del expediente. */
 const estado = (pagina: Page, texto: string) => pagina.getByText(texto, { exact: true }).first();
+
+/** Ningún texto que contenga SIN_ESPACIOS se sale de su caja. No basta con mirar
+ *  si la página se desborda: el área central recorta lo que sobresale (overflow:
+ *  clip), así que se revisa caja por caja (la más interna que lo contiene). */
+async function sinTextoDesbordado(pagina: Page) {
+  const desbordadas = await pagina.evaluate((pedazo) => {
+    const fuera: string[] = [];
+    for (const el of Array.from(document.querySelectorAll<HTMLElement>("body *"))) {
+      if (!el.textContent?.includes(pedazo)) continue;
+      if (Array.from(el.children).some((hijo) => hijo.textContent?.includes(pedazo))) continue;
+      const estilo = getComputedStyle(el);
+      // Una línea en línea no tiene ancho propio; lo recortado a propósito (…) no cuenta.
+      const caja = estilo.display === "inline" ? el.parentElement : el;
+      if (!caja || getComputedStyle(caja).overflowX !== "visible") continue;
+      if (caja.scrollWidth > caja.clientWidth + 1) fuera.push(`${caja.tagName}.${caja.className}`);
+    }
+    return fuera;
+  }, SIN_ESPACIOS.slice(0, 40));
+  expect(desbordadas, "texto largo sin espacios que se sale de su caja").toEqual([]);
+}
 
 /** Marca al tripulante «Sin impedimento» y guarda la verificación (de UCVMM o del puesto). */
 async function verificarSinImpedimento(pagina: Page) {
@@ -55,10 +78,13 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     for (const documento of ["Visa Especial de Marino", "Generales de Pasaporte", "Libreta de Marino"]) {
       await agencia.getByLabel(`Adjuntar ${documento} de ${TRIPULANTE}`).setInputFiles(pdf(`${documento}.pdf`));
     }
+    await agencia.getByRole("textbox", { name: "Observaciones", exact: true })
+      .fill(`Se sube la documentación, ${SIN_ESPACIOS}`);
     await agencia.getByRole("button", { name: "Enviar solicitud" }).click();
     await agencia.waitForURL(/\/solicitudes\/\d+$/);
     id = agencia.url().split("/").pop() ?? "";
     await expect(estado(agencia, "En revisión")).toBeVisible();
+    await sinTextoDesbordado(agencia);   // las observaciones y el historial
   });
 
   await test.step("UCVMM la ve en su campana y el enlace abre «Por revisar»", async () => {
@@ -76,9 +102,10 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     await verificarSinImpedimento(ucvmm);
     await ucvmm.getByRole("button", { name: "Devolver a corrección" }).click();
     const modal = ucvmm.getByRole("dialog");
-    await modal.locator("textarea").fill("La visa especial de marino está ilegible.");
+    await modal.locator("textarea").fill(`La visa especial de marino está ilegible. ${SIN_ESPACIOS}`);
     await modal.getByRole("button", { name: "Devolver" }).click();
     await expect(estado(ucvmm, "En corrección")).toBeVisible();
+    await sinTextoDesbordado(ucvmm);   // el motivo, en el aviso y en el historial
   });
 
   await test.step("la agencia ve la devolución en su campana y, al abrirla, queda leída", async () => {
@@ -100,6 +127,7 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     await agencia.goto(`/solicitudes/${id}`);
     // El motivo sale en el aviso de la devolución y en el historial.
     await expect(agencia.getByText("La visa especial de marino está ilegible.").first()).toBeVisible();
+    await sinTextoDesbordado(agencia);
     await agencia.getByRole("link", { name: "Corregir solicitud" }).click();
     await agencia.getByLabel(`Reemplazar Visa Especial de Marino de ${TRIPULANTE}`).setInputFiles(pdf("Visa corregida.pdf"));
     await agencia.getByRole("button", { name: "Reenviar a revisión" }).click();

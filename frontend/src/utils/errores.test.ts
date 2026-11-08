@@ -34,3 +34,17 @@ describe("mensajeDeError", () => {
     expect(mensajeDeError(null, POR_DEFECTO)).toBe(POR_DEFECTO);
   });
 });
+
+describe("mensajeDeError con el código del pedido", () => {
+  it("en un 5xx agrega el código, para encontrar la traza en el log", () => {
+    const error = { response: { status: 500, data: { detail: "Error interno del servidor.", codigo: "3f2a1b9c0d4e" } } };
+    expect(mensajeDeError(error, POR_DEFECTO)).toBe("Error interno del servidor. (código 3f2a1b9c0d4e)");
+    const sinDetalle = { response: { status: 500, data: { codigo: "3f2a1b9c0d4e" } } };
+    expect(mensajeDeError(sinDetalle, POR_DEFECTO)).toBe(`${POR_DEFECTO} (código 3f2a1b9c0d4e)`);
+  });
+
+  it("en un 4xx no: el motivo ya lo explica", () => {
+    const error = { response: { status: 409, data: { detail: "Ya la aprobó otra persona.", codigo: "3f2a1b9c0d4e" } } };
+    expect(mensajeDeError(error, POR_DEFECTO)).toBe("Ya la aprobó otra persona.");
+  });
+});

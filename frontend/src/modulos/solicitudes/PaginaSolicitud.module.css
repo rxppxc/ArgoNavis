@@ -16,7 +16,7 @@
   border-left: 4px solid var(--acc-orange);
 }
 .bannerTitulo { display: flex; align-items: center; gap: 8px; color: var(--acc-orange); font-weight: 800; font-size: .88rem; }
-.bannerTexto { color: var(--text); font-size: .9rem; margin: 6px 0; white-space: pre-wrap; }
+.bannerTexto { color: var(--text); font-size: .9rem; margin: 6px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .bannerPlazo { color: var(--text-2); font-size: .8rem; }
 
 /* ─── Bloques ─── */
@@ -190,7 +190,7 @@
 .casillaOk { border-color: color-mix(in srgb, var(--acc-green) 45%, transparent); background: color-mix(in srgb, var(--acc-green) 7%, transparent); }
 
 .casillaInfo { flex: 1; min-width: 0; }
-.casillaDoc { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: .88rem; font-weight: 600; }
+.casillaDoc { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: .88rem; font-weight: 600; overflow-wrap: anywhere; }
 .casillaAlcance { color: var(--text-2); font-size: .77rem; margin-top: 3px; margin-left: 21px; }
 
 .casillaAccion { display: flex; align-items: center; gap: 9px; flex-shrink: 0; }

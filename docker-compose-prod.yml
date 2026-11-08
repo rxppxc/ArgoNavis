@@ -50,7 +50,12 @@ services:
       - ACCESS_TOKEN_EXPIRE_MINUTES=60
       - SESION_MAXIMA_HORAS=${SESION_MAXIMA_HORAS:-12}
       - ALGORITHM=HS256
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres_db:5432/${POSTGRES_DB}
+      # La aplicación entra con su propia cuenta, sin poder crear ni cambiar tablas
+      # y con la bitácora solo para agregar (backend/app/infrastructure/permisos_bd.py).
+      # La dueña (POSTGRES_USER) solo migra: el entrypoint borra su dirección antes de
+      # levantar uvicorn.
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_APP_USER:-argonavis_app}:${POSTGRES_APP_PASSWORD:?Falta POSTGRES_APP_PASSWORD en el .env}@postgres_db:5432/${POSTGRES_DB}
+      - MIGRACIONES_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres_db:5432/${POSTGRES_DB}
       - LDAP_HOST=${LDAP_HOST}
       - LDAP_PORT=${LDAP_PORT:-389}
       - LDAP_USAR_SSL=${LDAP_USAR_SSL:-false}

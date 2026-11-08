@@ -86,9 +86,16 @@ constants/          → números mágicos.
 16. Crear y corregir solicitudes (lo que sube archivos) tienen tope por cuenta: `@limiter.limit(limite_envios, key_func=clave_usuario)` y `LIMITE_ENVIOS_POR_HORA`. Un endpoint nuevo que suba archivos lleva el mismo decorador.
 17. En producción el backend no arranca con una `SECRET_KEY` de menos de 32 caracteres o de ejemplo (validador en `core/config.py`).
 18. Los servidores de desarrollo escuchan solo en este equipo (`start-backend.bat` en 127.0.0.1, Vite en `localhost`): no tienen las protecciones de producción. `VITE_HOST=0.0.0.0` solo para probar desde otro equipo, y por un rato.
+19. La aplicación entra a PostgreSQL con **su propia cuenta** (`DATABASE_URL`, en Docker `argonavis_app`), no con la dueña de las tablas ni con un superusuario (2026-11-08):
+    - La crea y la pone al día `infrastructure/permisos_bd.py` después de cada migración, con la dueña (`MIGRACIONES_DATABASE_URL`, que el entrypoint borra antes de levantar uvicorn).
+    - Lee y escribe filas, pero no crea ni cambia tablas ni ejecuta programas del servidor (`COPY ... TO PROGRAM`).
+    - `audit_logs` y `solicitud_eventos` son **solo para agregar** (sin UPDATE ni DELETE): la bitácora y el historial no se pueden tapar desde la aplicación. Las FK con `ON DELETE SET NULL` las aplica PostgreSQL con la dueña, así que borrar un usuario funciona igual.
+    - No conectes la aplicación como dueña ni le des UPDATE o DELETE sobre esas tablas. Una tabla nueva que necesite otro trato va en `TABLAS_SOLO_AGREGAR` o `TABLAS_SIN_ACCESO`.
+    - Lo prueban `tests/test_permisos_bd.py` y el E2E, cuyo backend entra con una cuenta así (`servidor_e2e.py`).
 
 ### Errores
 - Backend: `HTTPException` con código y `detail` descriptivo. Nunca `except: pass`. Loggear con `logger.warning/.error` con contexto.
+- Cada pedido lleva un código (`X-Request-ID`, middleware `CodigoDePedido` en `main.py`, 2026-11-08). Va en cada línea del log (`[%(pedido)s]`, `core/registro.py`), en la respuesta y en el cuerpo de los 5xx (`codigo`), que el frontend agrega al mensaje (`mensajeDeError`). Para un error reportado, busca su código en el log: ahí está la traza. Un error sin controlar lo registra el middleware, con la traza, y responde 500 con el código.
 - Frontend: `useNotificacion()` (toast) para errores, `useConfirmar()` (modal) para acciones destructivas. **Nunca** `alert()` ni `window.confirm()`.
 
 ### Async correcto
@@ -134,6 +141,7 @@ constants/          → números mágicos.
 - "En corrección" va en naranja (`--acc-orange`): el ámbar se confundía con la marca.
 - Encabezado de página: `EncabezadoPagina` (título y descripción a la izquierda, acciones a la derecha); el expediente lleva el suyo.
 - Campos con `--input-border` / `--input-bg` (borde de 3:1). Las notas informativas, neutras con borde izquierdo `--acc-blue`.
+- Texto libre que escribe un usuario (observaciones, motivos, comentarios, nombres de archivo y de buque): con `overflow-wrap: anywhere`, para que una palabra larguísima sin espacios corte la línea en vez de salirse de su caja (2026-11-08; el `body` lleva `break-word` por defecto). Lo prueba `sinTextoDesbordado` en `e2e/flujo-completo.spec.ts`, que falla con los estilos anteriores.
 - Tablas que en el celular pasan a fichas: cada `<td>` lleva `data-etiqueta` (tripulantes del expediente, usuarios).
 - Accesibilidad (2026-10-27):
   - Enlace «Saltar al contenido» (clase global `.saltar-contenido`) en `MarcoPagina` y en el login, hacia `<main id="contenido">`.
@@ -375,6 +383,17 @@ Pedido del usuario: revisar todo en busca de fallos, saturación y lo que estorb
 - **Revisado y sin cambios:** LDAP, bcrypt y el PDF ya corren en hilos; las subidas tienen su propio tope de 300 s en el cliente; temporizadores y escuchas del frontend se limpian; las relaciones del ORM cargan en lote (`selectin`), sin N+1 en las bandejas.
 - **Documentación de la DTI, juego 0.6:** el 06 (configuración, Docker, salud, índices) y el 08 (evidencias y pendientes) pasan a la 0.6; el 00, a la 0.5, por su tabla de versiones. Los demás no cambian. `v06.py` (scratchpad) hace los reemplazos en los generadores, como `v05.py`.
 
+### «Vibe coder vs. desarrollador» (2026-11-08)
+El usuario pidió revisar el proyecto contra cinco puntos:
+- **No se cae con 100 usuarios:** prueba de carga `backend/tests/carga.py` (no la corre pytest). Levanta el backend con 2 procesos contra una BD temporal y pone a N usuarios a pedir algo cada 1 a 3 s.
+  - Con 100 usuarios: 2.683 pedidos sin un error; mediana de ~1 s y techo de ~29 pedidos por segundo, con las 30 conexiones al tope (detalle en README → «Capacidad y disponibilidad»).
+  - Consultas por pedido (en proceso, sin red): campana 8 a 9, bandejas 11 a 20, expediente 26. De esas, 6 son para saber quién pide.
+  - Si un día hace falta más capacidad, ahí está el margen (pendiente 16). No se tocó: es código de autenticación y el uso real (~8 pedidos por segundo con 100 usuarios) está lejos del techo.
+- **useEffect:** 34 en toda la app y como mucho 3 por componente. El lint exige las reglas del compilador de React y, además, `no-deriving-state-in-effects` y `void-use-memo` (`eslint.config.js`).
+- **Permisos en la BD:** regla 19 de Seguridad.
+- **Leer la traza:** el código de pedido (Errores, arriba).
+- **Claves en el frontend:** ninguna. El `.env` nunca entró al repositorio (revisado en todo el historial), el frontend solo lee `VITE_API_URL` y ninguna clave del servidor aparece en el paquete compilado.
+
 ### Los 20 puntos de «sitio hecho a la carrera» (2026-11-08)
 El usuario pidió revisar una lista de señales de sitios web públicos. ARGO NAVIS es un sistema **interno**: lo de buscadores no aplica, y lo de rastreadores aplica al revés.
 - **Hecho:** página 404 propia (`PaginaNoEncontrada`; antes una ruta desconocida llevaba a las bandejas sin avisar), `<noscript>`, meta description, `noindex` en tres capas (`robots.txt`, la etiqueta robots de `index.html` y `X-Robots-Tag` en nginx y en `_CABECERAS_SPA`), source maps apagados de forma explícita (`vite.config.ts`) y la vigilancia de la consola en el E2E (`e2e/base.ts`: un `console.error`, un error sin atrapar o un 5xx hacen fallar la prueba; los 4xx no).
@@ -404,6 +423,11 @@ El usuario pidió revisar una lista de señales de sitios web públicos. ARGO NA
     - Retención de la bitácora (`audit_logs`): es la tabla que más crece (cada documento visto, cada login) y no se purga. Va con la política de retención (punto 7).
     - Búsqueda por texto de las bandejas y la bitácora: `ILIKE '%…%'` recorre la tabla. Con muchos miles de filas, un índice trigram (`pg_trgm`) la acelera; hoy no hace falta.
     - Tope global del login y de la verificación en nginx (`limit_req`): el de slowapi es por proceso. Antes, confirmar si las agencias salen de la VPN con una sola IP (las frenaría a todas juntas).
+16. **Menos consultas por pedido, si crece el uso** (prueba de carga del 2026-11-08). Hoy cada pedido hace 6 consultas solo para saber quién es el usuario:
+    - `obtener_id_usuario_actual` y `usuario_actual` leen el mismo usuario dos veces;
+    - los permisos se consultan en cada pedido (a veces dos veces);
+    - el expediente vuelve a leer el catálogo (trámites, documentos y países) y carga `creada_por` con su rol y su agencia.
+    Juntar la verificación del token con la carga del usuario y cachear el catálogo por proceso ahorraría entre 10 y 20 %. Correr `tests/carga.py` antes y después.
 
 ### Flujo actual: Autorizaciones Marítimas (UCVMM)
 

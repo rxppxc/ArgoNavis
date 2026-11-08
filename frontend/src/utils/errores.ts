@@ -9,10 +9,18 @@ export const MENSAJE_NO_DISPONIBLE =
   "El sistema no está disponible en este momento. Intenta de nuevo en unos minutos.";
 
 type ErrorDeApi = {
-  response?: { status?: number; data?: { detail?: unknown } };
+  response?: { status?: number; data?: { detail?: unknown; codigo?: unknown } };
   request?: unknown;
   code?: string;
 };
+
+/** Los errores 5xx traen el código del pedido (X-Request-ID): con él se encuentra la
+ *  traza en el log del servidor. Va al final del mensaje, para que el usuario lo reporte. */
+function conCodigo(texto: string, e: ErrorDeApi | null): string {
+  const codigo = e?.response?.data?.codigo;
+  const estado = e?.response?.status ?? 0;
+  return estado >= 500 && typeof codigo === "string" && codigo ? `${texto} (código ${codigo})` : texto;
+}
 
 /** Mensaje legible de un error de la API (campo `detail` de FastAPI).
  *  `detail` puede ser texto o, en errores 422 de validación, una lista.
@@ -22,7 +30,7 @@ type ErrorDeApi = {
 export function mensajeDeError(error: unknown, porDefecto: string): string {
   const e = error as ErrorDeApi | null;
   const detalle = e?.response?.data?.detail;
-  if (typeof detalle === "string" && detalle.trim()) return detalle;
+  if (typeof detalle === "string" && detalle.trim()) return conCodigo(detalle, e);
   if (Array.isArray(detalle) && detalle.length > 0) {
     return detalle
       .map((d) => (typeof d === "object" && d && "msg" in d ? String((d as { msg: unknown }).msg) : String(d)))
@@ -33,5 +41,5 @@ export function mensajeDeError(error: unknown, porDefecto: string): string {
   }
   const estado = e?.response?.status;
   if (estado === 502 || estado === 503 || estado === 504) return MENSAJE_NO_DISPONIBLE;
-  return porDefecto;
+  return conCodigo(porDefecto, e);
 }

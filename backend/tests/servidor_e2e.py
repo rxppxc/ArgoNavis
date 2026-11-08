@@ -21,6 +21,7 @@ import tempfile
 from pathlib import Path
 
 import psycopg
+from sqlalchemy.engine import make_url
 from dotenv import dotenv_values
 
 BACKEND = Path(__file__).resolve().parent.parent
@@ -47,9 +48,15 @@ if not _url:
     raise SystemExit("Define TEST_DATABASE_URL o DATABASE_URL en backend/.env.")
 _base = _url.rpartition("/")[0]
 URL_ADMIN = f"{_base}/postgres".replace("postgresql+asyncpg://", "postgresql://")
+# El backend del E2E entra con su propia cuenta, con lo justo, como en producción
+# (infrastructure/permisos_bd.py): si algo pide un permiso que no tiene, el recorrido falla.
+URL_DUENA = f"{_base}/{NOMBRE_BD}"
+ROL_APP = "argonavis_e2e_app"
+URL_APP = make_url(URL_DUENA).set(username=ROL_APP, password=secrets.token_hex(16)).render_as_string(hide_password=False)
 
 os.environ.update({
-    "DATABASE_URL": f"{_base}/{NOMBRE_BD}",
+    "DATABASE_URL": URL_DUENA,          # para migrar; el backend pasa a URL_APP (main)
+    "MIGRACIONES_DATABASE_URL": "",
     "STORAGE_PATH": str(STORAGE),
     "APP_ENV": "test",
     "SECRET_KEY": secrets.token_urlsafe(32),
@@ -72,6 +79,7 @@ def _sql_admin(sentencia: str) -> None:
 
 def limpiar() -> None:
     _sql_admin(f'DROP DATABASE IF EXISTS "{NOMBRE_BD}" WITH (FORCE)')
+    _sql_admin(f'DROP ROLE IF EXISTS "{ROL_APP}"')
     shutil.rmtree(STORAGE, ignore_errors=True)
 
 
@@ -118,6 +126,9 @@ def main() -> None:
         limpiar()
         return
     preparar_bd()
+    from app.infrastructure.permisos_bd import aplicar
+    print(aplicar(URL_DUENA, URL_APP), file=sys.stderr)   # sale en el log de Playwright
+    os.environ["DATABASE_URL"] = URL_APP   # antes de importar la app: la siembra ya entra con ella
     asyncio.run(sembrar())
 
     import uvicorn

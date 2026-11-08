@@ -79,7 +79,7 @@ En GitHub, `.github/workflows/ci.yml` corre todo lo anterior en cada push a main
 docker compose -f docker-compose-prod.yml up -d --build
 ```
 
-El backend corre con `UVICORN_WORKERS` procesos (2 por defecto) y con un usuario sin privilegios (`argonavis`, uid 10001), sin las herramientas de compilación en la imagen. Si el firewall no deja llegar a Docker Hub (`auth.docker.io`), usa un espejo: `{ "registry-mirrors": ["https://mirror.gcr.io"] }` en `/etc/docker/daemon.json` y `sudo systemctl restart docker`. El volumen `documentos` de una instalación anterior al 08/11/2026 se creó cuando el contenedor corría como root: pásaselo al usuario una vez, antes de levantar la versión nueva (si no, las subidas fallan por permisos):
+El backend corre con `UVICORN_WORKERS` procesos (2 por defecto) y con un usuario sin privilegios (`argonavis`, uid 10001), sin las herramientas de compilación en la imagen. A PostgreSQL entra con su propia cuenta (`argonavis_app`), que no puede cambiar tablas y solo agrega a la bitácora: la crea el backend al arrancar con la clave de `POSTGRES_APP_PASSWORD`, que **hay que agregar al `.env`** (`openssl rand -hex 24`); sin ella, el compose no levanta. Si el firewall no deja llegar a Docker Hub (`auth.docker.io`), usa un espejo: `{ "registry-mirrors": ["https://mirror.gcr.io"] }` en `/etc/docker/daemon.json` y `sudo systemctl restart docker`. El volumen `documentos` de una instalación anterior al 08/11/2026 se creó cuando el contenedor corría como root: pásaselo al usuario una vez, antes de levantar la versión nueva (si no, las subidas fallan por permisos):
 ```bash
 docker compose -f docker-compose-prod.yml run --rm --no-deps --user root --entrypoint chown backend -R 10001:10001 /app/storage/documentos
 ```
@@ -256,6 +256,17 @@ Cada `VENCIMIENTOS_INTERVALO_MINUTOS` se expiran las solicitudes con plazos venc
 - **`/api/health`** comprueba la base: con la base caída responde 503 y Docker marca el servicio como no sano. Reusa la respuesta 5 segundos, para no cargar la base.
 - **Correos:** un solo despacho a la vez en cada proceso, y cada envío espera al servidor de correo como mucho `MAIL_TIEMPO_ESPERA` segundos (20).
 - **nginx** resuelve el nombre del backend en cada petición (el DNS de Docker): si el contenedor del backend se recrea con otra IP, sigue funcionando sin reiniciar nginx.
+- **Código de cada pedido** (`X-Request-ID`): va en cada línea del log y en los errores 5xx que ve el usuario («… (código 3f2a1b9c0d4e)»). Con ese código se encuentra su traza en el log.
+- **Prueba de carga** (`backend/tests/carga.py`; no la corre pytest):
+  ```bat
+  cd backend
+  venv\Scripts\python tests\carga.py --usuarios 100 --segundos 90
+  ```
+  Levanta el backend con 2 procesos contra una base temporal y pone a N usuarios a pedir algo cada 1 a 3 segundos, de 5 a 10 veces más que el uso real. El 08/11/2026, en un equipo de desarrollo de 4 núcleos con PostgreSQL y el generador de carga en la misma máquina, con 100 usuarios durante 90 s:
+  - 2.683 pedidos y **ningún error**.
+  - La mitad respondió en 1 s o menos, el 95 % en menos de 4 s, y las 30 conexiones a la base llegaron al tope.
+  - El techo fue de unos 29 pedidos por segundo. Como referencia, 100 usuarios reales piden unos 8 por segundo: una acción cada 10 a 30 s, más la campana cada minuto.
+  - Para más capacidad: un proceso por núcleo (`UVICORN_WORKERS`), sin pasar el tope de conexiones de PostgreSQL.
 
 ---
 

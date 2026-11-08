@@ -12,8 +12,11 @@ from app.core.config import obtener_configuracion
 
 configuracion = obtener_configuracion()
 config = context.config
+# Con la cuenta dueña de las tablas si está aparte (la de la aplicación no puede
+# crear ni cambiar tablas: infrastructure/permisos_bd.py).
+url_bd = configuracion.MIGRACIONES_DATABASE_URL or configuracion.DATABASE_URL
 # Alembic necesita un driver síncrono; asyncpg es sólo para la app async
-url_sync = configuracion.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql+psycopg://")
+url_sync = url_bd.replace("postgresql+asyncpg://", "postgresql+psycopg://")
 config.set_main_option("sqlalchemy.url", url_sync)
 
 if config.config_file_name is not None:

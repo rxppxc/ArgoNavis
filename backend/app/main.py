@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import re
+import secrets
 import time
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
@@ -13,7 +15,7 @@ from sqlalchemy.exc import DBAPIError, IntegrityError, InterfaceError, Operation
 from sqlalchemy.exc import TimeoutError as PoolAgotado
 from app.core.config import obtener_configuracion
 from app.core.rate_limit import limiter
-from app.core.registro import configurar_registro
+from app.core.registro import configurar_registro, id_pedido
 from app.core.security import CABECERA_CAMBIO_CONTRASENA
 from app.api.v1 import auth, admin, tramites, solicitudes, verificacion, catalogos, bitacora, pendientes
 # Registrar todos los modelos en el registry del ORM (relaciones por nombre).
@@ -91,7 +93,8 @@ _BD_NO_RESPONDE = {"detail": "La base de datos no respondió a tiempo. Intenta d
 
 
 def _no_disponible(contenido: dict) -> JSONResponse:
-    return JSONResponse(status_code=503, content=contenido, headers={"Retry-After": "5"})
+    return JSONResponse(status_code=503, content={**contenido, "codigo": id_pedido.get()},
+                        headers={"Retry-After": "5"})
 
 
 @aplicacion.exception_handler(PoolAgotado)
@@ -122,7 +125,7 @@ async def error_de_base_de_datos(request: Request, exc: DBAPIError) -> JSONRespo
                      request.method, request.url.path, type(exc.orig).__name__)
         return _no_disponible(_BD_NO_RESPONDE)
     logger.error("[bd] Error en %s %s", request.method, request.url.path, exc_info=exc)
-    return JSONResponse(status_code=500, content={"detail": "Error interno del servidor."})
+    return JSONResponse(status_code=500, content={"detail": "Error interno del servidor.", "codigo": id_pedido.get()})
 
 
 @aplicacion.exception_handler(ConnectionError)
@@ -145,6 +148,53 @@ aplicacion.add_middleware(
     allow_headers=["Authorization", "Content-Type", "Accept"],
     expose_headers=["Content-Disposition", CABECERA_CAMBIO_CONTRASENA],
 )
+
+_CODIGO_VALIDO = re.compile(r"[A-Za-z0-9._-]{8,64}")
+
+
+class CodigoDePedido:
+    """Cada pedido lleva un código (X-Request-ID): va en cada línea del log, en la
+    respuesta y en el cuerpo de los errores 5xx, que el frontend muestra. Quien
+    reporta un error dice el código y en el log está su traza (revisión del
+    2026-11-08; antes había que adivinar cuál de todos los errores era el suyo).
+
+    Un error sin controlar se registra aquí, con el código y la traza completa, y
+    se responde un 500 con el código. ASGI puro, no BaseHTTPMiddleware: el código
+    acompaña también a las tareas en segundo plano del pedido (los correos)."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        entrante = dict(scope["headers"]).get(b"x-request-id", b"").decode("latin-1")
+        codigo = entrante if _CODIGO_VALIDO.fullmatch(entrante) else secrets.token_hex(6)
+        marca = id_pedido.set(codigo)
+        empezada = False
+
+        async def enviar(mensaje):
+            nonlocal empezada
+            if mensaje["type"] == "http.response.start":
+                empezada = True
+                mensaje["headers"] = [*mensaje.get("headers", []), (b"x-request-id", codigo.encode())]
+            await send(mensaje)
+
+        try:
+            await self.app(scope, receive, enviar)
+        except Exception:
+            logger.exception("Error no controlado en %s %s", scope.get("method"), scope.get("path"))
+            if empezada:
+                raise
+            respuesta = JSONResponse(status_code=500, content={"detail": "Error interno del servidor.", "codigo": codigo})
+            await respuesta(scope, receive, enviar)
+        finally:
+            id_pedido.reset(marca)
+
+
+# El último que se agrega queda por fuera de todos: el código cubre también a CORS.
+aplicacion.add_middleware(CodigoDePedido)
 
 aplicacion.include_router(auth.enrutador,         prefix="/api/v1")
 aplicacion.include_router(admin.enrutador,        prefix="/api/v1")

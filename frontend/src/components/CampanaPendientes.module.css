@@ -91,7 +91,7 @@
 }
 .detalle { color: var(--text-2); font-size: .74rem; overflow-wrap: anywhere; }
 .comentario {
-  color: var(--text-2); font-size: .76rem; font-style: italic;
+  color: var(--text-2); font-size: .76rem; font-style: italic; overflow-wrap: anywhere;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 

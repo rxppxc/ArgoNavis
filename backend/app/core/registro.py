@@ -14,14 +14,32 @@ import logging
 import os
 import re
 from contextlib import suppress
+from contextvars import ContextVar
 from datetime import date, timedelta
 from pathlib import Path
 
 from app.core.config import obtener_configuracion
 
-_FORMATO = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
+_FORMATO = "%(asctime)s %(levelname)s [%(name)s] [%(pedido)s] %(message)s"
 _PREFIJO = "argonavis-"
 _NOMBRE_DIARIO = re.compile(rf"^{_PREFIJO}(\d{{4}}-\d{{2}}-\d{{2}})\.log$")
+
+# Código del pedido HTTP en curso: lo pone el middleware de main.py y vale "-" fuera
+# de un pedido (las tareas de fondo). Va en cada línea del log (%(pedido)s): quien
+# reporta un error dice el código que le mostró la pantalla y aquí está su traza.
+id_pedido: ContextVar[str] = ContextVar("id_pedido", default="-")
+_fabrica_registros = logging.getLogRecordFactory()
+
+
+def _registro_con_pedido(*args, **kwargs) -> logging.LogRecord:
+    registro = _fabrica_registros(*args, **kwargs)
+    registro.pedido = id_pedido.get()
+    return registro
+
+
+# En la fábrica y no en un filtro: así lo llevan también los registros de uvicorn
+# y de las librerías, y el formato nunca encuentra un registro sin `pedido`.
+logging.setLogRecordFactory(_registro_con_pedido)
 
 
 def _abrir_para_agregar(ruta: Path):

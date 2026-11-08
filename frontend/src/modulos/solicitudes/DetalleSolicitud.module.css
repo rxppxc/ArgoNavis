@@ -37,6 +37,7 @@
   background: var(--card);
   color: var(--text);
   font-size: .87rem;
+  overflow-wrap: anywhere;   /* motivos y comentarios que escribe un usuario */
 }
 .bannerTitulo { display: flex; align-items: center; gap: 8px; font-weight: 800; margin-bottom: 4px; }
 .bannerTexto { white-space: pre-wrap; line-height: 1.55; }
@@ -82,7 +83,7 @@
 /* ─── Datos ─── */
 .datos { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px 18px; }
 .dato dt { color: var(--muted); font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
-.dato dd { color: var(--text); font-size: .9rem; margin-top: 2px; word-break: break-word; }
+.dato dd { color: var(--text); font-size: .9rem; margin-top: 2px; overflow-wrap: anywhere; }
 /* Nota informativa del trámite: neutra con acento azul, como el resto de las notas. */
 .nota {
   margin-top: 14px; padding: 10px 13px; border-radius: 8px;
@@ -92,7 +93,7 @@
 .observaciones {
   margin-top: 12px; padding: 10px 13px; border-radius: 8px;
   background: var(--overlay); border-left: 3px solid var(--y-border);
-  color: var(--text); font-size: .85rem; white-space: pre-wrap;
+  color: var(--text); font-size: .85rem; white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .observaciones span { display: block; color: var(--muted); font-size: .7rem; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; }
 
@@ -158,7 +159,7 @@
 .eventoTitulo { color: var(--text); font-weight: 700; font-size: .84rem; }
 .eventoMeta { color: var(--muted); font-size: .74rem; margin-top: 1px; }
 .eventoComentario {
-  margin-top: 5px; color: var(--text); font-size: .8rem; white-space: pre-wrap;
+  margin-top: 5px; color: var(--text); font-size: .8rem; white-space: pre-wrap; overflow-wrap: anywhere;
   background: var(--overlay); padding: 6px 9px; border-radius: 6px;
 }
 .evento_creada .eventoPunto,

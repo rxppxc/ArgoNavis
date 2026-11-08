@@ -35,6 +35,8 @@ STORAGE   = Path(tempfile.mkdtemp(prefix="argonavis_documentos_pruebas_"))
 
 os.environ.update({
     "DATABASE_URL": f"{_base}/{NOMBRE_BD}",
+    # Vacía: si el .env de desarrollo la trae, las migraciones de las pruebas irían a otra BD.
+    "MIGRACIONES_DATABASE_URL": "",
     "STORAGE_PATH": str(STORAGE),
     "APP_ENV": "test",
     "SECRET_KEY": secrets.token_urlsafe(32),

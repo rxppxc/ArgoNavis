@@ -1,6 +1,9 @@
 """Alta disponibilidad (revisión del 2026-11-08): cada conexión lleva sus topes,
 la BD caída, lenta o sin conexiones libres responde 503 con motivo (no un 500
 mudo) y /api/health mira la BD."""
+import logging
+import re
+
 import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError, OperationalError
@@ -82,6 +85,7 @@ async def test_la_bd_caida_en_una_bandeja_llega_como_503_con_motivo(cliente, adm
     r = await cliente.get("/solicitudes/revision", headers=admin.headers)
     assert r.status_code == 503, r.text
     assert "no respondió" in r.json()["detail"] and r.headers["retry-after"] == "5"
+    assert r.json()["codigo"] == r.headers["x-request-id"], "con el código para encontrar la traza"
 
 
 @asincrona
@@ -112,3 +116,45 @@ async def test_salud_con_la_bd_apagada(base_de_datos, monkeypatch):
         assert await main._bd_responde() is False
     finally:
         await apagada.dispose()
+
+
+class _Captura(logging.Handler):
+    def __init__(self):
+        super().__init__()
+        self.registros: list[logging.LogRecord] = []
+
+    def emit(self, registro):
+        self.registros.append(registro)
+
+
+@asincrona
+async def test_cada_respuesta_lleva_su_codigo(cliente):
+    """El código del pedido (X-Request-ID) va en la respuesta y en el log."""
+    r = await cliente.get(SALUD)
+    assert re.fullmatch(r"[0-9a-f]{12}", r.headers["x-request-id"])
+    r = await cliente.get(SALUD, headers={"X-Request-ID": "balanceador-1234"})
+    assert r.headers["x-request-id"] == "balanceador-1234", "el de un proxy de adelante se conserva"
+    r = await cliente.get(SALUD, headers={"X-Request-ID": "con espacios <y otros>"})
+    assert re.fullmatch(r"[0-9a-f]{12}", r.headers["x-request-id"]), "uno raro se reemplaza: va al log"
+
+
+@asincrona
+async def test_un_error_sin_controlar_responde_500_con_su_codigo_y_deja_la_traza(cliente, admin, monkeypatch):
+    """Quien ve el error reporta el código; en el log está la traza con ese código."""
+    async def rota(*_args, **_kwargs):
+        raise RuntimeError("falla de prueba")
+
+    monkeypatch.setattr(RepositorioSolicitud, "listar", rota)
+    captura = _Captura()
+    registro = logging.getLogger("app.main")
+    registro.addHandler(captura)
+    try:
+        r = await cliente.get("/solicitudes/revision", headers=admin.headers)
+    finally:
+        registro.removeHandler(captura)
+    assert r.status_code == 500
+    cuerpo = r.json()
+    assert cuerpo["detail"] == "Error interno del servidor." and cuerpo["codigo"] == r.headers["x-request-id"]
+    trazas = [x for x in captura.registros if x.exc_info]
+    assert trazas, "la traza queda en el log"
+    assert trazas[0].pedido == cuerpo["codigo"] and "falla de prueba" in str(trazas[0].exc_info[1])

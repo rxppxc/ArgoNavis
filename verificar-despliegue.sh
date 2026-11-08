@@ -159,6 +159,31 @@ if [ -n "${t_consulta:-}" ] && [ "$t_consulta" != 0 ] && [ "${t_inactiva:-0}" !=
 else
   mal "Sin topes por conexión (${topes:-sin respuesta})"
 fi
+cuenta=$(py_backend <<'PY' 2>/dev/null
+import asyncio
+from sqlalchemy import text
+from app.infrastructure.database import motor_bd
+
+async def main():
+    async with motor_bd.connect() as c:
+        fila = (await c.execute(text(
+            "SELECT current_user, rolsuper, has_table_privilege(current_user, 'audit_logs', 'UPDATE'), "
+            "has_table_privilege(current_user, 'audit_logs', 'INSERT') FROM pg_roles WHERE rolname = current_user"
+        ))).one()
+    await motor_bd.dispose()
+    print(*fila)
+
+asyncio.run(main())
+PY
+)
+read -r c_nombre c_super c_edita c_agrega <<<"$cuenta"
+if [ "${c_super:-}" = False ] && [ "${c_edita:-}" = False ] && [ "${c_agrega:-}" = True ]; then
+  bien "La aplicación entra como $c_nombre: sin privilegios de administrador y con la bitácora solo para agregar"
+elif [ "${c_super:-}" = True ]; then
+  aviso "La aplicación entra como superusuario ($c_nombre): falta POSTGRES_APP_PASSWORD (README → Producción)"
+else
+  aviso "Cuenta de la aplicación: ${cuenta:-sin respuesta} (se esperaba sin superusuario y la bitácora solo para agregar)"
+fi
 max=$(psql_bd "show max_connections")
 workers=$(docker exec snm_backend printenv UVICORN_WORKERS 2>/dev/null); workers=${workers:-1}
 bd_pool=$(docker exec snm_backend printenv BD_POOL 2>/dev/null)

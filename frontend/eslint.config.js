@@ -18,5 +18,12 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      // Un efecto es para sincronizar con algo de afuera (la red, el DOM, un temporizador):
+      // un estado que sale de otro se calcula al renderizar, no en un efecto. Hoy no hay
+      // ninguno (revisión del 2026-11-08); estas dos reglas lo mantienen así.
+      'react-hooks/no-deriving-state-in-effects': 'error',
+      'react-hooks/void-use-memo': 'error',
+    },
   },
 ])

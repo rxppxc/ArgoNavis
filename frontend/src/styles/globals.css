@@ -193,6 +193,9 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Un texto sin espacios más largo que su caja (un «pruebasssss…» de 200 letras)
+     se corta en vez de salirse. Donde escribe el usuario va además «anywhere». */
+  overflow-wrap: break-word;
 }
 
 a { color: inherit; text-decoration: none; }
