@@ -261,6 +261,27 @@
 
 .btnPrimario { composes: boton primario from "../../components/Botones.module.css"; }
 .anchoCompleto { width: 100%; margin-top: 14px; }
+
+/* ─── Pasos del panel del puesto (revisión de UX del 2026-11-08) ─── */
+.plazoPanel, .plazoPanelVencido {
+  margin: 0 0 14px; padding: 8px 11px; border-radius: 8px; font-size: .8rem; line-height: 1.45;
+  color: var(--text); background: color-mix(in srgb, var(--acc-teal) 10%, transparent);
+}
+.plazoPanelVencido { background: color-mix(in srgb, var(--acc-red) 12%, transparent); color: var(--acc-red); }
+.pasos { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.pasos > li { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; align-items: start; }
+.pasoNumero {
+  width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+  font-size: .76rem; font-weight: 800; border: 2px solid var(--border-2); color: var(--muted); background: var(--card);
+}
+.pasoActual .pasoNumero { border-color: var(--acc-teal); color: var(--acc-teal); }
+.pasoHecho .pasoNumero { border-color: var(--exito-fuerte); background: var(--exito-fuerte); color: var(--sobre-fuerte); }
+.pasoCuerpo { display: grid; gap: 4px; min-width: 0; }
+.pasoTitulo { display: block; color: var(--text); font-size: .84rem; font-weight: 700; }
+.pasoEspera .pasoTitulo { color: var(--text-2); }
+.pasoTexto { color: var(--text-2); font-size: .79rem; line-height: 1.45; overflow-wrap: anywhere; }
+.pasoCuerpo .textarea { margin-top: 4px; }
+.pieAccion { margin: 8px 0 0; color: var(--muted); font-size: .74rem; text-align: center; }
 .btnSecundario { composes: boton secundario from "../../components/Botones.module.css"; }
 .btnConsultar { composes: boton consultar from "../../components/Botones.module.css"; }
 .btnCorregir { composes: boton advertir from "../../components/Botones.module.css"; }

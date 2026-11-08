@@ -4,6 +4,7 @@ import type { DocumentoSolicitud, RangoMarino, TripulanteEntrada } from "../../a
 import { IconoAlerta, IconoBasura, IconoChevronAbajo } from "../../components/Iconos";
 import type { CasillaFormulario } from "./checklist";
 import { ChecklistDocumentos } from "./ChecklistDocumentos";
+import { FechaEnPalabras } from "./FechaEnPalabras";
 import { ETIQUETA_RANGO, ETIQUETA_SEXO, TODOS_LOS_RANGOS, formatearFecha, hoyISO } from "./presentacion";
 import { NACIMIENTO_MINIMO, nacimientoMaximo, portaLibreta, type FichaTripulante } from "./validacionFormulario";
 import styles from "./PaginaSolicitud.module.css";
@@ -114,6 +115,7 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
             <label className={styles.campo}>
               <span>Fecha de nacimiento *</span>
               <input type="date" min={NACIMIENTO_MINIMO} max={nacimientoMaximo(hoyISO())} {...campo("fecha_nacimiento")} />
+              <FechaEnPalabras iso={ficha.fecha_nacimiento} />
             </label>
 
             <label className={styles.campo}>
@@ -150,6 +152,7 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
             <label className={styles.campo}>
               <span>Vence el pasaporte *</span>
               <input type="date" min={ficha.fecha_nacimiento || undefined} {...campo("pasaporte_expira")} />
+              <FechaEnPalabras iso={ficha.pasaporte_expira} />
             </label>
             {conLibreta ? (
               <>
@@ -160,6 +163,7 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
                 <label className={styles.campo}>
                   <span>Vence el seamanbook *</span>
                   <input type="date" min={ficha.fecha_nacimiento || undefined} {...campo("libreta_expira")} />
+                  <FechaEnPalabras iso={ficha.libreta_expira} />
                 </label>
               </>
             ) : (

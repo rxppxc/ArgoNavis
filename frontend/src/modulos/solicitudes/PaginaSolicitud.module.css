@@ -56,6 +56,8 @@
 .campo { display: flex; flex-direction: column; gap: 6px; margin-bottom: 13px; min-width: 0; }
 .campo > span { color: var(--text-2); font-size: .78rem; font-weight: 600; }
 .campo > span em { color: var(--muted); font-style: normal; font-weight: 400; }
+/* La fecha elegida, en palabras (FechaEnPalabras). */
+.fechaEnPalabras { color: var(--text-2); font-size: .74rem; margin-top: -2px; }
 
 /* Todos los campos iguales en todos los pasos (antes unos eran grises y otros
    blancos) y con borde de 3:1, para que se vea dónde se escribe. */

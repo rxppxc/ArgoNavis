@@ -22,14 +22,16 @@ export function ChecklistSolicitud({ documentos, tripulantes, onIrATripulante, o
   return (
     <section className={styles.bloque}>
       <div className={styles.bloqueTitulo}>
-        <span className={styles.paso}>4</span> Documentos de la solicitud
+        {/* Sin documentos propios de la solicitud, la sección es solo el resumen: antes
+            decía «no pide documentos» junto a «0 / 3 en total» y se contradecía. */}
+        <span className={styles.paso}>4</span> {casillasSolicitud.length ? "Documentos de la solicitud" : "Resumen de documentos"}
         <span className={faltantes.length === 0 ? styles.contadorOk : styles.contadorFalta}>
-          {casillas.length - faltantes.length} / {casillas.length} en total
+          {casillas.length - faltantes.length} de {casillas.length} adjuntos
         </span>
       </div>
       <p className={styles.ayudaSeccion}>PDF, Word o Excel, de hasta {TAMANO_MAX_MB} MB cada uno.</p>
       {tripulantes.some((t) => casillasPorTripulante.has(t.clave)) && (
-        <div className={styles.resumenTripulantes}>
+        <div className={styles.resumenTripulantes} aria-label="Documentos por tripulante">
           {tripulantes.map((t, i) => {
             const total = casillasPorTripulante.get(t.clave)?.length ?? 0;
             if (!total) return null;
@@ -57,7 +59,8 @@ export function ChecklistSolicitud({ documentos, tripulantes, onIrATripulante, o
         />
       ) : (
         <div className={styles.sinDocs}>
-          Este trámite no pide documentos de la solicitud: solo los de cada tripulante, en su tarjeta.
+          Este trámite no pide documentos generales: cada tripulante lleva los suyos en su tarjeta (paso 3). Toca un
+          nombre para ir a su tarjeta.
         </div>
       )}
       {faltantesSolicitud > 0 && casillasSolicitud.length > 0 && (

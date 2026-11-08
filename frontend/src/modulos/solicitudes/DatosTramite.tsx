@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { PuestoMini } from "../../api/catalogos";
 import type { TipoTramite } from "../../api/tramites";
+import { FechaEnPalabras } from "./FechaEnPalabras";
 import { AYUDA_CAMPOS_TRAMITE, formatearFechaHora } from "./presentacion";
 import { operacionMaxima, type CabeceraFormulario } from "./validacionFormulario";
 import styles from "./PaginaSolicitud.module.css";
@@ -46,6 +47,7 @@ export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos,
           <span>Fecha de la operación en puerto *</span>
           <input type="date" min={hoy} max={operacionMaxima(hoy)} value={cabecera.fecha_operacion}
             onChange={(e) => onCambiar("fecha_operacion", e.target.value)} />
+          <FechaEnPalabras iso={cabecera.fecha_operacion} />
         </label>
         {tipo.requiere_buque && (
           <>
@@ -56,7 +58,7 @@ export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos,
             </label>
             <label className={styles.campo}>
               <span>IMO * <em>(7 dígitos)</em></span>
-              <input type="text" maxLength={20} placeholder="IMO 9074729" value={cabecera.imo}
+              <input type="text" maxLength={20} placeholder="Ej. IMO 9074729" value={cabecera.imo}
                 onChange={(e) => onCambiar("imo", e.target.value)} />
             </label>
             <label className={styles.campo}>

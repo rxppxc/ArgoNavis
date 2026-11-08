@@ -26,6 +26,8 @@ export default function PaginaUsuarios() {
   const [errorBusq,    setErrorBusq]    = useState<string | null>(null);
 
   const [usuarios,     setUsuarios]     = useState<UsuarioSistema[]>([]);
+  // Filtro de la tabla (en el navegador): antes, para encontrar a alguien había que recorrerla entera.
+  const [filtro,       setFiltro]       = useState("");
   const [roles,        setRoles]        = useState<Rol[]>([]);
   const [cargando,     setCargando]     = useState(true);
   const [creando,      setCreando]      = useState<string | null>(null);
@@ -209,6 +211,11 @@ export default function PaginaUsuarios() {
   }
 
   const usuariosRegistrados = new Set(usuarios.map(u => u.username));
+  const textoFiltro = filtro.trim().toLowerCase();
+  const visibles = textoFiltro
+    ? usuarios.filter(u => [u.full_name, u.username, u.email, u.agencia?.nombre, u.rol_personalizado?.nombre]
+      .some(dato => dato?.toLowerCase().includes(textoFiltro)))
+    : usuarios;
 
   return (
     <MarcoPagina volverA="/dashboard" ancho="amplio">
@@ -237,14 +244,14 @@ export default function PaginaUsuarios() {
         <section className={styles.panel}>
           <div className={styles.panelHeader}>
             <IconoBuscar />
-            Buscar en Active Directory
+            Agregar un funcionario del Active Directory
           </div>
           <div className={styles.panelBody}>
             <form onSubmit={alBuscar} className={styles.searchRow}>
               <input
                 className={styles.searchInput}
                 type="text"
-                placeholder="Nombre, usuario o correo…"
+                placeholder="Busca por nombre, usuario o correo del dominio…"
                 aria-label="Buscar en Active Directory"
                 maxLength={100}
                 value={busqueda}
@@ -306,7 +313,7 @@ export default function PaginaUsuarios() {
         <section className={styles.panel}>
           <div className={styles.panelHeader}>
             <IconoLlave />
-            Cuenta local (usuarios externos)
+            Crear una cuenta local (agencias navieras y usuarios sin dominio)
             <button
               type="button"
               className={styles.btnPanel}
@@ -314,7 +321,7 @@ export default function PaginaUsuarios() {
               aria-expanded={mostrarLocal}
             >
               {!mostrarLocal && <IconoMas tamano={14} />}
-              {mostrarLocal ? "Ocultar" : "Nueva"}
+              {mostrarLocal ? "Ocultar" : "Crear cuenta"}
             </button>
           </div>
           {mostrarLocal && (
@@ -375,13 +382,26 @@ export default function PaginaUsuarios() {
           <div className={styles.panelHeader}>
             <IconoUsuario />
             Usuarios del sistema
-            <span className={styles.count}>{usuarios.length}</span>
+            <span className={styles.count}>{textoFiltro ? `${visibles.length} de ${usuarios.length}` : usuarios.length}</span>
           </div>
           <div className={styles.panelBody}>
+            {usuarios.length > 0 && (
+              <input
+                className={`${styles.searchInput} ${styles.filtroTabla}`}
+                type="search"
+                placeholder="Filtrar por nombre, usuario, correo, agencia o rol…"
+                aria-label="Filtrar los usuarios del sistema"
+                maxLength={100}
+                value={filtro}
+                onChange={e => setFiltro(e.target.value)}
+              />
+            )}
             {cargando ? (
               <EstadoCarga texto="Cargando usuarios…" />
             ) : usuarios.length === 0 ? (
               <p className={styles.empty}>No hay usuarios registrados. Usa la búsqueda de arriba para agregar el primero.</p>
+            ) : visibles.length === 0 ? (
+              <p className={styles.empty}>Ningún usuario coincide con «{filtro.trim()}».</p>
             ) : (
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
@@ -396,7 +416,7 @@ export default function PaginaUsuarios() {
                     </tr>
                   </thead>
                   <tbody>
-                    {usuarios.map(u => {
+                    {visibles.map(u => {
                       const esYo = u.id === usuario?.id;
                       const trabajando = ocupado === u.id;
                       return (

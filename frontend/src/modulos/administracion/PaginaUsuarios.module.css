@@ -57,6 +57,7 @@
   transition: border-color var(--t), box-shadow var(--t);
 }
 .searchInput::placeholder { color: var(--muted); }
+.filtroTabla { width: 100%; margin-bottom: 14px; }
 .searchInput:focus {
   border-color: var(--foco);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--foco) 18%, transparent);

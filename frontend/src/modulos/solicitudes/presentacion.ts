@@ -60,6 +60,23 @@ export function formatearFecha(iso: string | null | undefined): string {
   return `${dia}/${mes}/${anio}`;
 }
 
+const FECHA_LARGA = new Intl.DateTimeFormat("es-PA", {
+  weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
+});
+
+/** "2026-11-13" → "jueves, 13 de noviembre de 2026" (en UTC: una fecha sin hora no
+ *  debe correrse de día por la zona horaria). Va bajo los campos de fecha del
+ *  formulario: el navegador los muestra en su propio formato (en un Windows en
+ *  inglés, mm/dd/aaaa), y en palabras no hay cómo confundir el día con el mes. */
+export function fechaEnPalabras(iso: string | null | undefined): string {
+  const partes = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? "");
+  if (!partes) return "";
+  const [anio, mes, dia] = partes.slice(1).map(Number);
+  const fecha = new Date(Date.UTC(anio, mes - 1, dia));
+  if (fecha.getUTCMonth() !== mes - 1) return "";   // 31 de febrero y similares
+  return FECHA_LARGA.format(fecha);
+}
+
 /** Fecha y hora local como "06/10/2026, 03:10 p. m.". El orden día/mes se arma
  *  a mano: el locale es-PA formatea mes/día, y el PDF y los correos usan día/mes. */
 export function formatearFechaHora(iso: string | null | undefined): string {

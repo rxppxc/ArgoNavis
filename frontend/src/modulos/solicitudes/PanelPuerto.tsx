@@ -4,7 +4,7 @@ import { IconoExito } from "../../components/Iconos";
 import { useConfirmar } from "../../components/ModalConfirmacion";
 import { useNotificacion } from "../../components/Notificaciones";
 import { mensajeDeError } from "../../utils/errores";
-import { formatearFechaHora } from "./presentacion";
+import { formatearFechaHora, tiempoRestante } from "./presentacion";
 import type { VerificacionImpedimentos } from "./useVerificacionImpedimentos";
 import styles from "./DetalleSolicitud.module.css";
 
@@ -15,11 +15,15 @@ interface Props {
   onActualizada: (s: SolicitudDetalle) => void;
 }
 
-/** Panel del puesto de control: resume la verificación de impedimentos en
- *  SIMPLUS (obligatoria desde el 2026-11-06, se marca en la tabla de
- *  tripulantes) y finaliza, con el comentario de lo ocurrido (fecha, hora y
- *  usuario automáticos). Se finaliza en el puesto autorizado: una operación en
- *  otro puesto es una solicitud nueva de la agencia (reunión del 2026-10-30). */
+/** Panel del puesto de control, en tres pasos numerados (revisión de UX del
+ *  2026-11-08; antes eran tres párrafos seguidos en la columna angosta):
+ *    1. verificar los impedimentos en SIMPLUS (obligatoria desde el 2026-11-06;
+ *       se marca en la tabla de tripulantes);
+ *    2. escribir lo ocurrido en la operación;
+ *    3. finalizar (fecha, hora y usuario automáticos).
+ *  Arriba, el plazo: hasta cuándo se puede finalizar. Se finaliza en el puesto
+ *  autorizado: una operación en otro puesto es una solicitud nueva de la agencia
+ *  (reunión del 2026-10-30). */
 export function PanelPuerto({ solicitud, verificacion: v, onActualizada }: Props) {
   const { mostrar } = useNotificacion();
   const confirmar = useConfirmar();
@@ -59,53 +63,64 @@ export function PanelPuerto({ solicitud, verificacion: v, onActualizada }: Props
     }
   }
 
+  const plazo = tiempoRestante(solicitud.vigente_hasta);
+  const comentarioListo = comentario.trim().length >= 3;
+
   return (
     <section className={`${styles.panel} ${styles.panelAccion}`}>
       <h2 className={styles.panelTitulo}>Puesto de control</h2>
-      <div className={styles.resumenVerificacion}>
-        {v.corrigiendo ? (
-          <>
-            <strong className={styles.estadoPendiente}>Corrigiendo la verificación</strong>
-            <span>Guarda o cancela la corrección antes de finalizar.</span>
-          </>
-        ) : v.registrada ? (
-          <>
-            <strong className={styles.estadoOk}>Verificación guardada</strong>
-            <span>
-              {v.conImpedimento.length
-                ? <>Con impedimento: <strong>{v.conImpedimento.join(", ")}</strong></>
-                : "Ningún tripulante con impedimento."}
-            </span>
-          </>
-        ) : (
-          <>
-            <strong className={styles.estadoPendiente}>Verificación pendiente</strong>
-            <span>
-              Verifica los impedimentos en SIMPLUS: {total - v.pendientes} de {total} marcados en la tabla de
-              tripulantes. Para finalizar, primero guarda la verificación.
-            </span>
-          </>
-        )}
-      </div>
-      <p className={styles.ayuda}>
-        Registra lo ocurrido en la operación y finalízala. Queda con la fecha, la hora y tu usuario.
-        Debe finalizarse antes del {formatearFechaHora(solicitud.vigente_hasta)} o la autorización expira.
+      <p className={plazo.vencido ? styles.plazoPanelVencido : styles.plazoPanel}>
+        {plazo.vencido ? "Venció el plazo para finalizar" : "Finalizar antes del"}{" "}
+        <strong>{formatearFechaHora(solicitud.vigente_hasta)}</strong>
+        {!plazo.vencido && <> · {plazo.frase}</>}
       </p>
-      <p className={styles.ayuda}>
-        Finalízala solo si la operación se realizó en <strong>{solicitud.puesto_nombre}</strong>. Si se hizo en
-        otro puesto, no la finalices: vence sola y la agencia debe presentar una nueva solicitud.
-      </p>
-      <label className={styles.etiqueta} htmlFor="comentario-puerto">Comentario de la operación *</label>
-      <textarea id="comentario-puerto" className={styles.textarea} rows={3} maxLength={2000} value={comentario}
-        placeholder="Ej. Tripulantes presentados en garita, desembarque sin novedad…"
-        onChange={(e) => setComentario(e.target.value)} />
+
+      <ol className={styles.pasos}>
+        <li className={lista ? styles.pasoHecho : styles.pasoActual}>
+          <span className={styles.pasoNumero} aria-hidden="true">{lista ? "✓" : "1"}</span>
+          <div className={styles.pasoCuerpo}>
+            <strong className={styles.pasoTitulo}>Verifica los impedimentos en SIMPLUS</strong>
+            <span className={styles.pasoTexto}>
+              {v.corrigiendo
+                ? "Corrigiendo: guarda o cancela la corrección en la tabla de tripulantes."
+                : v.registrada
+                  ? (v.conImpedimento.length
+                    ? <>Guardada. Con impedimento: <strong>{v.conImpedimento.join(", ")}</strong></>
+                    : "Guardada: ningún tripulante con impedimento.")
+                  : `Marca a cada tripulante en la tabla (${total - v.pendientes} de ${total}) y guarda la verificación.`}
+            </span>
+          </div>
+        </li>
+        <li className={lista && comentarioListo ? styles.pasoHecho : lista ? styles.pasoActual : styles.pasoEspera}>
+          <span className={styles.pasoNumero} aria-hidden="true">{lista && comentarioListo ? "✓" : "2"}</span>
+          <div className={styles.pasoCuerpo}>
+            <label className={styles.pasoTitulo} htmlFor="comentario-puerto">Comentario de la operación *</label>
+            <span className={styles.pasoTexto}>Qué pasó en la operación, con lo que haya pasado con cada tripulante.</span>
+            <textarea id="comentario-puerto" className={styles.textarea} rows={3} maxLength={2000} value={comentario}
+              placeholder="Ej. Tripulantes presentados en garita, desembarque sin novedad…"
+              onChange={(e) => setComentario(e.target.value)} />
+          </div>
+        </li>
+        <li className={lista ? styles.pasoActual : styles.pasoEspera}>
+          <span className={styles.pasoNumero} aria-hidden="true">3</span>
+          <div className={styles.pasoCuerpo}>
+            <strong className={styles.pasoTitulo}>Finaliza</strong>
+            <span className={styles.pasoTexto}>
+              Solo si la operación se hizo en <strong>{solicitud.puesto_nombre}</strong>. Si fue en otro puesto, no la
+              finalices: vence sola y la agencia presenta una nueva solicitud.
+            </span>
+          </div>
+        </li>
+      </ol>
+
       {/* A todo el ancho, como las decisiones de UCVMM: es la acción del panel. Sin la
-          verificación guardada se desactiva, con el porqué arriba (en el resumen). */}
+          verificación guardada se desactiva, con el porqué en el paso 1. */}
       <button type="button" className={`${styles.btnFinalizar} ${styles.anchoCompleto}`} onClick={finalizar}
         disabled={trabajando || v.trabajando || !lista}
-        title={lista ? undefined : "Primero guarda la verificación de impedimentos"}>
+        title={lista ? undefined : "Primero guarda la verificación de impedimentos (paso 1)"}>
         <IconoExito tamano={15} /> {trabajando ? "Finalizando…" : "Finalizar"}
       </button>
+      <p className={styles.pieAccion}>Queda registrada con la fecha, la hora y tu usuario.</p>
     </section>
   );
 }
