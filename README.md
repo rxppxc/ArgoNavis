@@ -84,6 +84,8 @@ El backend corre con `UVICORN_WORKERS` procesos (2 por defecto) y con un usuario
 docker compose -f docker-compose-prod.yml run --rm --no-deps --user root --entrypoint chown backend -R 10001:10001 /app/storage/documentos
 ```
 
+Después de cada despliegue, `sudo bash verificar-despliegue.sh` revisa sin cambiar nada los contenedores, la salud, las cabeceras de seguridad, los puertos, el esquema, los topes de la base, el Active Directory, el correo, los respaldos, el reloj y los errores del log, y termina con «todo bien» o con la lista de fallas.
+
 **Windows**: `APP_ENV=production` y `LOG_CARPETA=logs` en `backend\.env`, `migrate.bat`, compilar el frontend (`npm run build`) y `start-backend-prod.bat` (sirve también `frontend/dist`). Con `LOG_CARPETA`, los logs quedan en `backend\logs\argonavis-AAAA-MM-DD.log`, uno por día, y se borran a los `LOG_DIAS` días (30); sin ella, solo se ven en la consola y se pierden al cerrarla. En Docker no hace falta: Docker guarda y rota la salida.
 
 > **Al actualizar en Windows**, antes de `migrate.bat`: `venv\Scripts\python -m pip install -r requirements.txt` en `backend` y `npm ci` en `frontend` (luego `npm run build`). Docker lo hace solo al reconstruir. Desde el 27/10/2026 el backend usa PyJWT en lugar de python-jose: sin ese paso no arranca (`No module named 'jwt'`). Lo viejo se puede quitar después: `venv\Scripts\python -m pip uninstall python-jose ecdsa rsa`. Las sesiones abiertas siguen valiendo.

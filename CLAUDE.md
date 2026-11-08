@@ -368,6 +368,7 @@ Pedido del usuario: revisar todo en busca de fallos, saturación y lo que estorb
 - **Docker:**
   - Imagen del backend en dos etapas, sin compiladores (todas las dependencias traen binario para Linux; instalar build-essential detrás del proxy del SNM trancaba el build más de 13 min): la final corre como `argonavis` (uid 10001). Un volumen `documentos` creado antes hay que pasárselo una vez (README → Producción).
   - `UVICORN_WORKERS` (entrypoint, 1 por defecto; el compose pone 2) y `PYTHONUNBUFFERED`.
+  - `verificar-despliegue.sh` (raíz): revisión de un despliegue con Docker, solo lectura salvo el freno del login (intentos con un usuario inexistente) y un archivo vacío en el volumen. Si agregas algo que el despliegue necesite (una variable, un servicio, un puerto), súmale su chequeo.
   - El servidor de pruebas (192.168.10.75, Rocky 9) no llega a Docker Hub (el firewall corta `auth.docker.io`): usa el espejo `mirror.gcr.io` en `/etc/docker/daemon.json` (`registry-mirrors`).
   - nginx resuelve `backend` en cada petición (`resolver 127.0.0.11` y `proxy_pass $api`): con el nombre fijo lo resolvía una vez al arrancar y, si el backend se recreaba con otra IP, respondía 502 hasta reiniciarlo.
 - **Revisado y sin cambios:** LDAP, bcrypt y el PDF ya corren en hilos; las subidas tienen su propio tope de 300 s en el cliente; temporizadores y escuchas del frontend se limpian; las relaciones del ORM cargan en lote (`selectin`), sin N+1 en las bandejas.
