@@ -9,6 +9,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    // Sin source maps en producción (es lo que Vite hace por defecto; explícito
+    // para que nadie lo active sin querer): publicarían el código fuente completo.
+    build: { sourcemap: false },
     server: {
       port: 5173,
       // Solo este equipo: el servidor de desarrollo no tiene las protecciones de

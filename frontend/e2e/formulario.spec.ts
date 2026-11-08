@@ -3,7 +3,8 @@
  * documentos al quitar un tripulante, cambiarle el rango o cambiar de trámite,
  * el resumen de lo que falta, los adicionales y el aviso de lo que hay que revisar.
  */
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./base";
 import { CUENTAS, entrar, pdf } from "./datos";
 
 const tarjeta = (pagina: Page, indice: number) => pagina.locator('[id^="tripulante-"]').nth(indice);

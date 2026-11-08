@@ -214,6 +214,8 @@ if _FRONTEND_DIST.exists():
         "X-Content-Type-Options": "nosniff",
         "Referrer-Policy": "same-origin",
         "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+        # Sistema interno: que ningún buscador ni rastreador lo indexe (como nginx).
+        "X-Robots-Tag": "noindex, nofollow",
     }
 
     @aplicacion.get("/{ruta_completa:path}", include_in_schema=False)

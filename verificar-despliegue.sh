@@ -77,11 +77,16 @@ seccion "Seguridad"
 for ruta in / /api/health; do
   cabeceras=$(curl -s -D - -o /dev/null --max-time 15 "http://localhost$ruta")
   faltan=""
-  for h in "content-security-policy" "x-frame-options: DENY" "x-content-type-options: nosniff" "referrer-policy"; do
+  for h in "content-security-policy" "x-frame-options: DENY" "x-content-type-options: nosniff" "referrer-policy" "x-robots-tag: noindex"; do
     echo "$cabeceras" | grep -qi "^$h" || faltan="$faltan ${h%%:*}"
   done
   if [ -z "$faltan" ]; then bien "Cabeceras de seguridad en $ruta"; else mal "Faltan cabeceras en $ruta:$faltan"; fi
 done
+if curl -s --max-time 15 http://localhost/robots.txt | tr -d '\r' | grep -qx 'Disallow: /'; then
+  bien "robots.txt pide que no se indexe nada"
+else
+  mal "robots.txt no bloquea la indexación"
+fi
 servidor=$(curl -s -D - -o /dev/null --max-time 15 http://localhost/ | grep -i '^server:' | tr -d '\r')
 if echo "$servidor" | grep -q '[0-9]'; then aviso "El servidor muestra su versión ($servidor)"; else bien "nginx no muestra su versión"; fi
 ip=$(hostname -I | awk '{print $1}')

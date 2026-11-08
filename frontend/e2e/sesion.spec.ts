@@ -4,7 +4,8 @@
  * pestaña olvidada cerraba a los 15 minutos la sesión de la que se usaba.
  * El reloj del navegador se adelanta (clock): 15 minutos pasan en un instante.
  */
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./base";
 import { CUENTAS, iniciarSesion } from "./datos";
 
 const MINUTO = 60_000;

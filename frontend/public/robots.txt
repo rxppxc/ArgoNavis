@@ -1,0 +1,5 @@
+# ARGO NAVIS es un sistema interno del Servicio Nacional de Migración: nada de
+# esto debe indexarse, ni por buscadores ni por rastreadores de IA. Lo mismo
+# dicen la etiqueta robots de index.html y la cabecera X-Robots-Tag.
+User-agent: *
+Disallow: /

@@ -16,6 +16,7 @@ import PaginaLogin                from "./modulos/autenticacion/PaginaLogin";
 import PaginaCambiarContrasena    from "./modulos/autenticacion/PaginaCambiarContrasena";
 import PaginaPanel                from "./modulos/solicitudes/PaginaPanel";
 import PaginaVerificacion         from "./modulos/solicitudes/PaginaVerificacion";
+import PaginaNoEncontrada         from "./modulos/general/PaginaNoEncontrada";
 import {
   AVISO_INACTIVIDAD_MS as AVISO_MS,
   LOGOUT_INACTIVIDAD_MS as LOGOUT_MS,
@@ -208,7 +209,9 @@ export default function App() {
                           <Route path="/admin/tramites"    element={<RutaRol roles={["admin"]}><PaginaTramites /></RutaRol>} />
                           <Route path="/admin/catalogos"   element={<RutaRol roles={["admin"]}><PaginaCatalogos /></RutaRol>} />
                           <Route path="/admin/bitacora"    element={<RutaRol roles={["admin", "sysadmin"]}><PaginaBitacora /></RutaRol>} />
-                          <Route path="*"                  element={<Navigate to="/dashboard" replace />} />
+                          <Route path="/"                  element={<Navigate to="/dashboard" replace />} />
+                          {/* Antes cualquier dirección desconocida llevaba en silencio a las bandejas. */}
+                          <Route path="*"                  element={<PaginaNoEncontrada />} />
                         </Routes>
                       </Suspense>
                     </GestorSesion>

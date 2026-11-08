@@ -375,6 +375,13 @@ Pedido del usuario: revisar todo en busca de fallos, saturación y lo que estorb
 - **Revisado y sin cambios:** LDAP, bcrypt y el PDF ya corren en hilos; las subidas tienen su propio tope de 300 s en el cliente; temporizadores y escuchas del frontend se limpian; las relaciones del ORM cargan en lote (`selectin`), sin N+1 en las bandejas.
 - **Documentación de la DTI, juego 0.6:** el 06 (configuración, Docker, salud, índices) y el 08 (evidencias y pendientes) pasan a la 0.6; el 00, a la 0.5, por su tabla de versiones. Los demás no cambian. `v06.py` (scratchpad) hace los reemplazos en los generadores, como `v05.py`.
 
+### Los 20 puntos de «sitio hecho a la carrera» (2026-11-08)
+El usuario pidió revisar una lista de señales de sitios web públicos. ARGO NAVIS es un sistema **interno**: lo de buscadores no aplica, y lo de rastreadores aplica al revés.
+- **Hecho:** página 404 propia (`PaginaNoEncontrada`; antes una ruta desconocida llevaba a las bandejas sin avisar), `<noscript>`, meta description, `noindex` en tres capas (`robots.txt`, la etiqueta robots de `index.html` y `X-Robots-Tag` en nginx y en `_CABECERAS_SPA`), source maps apagados de forma explícita (`vite.config.ts`) y la vigilancia de la consola en el E2E (`e2e/base.ts`: un `console.error`, un error sin atrapar o un 5xx hacen fallar la prueba; los 4xx no).
+- **Ya estaba:** título por página (`useTituloDocumento`), un solo H1 por página, `alt` en las imágenes, `lang="es"`, favicon, paquete inicial partido (357 KB; exceljs y docx-preview se cargan solo al previsualizar).
+- **No aplica, a propósito:** sitemap, tag canónico, OG image, datos estructurados y `llms.txt` (son para salir en buscadores y en IA; aquí nada debe indexarse). Vite y React son la decisión del proyecto. **No los agregues.**
+- Los avisos que quedan en la consola de Firefox (contraseña en página insegura, `crypto.randomUUID` en su visor de PDF) son por servir en HTTP: los quita el HTTPS (pendiente 1).
+
 ### Lo que sigue pendiente (no urgente)
 1. **HTTPS y TLS con el AD** — la configuración está lista (README → "Producción"); falta el certificado del servidor y el del controlador de dominio (infraestructura).
 2. **JWT en cookie httpOnly** — actualmente en localStorage, con la CSP como barrera (regla 15). Plan en README → "Decisiones documentadas".

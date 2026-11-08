@@ -3,7 +3,7 @@
  * enlace «Saltar al contenido», los controles que no tenían nombre y la
  * recarga cuando, tras un despliegue, falta un archivo de la versión anterior.
  */
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./base";
 import { CUENTAS, entrar } from "./datos";
 
 test("teclado, nombres de los controles y recarga tras un despliegue", async ({ browser, page }) => {
@@ -47,5 +47,20 @@ test("teclado, nombres de los controles y recarga tras un despliegue", async ({ 
     await expect(agencia.getByLabel("Agencia naviera")).not.toHaveValue("");
     await expect(agencia.getByLabel("Fecha y hora de solicitud")).not.toHaveValue("");
     await expect(agencia.getByRole("textbox", { name: "Observaciones", exact: true })).toBeVisible();
+  });
+});
+
+test("una dirección que no existe y un sistema que no se indexa", async ({ page, request }) => {
+  await test.step("una dirección que no existe muestra la página 404, también sin sesión", async () => {
+    await page.goto("/esta-direccion-no-existe");
+    await expect(page.getByRole("heading", { name: "No encontramos esta página", level: 1 })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Ir a iniciar sesión" })).toBeVisible();
+    await expect(page).toHaveTitle("Página no encontrada · ARGO NAVIS");
+  });
+
+  await test.step("ningún buscador ni rastreador lo indexa", async () => {
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex, nofollow");
+    const robots = await (await request.get("/robots.txt")).text();
+    expect(robots).toMatch(/^Disallow: \/\r?$/m);
   });
 });

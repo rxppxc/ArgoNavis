@@ -6,7 +6,8 @@
  * Administrador lo ve en la bitácora.
  */
 import { readFileSync } from "node:fs";
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./base";
 import { CUENTAS, NOMBRE_REVISOR, PUESTO, entrar, fechaPanama, pdf } from "./datos";
 
 const TRIPULANTE = "Juan Carlos Pérez Gómez";
