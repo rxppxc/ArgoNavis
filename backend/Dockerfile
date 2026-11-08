@@ -1,7 +1,10 @@
-# ── Dependencias: se instalan (y, si alguna no trae binario, se compilan) aquí ──
+# ── Dependencias: se instalan aquí, en un venv que la imagen final copia ───────
+# Sin compiladores: todas las dependencias traen binario para Linux y Python 3.12
+# (comprobado el 2026-11-08). Instalar build-essential eran más de 200 paquetes
+# de Debian, y detrás del proxy del SNM el build se trancaba más de 13 minutos en
+# ese paso. Si algún día una dependencia necesita compilarse, agrega aquí:
+#   RUN apt-get update && apt-get install -y --no-install-recommends build-essential && rm -rf /var/lib/apt/lists/*
 FROM python:3.12-slim AS dependencias
-RUN apt-get update && apt-get install -y --no-install-recommends build-essential libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 COPY requirements.txt .

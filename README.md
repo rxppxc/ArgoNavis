@@ -79,7 +79,7 @@ En GitHub, `.github/workflows/ci.yml` corre todo lo anterior en cada push a main
 docker compose -f docker-compose-prod.yml up -d --build
 ```
 
-El backend corre con `UVICORN_WORKERS` procesos (2 por defecto) y con un usuario sin privilegios (`argonavis`, uid 10001), sin las herramientas de compilación en la imagen. El volumen `documentos` de una instalación anterior al 08/11/2026 se creó cuando el contenedor corría como root: pásaselo al usuario una vez, antes de levantar la versión nueva (si no, las subidas fallan por permisos):
+El backend corre con `UVICORN_WORKERS` procesos (2 por defecto) y con un usuario sin privilegios (`argonavis`, uid 10001), sin las herramientas de compilación en la imagen. Si el firewall no deja llegar a Docker Hub (`auth.docker.io`), usa un espejo: `{ "registry-mirrors": ["https://mirror.gcr.io"] }` en `/etc/docker/daemon.json` y `sudo systemctl restart docker`. El volumen `documentos` de una instalación anterior al 08/11/2026 se creó cuando el contenedor corría como root: pásaselo al usuario una vez, antes de levantar la versión nueva (si no, las subidas fallan por permisos):
 ```bash
 docker compose -f docker-compose-prod.yml run --rm --no-deps --user root --entrypoint chown backend -R 10001:10001 /app/storage/documentos
 ```

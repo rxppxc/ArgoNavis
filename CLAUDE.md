@@ -366,8 +366,9 @@ Pedido del usuario: revisar todo en busca de fallos, saturación y lo que estorb
   - La verificación del QR y el cambio de contraseña siguen en el paquete inicial: son chicas, y la primera la abre el público en el teléfono (diferida, además, el E2E pulsaba Tab antes de que apareciera).
   - `mensajeDeError` (`utils/errores.ts`) dice «No hay conexión con el servidor…» sin respuesta (red o VPN caída), «tardó demasiado» con el tiempo agotado y «no está disponible» con un 502/503/504 sin motivo. Antes cada pantalla mostraba su texto genérico.
 - **Docker:**
-  - Imagen del backend en dos etapas: las herramientas de compilación quedan en la primera y la final corre como `argonavis` (uid 10001). Un volumen `documentos` creado antes hay que pasárselo una vez (README → Producción).
+  - Imagen del backend en dos etapas, sin compiladores (todas las dependencias traen binario para Linux; instalar build-essential detrás del proxy del SNM trancaba el build más de 13 min): la final corre como `argonavis` (uid 10001). Un volumen `documentos` creado antes hay que pasárselo una vez (README → Producción).
   - `UVICORN_WORKERS` (entrypoint, 1 por defecto; el compose pone 2) y `PYTHONUNBUFFERED`.
+  - El servidor de pruebas (192.168.10.75, Rocky 9) no llega a Docker Hub (el firewall corta `auth.docker.io`): usa el espejo `mirror.gcr.io` en `/etc/docker/daemon.json` (`registry-mirrors`).
   - nginx resuelve `backend` en cada petición (`resolver 127.0.0.11` y `proxy_pass $api`): con el nombre fijo lo resolvía una vez al arrancar y, si el backend se recreaba con otra IP, respondía 502 hasta reiniciarlo.
 - **Revisado y sin cambios:** LDAP, bcrypt y el PDF ya corren en hilos; las subidas tienen su propio tope de 300 s en el cliente; temporizadores y escuchas del frontend se limpian; las relaciones del ORM cargan en lote (`selectin`), sin N+1 en las bandejas.
 - **Documentación de la DTI, juego 0.6:** el 06 (configuración, Docker, salud, índices) y el 08 (evidencias y pendientes) pasan a la 0.6; el 00, a la 0.5, por su tabla de versiones. Los demás no cambian. `v06.py` (scratchpad) hace los reemplazos en los generadores, como `v05.py`.
