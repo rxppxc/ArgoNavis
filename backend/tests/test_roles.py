@@ -141,3 +141,23 @@ async def test_limites_de_entrada_en_usuarios_y_roles(cliente, admin):
     r = await cliente.put(f"/admin/roles/{rol['id']}/permisos", json={"permiso_ids": list(range(1, 102))},
                           headers=admin.headers)
     assert r.status_code == 422
+
+
+async def test_la_consola_crea_el_primer_usuario(cliente):
+    """En una instalación nueva no hay usuarios y el AD solo deja entrar a cuentas
+    registradas: asignar_rol --crear-local da de alta al primero, con el rol y una
+    contraseña temporal que hay que cambiar al entrar."""
+    from app.infrastructure.asignar_rol import asignar
+
+    nombre = f"primero.{secrets.token_hex(3)}"
+    with pytest.raises(SystemExit, match="--crear-ad o --crear-local"):
+        await asignar(nombre, "SysAdmin")
+    salida = await asignar(nombre, "SysAdmin", crear="local")
+    temporal = salida.split("cambia al entrar): ")[1].split("\n")[0]
+    async with SesionLocal() as s:
+        usuario = (await s.execute(select(Usuario).where(Usuario.username == nombre))).scalar_one()
+        rol = (await s.execute(select(Rol).where(Rol.id == usuario.rol_id))).scalar_one()
+    assert rol.nombre == "SysAdmin" and usuario.debe_cambiar_password
+
+    r = await cliente.post("/auth/login", json={"username": nombre, "password": temporal})
+    assert r.status_code == 200, r.text

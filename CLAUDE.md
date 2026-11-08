@@ -418,7 +418,7 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
   - El último SysAdmin activo no se puede desactivar, borrar ni cambiar de rol (409).
   - Administrador y SysAdmin no se pueden renombrar y sus permisos son fijos (400 en `asignar_permisos_a_rol`): el SysAdmin no puede darse permisos `T-*`.
   - Nadie cambia su propio rol (400): ni subirse de rol ni quedarse fuera por error.
-  - El primero se nombra desde la consola: `python -m app.infrastructure.asignar_rol <usuario> SysAdmin` (queda en la bitácora como "consola").
+  - El primero se nombra desde la consola: `python -m app.infrastructure.asignar_rol <usuario> SysAdmin` (queda en la bitácora como "consola"). En una instalación nueva no hay usuarios y el AD solo deja entrar a los registrados: `--crear-ad` lo da de alta desde el AD y `--crear-local` crea una cuenta local con contraseña temporal (2026-11-08, `test_la_consola_crea_el_primer_usuario`).
 
 **Estados (`solicitudes.estado`, con CHECK en la BD):** `review` → `approved` → `finalized`; `review` → `returned` → (corrige) `review`; `review` → `denied`; `approved` o `returned` con el plazo vencido → `expired` (`infrastructure/tareas.py`).
 

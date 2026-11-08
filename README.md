@@ -111,10 +111,10 @@ docker compose -f docker-compose-prod.yml run --rm --no-deps --user root --entry
 
 > **Al migrar un servidor que venía del storage** (revisión `d4f1a8c27e90`): las transferencias sueltas que existan se **eliminan**, en la base y en disco. Si alguna hace falta, descárgala antes de actualizar.
 
-> **Primer SysAdmin** (desde la revisión `c7a2e94b1f30`): usuarios, roles y permisos los gestionan el SysAdmin y el Administrador, y la migración no le asigna esos roles a nadie. Después de migrar, nómbralo desde la consola del servidor (el usuario ya tiene que existir; queda en la bitácora):
+> **Primer SysAdmin** (desde la revisión `c7a2e94b1f30`): usuarios, roles y permisos los gestionan el SysAdmin y el Administrador, y la migración no le asigna esos roles a nadie. Después de migrar, nómbralo desde la consola del servidor (queda en la bitácora). En una instalación nueva no hay usuarios: agrega `--crear-ad` para darlo de alta desde el Active Directory, o `--crear-local` para una cuenta local con contraseña temporal (se muestra una vez):
 > ```bat
 > cd backend
-> venv\Scripts\python -m app.infrastructure.asignar_rol <usuario> SysAdmin
+> venv\Scripts\python -m app.infrastructure.asignar_rol <usuario> SysAdmin --crear-ad
 > ```
 > Con Docker: `docker compose -f docker-compose-prod.yml exec backend python -m app.infrastructure.asignar_rol <usuario> SysAdmin`. El mismo comando sirve para recuperar el acceso si se pierde.
 
