@@ -94,7 +94,7 @@ class _Informe:
         h.fit_to_pages(1, 0)
         if horizontal:
             h.set_landscape()
-        h.set_header(f"&L&8{TITULO}&R&8{self.d.periodo}")
+        h.set_header(f"&L&8{TITULO}&R&8{self.d.periodo} · {self.d.alcance}")
         h.set_footer(f"&L&8{SISTEMA} — {INSTITUCION}. {USO_INTERNO}.&R&8Página &P de &N")
         h.set_column(0, 0, 9)
         for fila, alto in ((0, 24), (1, 16), (2, 16), (3, 16)):
@@ -107,7 +107,8 @@ class _Informe:
         h.write_string(0, 1, TITULO, self.f(bold=True, font_size=15, font_color=MARINO))
         h.write_string(1, 1, f"{INSTITUCION} · {SISTEMA}", self.f(font_color=GRIS))
         h.write_rich_string(2, 1, self.f(bold=True, font_color=GRIS), "Periodo: ", self.f(font_color=TEXTO),
-                            self.d.periodo, self.f(font_color=GRIS))
+                            self.d.periodo, self.f(bold=True, font_color=GRIS), " · Sectores: ",
+                            self.f(font_color=TEXTO), self.d.alcance, self.f(font_color=GRIS))
         h.write_string(3, 1, f"Generado el {self.d.generado} · {USO_INTERNO}", self.f(font_color=GRIS, italic=True))
         if LOGO_ARGO_NAVIS.exists():
             h.insert_image(0, ancho + 1, str(LOGO_ARGO_NAVIS), {
@@ -385,6 +386,8 @@ class _Informe:
 
     def hoja_uso(self) -> None:
         uso = self.d.uso
+        if uso is None:   # solo para quien ve todos los sectores
+            return
         h, fila = self.hoja("Uso del sistema", ancho=5)
         h.set_column(1, 1, 40)
         h.set_column(2, 2, 16)

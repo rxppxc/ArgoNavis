@@ -283,19 +283,28 @@ class RepositorioSolicitud:
     # ── Estadísticas del flujo ───────────────────────────────────────────────
 
     @staticmethod
-    def _filtro_fechas(desde: date | None, hasta: date | None) -> list:
-        """Filtra por fecha de creación (inclusive, en hora de Panamá), con el índice de created_at."""
-        return entre_fechas_panama(Solicitud.created_at, desde, hasta)
+    def _filtro_fechas(desde: date | None, hasta: date | None, puestos_ids: set[int] | None = None) -> list:
+        """Filtra por fecha de creación (inclusive, en hora de Panamá), con el índice
+        de created_at, y por los puestos visibles (los del sector; None = todos)."""
+        filtros = entre_fechas_panama(Solicitud.created_at, desde, hasta)
+        if puestos_ids is not None:
+            # Sin puestos no ve nada (IN de una lista vacía no es válido en SQL).
+            filtros.append(Solicitud.puesto_control_id.in_(sorted(puestos_ids) or [-1]))
+        return filtros
 
-    async def contar_por_estado(self, desde: date | None, hasta: date | None) -> dict[str, int]:
+    async def contar_por_estado(
+        self, desde: date | None, hasta: date | None, puestos_ids: set[int] | None = None,
+    ) -> dict[str, int]:
         consulta = (
             select(Solicitud.estado, func.count())
-            .where(*self._filtro_fechas(desde, hasta))
+            .where(*self._filtro_fechas(desde, hasta, puestos_ids))
             .group_by(Solicitud.estado)
         )
         return {estado: total for estado, total in (await self.sesion.execute(consulta)).all()}
 
-    async def contar_hitos(self, desde: date | None, hasta: date | None) -> dict[str, float | int | None]:
+    async def contar_hitos(
+        self, desde: date | None, hasta: date | None, puestos_ids: set[int] | None = None,
+    ) -> dict[str, float | int | None]:
         """Totales por hito alcanzado (no por estado actual): una solicitud
         aprobada y luego finalizada cuenta como aprobada y como finalizada. Las
         fuera del horario, por la hora en que UCVMM aprobó."""
@@ -310,7 +319,7 @@ class RepositorioSolicitud:
             func.count(Solicitud.finalizada_en).label("finalizadas"),
             _contar_fuera_de_horario(Solicitud.aprobada_en).label("fuera_horario"),
             horas_resolucion.label("horas"),
-        ).where(*self._filtro_fechas(desde, hasta))
+        ).where(*self._filtro_fechas(desde, hasta, puestos_ids))
         fila = (await self.sesion.execute(consulta)).one()
         return {
             "recibidas":     fila.recibidas,
@@ -322,7 +331,9 @@ class RepositorioSolicitud:
             "horas":         float(fila.horas) if fila.horas is not None else None,
         }
 
-    async def contar_por_tipo(self, desde: date | None, hasta: date | None) -> list:
+    async def contar_por_tipo(
+        self, desde: date | None, hasta: date | None, puestos_ids: set[int] | None = None,
+    ) -> list:
         consulta = (
             select(
                 TipoTramite.codigo, TipoTramite.nombre,
@@ -332,13 +343,15 @@ class RepositorioSolicitud:
                 func.count(Solicitud.expirada_en).label("expiradas"),
             )
             .join(TipoTramite, TipoTramite.id == Solicitud.tipo_tramite_id)
-            .where(*self._filtro_fechas(desde, hasta))
+            .where(*self._filtro_fechas(desde, hasta, puestos_ids))
             .group_by(TipoTramite.codigo, TipoTramite.nombre, TipoTramite.orden)
             .order_by(TipoTramite.orden)
         )
         return list((await self.sesion.execute(consulta)).all())
 
-    async def contar_por_puesto(self, desde: date | None, hasta: date | None) -> list:
+    async def contar_por_puesto(
+        self, desde: date | None, hasta: date | None, puestos_ids: set[int] | None = None,
+    ) -> list:
         consulta = (
             select(
                 PuestoControl.nombre,
@@ -347,13 +360,15 @@ class RepositorioSolicitud:
                 func.count(case((Solicitud.aprobada_en.isnot(None), Solicitud.expirada_en))).label("expiradas"),
             )
             .join(PuestoControl, PuestoControl.id == Solicitud.puesto_control_id)
-            .where(*self._filtro_fechas(desde, hasta))
+            .where(*self._filtro_fechas(desde, hasta, puestos_ids))
             .group_by(PuestoControl.nombre)
             .order_by(func.count(Solicitud.aprobada_en).desc(), PuestoControl.nombre)
         )
         return list((await self.sesion.execute(consulta)).all())
 
-    async def serie_diaria(self, desde: date | None = None, hasta: date | None = None) -> dict[date, dict[str, int]]:
+    async def serie_diaria(
+        self, desde: date | None = None, hasta: date | None = None, puestos_ids: set[int] | None = None,
+    ) -> dict[date, dict[str, int]]:
         """Conteo por día (hora de Panamá) de cada hito, sobre las solicitudes
         creadas en el rango `desde`/`hasta` (si se da): cada cifra cuenta el día
         en que ocurrió (la llegada, la aprobación, la finalización…), y las fuera
@@ -373,7 +388,7 @@ class RepositorioSolicitud:
             consulta = (
                 select(dia.label("dia"), func.count())
                 .where(
-                    *self._filtro_fechas(desde, hasta),
+                    *self._filtro_fechas(desde, hasta, puestos_ids),
                     columna.isnot(None),
                     *([condicion] if condicion is not None else []),
                 )
@@ -383,7 +398,9 @@ class RepositorioSolicitud:
                 series.setdefault(valor_dia, {})[clave] = total
         return series
 
-    async def aprobadas_por_hora(self, desde: date | None, hasta: date | None) -> list:
+    async def aprobadas_por_hora(
+        self, desde: date | None, hasta: date | None, puestos_ids: set[int] | None = None,
+    ) -> list:
         """Aprobadas por día de la semana (1 = lunes … 7 = domingo) y hora de la
         aprobación, en hora de Panamá: (dia, hora, total), solo las que tienen alguna."""
         local = func.timezone(_ZONA, Solicitud.aprobada_en)
@@ -391,12 +408,14 @@ class RepositorioSolicitud:
         hora = extract("hour", local)
         consulta = (
             select(dia.label("dia"), hora.label("hora"), func.count().label("total"))
-            .where(*self._filtro_fechas(desde, hasta), Solicitud.aprobada_en.isnot(None))
+            .where(*self._filtro_fechas(desde, hasta, puestos_ids), Solicitud.aprobada_en.isnot(None))
             .group_by(dia, hora)
         )
         return list((await self.sesion.execute(consulta)).all())
 
-    async def listar_fuera_horario(self, desde: date | None, hasta: date | None, limite: int) -> list:
+    async def listar_fuera_horario(
+        self, desde: date | None, hasta: date | None, limite: int, puestos_ids: set[int] | None = None,
+    ) -> list:
         """Las aprobadas fuera del horario laboral, la más reciente primero:
         (id, número, trámite, puesto autorizado, aprobada_en, quién aprobó). El
         nombre es la foto del historial, como en el expediente."""
@@ -416,7 +435,7 @@ class RepositorioSolicitud:
             )
             .join(TipoTramite, TipoTramite.id == Solicitud.tipo_tramite_id)
             .where(
-                *self._filtro_fechas(desde, hasta),
+                *self._filtro_fechas(desde, hasta, puestos_ids),
                 Solicitud.aprobada_en.isnot(None),
                 _fuera_de_horario(Solicitud.aprobada_en),
             )

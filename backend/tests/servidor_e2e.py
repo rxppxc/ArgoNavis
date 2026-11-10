@@ -34,11 +34,16 @@ STORAGE = Path(tempfile.gettempdir()) / "argonavis_e2e_documentos"
 CLAVE = "Prueba-E2e-2026!"
 AGENCIA = "Agencia E2E, S.A."
 PUESTO = "Puesto E2E"
-CUENTAS = [  # usuario, nombre, apellido, rol, ¿de la agencia?, ¿del puesto?
-    ("e2e.agencia", "Laura", "Agencia", "Naviera", True, False),
-    ("e2e.ucvmm", "Ricardo", "Revisor", "Sector Pacífico", False, False),
-    ("e2e.puesto", "Ana", "Puesto", "Puesto de Control", False, True),
-    ("e2e.admin", "José", "Administrador", "Administrador", False, False),
+# El puesto de las pruebas es del Sector Pacífico (2026-11-10): el revisor del
+# Atlántico no ve sus solicitudes, y el supervisor general las ve sin decidir.
+SECTOR_DEL_PUESTO = "Sector Pacífico"
+CUENTAS = [  # usuario, nombre, apellido, rol, ¿de la agencia?, ¿del puesto?, sector
+    ("e2e.agencia", "Laura", "Agencia", "Naviera", True, False, None),
+    ("e2e.ucvmm", "Ricardo", "Revisor", "UCVMM", False, False, "Sector Pacífico"),
+    ("e2e.atlantico", "Marta", "Atlántico", "UCVMM", False, False, "Sector Atlántico"),
+    ("e2e.supervisor", "Sofía", "Supervisora", "Supervisor general", False, False, None),
+    ("e2e.puesto", "Ana", "Puesto", "Puesto de Control", False, True, None),
+    ("e2e.admin", "José", "Administrador", "Administrador", False, False, None),
 ]
 
 # ── Entorno (antes de importar la app: la configuración se lee una sola vez) ──
@@ -99,17 +104,19 @@ async def sembrar() -> None:
     from sqlalchemy import insert, select
 
     from app.core.security import hashear_password
-    from app.domain.models.catalogo import AgenciaNaviera, PuestoControl, usuarios_puestos
+    from app.domain.models.catalogo import AgenciaNaviera, PuestoControl, Sector, usuarios_puestos, usuarios_sectores
     from app.domain.models.rol import Rol
     from app.domain.models.user import TipoUsuario, Usuario
     from app.infrastructure.database import SesionLocal, motor_bd
 
     async with SesionLocal() as s:
-        agencia, puesto = AgenciaNaviera(nombre=AGENCIA), PuestoControl(nombre=PUESTO)
+        sectores = {x.nombre: x.id for x in (await s.execute(select(Sector))).scalars()}
+        agencia = AgenciaNaviera(nombre=AGENCIA)
+        puesto = PuestoControl(nombre=PUESTO, sector_id=sectores[SECTOR_DEL_PUESTO])
         s.add_all([agencia, puesto])
         await s.flush()
         clave = hashear_password(CLAVE)
-        for usuario, nombre, apellido, rol, de_agencia, de_puesto in CUENTAS:
+        for usuario, nombre, apellido, rol, de_agencia, de_puesto, sector in CUENTAS:
             rol_id = (await s.execute(select(Rol.id).where(Rol.nombre == rol))).scalar_one()
             u = Usuario(username=usuario, name=nombre, last_name=apellido, user_type=TipoUsuario.LOCAL,
                         password_hash=clave, rol_id=rol_id, agencia_id=agencia.id if de_agencia else None)
@@ -117,6 +124,8 @@ async def sembrar() -> None:
             await s.flush()
             if de_puesto:
                 await s.execute(insert(usuarios_puestos).values(usuario_id=u.id, puesto_id=puesto.id))
+            if sector:
+                await s.execute(insert(usuarios_sectores).values(usuario_id=u.id, sector_id=sectores[sector]))
         await s.commit()
     await motor_bd.dispose()
 

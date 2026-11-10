@@ -87,7 +87,7 @@ export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos,
         {tipo.requiere_clinica && (
           <label className={styles.campo}>
             <span>Clínica u hospital *</span>
-            <input type="text" maxLength={255} placeholder="Donde será llevado el tripulante"
+            <input type="text" maxLength={255} placeholder="Donde será llevado el pasajero"
               value={cabecera.clinica_hospital}
               onChange={(e) => onCambiar("clinica_hospital", e.target.value)} />
           </label>

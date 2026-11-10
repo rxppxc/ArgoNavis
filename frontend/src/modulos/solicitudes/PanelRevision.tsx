@@ -33,14 +33,14 @@ export function PanelRevision({ solicitud, verificacion: v, onActualizada }: Pro
             <span>
               {v.conImpedimento.length
                 ? <>Con impedimento: <strong>{v.conImpedimento.join(", ")}</strong></>
-                : "Ningún tripulante con impedimento."}
+                : "Ningún pasajero con impedimento."}
             </span>
           </>
         ) : (
           <>
             <strong className={styles.estadoPendiente}>Verificación pendiente</strong>
             <span>
-              {total - v.pendientes} de {total} marcados en la tabla de tripulantes. Para aprobar, primero
+              {total - v.pendientes} de {total} marcados en la tabla de pasajeros. Para aprobar, primero
               guarda la verificación.
             </span>
           </>

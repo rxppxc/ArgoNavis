@@ -312,6 +312,8 @@ function Expediente({ s, onActualizada }: { s: SolicitudDetalle; onActualizada: 
               <Dato etiqueta="Creada por" valor={s.creada_por} />
               <Dato etiqueta="Fecha de solicitud" valor={formatearFechaHora(s.created_at)} />
               <Dato etiqueta="Puesto de Control Migratorio" valor={s.puesto_nombre} />
+              {/* El sector de UCVMM (2026-11-10): solo le llega al SNM. */}
+              {s.sector_nombre && <Dato etiqueta="Sector" valor={s.sector_nombre} />}
               <Dato etiqueta="Fecha de la operación" valor={formatearFecha(s.fecha_operacion)} />
               <Dato etiqueta="Buque" valor={s.nombre_buque} />
               <Dato etiqueta="IMO" valor={s.imo} />

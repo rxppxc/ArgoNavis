@@ -15,7 +15,7 @@ from app.domain.models.tramite import TipoTramite
 from app.domain.repositories.solicitud_repository import _fuera_de_horario
 from app.domain.services.solicitud_service import _meses_antes, _periodos_mes, _serie
 from app.infrastructure.database import SesionLocal
-from conftest import crear_actor
+from conftest import crear_actor, id_sector
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
@@ -70,10 +70,10 @@ def _ultimo(dia_semana: int) -> date:
 
 async def test_estadisticas_e_insignia(cliente):
     sufijo = secrets.token_hex(3)
-    revisor = await crear_actor("Sector Pacífico", prefijo="revisor")
+    revisor = await crear_actor("UCVMM", prefijo="revisor")
     async with SesionLocal() as s:
         agencia = AgenciaNaviera(nombre=f"Agencia Horario {sufijo}")
-        puesto = PuestoControl(nombre=f"Puesto Horario {sufijo}")
+        puesto = PuestoControl(nombre=f"Puesto Horario {sufijo}", sector_id=await id_sector())
         s.add_all([agencia, puesto])
         await s.commit()
     naviera = await crear_actor("Naviera", agencia_id=agencia.id, prefijo="naviera")
@@ -158,7 +158,7 @@ async def test_estadisticas_e_insignia(cliente):
 
 async def test_series_del_periodo(cliente):
     """Con un periodo, la serie muestra sus días, meses y años (hasta hoy)."""
-    revisor = await crear_actor("Sector Pacífico", prefijo="revisor")
+    revisor = await crear_actor("UCVMM", prefijo="revisor")
     hoy = datetime.now(ZONA_PANAMA).date()
     desde = hoy.replace(day=1)
     r = await cliente.get("/solicitudes/estadisticas", params={"desde": desde.isoformat(), "hasta": hoy.isoformat()},

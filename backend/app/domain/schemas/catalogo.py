@@ -43,7 +43,9 @@ class SalidaCatalogoConUsuarios(BaseModel):
 
 
 class SalidaPuesto(SalidaCatalogoConUsuarios):
-    pass
+    # El sector de UCVMM que revisa sus solicitudes (2026-11-10).
+    sector_id:     int
+    sector_nombre: str
 
 
 class SalidaAgencia(SalidaCatalogoConUsuarios):
@@ -76,11 +78,12 @@ class _DatosActualizarConCorreo(BaseModel):
 
 
 class DatosCrearPuesto(_DatosCrearConCorreo):
-    pass
+    sector_id: int   # obligatorio: sin sector, ningún revisor vería sus solicitudes
 
 
 class DatosActualizarPuesto(_DatosActualizarConCorreo):
-    pass
+    # Cambiarlo pasa sus solicitudes (también las abiertas) al otro sector.
+    sector_id: int | None = None
 
 
 class DatosCrearAgencia(_DatosCrearConCorreo):
@@ -93,6 +96,30 @@ class DatosActualizarAgencia(_DatosActualizarConCorreo):
 
 class DatosAsignarUsuarios(BaseModel):
     usuario_ids: list[int] = Field(default_factory=list, max_length=500)
+
+
+# ── Sectores de UCVMM (2026-11-10) ───────────────────────────────────────────
+# Fijos (Pacífico y Atlántico, los siembra la migración): se cambian el buzón y
+# los funcionarios asignados (UCVMM y supervisores de sector). Los puestos se
+# asignan desde cada puesto.
+
+class SalidaSector(BaseModel):
+    id:       int
+    nombre:   str
+    correo:   str | None = None
+    usuarios: list[UsuarioAsignado] = Field(default_factory=list)
+    puestos:  list[SalidaCatalogoMini] = Field(default_factory=list)
+
+
+class DatosActualizarSector(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    correo: str | None = Field(default=None, max_length=255)
+
+    @field_validator("correo")
+    @classmethod
+    def _v_correo(cls, v: str | None) -> str | None:
+        return validar_correo(v)
 
 
 # ── Países ───────────────────────────────────────────────────────────────────

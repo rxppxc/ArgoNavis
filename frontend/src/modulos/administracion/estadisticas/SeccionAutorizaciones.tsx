@@ -10,7 +10,7 @@
  * «Ver tabla». El periodo y la unidad los lleva la página (los usa también la
  * exportación).
  */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiSolicitudes, type EstadisticasSolicitudes } from "../../../api/solicitudes";
 import { EstadoCarga } from "../../../components/EstadoCarga";
 import type { RangoFechas } from "../../../components/FiltroFechas";
@@ -29,31 +29,48 @@ interface Props {
   onCambioRango: (r: RangoFechas) => void;
   unidad: Unidad;
   onCambioUnidad: (u: Unidad) => void;
+  /** null = los sectores que ve quien consulta (todos, o el suyo). */
+  sectorId: number | null;
+  onCambioSector: (id: number | null) => void;
 }
 
-export default function SeccionAutorizaciones({ rango, onCambioRango, unidad, onCambioUnidad }: Props) {
-  // Las cifras junto con el periodo al que corresponden: mientras llega uno nuevo,
-  // lo de pantalla sigue diciendo de qué periodo es (atenuado, sin saltos).
-  const [resultado, setResultado] = useState<{ datos: EstadisticasSolicitudes; rango: RangoFechas } | null>(null);
-  const [fallo, setFallo] = useState<{ rango: RangoFechas; mensaje: string } | null>(null);
+export default function SeccionAutorizaciones({ rango, onCambioRango, unidad, onCambioUnidad, sectorId, onCambioSector }: Props) {
+  // Lo pedido (periodo y sector) y, con las cifras, a qué pedido corresponden:
+  // mientras llega uno nuevo, lo de pantalla sigue diciendo de qué es (atenuado).
+  const consulta = useMemo(() => ({ rango, sectorId }), [rango, sectorId]);
+  const [resultado, setResultado] = useState<{ datos: EstadisticasSolicitudes; consulta: typeof consulta } | null>(null);
+  const [fallo, setFallo] = useState<{ consulta: typeof consulta; mensaje: string } | null>(null);
 
   useEffect(() => {
     let cancelado = false;
-    apiSolicitudes.estadisticas(rango.desde, rango.hasta)
-      .then((datos) => { if (!cancelado) { setResultado({ datos, rango }); setFallo(null); } })
+    apiSolicitudes.estadisticas(consulta.rango.desde, consulta.rango.hasta, consulta.sectorId)
+      .then((datos) => { if (!cancelado) { setResultado({ datos, consulta }); setFallo(null); } })
       .catch((e) => {
-        if (!cancelado) setFallo({ rango, mensaje: mensajeDeError(e, "No se pudieron cargar las estadísticas de autorizaciones.") });
+        if (!cancelado) setFallo({ consulta, mensaje: mensajeDeError(e, "No se pudieron cargar las estadísticas de autorizaciones.") });
       });
     return () => { cancelado = true; };
-  }, [rango]);
+  }, [consulta]);
 
-  const error = fallo?.rango === rango ? fallo.mensaje : null;
-  const actualizando = resultado?.rango !== rango && !error;
+  const error = fallo?.consulta === consulta ? fallo.mensaje : null;
+  const actualizando = resultado?.consulta !== consulta && !error;
+  const sectores = resultado?.datos.sectores ?? [];
 
   return (
     <section className={styles.seccion} aria-labelledby="titulo-autorizaciones" aria-busy={actualizando}>
       <div className={styles.cabeceraSeccion}>
         <h2 id="titulo-autorizaciones">Autorizaciones marítimas</h2>
+        {/* De qué sector son las cifras: un sector, el nombre; varios, para elegir. */}
+        {sectores.length === 1 && <span className={styles.alcance}>{sectores[0].nombre}</span>}
+        {sectores.length > 1 && (
+          <div className={styles.chips} role="group" aria-label="Sector">
+            {[{ id: null, nombre: "Todos" }, ...sectores].map((x) => (
+              <button key={x.id ?? "todos"} type="button" className={styles.chip} aria-pressed={sectorId === x.id}
+                onClick={() => onCambioSector(x.id)}>
+                {x.nombre}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <SelectorPeriodo valor={rango} onCambio={onCambioRango} />
 
@@ -63,9 +80,9 @@ export default function SeccionAutorizaciones({ rango, onCambioRango, unidad, on
         !error && <EstadoCarga texto="Cargando estadísticas…" />
       ) : (
         <div className={`${styles.contenido} ${actualizando ? styles.atenuado : ""}`}>
-          <ResumenPeriodo datos={resultado.datos} rango={resultado.rango} />
+          <ResumenPeriodo datos={resultado.datos} rango={resultado.consulta.rango} />
           <div className={styles.grilla}>
-            <GraficoTiempo datos={resultado.datos} rango={resultado.rango} unidad={unidad} onUnidad={onCambioUnidad} />
+            <GraficoTiempo datos={resultado.datos} rango={resultado.consulta.rango} unidad={unidad} onUnidad={onCambioUnidad} />
             <GraficoTramites tramites={resultado.datos.por_tipo} />
             <GraficoPuestos puestos={resultado.datos.por_puesto} />
             <MapaHoras datos={resultado.datos} />

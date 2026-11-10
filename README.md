@@ -1,6 +1,6 @@
 # ARGO NAVIS · Sistema Interno Marítimo (SNM)
 
-**ARGO NAVIS** es el Sistema Interno Marítimo del **Servicio Nacional de Migración (SNM) de Panamá**; el nombre viene de la constelación *Argo Navis*, «la nave Argo». Hoy cubre las **Autorizaciones Marítimas** de la UCVMM: las agencias navieras envían solicitudes con el expediente de los tripulantes, UCVMM las revisa y aprueba (o devuelve o deniega), y el puesto de control migratorio registra la operación y la finaliza. La autorización aprobada se descarga en PDF con un código QR verificable.
+**ARGO NAVIS** es el Sistema Interno Marítimo del **Servicio Nacional de Migración (SNM) de Panamá**; el nombre viene de la constelación *Argo Navis*, «la nave Argo». Hoy cubre las **Autorizaciones Marítimas** de la UCVMM: las agencias navieras envían solicitudes con el expediente de los pasajeros, UCVMM (Sector Pacífico o Atlántico, según el puesto) las revisa y aprueba (o devuelve o deniega), y el puesto de control migratorio registra la operación y la finaliza. La autorización aprobada se descarga en PDF con un código QR verificable.
 
 Nació como una herramienta de *storage* (transferencias de archivos con enlace público) y se adaptó: el almacenamiento pasó a ser la capa documental del expediente de cada solicitud. Ya no hay enlaces públicos de descarga. Antes se llamaba "FileDrop - SNM" y el repositorio, FileTransfer.
 
@@ -63,13 +63,13 @@ npm run lint
 npm test
 npm run build
 ```
-`npm test` corre las pruebas unitarias (Vitest). Las reglas que se validan en pantalla y en el servidor (checklist, tripulantes, IMO, contraseñas, formatos y tamaño) comparten sus casos en `backend/tests/espejo/`: si una cambia de un lado y no del otro, falla pytest o Vitest.
+`npm test` corre las pruebas unitarias (Vitest). Las reglas que se validan en pantalla y en el servidor (checklist, pasajeros, IMO, contraseñas, formatos y tamaño) comparten sus casos en `backend/tests/espejo/`: si una cambia de un lado y no del otro, falla pytest o Vitest.
 
 ```bat
 cd frontend
 npm run test:e2e
 ```
-Recorre en el navegador una autorización completa: la agencia la envía, UCVMM la devuelve, la agencia la corrige, UCVMM la aprueba, un tercero verifica el QR, el puesto la finaliza y el Administrador la ve en la bitácora. También prueba el formulario sin enviarlo: cambiar de trámite, quitar un tripulante y los documentos adicionales. Levanta su propio backend (`backend/tests/servidor_e2e.py`, puerto 8001, con la base temporal `argonavis_e2e`, que borra al terminar) y su propio Vite (puerto 5174): no choca con los de desarrollo. Usa el Chrome instalado; en un equipo sin Chrome, `npx playwright install chromium` y `set PLAYWRIGHT_CHROMIUM=1`. Además prueba con el teclado el enlace «Saltar al contenido» y que los controles tengan nombre (`accesibilidad.spec.ts`), y la sesión con dos pestañas abiertas, adelantando el reloj del navegador (`sesion.spec.ts`).
+Recorre en el navegador una autorización completa: la agencia la envía, UCVMM la devuelve, la agencia la corrige, UCVMM la aprueba, un tercero verifica el QR, el puesto la finaliza y el Administrador la ve en la bitácora. También prueba el formulario sin enviarlo: cambiar de trámite, quitar un pasajero y los documentos adicionales. Y los sectores: UCVMM del Atlántico no ve una solicitud del Pacífico y el supervisor general la ve sin poder decidir. Levanta su propio backend (`backend/tests/servidor_e2e.py`, puerto 8001, con la base temporal `argonavis_e2e`, que borra al terminar) y su propio Vite (puerto 5174): no choca con los de desarrollo. Usa el Chrome instalado; en un equipo sin Chrome, `npx playwright install chromium` y `set PLAYWRIGHT_CHROMIUM=1`. Además prueba con el teclado el enlace «Saltar al contenido» y que los controles tengan nombre (`accesibilidad.spec.ts`), y la sesión con dos pestañas abiertas, adelantando el reloj del navegador (`sesion.spec.ts`).
 
 En GitHub, `.github/workflows/ci.yml` corre todo lo anterior en cada push a main, más un análisis de vulnerabilidades en las dependencias, que se repite cada lunes. Una vulnerabilidad nueva deja ese análisis en rojo. Para correrlo en el equipo: en `backend`, `venv\Scripts\python -m pip_audit -r requirements.txt` (con `set PYTHONUTF8=1`), y en `frontend`, `npm audit --omit=dev`.
 
@@ -169,9 +169,11 @@ ArgoNavis/
 | Rol | Permiso | Qué hace |
 |---|---|---|
 | **Naviera** (usuario de una agencia) | `T-CREAR-BASICA` | Envía solicitudes de su agencia y las corrige cuando UCVMM las devuelve. Todos los usuarios de la agencia comparten sus solicitudes. |
-| **Sector Pacífico** (UCVMM) | `T-PROCESAR-PACIFICO` | Verifica impedimentos tripulante por tripulante (obligatorio para aprobar), aprueba, devuelve a corrección o deniega. |
-| **Puesto de Control** | `T-FINALIZAR-PUERTO` + puestos asignados | Ve las aprobadas de sus puestos, verifica impedimentos tripulante por tripulante (obligatorio para finalizar, aparte de la de UCVMM) y las finaliza con un comentario. Se finaliza en el puesto autorizado: si la operación se hace en otro, la agencia presenta una nueva solicitud. |
-| **Administrador** | todos los `T-*` | Acceso total: bandejas y expedientes, catálogo de trámites, agencias, puestos, nacionalidades restringidas, estadísticas, bitácora, usuarios y roles. |
+| **UCVMM** | `T-PROCESAR-PACIFICO` + sector asignado | Revisa las solicitudes de los puestos de su sector (Pacífico o Atlántico): verifica impedimentos pasajero por pasajero (obligatorio para aprobar), aprueba, devuelve a corrección o deniega. No ve las del otro sector. |
+| **Supervisor de sector** | `T-SUPERVISAR-SECTOR` + sector asignado | Solo lectura: ve las solicitudes de su sector (expedientes, documentos, autorizaciones y estadísticas), sin decidir nada. |
+| **Supervisor general** (UCVMM en Tocumen) | `T-SUPERVISAR-TODO` | Solo lectura, de los dos sectores, más el uso del sistema. |
+| **Puesto de Control** | `T-FINALIZAR-PUERTO` + puestos asignados | Ve las aprobadas de sus puestos, verifica impedimentos pasajero por pasajero (obligatorio para finalizar, aparte de la de UCVMM) y las finaliza con un comentario. Se finaliza en el puesto autorizado: si la operación se hace en otro, la agencia presenta una nueva solicitud. |
+| **Administrador** | todos los `T-*` | Acceso total: bandejas y expedientes de los dos sectores, catálogo de trámites, agencias, puestos, sectores, nacionalidades restringidas, estadísticas, bitácora, usuarios y roles. |
 | **SysAdmin** | ninguno | Rol técnico: usuarios, roles (con los permisos fijos del sistema) y bitácora. No ve solicitudes ni expedientes. |
 
 Administrador y SysAdmin se reconocen por el nombre del rol (`rol_personalizado.nombre`): no se pueden renombrar y sus permisos son fijos. Nadie cambia su propio rol. El último SysAdmin activo no se puede desactivar, borrar ni cambiar de rol.
@@ -182,23 +184,23 @@ Administrador y SysAdmin se reconocen por el nombre del rol (`rol_personalizado.
 - El checklist de documentos de cada trámite vive en BD (`tipos_tramite`, `documentos_requeridos`, `tramite_documentos`). Las condiciones se resuelven en `ServicioTramite.construir_casillas`, espejado en `frontend/src/modulos/solicitudes/checklist.ts`.
 - Fechas del formulario:
   - La operación va de hoy hasta `DIAS_MAXIMOS_ANTICIPACION` (365) días.
-  - Cada tripulante debe tener 18 años cumplidos y haber nacido desde 1900.
+  - Cada pasajero debe tener 18 años cumplidos y haber nacido desde 1900.
   - El pasaporte y el seamanbook tienen que vencer después del nacimiento.
 - En ningún trámite se puede enviar la solicitud si el pasaporte o el seamanbook vence antes del día de la operación. Solo el rango Marino porta seamanbook; en Embarque se le pide la libreta sin importar la nacionalidad.
 - El catálogo sigue tal cual los documentos:
   - Los documentos de cada trámite son los del Formulario No. 3 oficial.
-  - Todos se suben por tripulante, salvo la Lista de Tripulantes, que va a la solicitud.
+  - Todos se suben por pasajero, salvo la Lista de Tripulantes (su nombre oficial en el Form. 3), que va a la solicitud.
   - Excepción (30/10/2026): a los rangos distintos de Marino solo se les piden las Generales de pasaporte y el boleto aéreo (`tramite_documentos.rangos`).
-- Una solicitud admite hasta 30 tripulantes.
+- Una solicitud admite hasta 30 pasajeros.
 - Nacionalidad restringida:
-  - En Desembarque se exige el Formulario No. 6 de custodia por tripulante.
+  - En Desembarque se exige el Formulario No. 6 de custodia por pasajero.
   - En Desembarque, Urgencias, Renovación y Shore Pass, al aprobar se avisa a la agencia que debe realizar el trámite de solicitud de custodia (`tipos_tramite.aviso_custodia`).
   - La lista de nacionalidades restringidas la marca el admin; no viene ninguna sembrada.
-- El trámite de Técnico, Superintendente o Supernumerario solo admite tripulantes con esos rangos (`tipos_tramite.rangos_permitidos`).
+- El trámite de Técnico, Superintendente o Supernumerario solo admite pasajeros con esos rangos (`tipos_tramite.rangos_permitidos`).
 - `backend/tests/test_documento_ucvmm.py` tiene la lectura del Formulario No. 3 y del documento de UCVMM trámite por trámite (campos, documentos, vigencias, custodia): si el catálogo se aparta de él, la prueba falla.
 - Además del checklist, se pueden adjuntar hasta 20 documentos adicionales por solicitud.
 - Lo interno no le llega a la agencia, porque el backend lo filtra, no solo la vista:
-  - La verificación de impedimentos (por tripulante).
+  - La verificación de impedimentos (por pasajero).
   - La observación de aprobación.
   - El comentario de cierre del puesto de control.
   - Los nombres de los funcionarios: en su historial ve "UCVMM" o "Puesto de control".
@@ -208,6 +210,8 @@ Administrador y SysAdmin se reconocen por el nombre del rol (`rol_personalizado.
 - **Estadísticas exportables:** Excel, PDF o CSV del periodo elegido, con el escudo del SNM, el logo de ARGO NAVIS, quién lo generó y «Uso interno del SNM» (`GET /api/v1/solicitudes/estadisticas/exportar`).
 - **Notificaciones internas:** la campana de la cabecera muestra lo que le toca hacer a cada rol (por revisar, por corregir, por finalizar) y las novedades de sus solicitudes. Consulta `GET /api/v1/pendientes` cada minuto con la pestaña a la vista.
 - **Separación de funciones:** nadie revisa una solicitud que creó o que es de su propia agencia.
+- **Sectores:** cada puesto de control es del Sector Pacífico o del Atlántico (Catálogos → Sectores). UCVMM y el supervisor de sector ven solo las solicitudes de los puestos de su sector; el aviso de cada solicitud nueva va al correo de su sector.
+- **Pasajeros:** en pantalla, en los correos y en el PDF se dice «pasajeros»; en el código, la API y la base de datos sigue `tripulantes`.
 - Cada transición bloquea la fila de la solicitud: dos revisores no pueden aprobar y negar la misma a la vez.
 - Las solicitudes no se borran. Un usuario, agencia o puesto con solicitudes se desactiva en lugar de eliminarse.
 - El QR del PDF lleva a `/verificar/{codigo}`, una página pública que solo muestra lo necesario para verificar la autorización (pasaportes enmascarados).

@@ -21,8 +21,13 @@ from app.domain.models.rol import Permiso, RolPermiso
 
 # Permisos del flujo de Autorizaciones Marítimas
 PERMISO_SOLICITAR = "T-CREAR-BASICA"        # Naviera
-PERMISO_REVISAR   = "T-PROCESAR-PACIFICO"   # UCVMM (Sector Pacífico)
+# UCVMM: revisa las solicitudes de los puestos de sus sectores (users ↔ sectores).
+# El código es de cuando había un solo sector: no se cambia, lo usa el frontend.
+PERMISO_REVISAR   = "T-PROCESAR-PACIFICO"
 PERMISO_PUERTO    = "T-FINALIZAR-PUERTO"    # Puesto de control migratorio
+# Solo lectura (2026-11-10): las de sus sectores, o las de los dos (Tocumen).
+PERMISO_SUPERVISAR_SECTOR = "T-SUPERVISAR-SECTOR"
+PERMISO_SUPERVISAR_TODO   = "T-SUPERVISAR-TODO"
 
 ROL_ADMIN    = "Administrador"
 ROL_SYSADMIN = "SysAdmin"

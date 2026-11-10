@@ -3,7 +3,9 @@
   - Lectura (cualquier usuario autenticado): puestos de control activos y
     países, para llenar el formulario de solicitud.
   - Administración (solo admin):
-      · puestos de control y los funcionarios asignados a cada uno;
+      · sectores de UCVMM (Pacífico y Atlántico): su buzón y sus funcionarios
+        (UCVMM y supervisores de sector), 2026-11-10;
+      · puestos de control, su sector y los funcionarios asignados a cada uno;
       · agencias navieras y sus usuarios (comparten las solicitudes de la agencia);
       · marca de nacionalidades restringidas.
 """
@@ -16,13 +18,13 @@ from app.api.v1.dependencias import auditar_admin
 from app.core.permisos import requerir_admin
 from app.core.security import obtener_id_usuario_actual
 from app.domain.models.audit_log import AccionAuditoria
-from app.domain.models.catalogo import AgenciaNaviera, PuestoControl
+from app.domain.models.catalogo import AgenciaNaviera, PuestoControl, Sector
 from app.domain.repositories.catalogo_repository import RepositorioCatalogo
 from app.domain.repositories.user_repository import RepositorioUsuario
 from app.domain.schemas.catalogo import (
-    DatosActualizarAgencia, DatosActualizarPais, DatosActualizarPuesto, DatosAsignarUsuarios,
+    DatosActualizarAgencia, DatosActualizarPais, DatosActualizarPuesto, DatosActualizarSector, DatosAsignarUsuarios,
     DatosCrearAgencia, DatosCrearPuesto, SalidaAgencia, SalidaCatalogoConUsuarios, SalidaCatalogoMini,
-    SalidaPais, SalidaPuesto, UsuarioAsignado,
+    SalidaPais, SalidaPuesto, SalidaSector, UsuarioAsignado,
 )
 from app.infrastructure.database import obtener_sesion_bd
 
@@ -31,15 +33,30 @@ enrutador = APIRouter(tags=["catalogos"])
 Entidad = PuestoControl | AgenciaNaviera
 
 
+def _usuarios(entidad: Entidad | Sector) -> list[UsuarioAsignado]:
+    return [UsuarioAsignado(id=u.id, username=u.username, full_name=u.full_name) for u in entidad.usuarios]
+
+
 def _salida(clase: type[SalidaCatalogoConUsuarios], entidad: Entidad, totales: dict[int, int]) -> SalidaCatalogoConUsuarios:
+    extra = {"sector_id": entidad.sector_id, "sector_nombre": entidad.sector.nombre} if clase is SalidaPuesto else {}
     return clase(
         id=entidad.id, nombre=entidad.nombre, correo=entidad.correo, activo=entidad.activo,
-        usuarios=[
-            UsuarioAsignado(id=u.id, username=u.username, full_name=u.full_name)
-            for u in entidad.usuarios
-        ],
-        total_solicitudes=totales.get(entidad.id, 0),
+        usuarios=_usuarios(entidad), total_solicitudes=totales.get(entidad.id, 0), **extra,
     )
+
+
+def _salida_sector(sector: Sector) -> SalidaSector:
+    return SalidaSector(
+        id=sector.id, nombre=sector.nombre, correo=sector.correo, usuarios=_usuarios(sector),
+        puestos=[SalidaCatalogoMini(id=pu.id, nombre=pu.nombre) for pu in sector.puestos],
+    )
+
+
+async def _sector_existente(repo: RepositorioCatalogo, sector_id: int) -> Sector:
+    sector = await repo.buscar_sector(sector_id)
+    if not sector:
+        raise HTTPException(status_code=400, detail="El sector elegido no existe.")
+    return sector
 
 
 async def _aplicar_cambios(
@@ -110,11 +127,14 @@ async def crear_puesto(
     repo = RepositorioCatalogo(sesion)
     if await repo.buscar_puesto_por_nombre(datos.nombre):
         raise HTTPException(status_code=409, detail="Ya existe un puesto de control con ese nombre.")
-    puesto = PuestoControl(nombre=datos.nombre, correo=datos.correo, activo=True)
+    sector = await _sector_existente(repo, datos.sector_id)
+    # Con el objeto (no el id): así `puesto.sector` queda cargado para la respuesta.
+    puesto = PuestoControl(nombre=datos.nombre, correo=datos.correo, activo=True, sector=sector)
     repo.agregar(puesto)
     await sesion.flush()
     await auditar_admin(sesion, request, admin_id, AccionAuditoria.PUESTO_CREADO,
-                        {"puesto_id": puesto.id, "nombre": puesto.nombre, "correo": puesto.correo})
+                        {"puesto_id": puesto.id, "nombre": puesto.nombre, "correo": puesto.correo,
+                         "sector": sector.nombre})
     puesto = await repo.buscar_puesto(puesto.id, con_usuarios=True)
     return _salida(SalidaPuesto, puesto, {})
 
@@ -134,6 +154,11 @@ async def actualizar_puesto(
     cambios = await _aplicar_cambios(
         puesto, datos, repo.buscar_puesto_por_nombre, "Ya existe otro puesto de control con ese nombre.",
     )
+    if datos.sector_id is not None and datos.sector_id != puesto.sector_id:
+        # Sus solicitudes, también las abiertas, pasan a los revisores del otro sector.
+        sector = await _sector_existente(repo, datos.sector_id)
+        puesto.sector = sector
+        cambios["sector"] = sector.nombre
     await sesion.flush()
     if cambios:
         await auditar_admin(sesion, request, admin_id, AccionAuditoria.PUESTO_ACTUALIZADO,
@@ -184,6 +209,63 @@ async def asignar_usuarios_puesto(
     sesion.expire(puesto, ["usuarios"])
     puesto = await repo.buscar_puesto(puesto_id, con_usuarios=True)
     return _salida(SalidaPuesto, puesto, await repo.contar_solicitudes_por_puesto())
+
+
+# ── Administración de sectores de UCVMM ──────────────────────────────────────
+
+@enrutador.get("/admin/sectores", response_model=list[SalidaSector])
+async def listar_sectores(
+    _admin: int = Depends(requerir_admin),
+    sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
+):
+    """Los dos sectores, con sus puestos y sus funcionarios asignados."""
+    return [_salida_sector(x) for x in await RepositorioCatalogo(sesion).listar_sectores(con_usuarios=True)]
+
+
+@enrutador.patch("/admin/sectores/{sector_id}", response_model=SalidaSector)
+async def actualizar_sector(
+    sector_id: int,
+    datos:     DatosActualizarSector,
+    request:   Request,
+    admin_id:  int = Depends(requerir_admin),
+    sesion:    AsyncSession = Depends(obtener_sesion_bd, scope="function"),
+):
+    """El buzón que recibe el aviso de cada solicitud nueva del sector (sin buzón,
+    va al general de UCVMM)."""
+    repo = RepositorioCatalogo(sesion)
+    sector = await repo.buscar_sector(sector_id, con_usuarios=True)
+    if not sector:
+        raise HTTPException(status_code=404, detail="Sector no encontrado.")
+    if datos.correo != sector.correo:
+        sector.correo = datos.correo
+        await sesion.flush()
+        await auditar_admin(sesion, request, admin_id, AccionAuditoria.SECTOR_ACTUALIZADO,
+                            {"sector_id": sector.id, "sector": sector.nombre, "correo": sector.correo})
+    return _salida_sector(sector)
+
+
+@enrutador.put("/admin/sectores/{sector_id}/usuarios", response_model=SalidaSector)
+async def asignar_usuarios_sector(
+    sector_id: int,
+    datos:     DatosAsignarUsuarios,
+    request:   Request,
+    admin_id:  int = Depends(requerir_admin),
+    sesion:    AsyncSession = Depends(obtener_sesion_bd, scope="function"),
+):
+    """Reemplaza los funcionarios del sector. Un revisor puede estar en los dos
+    (vacaciones, refuerzos): ve las solicitudes de los puestos de ambos."""
+    repo = RepositorioCatalogo(sesion)
+    sector = await repo.buscar_sector(sector_id)
+    if not sector:
+        raise HTTPException(status_code=404, detail="Sector no encontrado.")
+    ids = await _validar_usuarios(sesion, datos.usuario_ids)
+    await repo.reemplazar_usuarios_de_sector(sector_id, ids)
+    await auditar_admin(sesion, request, admin_id, AccionAuditoria.SECTOR_ACTUALIZADO,
+                        {"sector_id": sector_id, "sector": sector.nombre, "usuarios_asignados": ids})
+
+    sesion.expire(sector, ["usuarios"])
+    sector = await repo.buscar_sector(sector_id, con_usuarios=True)
+    return _salida_sector(sector)
 
 
 # ── Administración de agencias navieras ──────────────────────────────────────

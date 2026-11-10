@@ -23,8 +23,9 @@
 .input::placeholder { color: var(--muted); }
 .input:focus { outline: 2px solid var(--foco); border-color: transparent; }
 
+/* Flex con salto de línea: los puestos llevan además el sector (2026-11-10). */
 .formNuevo {
-  display: grid; grid-template-columns: 2fr 2fr auto; gap: 8px;
+  display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px;
   padding: 14px; margin-bottom: 14px;
   background: var(--card); border: 1px solid var(--border); border-radius: 12px;
 }
@@ -42,7 +43,10 @@
 .tarjetaInfo { flex: 1; min-width: 0; }
 .tarjetaNombre { color: var(--text); font-weight: 800; font-size: .95rem; }
 .tarjetaMeta { color: var(--text-2); font-size: .78rem; margin-top: 2px; }
-.formEnLinea { display: grid; grid-template-columns: 2fr 2fr auto auto; gap: 8px; width: 100%; }
+.formEnLinea { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; width: 100%; }
+.formNuevo > input, .formEnLinea > input { flex: 2 1 200px; min-width: 0; }
+.formNuevo > select, .formEnLinea > select { flex: 1 1 150px; min-width: 0; }
+.formNuevo > button, .formEnLinea > button { flex: 0 0 auto; }
 
 .interruptor { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); font-size: .8rem; cursor: pointer; }
 .interruptor input { width: 16px; height: 16px; accent-color: var(--y); }
@@ -107,6 +111,6 @@
 .paisCodigo { color: var(--muted); font-size: .72rem; font-weight: 700; }
 
 @media (max-width: 720px) {
-  .formNuevo, .formEnLinea { grid-template-columns: 1fr; }
+  .formNuevo > *, .formEnLinea > * { flex: 1 1 100%; }
   .tarjetaCabecera { flex-wrap: wrap; }
 }

@@ -5,7 +5,7 @@ import secrets
 import pytest
 
 from ayudas import cabecera, enviar, pdf, tripulante
-from conftest import Actor, crear_actor
+from conftest import Actor, crear_actor, id_sector
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
@@ -33,11 +33,12 @@ async def test_campana_por_rol(cliente, admin, sysadmin):
         return r.json()
 
     agencia = await crear("/admin/agencias", {"nombre": f"Agencia Campana {sufijo}"})
-    puesto = await crear("/admin/puestos", {"nombre": f"Puesto Campana {sufijo}"})
-    otro_puesto = await crear("/admin/puestos", {"nombre": f"Otro Puesto Campana {sufijo}"})
+    pacifico = await id_sector()
+    puesto = await crear("/admin/puestos", {"nombre": f"Puesto Campana {sufijo}", "sector_id": pacifico})
+    otro_puesto = await crear("/admin/puestos", {"nombre": f"Otro Puesto Campana {sufijo}", "sector_id": pacifico})
     nav1 = await crear_actor("Naviera", agencia_id=agencia["id"], prefijo="naviera")
     nav2 = await crear_actor("Naviera", agencia_id=agencia["id"], prefijo="naviera")
-    revisor = await crear_actor("Sector Pacífico", prefijo="revisor")
+    revisor = await crear_actor("UCVMM", prefijo="revisor")
     del_puesto = await crear_actor("Puesto de Control", prefijo="puerto")
     de_otro_puesto = await crear_actor("Puesto de Control", prefijo="puerto")
     for p, actor in ((puesto, del_puesto), (otro_puesto, de_otro_puesto)):

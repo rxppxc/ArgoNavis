@@ -99,7 +99,7 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
       const ok = await confirmar({
         titulo: "Cambiar de trámite",
         mensaje: `Cada trámite pide sus propios documentos: ${cuales} que adjuntaste en el checklist. `
-          + "Los datos, los tripulantes y los documentos adicionales se conservan.",
+          + "Los datos, los pasajeros y los documentos adicionales se conservan.",
         textoOk: "Cambiar de trámite",
         peligroso: true,
       });
@@ -198,12 +198,12 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
             {/* ── 3. Tripulantes ── */}
             <section className={styles.bloque}>
               <div className={styles.bloqueTitulo}>
-                <span className={styles.paso}>3</span> Tripulantes
+                <span className={styles.paso}>3</span> Pasajeros
                 <span className={styles.contador}>{tripulantes.length}</span>
               </div>
               <p className={styles.ayudaSeccion}>
                 Escribe nombres, apellidos y números de pasaporte y de libreta tal como aparecen en esos
-                documentos. Los documentos de cada tripulante se adjuntan en su propia tarjeta (PDF, Word o
+                documentos. Los documentos de cada pasajero se adjuntan en su propia tarjeta (PDF, Word o
                 Excel, de hasta {TAMANO_MAX_MB} MB cada uno).
               </p>
               {tripulantes.map((t, i) => (
@@ -234,11 +234,11 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
               {tripulantes.length < MAX_TRIPULANTES ? (
                 <button type="button" className={styles.btnAgregar}
                   onClick={() => fichas.agregar(tipo.rangos_permitidos?.[0])}>
-                  <IconoMas /> Agregar tripulante
+                  <IconoMas /> Agregar pasajero
                 </button>
               ) : (
                 <p className={styles.ayudaSeccion}>
-                  Llegaste al máximo de {MAX_TRIPULANTES} tripulantes por solicitud. Si son más, preséntalos en otra
+                  Llegaste al máximo de {MAX_TRIPULANTES} pasajeros por solicitud. Si son más, preséntalos en otra
                   solicitud.
                 </p>
               )}

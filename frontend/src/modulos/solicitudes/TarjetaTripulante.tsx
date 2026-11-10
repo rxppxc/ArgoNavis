@@ -65,7 +65,7 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
     <div id={`tripulante-${ficha.clave}`} className={`${styles.marino} ${contraida ? styles.marinoContraido : ""}`}>
       <div className={styles.marinoCabecera}>
         <span className={styles.marinoNum}>{indice + 1}</span>
-        <span className={styles.marinoTitulo}>{nombre || "Nuevo tripulante"}</span>
+        <span className={styles.marinoTitulo}>{nombre || "Nuevo pasajero"}</span>
         {restringida && <span className={styles.chipRestringida}>Nacionalidad restringida</span>}
         {casillas.length > 0 && (
           <span className={completo ? styles.chipDocsOk : styles.chipDocsFalta}>
@@ -73,14 +73,14 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
           </span>
         )}
         <button type="button" className={styles.btnContraer} onClick={() => onAlternar(ficha.clave)}
-          aria-expanded={!contraida} aria-label={contraida ? `Expandir tripulante ${indice + 1}` : `Contraer tripulante ${indice + 1}`}
+          aria-expanded={!contraida} aria-label={contraida ? `Expandir pasajero ${indice + 1}` : `Contraer pasajero ${indice + 1}`}
           title={contraida ? "Expandir" : "Contraer"}>
           <span className={contraida ? styles.chevronCerrado : styles.chevronAbierto}><IconoChevronAbajo /></span>
         </button>
         {puedeQuitar && (
           <button type="button" className={styles.btnQuitar}
-            onClick={() => onQuitar(ficha.clave)} title="Quitar tripulante"
-            aria-label={`Quitar tripulante ${indice + 1}`}>
+            onClick={() => onQuitar(ficha.clave)} title="Quitar pasajero"
+            aria-label={`Quitar pasajero ${indice + 1}`}>
             <IconoBasura tamano={14} />
           </button>
         )}
@@ -202,7 +202,7 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
 
           {casillas.length > 0 && (
             <div className={styles.marinoDocs}>
-              <div className={styles.marinoDocsTitulo}>Documentos de {nombre || `tripulante ${indice + 1}`}</div>
+              <div className={styles.marinoDocsTitulo}>Documentos de {nombre || `pasajero ${indice + 1}`}</div>
               <ChecklistDocumentos
                 casillas={casillas}
                 nuevos={nuevos}

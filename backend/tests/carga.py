@@ -87,7 +87,7 @@ async def sembrar(navieras: int, ucvmm: int, puesto: int) -> dict:
     from sqlalchemy import insert, select
 
     from app.core.security import crear_token_acceso, hashear_password
-    from app.domain.models.catalogo import AgenciaNaviera, PuestoControl, usuarios_puestos
+    from app.domain.models.catalogo import AgenciaNaviera, PuestoControl, Sector, usuarios_puestos, usuarios_sectores
     from app.domain.models.rol import Rol
     from app.domain.models.user import TipoUsuario, Usuario
     from app.infrastructure.database import SesionLocal, motor_bd
@@ -96,7 +96,9 @@ async def sembrar(navieras: int, ucvmm: int, puesto: int) -> dict:
     clave = hashear_password(CLAVE)
     async with SesionLocal() as s:
         agencias = [AgenciaNaviera(nombre=f"Agencia Carga {i}") for i in range(10)]
-        puestos = [PuestoControl(nombre=f"Puesto Carga {i}") for i in range(2)]
+        # Un puesto en cada sector; los revisores, en los dos (ven todo, como antes).
+        sectores = [x.id for x in (await s.execute(select(Sector).order_by(Sector.id))).scalars()]
+        puestos = [PuestoControl(nombre=f"Puesto Carga {i}", sector_id=sectores[i % 2]) for i in range(2)]
         s.add_all(agencias + puestos)
         await s.flush()
         roles = {r.nombre: r.id for r in (await s.execute(select(Rol))).scalars()}
@@ -108,11 +110,14 @@ async def sembrar(navieras: int, ucvmm: int, puesto: int) -> dict:
             return u
 
         de_agencias = [cuenta(f"carga.naviera{i}", "Naviera", agencias[i % 10].id) for i in range(navieras)]
-        de_ucvmm = [cuenta(f"carga.ucvmm{i}", "Sector Pacífico") for i in range(ucvmm)]
+        de_ucvmm = [cuenta(f"carga.ucvmm{i}", "UCVMM") for i in range(ucvmm)]
         de_puesto = [cuenta(f"carga.puesto{i}", "Puesto de Control") for i in range(puesto)]
         await s.flush()
         for i, u in enumerate(de_puesto):
             await s.execute(insert(usuarios_puestos).values(usuario_id=u.id, puesto_id=puestos[i % 2].id))
+        for u in de_ucvmm:
+            for sector_id in sectores:
+                await s.execute(insert(usuarios_sectores).values(usuario_id=u.id, sector_id=sector_id))
         await s.commit()
         datos = {
             "naviera": [u.id for u in de_agencias], "ucvmm": [u.id for u in de_ucvmm],

@@ -38,7 +38,7 @@ describe("desdeSolicitud: la precarga de una solicitud devuelta", () => {
     });
   });
 
-  it("conserva el id de cada tripulante, que da su clave", () => {
+  it("conserva el id de cada pasajero, que da su clave", () => {
     expect(precarga.tripulantes).toEqual([expect.objectContaining({
       clave: "t11", id: 11, nombre: "Ana", rango: "tecnico", libreta_marino: "", libreta_expira: "",
     })]);
@@ -108,7 +108,7 @@ describe("armarEnvio: lo que se manda al servidor", () => {
     expect(armarEnvio({ ...CABECERA_VACIA, imo: " IMO 9074728 " }, [ana], SIN_DOCUMENTOS).datos.imo).toBe("IMO 9074728");
   });
 
-  it("el seamanbook va solo en los rangos que lo portan; los tripulantes nuevos van sin id", () => {
+  it("el seamanbook va solo en los rangos que lo portan; los pasajeros nuevos van sin id", () => {
     const { datos } = armarEnvio(CABECERA_VACIA, [ana, beto], SIN_DOCUMENTOS);
     expect(datos.tripulantes.map((t) => [t.id, t.libreta_marino, t.libreta_expira])).toEqual([
       [11, "SB-1", "2030-01-01"],

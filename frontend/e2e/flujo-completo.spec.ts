@@ -182,6 +182,24 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     await expect(tercero.getByText("Autorización auténtica — operación finalizada")).toBeVisible();
   });
 
+  await test.step("sectores: UCVMM del Atlántico no la ve y la supervisión general la ve sin decidir", async () => {
+    // El puesto de las pruebas es del Sector Pacífico (servidor_e2e.py).
+    const atlantico = await entrar(browser, CUENTAS.atlantico);
+    await atlantico.goto(`/solicitudes/${id}`);
+    await expect(atlantico.getByText("No tienes acceso a esta solicitud.")).toBeVisible();
+    await atlantico.goto("/dashboard?bandeja=revision&estado=todas");
+    await expect(atlantico.getByText("No hay solicitudes aquí")).toBeVisible();
+
+    const supervisor = await entrar(browser, CUENTAS.supervisor);
+    await supervisor.goto("/dashboard");
+    await expect(supervisor.getByText("Solicitudes de los dos sectores, en solo lectura")).toBeVisible();
+    await supervisor.goto(`/solicitudes/${id}`);
+    await expect(estado(supervisor, "Finalizada")).toBeVisible();
+    await expect(supervisor.getByText("Sector Pacífico", { exact: true })).toBeVisible();
+    await expect(supervisor.getByRole("button", { name: /^(Aprobar|Devolver|Denegar|Finalizar|Guardar verificación)/ }))
+      .toHaveCount(0);
+  });
+
   await test.step("el Administrador ve usuarios y la bitácora", async () => {
     const admin = await entrar(browser, CUENTAS.admin);
     await admin.goto("/admin");

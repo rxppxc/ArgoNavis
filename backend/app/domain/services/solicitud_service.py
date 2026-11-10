@@ -24,7 +24,7 @@
 import logging
 import secrets
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -36,7 +36,8 @@ from app.core.config import obtener_configuracion
 from app.core.horario import TEXTO_HORARIO, fuera_de_horario
 from app.core.pdf_autorizacion import DatosPdfAutorizacion, TripulantePdf
 from app.core.permisos import (
-    PERMISO_PUERTO, PERMISO_REVISAR, PERMISO_SOLICITAR, codigos_permiso, es_admin_efectivo,
+    PERMISO_PUERTO, PERMISO_REVISAR, PERMISO_SOLICITAR, PERMISO_SUPERVISAR_SECTOR, PERMISO_SUPERVISAR_TODO,
+    codigos_permiso, es_admin_efectivo,
 )
 from app.domain.models.catalogo import PuestoControl
 from app.domain.models.solicitud import (
@@ -50,7 +51,7 @@ from app.domain.repositories.solicitud_repository import FiltrosBandeja, Reposit
 from app.domain.repositories.tramite_repository import RepositorioTramite
 from app.domain.schemas.solicitud import (
     AccionesSolicitud, AsignacionArchivo, ConsultaBandeja, DatosCorregirSolicitud,
-    DatosCrearSolicitud, DatosImpedimentos, DatosTripulanteEntrada, FilaEstadisticaPuesto,
+    DatosCrearSolicitud, DatosImpedimentos, DatosTripulanteEntrada, FilaEstadisticaPuesto, FilaSector,
     FilaEstadisticaSerie, FilaEstadisticaTipo, FilaFueraHorario, FilaPorHora, PaginaSolicitudes,
     SalidaCasilla,
     SalidaDocumentoSolicitud, SalidaEstadisticasSolicitudes, SalidaEvento, SalidaSolicitud,
@@ -163,28 +164,69 @@ def _serie(
 
 @dataclass
 class ContextoAcceso:
-    """Quién es el usuario dentro del flujo (se calcula una vez por request)."""
+    """Quién es el usuario dentro del flujo (se calcula una vez por request).
+
+    Sectores (2026-11-10): UCVMM y los supervisores de sector ven solo las
+    solicitudes de los puestos de sus sectores (`puestos_de_sectores`); el
+    Administrador y el supervisor general, las de todos."""
     usuario:     Usuario
     es_admin:    bool
     es_naviera:  bool
     es_revisor:  bool
     es_puerto:   bool
-    puestos_ids: set[int]
+    puestos_ids: set[int]          # los puestos asignados (puesto de control)
     agencia_id:  int | None
+    es_supervisor_sector:  bool = False
+    es_supervisor_general: bool = False
+    sectores_ids:          set[int] = field(default_factory=set)
+    puestos_de_sectores:   set[int] = field(default_factory=set)
 
     @property
     def puede_revisar(self) -> bool:
+        """Tiene el permiso de revisar (de qué solicitudes, lo dice el sector)."""
         return self.es_admin or self.es_revisor
 
     @property
+    def es_supervisor(self) -> bool:
+        return self.es_supervisor_sector or self.es_supervisor_general
+
+    @property
+    def ve_todos_los_sectores(self) -> bool:
+        return self.es_admin or self.es_supervisor_general
+
+    @property
+    def alcance_ucvmm(self) -> set[int] | None:
+        """Los puestos cuyas solicitudes ve como UCVMM o supervisión (None = todos)."""
+        return None if self.ve_todos_los_sectores else self.puestos_de_sectores
+
+    def en_sus_sectores(self, s: Solicitud) -> bool:
+        return self.ve_todos_los_sectores or s.puesto_control_id in self.puestos_de_sectores
+
+    def puede_revisar_esta(self, s: Solicitud) -> bool:
+        """Revisa las de los puestos de sus sectores (el Administrador, todas)."""
+        return self.es_admin or (self.es_revisor and s.puesto_control_id in self.puestos_de_sectores)
+
+    @property
     def es_personal_snm(self) -> bool:
-        """UCVMM, puesto de control o admin. La verificación de impedimentos
-        (y la acción tomada, p. ej. avisar a Operaciones) es información
-        interna: no se muestra a la agencia."""
-        return self.es_admin or self.es_revisor or self.es_puerto
+        """UCVMM, supervisión, puesto de control o admin. La verificación de
+        impedimentos (y la acción tomada, p. ej. avisar a Operaciones) es
+        información interna: no se muestra a la agencia."""
+        return self.es_admin or self.es_revisor or self.es_puerto or self.es_supervisor
 
     def es_de_su_agencia(self, s: Solicitud) -> bool:
         return (self.es_naviera or self.es_admin) and self.agencia_id is not None and s.agencia_id == self.agencia_id
+
+
+@dataclass(frozen=True)
+class AlcanceEstadisticas:
+    """De qué solicitudes son las estadísticas de quien consulta (2026-11-10):
+    las de sus sectores, o las de todos (Administrador y supervisor general), o
+    las del sector que eligió."""
+    puestos_ids: set[int] | None          # None = todas
+    texto:       str                      # "Todos los sectores", "Sector Pacífico"…
+    sector_id:   int | None               # el sector elegido, si eligió uno
+    sectores:    list[tuple[int, str]]    # los que puede elegir
+    uso_del_sistema: bool                 # ve los totales de todo el sistema
 
 
 @dataclass
@@ -255,14 +297,27 @@ class ServicioSolicitud:
 
     async def contexto(self, usuario: Usuario) -> ContextoAcceso:
         codigos = await codigos_permiso(self.sesion, usuario)
+        es_admin = es_admin_efectivo(usuario)
+        es_revisor = PERMISO_REVISAR in codigos
+        es_supervisor_sector = PERMISO_SUPERVISAR_SECTOR in codigos and not es_admin
+        # El Administrador tiene todos los permisos por el atajo, pero no es un
+        # supervisor ni necesita sector: ya ve todo.
+        sectores = (
+            await self.repo_catalogos.sectores_de_usuario(usuario.id)
+            if not es_admin and (es_revisor or es_supervisor_sector) else set()
+        )
         return ContextoAcceso(
             usuario=usuario,
-            es_admin=es_admin_efectivo(usuario),
+            es_admin=es_admin,
             es_naviera=PERMISO_SOLICITAR in codigos,
-            es_revisor=PERMISO_REVISAR in codigos,
+            es_revisor=es_revisor,
             es_puerto=PERMISO_PUERTO in codigos,
             puestos_ids=await self.repo_catalogos.puestos_de_usuario(usuario.id),
             agencia_id=usuario.agencia_id,
+            es_supervisor_sector=es_supervisor_sector,
+            es_supervisor_general=PERMISO_SUPERVISAR_TODO in codigos and not es_admin,
+            sectores_ids=sectores,
+            puestos_de_sectores=await self.repo_catalogos.puestos_de_sectores(sectores),
         )
 
     @staticmethod
@@ -277,9 +332,12 @@ class ServicioSolicitud:
         )
 
     def puede_ver(self, ctx: ContextoAcceso, s: Solicitud) -> bool:
-        """La ven su agencia, UCVMM y el admin; el puesto de control, solo las
-        de sus puestos y desde que se aprueban."""
-        if ctx.puede_revisar or ctx.es_de_su_agencia(s):
+        """La ven su agencia, el admin y el supervisor general; UCVMM y el
+        supervisor de sector, si es de un puesto de sus sectores; el puesto de
+        control, solo las de sus puestos y desde que se aprueban."""
+        if ctx.ve_todos_los_sectores or ctx.es_de_su_agencia(s):
+            return True
+        if (ctx.es_revisor or ctx.es_supervisor_sector) and ctx.en_sus_sectores(s):
             return True
         return s.aprobada_en is not None and self._es_del_puerto(ctx, s)
 
@@ -288,7 +346,7 @@ class ServicioSolicitud:
         vigente    = s.estado == Estado.APROBADA.value and (s.vigente_hasta is None or s.vigente_hasta >= ahora)
         en_plazo   = s.plazo_correccion is None or s.plazo_correccion >= ahora
         del_puerto = vigente and self._es_del_puerto(ctx, s)
-        revisable  = ctx.puede_revisar and s.estado == Estado.EN_REVISION.value
+        revisable  = ctx.puede_revisar_esta(s) and s.estado == Estado.EN_REVISION.value
         conflicto  = revisable and self._tiene_conflicto(ctx, s)
         return AccionesSolicitud(
             corregir=ctx.es_de_su_agencia(s) and s.estado == Estado.EN_CORRECCION.value and en_plazo,
@@ -361,13 +419,34 @@ class ServicioSolicitud:
             )
         return await self._pagina(ctx, self._filtros(consulta, agencia_id=ctx.agencia_id), consulta, "recientes")
 
+    @staticmethod
+    def _exigir_sector(ctx: ContextoAcceso) -> None:
+        """UCVMM y el supervisor de sector necesitan su sector: sin él no verían nada."""
+        if not ctx.ve_todos_los_sectores and not ctx.sectores_ids:
+            raise _error(
+                status.HTTP_409_CONFLICT,
+                "Tu usuario no tiene un sector asignado (Pacífico o Atlántico). Pide al administrador que te "
+                "asigne al tuyo.",
+            )
+
     async def bandeja_revision(self, ctx: ContextoAcceso, consulta: ConsultaBandeja) -> PaginaSolicitudes:
-        """Todas las solicitudes, para UCVMM. Las pendientes salen en orden de
-        llegada (la más antigua primero)."""
+        """Las solicitudes de los puestos de sus sectores, para UCVMM (el admin,
+        todas). Las pendientes salen en orden de llegada (la más antigua primero)."""
         if not ctx.puede_revisar:
             raise _error(status.HTTP_403_FORBIDDEN, f"No tienes el permiso requerido: {PERMISO_REVISAR}.")
+        self._exigir_sector(ctx)
         orden = "cola" if consulta.estado == Estado.EN_REVISION.value else "recientes"
-        return await self._pagina(ctx, self._filtros(consulta), consulta, orden)
+        filtros = self._filtros(consulta, puestos_ids=None if ctx.es_admin else ctx.puestos_de_sectores)
+        return await self._pagina(ctx, filtros, consulta, orden)
+
+    async def bandeja_supervision(self, ctx: ContextoAcceso, consulta: ConsultaBandeja) -> PaginaSolicitudes:
+        """Solo lectura (2026-11-10): las de sus sectores (supervisor de sector) o
+        las de los dos (supervisor general). Sin acciones: lo dice `acciones`."""
+        if not (ctx.es_admin or ctx.es_supervisor):
+            raise _error(status.HTTP_403_FORBIDDEN, "No tienes permiso para supervisar las solicitudes.")
+        self._exigir_sector(ctx)
+        filtros = self._filtros(consulta, puestos_ids=ctx.alcance_ucvmm)
+        return await self._pagina(ctx, filtros, consulta, "recientes")
 
     async def bandeja_puerto(self, ctx: ContextoAcceso, consulta: ConsultaBandeja) -> PaginaSolicitudes:
         """Autorizaciones aprobadas de los puestos del usuario (el admin ve
@@ -415,11 +494,11 @@ class ServicioSolicitud:
                 )
 
         if not datos.tripulantes:
-            raise _error(status.HTTP_400_BAD_REQUEST, "Debes registrar al menos un tripulante en la solicitud.")
+            raise _error(status.HTTP_400_BAD_REQUEST, "Debes registrar al menos un pasajero en la solicitud.")
         if len(datos.tripulantes) > MAX_TRIPULANTES:
             raise _error(
                 status.HTTP_400_BAD_REQUEST,
-                f"Una solicitud admite hasta {MAX_TRIPULANTES} tripulantes. Si son más, presenta otra solicitud.",
+                f"Una solicitud admite hasta {MAX_TRIPULANTES} pasajeros. Si son más, presenta otra solicitud.",
             )
 
         codigos = {t.nacionalidad for t in datos.tripulantes} | {t.pais_nacimiento for t in datos.tripulantes}
@@ -438,7 +517,7 @@ class ServicioSolicitud:
         if errores:
             extra = len(errores) - MAX_ERRORES_MOSTRADOS
             detalle = " ".join(errores[:MAX_ERRORES_MOSTRADOS]) + (f" (y {extra} más)" if extra > 0 else "")
-            raise _error(status.HTTP_400_BAD_REQUEST, f"Revisa los datos de los tripulantes: {detalle}")
+            raise _error(status.HTTP_400_BAD_REQUEST, f"Revisa los datos de los pasajeros: {detalle}")
 
         resueltos = [
             _TripulanteResuelto(entrada=t, restringido=paises[t.nacionalidad].nacionalidad_restringida)
@@ -474,11 +553,11 @@ class ServicioSolicitud:
                 if indice is None or not 0 <= indice < total_tripulantes:
                     raise _error(
                         status.HTTP_400_BAD_REQUEST,
-                        f"Tripulante inválido para el documento '{td.documento.nombre}'.",
+                        f"Pasajero inválido para el documento '{td.documento.nombre}'.",
                     )
             casilla = (td.documento.codigo, indice)
             if casilla in ocupadas:
-                de_quien = f" del tripulante {indice + 1}" if indice is not None else ""
+                de_quien = f" del pasajero {indice + 1}" if indice is not None else ""
                 raise _error(
                     status.HTTP_400_BAD_REQUEST,
                     f"Llegó más de un archivo para «{td.documento.nombre}»{de_quien}: adjunta uno solo por documento.",
@@ -527,7 +606,7 @@ class ServicioSolicitud:
         partes = [tipo.nombre]
         if nombre_buque:
             partes.append(nombre_buque)
-        partes.append(f"{cantidad} tripulante{'' if cantidad == 1 else 's'}")
+        partes.append(f"{cantidad} pasajero{'' if cantidad == 1 else 's'}")
         return " — ".join(partes)[:255]
 
     def _aplicar_cabecera(
@@ -693,7 +772,7 @@ class ServicioSolicitud:
         existentes = {t.id: t for t in s.tripulantes}
         ids = [t.entrada.id for t in tripulantes if t.entrada.id is not None]
         if len(ids) != len(set(ids)) or any(i not in existentes for i in ids):
-            raise _error(status.HTTP_400_BAD_REQUEST, "La lista de tripulantes no coincide con la solicitud.")
+            raise _error(status.HTTP_400_BAD_REQUEST, "La lista de pasajeros no coincide con la solicitud.")
         quitados = set(existentes) - set(ids)
 
         # ── Documentos que se conservan (los de un tripulante quitado se van con él) ──
@@ -763,7 +842,7 @@ class ServicioSolicitud:
 
             resumen = (
                 f"Documentos nuevos: {len(nuevos)}. Documentos retirados: {len(retirados)}. "
-                f"Tripulantes: {len(tripulantes)}."
+                f"Pasajeros: {len(tripulantes)}."
             )
             if datos.observaciones:
                 resumen += f" Observaciones: {datos.observaciones}"
@@ -788,6 +867,8 @@ class ServicioSolicitud:
         if not ctx.puede_revisar:
             raise _error(status.HTTP_403_FORBIDDEN, f"No tienes el permiso requerido: {PERMISO_REVISAR}.")
         s = await self.obtener(ctx, solicitud_id, bloquear=True)
+        if not ctx.puede_revisar_esta(s):
+            raise _error(status.HTTP_403_FORBIDDEN, "La solicitud es de un puesto de otro sector.")
         if self._tiene_conflicto(ctx, s):
             raise _error(
                 status.HTTP_403_FORBIDDEN,
@@ -820,7 +901,7 @@ class ServicioSolicitud:
         if len(recibidos) != len(datos.tripulantes) or set(recibidos) != set(por_id):
             raise _error(
                 status.HTTP_400_BAD_REQUEST,
-                "Indica el resultado de la verificación de cada tripulante de la solicitud (una vez cada uno).",
+                "Indica el resultado de la verificación de cada pasajero de la solicitud (una vez cada uno).",
             )
 
         correccion = getattr(s, etapa.verificados)
@@ -854,10 +935,10 @@ class ServicioSolicitud:
             # El título del evento ya dice "Verificación de impedimentos": aquí solo el resultado.
             total = len(recibidos)
             if not con:
-                texto = "Sin impedimento." if total == 1 else f"Sin impedimentos ({total} tripulantes)."
+                texto = "Sin impedimento." if total == 1 else f"Sin impedimentos ({total} pasajeros)."
             else:
                 texto = f"Con impedimento: {', '.join(con)}"
-                texto += f" ({len(con)} de {total} tripulantes)." if total > 1 else "."
+                texto += f" ({len(con)} de {total} pasajeros)." if total > 1 else "."
             if datos.comentario:
                 texto += f" {datos.comentario}"
             tipo = etapa.evento
@@ -868,7 +949,7 @@ class ServicioSolicitud:
     async def aprobar(self, ctx: ContextoAcceso, solicitud_id: int, observacion: str | None) -> Solicitud:
         s = await self._para_revision(ctx, solicitud_id)
         if not s.impedimentos_verificados or any(t.con_impedimento is None for t in s.tripulantes):
-            raise _error(status.HTTP_409_CONFLICT, "Antes de aprobar registra la verificación de impedimentos de cada tripulante.")
+            raise _error(status.HTTP_409_CONFLICT, "Antes de aprobar registra la verificación de impedimentos de cada pasajero.")
         limite = s.fecha_operacion + timedelta(days=configuracion.DIAS_GRACIA_FINALIZACION)
         if limite < hoy_panama():
             raise _error(
@@ -953,7 +1034,7 @@ class ServicioSolicitud:
         if not s.impedimentos_puesto_verificados or any(t.con_impedimento_puesto is None for t in s.tripulantes):
             raise _error(
                 status.HTTP_409_CONFLICT,
-                "Antes de finalizar registra la verificación de impedimentos de cada tripulante en SIMPLUS.",
+                "Antes de finalizar registra la verificación de impedimentos de cada pasajero en SIMPLUS.",
             )
         anterior = s.estado
         s.estado                     = Estado.FINALIZADA.value
@@ -1021,6 +1102,8 @@ class ServicioSolicitud:
             id=s.id, numero=s.numero, titulo=s.titulo, estado=s.estado,
             tipo_tramite_codigo=s.tipo_tramite.codigo, tipo_tramite_nombre=s.tipo_tramite.nombre,
             agencia_id=s.agencia_id, agencia_nombre=s.agencia_nombre, puesto_nombre=s.puesto_nombre,
+            # El sector del puesto, para el SNM (la agencia no trabaja con sectores).
+            sector_nombre=s.puesto.sector.nombre if interno and s.puesto else None,
             nombre_buque=s.nombre_buque, imo=s.imo, fecha_operacion=s.fecha_operacion,
             cantidad_tripulantes=s.cantidad_tripulantes,
             creada_por=s.creada_por.full_name if s.creada_por else None,
@@ -1237,24 +1320,47 @@ class ServicioSolicitud:
 
     # ── Estadísticas ─────────────────────────────────────────────────────────
 
-    async def estadisticas(self, desde: date | None, hasta: date | None) -> SalidaEstadisticasSolicitudes:
+    async def alcance_estadisticas(self, ctx: ContextoAcceso, sector_id: int | None) -> AlcanceEstadisticas:
+        """UCVMM y el supervisor de sector ven las de sus sectores; el Administrador y
+        el supervisor general, las de todos. Los que ven más de un sector pueden
+        elegir uno."""
+        self._exigir_sector(ctx)
+        sectores = await self.repo_catalogos.listar_sectores()
+        elegibles = [x for x in sectores if ctx.ve_todos_los_sectores or x.id in ctx.sectores_ids]
+        opciones = [(x.id, x.nombre) for x in elegibles]
+        if sector_id is not None:
+            elegido = next((x for x in elegibles if x.id == sector_id), None)
+            if elegido is None:
+                raise _error(status.HTTP_403_FORBIDDEN, "No puedes ver las estadísticas de ese sector.")
+            return AlcanceEstadisticas({pu.id for pu in elegido.puestos}, elegido.nombre, elegido.id, opciones,
+                                       ctx.ve_todos_los_sectores)
+        if ctx.ve_todos_los_sectores:
+            return AlcanceEstadisticas(None, "Todos los sectores", None, opciones, True)
+        return AlcanceEstadisticas(set(ctx.puestos_de_sectores), " y ".join(n for _, n in opciones), None, opciones,
+                                   False)
+
+    async def estadisticas(
+        self, desde: date | None, hasta: date | None, alcance: AlcanceEstadisticas | None = None,
+    ) -> SalidaEstadisticasSolicitudes:
         """Lo que pasó con las solicitudes recibidas en el periodo: por día, por
         mes y por año, más las aprobadas fuera del horario laboral (las 50 más
-        recientes) y las aprobadas por día de la semana y hora (el mapa de horas)."""
-        hitos = await self.repo.contar_hitos(desde, hasta)
+        recientes) y las aprobadas por día de la semana y hora (el mapa de horas).
+        Solo las de los puestos del alcance (sin alcance, todas)."""
+        puestos = alcance.puestos_ids if alcance else None
+        hitos = await self.repo.contar_hitos(desde, hasta, puestos)
 
         # La serie se cuenta por día y se agrupa aquí: los últimos días, meses y
         # años del periodo (con «Todo», hasta hoy).
         hoy = hoy_panama()
         fin = min(hasta, hoy) if hasta else hoy
-        diaria = await self.repo.serie_diaria(desde, hasta)
+        diaria = await self.repo.serie_diaria(desde, hasta, puestos)
         inicio_dias = max(desde or date.min, fin - timedelta(days=DIAS_EN_SERIE - 1))
         inicio_meses = max(desde or date.min, _meses_antes(fin, MESES_EN_SERIE - 1))
         inicio_anios = max(desde or min(diaria, default=fin), date(fin.year - ANIOS_EN_SERIE + 1, 1, 1))
 
         return SalidaEstadisticasSolicitudes(
             recibidas=int(hitos["recibidas"] or 0),
-            por_estado=await self.repo.contar_por_estado(desde, hasta),
+            por_estado=await self.repo.contar_por_estado(desde, hasta, puestos),
             aprobadas=int(hitos["aprobadas"] or 0),
             negadas=int(hitos["negadas"] or 0),
             expiradas=int(hitos["expiradas"] or 0),
@@ -1267,18 +1373,18 @@ class ServicioSolicitud:
             operaciones_fuera_horario=[
                 FilaFueraHorario(id=f.id, numero=f.numero, tipo_tramite=f.tipo_tramite, puesto=f.puesto,
                                  aprobada_en=f.aprobada_en, aprobada_por=f.aprobada_por)
-                for f in await self.repo.listar_fuera_horario(desde, hasta, MAX_FUERA_HORARIO_LISTADAS)
+                for f in await self.repo.listar_fuera_horario(desde, hasta, MAX_FUERA_HORARIO_LISTADAS, puestos)
             ],
             aprobadas_por_hora=[
                 FilaPorHora(dia=int(f.dia), hora=int(f.hora), total=f.total)
-                for f in await self.repo.aprobadas_por_hora(desde, hasta)
+                for f in await self.repo.aprobadas_por_hora(desde, hasta, puestos)
             ],
             por_tipo=[
                 FilaEstadisticaTipo(
                     codigo=f.codigo, nombre=f.nombre,
                     recibidas=f.recibidas, aprobadas=f.aprobadas, negadas=f.negadas, expiradas=f.expiradas,
                 )
-                for f in await self.repo.contar_por_tipo(desde, hasta)
+                for f in await self.repo.contar_por_tipo(desde, hasta, puestos)
             ],
             por_dia=_serie(diaria, _periodos_dia(inicio_dias, fin), lambda d: d.isoformat()),
             por_mes=_serie(diaria, _periodos_mes(inicio_meses, fin), lambda d: f"{d.year:04d}-{d.month:02d}"),
@@ -1286,6 +1392,10 @@ class ServicioSolicitud:
             por_puesto=[
                 FilaEstadisticaPuesto(puesto=f.nombre, aprobadas=f.aprobadas, finalizadas=f.finalizadas,
                                       expiradas=f.expiradas)
-                for f in await self.repo.contar_por_puesto(desde, hasta)
+                for f in await self.repo.contar_por_puesto(desde, hasta, puestos)
             ],
+            alcance=alcance.texto if alcance else "Todos los sectores",
+            sector_id=alcance.sector_id if alcance else None,
+            sectores=[FilaSector(id=i, nombre=n) for i, n in alcance.sectores] if alcance else [],
+            uso_del_sistema=alcance.uso_del_sistema if alcance else True,
         )

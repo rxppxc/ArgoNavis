@@ -31,6 +31,8 @@ Todo el código nuevo va en **español** (variables, funciones, clases, componen
 
 Cuando agregues nombres nuevos, hazlo en español. Cuando toques nombres existentes, no los renombres "porque sí" — verifica primero si son de los inamovibles arriba.
 
+En pantalla se dice **«pasajeros»** (desde el 2026-11-10; antes «tripulantes»), pero en el código, la API y la BD sigue `tripulante(s)`: es contrato (ver «Sectores, supervisión y pasajeros»).
+
 ### Naming
 - Backend Python: `snake_case` funciones/variables, `PascalCase` clases, `UPPER_SNAKE` constantes.
 - Frontend: `camelCase` variables/funciones, `PascalCase` componentes/tipos, `UPPER_SNAKE` constantes.
@@ -76,6 +78,7 @@ constants/          → números mágicos.
 9. Rate limit en `/auth/login`, `/auth/cambiar-contrasena` y `/verificacion/{codigo}` (el único endpoint público) — si agregas otro endpoint público, agrégalo, y súmalo a la lista de `test_solo_estas_rutas_responden_sin_sesion` (`tests/test_seguridad.py`), que falla con cualquier ruta sin token que no esté ahí.
 10. Los documentos del expediente solo se sirven con sesión, validando acceso a la solicitud (`ServicioSolicitud.obtener_documento`) y dejando DOCUMENTO_VISTO/DESCARGADO en la bitácora. **Nunca** vuelvas a exponer archivos por token o enlace público.
 11. Separación de funciones: nadie revisa (impedimentos, aprobar, devolver, negar) una solicitud que creó o que es de su agencia. No la quites "para probar": usa dos cuentas.
+    - Y cada sector de UCVMM ve y revisa solo las solicitudes de los puestos de su sector (2026-11-10). No lo abras "para probar": asigna el usuario a los dos sectores.
 12. El login responde lo mismo si el usuario no existe y si la contraseña está mal (`ErrorAcceso` en `auth_service.py`); el motivo real va solo a la bitácora. No vuelvas a distinguirlos: revela qué cuentas existen en el AD.
     - Al AD solo se le pregunta por cuentas del AD **registradas y activas en ARGO NAVIS** (`ServicioAutenticacion._login_ad`). No vuelvas a consultarlo antes de esa comprobación: ARGO NAVIS serviría para probar contraseñas de cualquier cuenta del SNM (con la correcta respondía "no tienes acceso") y para bloquearlas.
     - El freno de las cuentas del AD vive en la BD (`users.intentos_fallidos` / `bloqueado_hasta`, las columnas del bloqueo de las locales) y la fila queda bloqueada durante el login (`RepositorioUsuario.buscar_para_login`, FOR UPDATE). No lo pases a memoria: con varios workers o pedidos en paralelo, al AD le llegarían más intentos (`test_freno_del_ad_con_intentos_en_paralelo`).
@@ -416,6 +419,21 @@ El usuario pidió revisar una lista de señales de sitios web públicos. ARGO NA
 - **No aplica, a propósito:** sitemap, tag canónico, OG image, datos estructurados y `llms.txt` (son para salir en buscadores y en IA; aquí nada debe indexarse). Vite y React son la decisión del proyecto. **No los agregues.**
 - Los avisos que quedan en la consola de Firefox (contraseña en página insegura, `crypto.randomUUID` en su visor de PDF) son por servir en HTTP: los quita el HTTPS (pendiente 1).
 
+### Sectores, supervisión y «pasajeros» (2026-11-10, revisiones `c1f7a3e9d2b6` y `d5b8e2f1a9c3`)
+Pedido del usuario: dos sectores de UCVMM que no ven lo del otro, roles de supervisión de solo lectura, y «a los marinos tripulantes ahora se les llama pasajeros». Decisiones del usuario: un rol UCVMM con el sector asignado (no un rol por sector), supervisores con todo en solo lectura, un buzón por sector y el documento «Lista de Tripulantes» con su nombre oficial.
+- **Sectores** (`sectores`, sembrados: Sector Pacífico y Sector Atlántico). Cada puesto es de uno (`puestos_control.sector_id`, obligatorio). La agencia sigue eligiendo solo el puesto, y de ahí sale el sector.
+  - Los funcionarios se asignan en `usuarios_sectores` (Catálogos → Sectores), como los puestos. Uno puede estar en los dos (vacaciones, refuerzos).
+  - El sector **no se guarda en la solicitud**: sale del puesto. Mover un puesto de sector mueve también sus solicitudes abiertas (la pantalla lo confirma). Así, al desplegar, todo quedó en el Pacífico (como funcionaba) y el administrador pasa a Atlántico sus puestos y sus usuarios.
+  - El alcance vive en `ContextoAcceso` (`puestos_de_sectores`, `ve_todos_los_sectores`, `alcance_ucvmm`, `puede_revisar_esta`). **Si agregas una bandeja, una consulta o una estadística de UCVMM, filtra por ahí**: bandeja de revisión, campana, expediente, transiciones (`_para_revision`) y estadísticas ya lo hacen. Lo prueba `tests/test_sectores.py`.
+  - El aviso de cada solicitud nueva o corregida va al buzón del sector (`sectores.correo`); sin buzón, al general (`CORREO_UCVMM`).
+  - El sector se muestra al SNM (`sector_nombre` en la bandeja y el expediente; a la agencia le llega nulo). En las tarjetas, solo a quien ve los dos.
+- **Estadísticas por sector:** UCVMM y el supervisor de sector ven las de sus sectores; el Administrador y el supervisor general, las de los dos, con un selector («Todos · Sector Pacífico · Sector Atlántico», `sector_id`). El uso del sistema (`/admin/stats`, totales de todo y las agencias de los dos sectores) queda solo para ellos. La exportación lleva el sector en el encabezado y en el nombre del archivo (`…-sector-atlantico-…`).
+- **El rol «Sector Pacífico» pasó a llamarse «UCVMM».** El permiso conserva el código `T-PROCESAR-PACIFICO` (lo usan el backend y el frontend): no lo renombres.
+- **«Pasajeros» en lugar de «tripulantes»**, en todo lo que ve el usuario: pantallas, mensajes de error, correos, PDF y las descripciones del catálogo (migración `d5b8e2f1a9c3`).
+  - **En el código, la API y la BD sigue diciendo `tripulante(s)`** (`solicitud_tripulantes`, `cantidad_tripulantes`, `tripulantes` en el JSON, `TarjetaTripulante`): cambiarlos rompería el contrato con datos en producción. No los renombres.
+  - El documento del Formulario No. 3 conserva su nombre oficial, «Lista de Tripulantes», hasta que UCVMM cambie el formulario.
+  - Los ids de las tarjetas del formulario (`tripulante-${clave}`) no se ven: siguen igual (los usa el desplazamiento y la E2E).
+
 ### Lo que sigue pendiente (no urgente)
 1. **HTTPS y TLS con el AD** — la configuración está lista (README → "Producción"); falta el certificado del servidor y el del controlador de dominio (infraestructura).
 2. **JWT en cookie httpOnly** — actualmente en localStorage, con la CSP como barrera (regla 15). Plan en README → "Decisiones documentadas".
@@ -450,8 +468,8 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
 
 **Roles:**
 - **Naviera** (`T-CREAR-BASICA` + `users.agencia_id`) — envía solicitudes de su agencia (`/new`) y corrige las devueltas dentro del plazo. Cualquier usuario de la agencia ve y corrige las de la agencia. Sin agencia no puede enviar; con la agencia desactivada no entra.
-- **Sector Pacífico / UCVMM** (`T-PROCESAR-PACIFICO`) — revisa:
-  - Verifica impedimentos **por tripulante** (`solicitud_tripulantes.con_impedimento`, NULL = sin verificar). Todos marcados es obligatorio para aprobar; con impedimento igual se puede aprobar. El comentario es opcional.
+- **UCVMM** (`T-PROCESAR-PACIFICO` + asignación en `usuarios_sectores`; el rol se llamaba «Sector Pacífico» hasta el 2026-11-10) — revisa las solicitudes de los puestos de **sus sectores** (ver «Sectores», abajo). Sin sector asignado, su bandeja responde 409:
+  - Verifica impedimentos **por pasajero** (`solicitud_tripulantes.con_impedimento`, NULL = sin verificar). Todos marcados es obligatorio para aprobar; con impedimento igual se puede aprobar. El comentario es opcional.
   - Registrada, la verificación queda de solo lectura. Cambiarla es una **corrección**:
     - Exige `motivo_correccion`.
     - Deja un evento `impedimentos_corregidos` (interno, como `impedimentos`) con qué cambió y por qué.
@@ -462,7 +480,8 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
   - El comentario sin finalizar (`POST /solicitudes/{id}/comentarios`) se retiró el 2026-10-20: no tenía pantalla. Los eventos `comentario` de antes se siguen mostrando, solo al SNM.
   - Finaliza siempre en el puesto autorizado (reunión del 2026-10-30; antes podía indicar otro). Si la operación se hace en otro puesto, no se finaliza: vence sola y la agencia presenta una nueva solicitud. Las finalizadas en otro puesto antes del cambio se siguen mostrando así en el expediente, el PDF y la verificación pública.
   - El rol se siembra con `es_sistema = false` (el admin puede renombrarlo o borrarlo).
-- **Administrador** — acceso total (decisión del usuario del 2026-10-20): bandejas y expedientes (atajo a todos los `T-*`), catálogo de trámites, agencias/puestos/nacionalidades (`/admin/catalogos`), estadísticas, bitácora y también usuarios y roles (`/admin`, `/admin/roles`). Antes solo listaba usuarios y roles.
+- **Supervisor de sector** (`T-SUPERVISAR-SECTOR` + `usuarios_sectores`) y **Supervisor general** (`T-SUPERVISAR-TODO`; UCVMM en Tocumen) — solo lectura (2026-11-10): la bandeja «Supervisión» (`GET /solicitudes/supervision`), los expedientes con sus documentos (cada apertura queda en la bitácora), el PDF de la autorización (copia interna) y las estadísticas de su alcance, con exportación. Ningún botón de decisión (`acciones` todo en falso) y sin campana. El de sector ve las de sus sectores; el general, las de los dos, y el uso del sistema.
+- **Administrador** — acceso total (decisión del usuario del 2026-10-20): bandejas y expedientes (atajo a todos los `T-*`), catálogo de trámites, agencias/puestos/sectores/nacionalidades (`/admin/catalogos`), estadísticas, bitácora y también usuarios y roles (`/admin`, `/admin/roles`). Antes solo listaba usuarios y roles. No necesita sector: ve los dos.
 - **SysAdmin** — rol técnico, sin permisos `T-*` y sin atajo: usuarios (`/admin`), roles (`/admin/roles`; los permisos son fijos y solo se asignan a roles) y bitácora. No ve solicitudes (403 en la API; el frontend lo manda a `/admin`).
   - El último SysAdmin activo no se puede desactivar, borrar ni cambiar de rol (409).
   - Administrador y SysAdmin no se pueden renombrar y sus permisos son fijos (400 en `asignar_permisos_a_rol`): el SysAdmin no puede darse permisos `T-*`.

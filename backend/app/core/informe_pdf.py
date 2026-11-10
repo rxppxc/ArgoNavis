@@ -247,7 +247,7 @@ class _Pdf:
         return [
             t, Spacer(1, 3 * mm), franja, Spacer(1, 5 * mm),
             Paragraph(TITULO.upper(), self.e_titulo),
-            Paragraph(escape(self.d.periodo), self.e_periodo),
+            Paragraph(f"{escape(self.d.periodo)} · {escape(self.d.alcance)}", self.e_periodo),
             Spacer(1, 1.5 * mm),
             Paragraph(f"Generado el {escape(self.d.generado)} · {USO_INTERNO}", self.e_meta),
             Spacer(1, 3 * mm),
@@ -482,6 +482,8 @@ class _Pdf:
 
     def uso(self) -> list:
         uso = self.d.uso
+        if uso is None:   # solo para quien ve todos los sectores
+            return []
         ancho = self.ancho()
         separacion = 2.5 * mm
         a = (ancho - 3 * separacion) / 4
@@ -519,7 +521,7 @@ class _Pdf:
             for pieza in parte if isinstance(parte, list) else [parte]:
                 self.agregar(historia, pieza)
         pie = f"{SISTEMA} · Generado el {self.d.generado} · {USO_INTERNO}"
-        encabezado = f"{TITULO} · {self.d.periodo}"
+        encabezado = f"{TITULO} · {self.d.periodo} · {self.d.alcance}"
         doc.build(historia, canvasmaker=_lienzo(pie, encabezado, self.normal))
         return salida.getvalue()
 

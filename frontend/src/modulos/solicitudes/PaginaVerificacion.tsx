@@ -91,7 +91,7 @@ export default function PaginaVerificacion() {
                 )}
               </dl>
 
-              <h2 className={styles.subtitulo}>Tripulantes autorizados ({datos.tripulantes.length})</h2>
+              <h2 className={styles.subtitulo}>Pasajeros autorizados ({datos.tripulantes.length})</h2>
               <ul className={styles.marinos}>
                 {datos.tripulantes.map((m, i) => (
                   <li key={i}>

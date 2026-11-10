@@ -80,7 +80,7 @@ function RutaStats({ children }: { children: React.ReactNode }) {
     <RutaPrivada>
       {/* Recién iniciada la sesión los permisos aún no llegan: esperar en vez de rebotar. */}
       {cargando ? <CargandoRuta />
-        : esAdmin || tiene("T-PROCESAR-PACIFICO")
+        : esAdmin || tiene("T-PROCESAR-PACIFICO") || tiene("T-SUPERVISAR-SECTOR") || tiene("T-SUPERVISAR-TODO")
           ? <Suspense fallback={<CargandoRuta />}>{children}</Suspense>
           : <Navigate to="/dashboard" replace />}
     </RutaPrivada>

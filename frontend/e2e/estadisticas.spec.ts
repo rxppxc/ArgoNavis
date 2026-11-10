@@ -16,6 +16,9 @@ test("estadísticas: la escala sigue al periodo y se exporta en los tres formato
   const ucvmm = await entrar(browser, CUENTAS.ucvmm);
   await ucvmm.goto("/admin/stats");
   await expect(ucvmm.getByRole("heading", { name: "Estadísticas", level: 1 })).toBeVisible();
+  // Es del Sector Pacífico: ve las de su sector, y no el uso del sistema (2026-11-10).
+  await expect(ucvmm.getByText("Sector Pacífico", { exact: true })).toBeVisible();
+  await expect(ucvmm.getByRole("heading", { name: "Uso del sistema" })).toHaveCount(0);
 
   await test.step("«Mes pasado» se ve por día y «Este año», por mes", async () => {
     await ucvmm.getByRole("button", { name: "Mes pasado" }).click();
@@ -32,7 +35,8 @@ test("estadísticas: la escala sigue al periodo y se exporta en los tres formato
       await grupo.getByRole("button", { name: boton, exact: true }).click();
       const archivo = await descarga;
       const nombre = archivo.suggestedFilename();
-      expect(nombre).toMatch(new RegExp(`^Estadisticas-autorizaciones-\\d{4}-01-01_\\d{4}-\\d{2}-\\d{2}\\.${extension}$`));
+      expect(nombre).toMatch(
+        new RegExp(`^Estadisticas-autorizaciones-sector-pacifico-\\d{4}-01-01_\\d{4}-\\d{2}-\\d{2}\\.${extension}$`));
       const contenido = await readFile(await archivo.path());
       expect(contenido.subarray(0, Buffer.byteLength(empieza)).toString(), nombre).toBe(empieza);
       await expect(ucvmm.getByText(`Se descargó «${nombre}».`)).toBeVisible();

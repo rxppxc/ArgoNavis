@@ -5,8 +5,9 @@ import { InsigniaEstado } from "./InsigniaEstado";
 import { formatearFecha, formatearFechaHora, tiempoRestante } from "./presentacion";
 import styles from "./TarjetaSolicitud.module.css";
 
-/** Fila de las bandejas: lleva al expediente de la solicitud. */
-export function TarjetaSolicitud({ s, vista }: { s: SolicitudResumen; vista: Bandeja }) {
+/** Fila de las bandejas: lleva al expediente de la solicitud. `conSector`: para
+ *  quien ve los dos sectores (Administrador, supervisor general), el del puesto. */
+export function TarjetaSolicitud({ s, vista, conSector = false }: { s: SolicitudResumen; vista: Bandeja; conSector?: boolean }) {
   const deAgencia = vista === "agencia";
   // Quien finaliza es el puesto de control: a la agencia le basta saber hasta cuándo vale.
   const plazo =
@@ -38,9 +39,9 @@ export function TarjetaSolicitud({ s, vista }: { s: SolicitudResumen; vista: Ban
       <div className={styles.meta}>
         {/* La agencia solo ve las suyas: su nombre en cada tarjeta sobraba. */}
         {!deAgencia && <span>{s.agencia_nombre}</span>}
-        <span>{s.puesto_nombre}</span>
+        <span>{s.puesto_nombre}{conSector && s.sector_nombre && <> · {s.sector_nombre}</>}</span>
         <span>Operación: {formatearFecha(s.fecha_operacion)}</span>
-        <span><IconoUsuario tamano={12} /> {s.cantidad_tripulantes} tripulante{s.cantidad_tripulantes === 1 ? "" : "s"}</span>
+        <span><IconoUsuario tamano={12} /> {s.cantidad_tripulantes} pasajero{s.cantidad_tripulantes === 1 ? "" : "s"}</span>
         <span>
           Enviada {formatearFechaHora(s.enviada_en)}
           {!deAgencia && s.creada_por && <> por {s.creada_por}</>}

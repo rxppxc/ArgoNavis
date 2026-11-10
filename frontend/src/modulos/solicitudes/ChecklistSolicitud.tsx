@@ -31,15 +31,15 @@ export function ChecklistSolicitud({ documentos, tripulantes, onIrATripulante, o
       </div>
       <p className={styles.ayudaSeccion}>PDF, Word o Excel, de hasta {TAMANO_MAX_MB} MB cada uno.</p>
       {tripulantes.some((t) => casillasPorTripulante.has(t.clave)) && (
-        <div className={styles.resumenTripulantes} aria-label="Documentos por tripulante">
+        <div className={styles.resumenTripulantes} aria-label="Documentos por pasajero">
           {tripulantes.map((t, i) => {
             const total = casillasPorTripulante.get(t.clave)?.length ?? 0;
             if (!total) return null;
             const faltan = faltantesPorTripulante.get(t.clave) ?? 0;
             return (
               <button key={t.clave} type="button" className={styles.resumenTripulante}
-                onClick={() => onIrATripulante(t.clave)} title="Ir a la tarjeta del tripulante">
-                {i + 1}. {`${t.nombre} ${t.apellido}`.trim() || "Tripulante sin nombre"}
+                onClick={() => onIrATripulante(t.clave)} title="Ir a la tarjeta del pasajero">
+                {i + 1}. {`${t.nombre} ${t.apellido}`.trim() || "Pasajero sin nombre"}
                 {faltan === 0
                   ? <span className={styles.resumenOk}>✓ completo</span>
                   : <span className={styles.resumenFalta}>faltan {faltan}</span>}
@@ -59,7 +59,7 @@ export function ChecklistSolicitud({ documentos, tripulantes, onIrATripulante, o
         />
       ) : (
         <div className={styles.sinDocs}>
-          Este trámite no pide documentos generales: cada tripulante lleva los suyos en su tarjeta (paso 3). Toca un
+          Este trámite no pide documentos generales: cada pasajero lleva los suyos en su tarjeta (paso 3). Toca un
           nombre para ir a su tarjeta.
         </div>
       )}

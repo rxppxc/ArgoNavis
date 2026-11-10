@@ -23,6 +23,7 @@ from importlib import import_module
 from math import ceil
 from pathlib import Path
 from typing import Literal
+from unicodedata import normalize
 
 from app.core.horario import TEXTO_HORARIO, ZONA_PANAMA
 from app.domain.schemas.solicitud import (
@@ -80,7 +81,8 @@ _ESPACIO = "\u00a0"   # espacio sin corte: la cifra y el % no se separan (como e
 @dataclass(frozen=True)
 class DatosInforme:
     estadisticas: SalidaEstadisticasSolicitudes
-    uso:          SalidaUsoSistema
+    # Solo para quien ve todos los sectores (Administrador y supervisor general).
+    uso:          SalidaUsoSistema | None
     desde:        date | None
     hasta:        date | None
     unidad:       Unidad
@@ -94,6 +96,11 @@ class DatosInforme:
     @property
     def periodo(self) -> str:
         return texto_periodo(self.desde, self.hasta, self.hoy)
+
+    @property
+    def alcance(self) -> str:
+        """De qué sectores son las cifras: "Todos los sectores", "Sector Pacífico"…"""
+        return self.estadisticas.alcance
 
     @property
     def generado(self) -> str:
@@ -343,11 +350,19 @@ def puestos_con_aprobadas(e: SalidaEstadisticasSolicitudes):
 
 # ── Archivo ──────────────────────────────────────────────────────────────────
 
+def _sin_acentos(texto: str) -> str:
+    """"Sector Atlántico" → "sector-atlantico"."""
+    plano = normalize("NFKD", texto).encode("ascii", "ignore").decode("ascii").lower()
+    return "-".join(parte for parte in "".join(c if c.isalnum() else " " for c in plano).split())
+
+
 def nombre_archivo(datos: DatosInforme, extension: str) -> str:
-    """"Estadisticas-autorizaciones-2026-10-01_2026-10-31.xlsx" (sin acentos: va en una cabecera)."""
+    """"Estadisticas-autorizaciones-2026-10-01_2026-10-31.xlsx", con el sector si son
+    las de uno ("…-sector-atlantico-…"). Sin acentos: va en una cabecera HTTP."""
     desde = datos.desde.isoformat() if datos.desde else "inicio"
     hasta = (datos.hasta or datos.hoy).isoformat()
-    return f"Estadisticas-autorizaciones-{desde}_{hasta}.{extension}"
+    sector = "" if datos.alcance == "Todos los sectores" else f"-{_sin_acentos(datos.alcance)}"
+    return f"Estadisticas-autorizaciones{sector}-{desde}_{hasta}.{extension}"
 
 
 _GENERADORES: dict[str, tuple[str, str]] = {

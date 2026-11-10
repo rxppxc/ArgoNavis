@@ -2,15 +2,17 @@
  * Catálogos del flujo de Autorizaciones Marítimas (solo admin):
  *  - Agencias navieras: alta, edición, activación y sus usuarios (comparten
  *    las solicitudes de la agencia).
- *  - Puestos de control: alta, edición, activación y funcionarios asignados
- *    (los que ven y finalizan las autorizaciones de ese puesto).
+ *  - Puestos de control: alta, edición, activación, su sector y funcionarios
+ *    asignados (los que ven y finalizan las autorizaciones de ese puesto).
+ *  - Sectores de UCVMM (2026-11-10): Pacífico y Atlántico, con su correo y sus
+ *    funcionarios (UCVMM y supervisores de sector), en SeccionSectores.
  *  - Nacionalidades restringidas: en Desembarque exigen el Formulario No. 6 de
  *    custodia; en los trámites que lo indican, la aprobación avisa la custodia.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiAdmin, type Rol, type UsuarioSistema } from "../../api/admin";
 import {
-  apiCatalogos, type CatalogoConUsuarios, type DatosCatalogo, type Pais,
+  apiCatalogos, type CatalogoConUsuarios, type DatosCatalogo, type Pais, type PuestoAdmin, type SectorAdmin,
 } from "../../api/catalogos";
 import { MarcoPagina } from "../../components/MarcoPagina";
 import { EncabezadoPagina } from "../../components/EncabezadoPagina";
@@ -19,9 +21,11 @@ import { useConfirmar } from "../../components/ModalConfirmacion";
 import { useNotificacion } from "../../components/Notificaciones";
 import { IconoBasura, IconoBuscar, IconoEditar, IconoMas, IconoUsuarios } from "../../components/Iconos";
 import { mensajeDeError } from "../../utils/errores";
+import { SeccionSectores } from "./SeccionSectores";
+import { SelectorUsuarios } from "./SelectorUsuarios";
 import styles from "./PaginaCatalogos.module.css";
 
-type Pestana = "agencias" | "puestos" | "paises";
+type Pestana = "agencias" | "puestos" | "sectores" | "paises";
 type Tipo = "agencia" | "puesto";
 
 const PERMISO_POR_TIPO: Record<Tipo, string> = {
@@ -56,37 +60,48 @@ const CONFIG: Record<Tipo, {
 };
 
 function TarjetaCatalogo({
-  tipo, entidad, usuarios, rolesCandidatos, onCambio,
+  tipo, entidad, usuarios, rolesCandidatos, sectores = [], onCambio,
 }: {
   tipo: Tipo;
   entidad: CatalogoConUsuarios;
   usuarios: UsuarioSistema[];
   rolesCandidatos: Set<number>;
+  /** Solo los puestos: el sector se elige al editarlo. */
+  sectores?: SectorAdmin[];
   onCambio: (e: CatalogoConUsuarios | null, id: number) => void;
 }) {
   const config = CONFIG[tipo];
   const { mostrar } = useNotificacion();
   const confirmar = useConfirmar();
+  const puesto = tipo === "puesto" ? (entidad as PuestoAdmin) : null;
   const [editando, setEditando] = useState(false);
   const [nombre, setNombre] = useState(entidad.nombre);
   const [correo, setCorreo] = useState(entidad.correo ?? "");
+  const [sectorId, setSectorId] = useState(puesto?.sector_id ?? 0);
   const [asignando, setAsignando] = useState(false);
   const [seleccion, setSeleccion] = useState<Set<number>>(new Set(entidad.usuarios.map((u) => u.id)));
-  const [todos, setTodos] = useState(false);
   const [guardando, setGuardando] = useState(false);
-
-  const candidatos = usuarios.filter(
-    (u) => todos || (u.rol_id !== null && rolesCandidatos.has(u.rol_id)) || seleccion.has(u.id),
-  );
 
   async function guardarDatos() {
     if (nombre.trim().length < 3) {
       mostrar("El nombre debe tener al menos 3 letras.", "aviso");
       return;
     }
+    const otroSector = puesto && sectorId !== puesto.sector_id ? sectores.find((x) => x.id === sectorId) : undefined;
+    if (otroSector) {
+      const ok = await confirmar({
+        titulo: "Cambiar de sector",
+        mensaje: `"${entidad.nombre}" pasa a ${otroSector.nombre}: sus solicitudes, también las que están en `
+          + `revisión, las verán y revisarán los funcionarios de ese sector.`,
+        textoOk: "Cambiar de sector",
+      });
+      if (!ok) return;
+    }
     setGuardando(true);
     try {
-      onCambio(await config.actualizar(entidad.id, { nombre: nombre.trim(), correo: correo.trim() || null }), entidad.id);
+      const datos: DatosCatalogo = { nombre: nombre.trim(), correo: correo.trim() || null };
+      if (otroSector) datos.sector_id = otroSector.id;
+      onCambio(await config.actualizar(entidad.id, datos), entidad.id);
       setEditando(false);
       mostrar("Cambios guardados.", "exito");
     } catch (e) {
@@ -154,10 +169,18 @@ function TarjetaCatalogo({
               onChange={(e) => setNombre(e.target.value)} />
             <input className={styles.input} value={correo} maxLength={255} type="email" aria-label="Correo"
               placeholder={config.placeholder} onChange={(e) => setCorreo(e.target.value)} />
+            {puesto && (
+              <select className={styles.input} value={sectorId} aria-label="Sector"
+                onChange={(e) => setSectorId(Number(e.target.value))}>
+                {sectores.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
+              </select>
+            )}
             <button type="button" className={styles.btnPrimario} onClick={guardarDatos} disabled={guardando}>
               Guardar
             </button>
-            <button type="button" className={styles.btnTexto} onClick={() => { setEditando(false); setNombre(entidad.nombre); setCorreo(entidad.correo ?? ""); }}>
+            <button type="button" className={styles.btnTexto} onClick={() => {
+              setEditando(false); setNombre(entidad.nombre); setCorreo(entidad.correo ?? ""); setSectorId(puesto?.sector_id ?? 0);
+            }}>
               Cancelar
             </button>
           </div>
@@ -166,6 +189,7 @@ function TarjetaCatalogo({
             <div className={styles.tarjetaInfo}>
               <div className={styles.tarjetaNombre}>{entidad.nombre}</div>
               <div className={styles.tarjetaMeta}>
+                {puesto && <><strong>{puesto.sector_nombre}</strong> · </>}
                 {entidad.correo ?? "Sin correo"} · {entidad.total_solicitudes} solicitud{entidad.total_solicitudes === 1 ? "" : "es"}
               </div>
             </div>
@@ -201,52 +225,25 @@ function TarjetaCatalogo({
       </div>
 
       {asignando && (
-        <div className={styles.selector}>
-          <p className={styles.ayuda}>
-            {config.ayudaCandidatos}
-            <label className={styles.checkTodos}>
-              <input type="checkbox" checked={todos} onChange={(e) => setTodos(e.target.checked)} /> Mostrar todos los usuarios
-            </label>
-          </p>
-          <div className={styles.listaUsuarios}>
-            {candidatos.length === 0 && <span className={styles.vacio}>No hay usuarios con ese permiso.</span>}
-            {candidatos.map((u) => {
-              const otraAgencia = tipo === "agencia" && u.agencia && u.agencia.id !== entidad.id ? u.agencia.nombre : null;
-              return (
-                <label key={u.id} className={styles.opcionUsuario}>
-                  <input type="checkbox" checked={seleccion.has(u.id)}
-                    onChange={(e) => setSeleccion((prev) => {
-                      const s = new Set(prev);
-                      if (e.target.checked) s.add(u.id); else s.delete(u.id);
-                      return s;
-                    })} />
-                  <span>{u.full_name}</span>
-                  <em>
-                    @{u.username}{u.rol_personalizado ? ` · ${u.rol_personalizado.nombre}` : ""}
-                    {otraAgencia && ` · hoy en ${otraAgencia}`}
-                  </em>
-                </label>
-              );
-            })}
-          </div>
-          <div className={styles.filaBotones}>
-            <button type="button" className={styles.btnPrimario} onClick={guardarAsignacion} disabled={guardando}>
-              Guardar asignación
-            </button>
-          </div>
-        </div>
+        <SelectorUsuarios
+          usuarios={usuarios} rolesCandidatos={rolesCandidatos} seleccion={seleccion} onSeleccion={setSeleccion}
+          ayuda={config.ayudaCandidatos}
+          detalle={(u) => (tipo === "agencia" && u.agencia && u.agencia.id !== entidad.id ? `hoy en ${u.agencia.nombre}` : null)}
+          onGuardar={guardarAsignacion} guardando={guardando}
+        />
       )}
     </div>
   );
 }
 
 function SeccionCatalogo({
-  tipo, lista, usuarios, rolesCandidatos, onCambio, onCreado, descripcion, vacio,
+  tipo, lista, usuarios, rolesCandidatos, sectores = [], onCambio, onCreado, descripcion, vacio,
 }: {
   tipo: Tipo;
   lista: CatalogoConUsuarios[];
   usuarios: UsuarioSistema[];
   rolesCandidatos: Set<number>;
+  sectores?: SectorAdmin[];
   onCambio: (e: CatalogoConUsuarios | null, id: number) => void;
   onCreado: (e: CatalogoConUsuarios) => void;
   descripcion: string;
@@ -255,6 +252,7 @@ function SeccionCatalogo({
   const { mostrar } = useNotificacion();
   const [nombre, setNombre] = useState("");
   const [correo, setCorreo] = useState("");
+  const [sectorId, setSectorId] = useState(0);
   const [creando, setCreando] = useState(false);
 
   async function crear(e: React.FormEvent) {
@@ -263,12 +261,19 @@ function SeccionCatalogo({
       mostrar(`Escribe el nombre ${tipo === "agencia" ? "de la agencia" : "del puesto"} (al menos 3 letras).`, "aviso");
       return;
     }
+    // Sin sector, ningún revisor vería sus solicitudes: se elige siempre.
+    if (tipo === "puesto" && !sectorId) {
+      mostrar("Elige el sector del puesto (Pacífico o Atlántico).", "aviso");
+      return;
+    }
     setCreando(true);
     try {
-      const crearEn = tipo === "agencia" ? apiCatalogos.crearAgencia : apiCatalogos.crearPuesto;
-      onCreado(await crearEn(nombre.trim(), correo.trim() || null));
+      onCreado(tipo === "agencia"
+        ? await apiCatalogos.crearAgencia(nombre.trim(), correo.trim() || null)
+        : await apiCatalogos.crearPuesto(nombre.trim(), correo.trim() || null, sectorId));
       setNombre("");
       setCorreo("");
+      setSectorId(0);
       mostrar(tipo === "agencia" ? "Agencia naviera creada." : "Puesto de control creado.", "exito");
     } catch (err) {
       mostrar(mensajeDeError(err, "No se pudo crear."), "error");
@@ -286,6 +291,13 @@ function SeccionCatalogo({
           placeholder={tipo === "agencia" ? "Nombre de la agencia naviera" : "Nombre del puesto (p. ej. Puerto de Balboa)"} />
         <input className={styles.input} type="email" maxLength={255} value={correo} onChange={(e) => setCorreo(e.target.value)}
           aria-label="Correo (opcional)" placeholder={CONFIG[tipo].placeholder} />
+        {tipo === "puesto" && (
+          <select className={styles.input} value={sectorId} aria-label="Sector del puesto nuevo"
+            onChange={(e) => setSectorId(Number(e.target.value))}>
+            <option value={0}>Sector…</option>
+            {sectores.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
+          </select>
+        )}
         <button type="submit" className={styles.btnPrimario} disabled={creando}>
           <IconoMas tamano={14} /> {tipo === "agencia" ? "Agregar agencia" : "Agregar puesto"}
         </button>
@@ -296,7 +308,7 @@ function SeccionCatalogo({
         <div className={styles.lista}>
           {lista.map((e) => (
             <TarjetaCatalogo key={e.id} tipo={tipo} entidad={e} usuarios={usuarios}
-              rolesCandidatos={rolesCandidatos} onCambio={onCambio} />
+              rolesCandidatos={rolesCandidatos} sectores={sectores} onCambio={onCambio} />
           ))}
         </div>
       )}
@@ -314,6 +326,7 @@ export default function PaginaCatalogos() {
   const [agencias, setAgencias] = useState<CatalogoConUsuarios[]>([]);
   const [puestos, setPuestos] = useState<CatalogoConUsuarios[]>([]);
   const [paises, setPaises] = useState<Pais[]>([]);
+  const [sectores, setSectores] = useState<SectorAdmin[]>([]);
   const [usuarios, setUsuarios] = useState<UsuarioSistema[]>([]);
   const [roles, setRoles] = useState<Rol[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -329,13 +342,14 @@ export default function PaginaCatalogos() {
     let cancelado = false;
     Promise.all([
       apiCatalogos.listarAgenciasAdmin(), apiCatalogos.listarPuestosAdmin(), apiCatalogos.listarPaises(),
-      apiAdmin.listarUsuarios(), apiAdmin.listarRoles(),
+      apiAdmin.listarUsuarios(), apiAdmin.listarRoles(), apiCatalogos.listarSectoresAdmin(),
     ])
-      .then(([a, p, pa, u, r]) => {
+      .then(([a, p, pa, u, r, se]) => {
         if (cancelado) return;
         setAgencias(a);
         setPuestos(p);
         setPaises(pa);
+        setSectores(se);
         setUsuarios(u.data);
         setRoles(r.data);
       })
@@ -352,6 +366,11 @@ export default function PaginaCatalogos() {
   );
   const rolesAgencia = useMemo(() => rolesCon(PERMISO_POR_TIPO.agencia), [rolesCon]);
   const rolesPuerto = useMemo(() => rolesCon(PERMISO_POR_TIPO.puesto), [rolesCon]);
+  // UCVMM y supervisores de sector (sin el Administrador, que ve todo sin sector).
+  const rolesSector = useMemo(() => new Set(
+    roles.filter((r) => r.nombre !== "Administrador"
+      && r.permisos.some((p) => p.codigo === "T-PROCESAR-PACIFICO" || p.codigo === "T-SUPERVISAR-SECTOR")).map((r) => r.id),
+  ), [roles]);
 
   const cambiarAgencia = useCallback((a: CatalogoConUsuarios | null, id: number) => {
     // Asignar usuarios a una agencia puede sacarlos de otra: se releen todas.
@@ -360,9 +379,15 @@ export default function PaginaCatalogos() {
     recargarUsuarios();
   }, [recargarUsuarios]);
 
+  // Los puestos de cada sector cambian al crear, mover o borrar un puesto: se releen.
+  const recargarSectores = useCallback(() => {
+    apiCatalogos.listarSectoresAdmin().then(setSectores).catch(() => { /* queda la versión anterior */ });
+  }, []);
+
   const cambiarPuesto = useCallback((p: CatalogoConUsuarios | null, id: number) => {
     setPuestos((prev) => (p ? prev.map((x) => (x.id === id ? p : x)) : prev.filter((x) => x.id !== id)));
-  }, []);
+    recargarSectores();
+  }, [recargarSectores]);
 
   async function alternarRestringida(pais: Pais) {
     try {
@@ -387,12 +412,13 @@ export default function PaginaCatalogos() {
   const pestanas: { id: Pestana; etiqueta: string; conteo: number }[] = [
     { id: "agencias", etiqueta: "Agencias navieras", conteo: agencias.length },
     { id: "puestos", etiqueta: "Puestos de control", conteo: puestos.length },
+    { id: "sectores", etiqueta: "Sectores", conteo: sectores.length },
     { id: "paises", etiqueta: "Nacionalidades restringidas", conteo: totalRestringidas },
   ];
 
   return (
     <MarcoPagina volverA="/dashboard">
-      <EncabezadoPagina titulo="Agencias, puestos y países" descripcion="Catálogos del flujo de autorizaciones marítimas." />
+      <EncabezadoPagina titulo="Agencias, puestos y países" descripcion="Catálogos del flujo de autorizaciones marítimas, con los sectores de UCVMM." />
 
       <div className={styles.pestanas} role="tablist" aria-label="Catálogo">
         {pestanas.map((p) => (
@@ -420,19 +446,22 @@ export default function PaginaCatalogos() {
         />
       ) : pestana === "puestos" ? (
         <SeccionCatalogo
-          tipo="puesto" lista={puestos} usuarios={usuarios} rolesCandidatos={rolesPuerto}
+          tipo="puesto" lista={puestos} usuarios={usuarios} rolesCandidatos={rolesPuerto} sectores={sectores}
           onCambio={cambiarPuesto}
-          onCreado={(p) => setPuestos((prev) => ordenar([...prev, p]))}
+          onCreado={(p) => { setPuestos((prev) => ordenar([...prev, p])); recargarSectores(); }}
           descripcion={
-            "Cada solicitud indica el puesto donde se hará el trámite. Al aprobarse, se avisa al correo del puesto y a "
-            + "sus funcionarios asignados, que son los que la ven y la finalizan."
+            "Cada solicitud indica el puesto donde se hará el trámite, y el sector del puesto decide qué UCVMM la "
+            + "revisa. Al aprobarse, se avisa al correo del puesto y a sus funcionarios, que la ven y la finalizan."
           }
           vacio="Aún no hay puestos de control. Agrega el primero para que las agencias puedan elegirlo."
         />
+      ) : pestana === "sectores" ? (
+        <SeccionSectores sectores={sectores} usuarios={usuarios} rolesCandidatos={rolesSector}
+          onCambio={(x) => setSectores((prev) => prev.map((y) => (y.id === x.id ? x : y)))} />
       ) : (
         <>
           <p className={styles.descripcion}>
-            A los tripulantes de una nacionalidad restringida se les exige el Formulario No. 6 de custodia en
+            A los pasajeros de una nacionalidad restringida se les exige el Formulario No. 6 de custodia en
             Desembarque. En Desembarque, Urgencias, Renovación de pasaporte y Shore Pass, al aprobar se avisa a la
             agencia que debe realizar el trámite de solicitud de custodia. El cambio aplica a las solicitudes que se
             envíen desde ahora.

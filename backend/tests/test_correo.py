@@ -8,7 +8,7 @@ from app.domain.services.notificacion_service import _vista_previa
 
 CAMPOS = [
     ("Buque", "ISTMO EXPRESS"), ("IMO", "9074729"), ("Trámite", "Embarque"),
-    ("Puesto", "Puerto de Balboa"), ("Operación", "15/10/2026"), ("Tripulantes", "1"),
+    ("Puesto", "Puerto de Balboa"), ("Operación", "15/10/2026"), ("Pasajeros", "1"),
     ("Agencia naviera", "Agencia Marítima del Istmo"),
 ]
 

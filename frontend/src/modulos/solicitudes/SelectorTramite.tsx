@@ -38,7 +38,7 @@ function resumenRequisitos(t: TipoTramite): string {
   const n = Math.max(0, ...porRango.map((r) => r.todos));
   const fijos = Math.min(n, ...porRango.map((r) => r.fijos));
   const partes = [
-    n > 0 && `${fijos < n ? "Hasta " : ""}${n} documento${n === 1 ? "" : "s"} por tripulante`,
+    n > 0 && `${fijos < n ? "Hasta " : ""}${n} documento${n === 1 ? "" : "s"} por pasajero`,
     ...t.documentos.filter((d) => d.alcance === "solicitud" && d.condicion === "siempre").map((d) => d.nombre),
     t.requiere_puerto && (AYUDA_CAMPOS_TRAMITE[t.codigo]?.puerto?.toLowerCase() ?? "puerto"),
     t.requiere_puerto_desembarque && "puerto de desembarque",

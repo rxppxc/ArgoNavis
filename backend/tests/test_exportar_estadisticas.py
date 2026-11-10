@@ -43,23 +43,35 @@ def _csv(contenido: bytes) -> list[list[str]]:
     return list(csv.reader(io.StringIO(contenido.decode("utf-8-sig"))))
 
 
+HOJAS = ["Resumen", "Por día", "Por mes", "Por año", "Por trámite", "Por puesto", "Horas de aprobación",
+         "Fuera del horario"]
+
+
 @asincrona
-async def test_exporta_en_los_tres_formatos(cliente):
-    revisor = await crear_actor("Sector Pacífico", prefijo="revisor")
+async def test_exporta_en_los_tres_formatos(cliente, admin):
+    revisor = await crear_actor("UCVMM", prefijo="revisor")
     est = (await cliente.get("/solicitudes/estadisticas", headers=revisor.headers)).json()
     hoy = datetime.now(ZONA_PANAMA).date()
 
     r = await cliente.get(RUTA, params={"formato": "xlsx"}, headers=revisor.headers)
     assert r.status_code == 200, r.text
     assert r.headers["content-type"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    # Las de su sector (2026-11-10): lo dicen el nombre del archivo y el encabezado.
     assert r.headers["content-disposition"] == (
-        f'attachment; filename="Estadisticas-autorizaciones-inicio_{hoy.isoformat()}.xlsx"')
+        f'attachment; filename="Estadisticas-autorizaciones-sector-pacifico-inicio_{hoy.isoformat()}.xlsx"')
     assert r.headers["cache-control"] == "no-store"
     hojas, textos, xml_hojas = _hojas(r.content)
-    assert hojas == ["Resumen", "Por día", "Por mes", "Por año", "Por trámite", "Por puesto", "Horas de aprobación",
-                     "Fuera del horario", "Uso del sistema"]
+    assert hojas == HOJAS, "sin el uso del sistema: no ve todos los sectores"
     assert "Revisor Prueba" in textos and "Uso interno del SNM" in textos and "Todo el historial" in textos
+    assert "Sector Pacífico" in textos
     assert not any("<f>" in x for x in xml_hojas), "solo valores: ninguna fórmula"
+
+    # El Administrador ve todos los sectores, con el uso del sistema.
+    r = await cliente.get(RUTA, params={"formato": "xlsx"}, headers=admin.headers)
+    hojas, textos, _ = _hojas(r.content)
+    assert hojas == [*HOJAS, "Uso del sistema"] and "Todos los sectores" in textos
+    assert r.headers["content-disposition"] == (
+        f'attachment; filename="Estadisticas-autorizaciones-inicio_{hoy.isoformat()}.xlsx"')
 
     r = await cliente.get(RUTA, params={"formato": "pdf"}, headers=revisor.headers)
     assert r.status_code == 200 and r.headers["content-type"] == "application/pdf"
@@ -80,11 +92,12 @@ async def test_exporta_en_los_tres_formatos(cliente):
 
 @asincrona
 async def test_periodo_unidad_y_validacion(cliente):
-    revisor = await crear_actor("Sector Pacífico", prefijo="revisor")
+    revisor = await crear_actor("UCVMM", prefijo="revisor")
     params = {"formato": "pdf", "desde": "2026-10-01", "hasta": "2026-10-31", "unidad": "dia"}
     r = await cliente.get(RUTA, params=params, headers=revisor.headers)
     assert r.status_code == 200, r.text
-    assert 'filename="Estadisticas-autorizaciones-2026-10-01_2026-10-31.pdf"' in r.headers["content-disposition"]
+    assert 'filename="Estadisticas-autorizaciones-sector-pacifico-2026-10-01_2026-10-31.pdf"' in \
+        r.headers["content-disposition"]
     r = await cliente.get(RUTA, params={**params, "formato": "xlsx", "unidad": "anio"}, headers=revisor.headers)
     hojas, textos, _ = _hojas(r.content)
     assert r.status_code == 200 and "Del 1 al 31 de octubre de 2026" in textos

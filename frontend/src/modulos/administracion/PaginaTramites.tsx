@@ -103,7 +103,7 @@ export default function PaginaTramites() {
                       {t.rangos_permitidos && (
                         <div className={styles.nota}>
                           <IconoCandado tamano={13} />
-                          <span>Solo admite tripulantes con rango {t.rangos_permitidos.map((r) => ETIQUETA_RANGO[r]).join(", ")}.</span>
+                          <span>Solo admite pasajeros con rango {t.rangos_permitidos.map((r) => ETIQUETA_RANGO[r]).join(", ")}.</span>
                         </div>
                       )}
 
@@ -112,7 +112,7 @@ export default function PaginaTramites() {
                           <IconoCandado tamano={13} />
                           <span>
                             Al aprobar, se avisa a la agencia que debe realizar el trámite de solicitud de custodia de
-                            los tripulantes de nacionalidad restringida.
+                            los pasajeros de nacionalidad restringida.
                           </span>
                         </div>
                       )}
@@ -148,7 +148,7 @@ export default function PaginaTramites() {
                                       <div className={styles.docDesc}>{d.descripcion}</div>
                                     )}
                                     {d.requiere_libreta && (
-                                      <div className={styles.docDesc}>Solo a tripulantes que portan seamanbook (rango Marino).</div>
+                                      <div className={styles.docDesc}>Solo a pasajeros que portan seamanbook (rango Marino).</div>
                                     )}
                                     {d.rangos && (
                                       <div className={styles.docDesc}>

@@ -35,7 +35,7 @@ async def test_sysadmin_administra_usuarios_y_no_ve_solicitudes(cliente):
     assert r.status_code == 201, r.text
     nuevo = r.json()
     r = await cliente.patch(f"/admin/usuarios/{nuevo['id']}/rol-personalizado",
-                            json={"rol_id": await _id_rol("Sector Pacífico")}, headers=sysadmin.headers)
+                            json={"rol_id": await _id_rol("UCVMM")}, headers=sysadmin.headers)
     assert r.status_code == 200
     for ruta in ("/admin/usuarios", "/admin/roles", "/admin/permisos", "/admin/bitacora"):
         r = await cliente.get(ruta, headers=sysadmin.headers)

@@ -30,7 +30,7 @@ import secrets
 import pytest
 
 from ayudas import HOY, cabecera, enviar, pdf, tripulante
-from conftest import Actor, crear_actor
+from conftest import Actor, crear_actor, id_sector
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
@@ -149,7 +149,8 @@ async def agencia(cliente, admin) -> tuple[Actor, int]:
     """Un usuario de agencia y un puesto, más Cuba como nacionalidad restringida."""
     r = await cliente.post("/admin/agencias", json={"nombre": f"Agencia Documento {secrets.token_hex(2)}"}, headers=admin.headers)
     naviera = await crear_actor("Naviera", agencia_id=r.json()["id"], prefijo="naviera")
-    r = await cliente.post("/admin/puestos", json={"nombre": f"Puesto Documento {secrets.token_hex(2)}"}, headers=admin.headers)
+    r = await cliente.post("/admin/puestos", json={"nombre": f"Puesto Documento {secrets.token_hex(2)}",
+                                                   "sector_id": await id_sector()}, headers=admin.headers)
     puesto_id = r.json()["id"]
     r = await cliente.patch("/admin/paises/CUB", json={"nacionalidad_restringida": True}, headers=admin.headers)
     assert r.status_code == 200
@@ -245,10 +246,11 @@ async def test_aviso_de_custodia_al_aprobar(cliente, admin, monkeypatch):
     r = await cliente.post("/admin/agencias", json={"nombre": f"Agencia Custodia {sufijo}", "correo": "custodia@prueba.pa"},
                            headers=admin.headers)
     naviera = await crear_actor("Naviera", agencia_id=r.json()["id"], prefijo="naviera")
-    r = await cliente.post("/admin/puestos", json={"nombre": f"Puesto Custodia {sufijo}", "correo": "puesto@prueba.pa"},
+    r = await cliente.post("/admin/puestos", json={"nombre": f"Puesto Custodia {sufijo}", "correo": "puesto@prueba.pa",
+                                                   "sector_id": await id_sector()},
                            headers=admin.headers)
     puesto_id = r.json()["id"]
-    revisor = await crear_actor("Sector Pacífico", prefijo="revisor")
+    revisor = await crear_actor("UCVMM", prefijo="revisor")
     r = await cliente.patch("/admin/paises/CUB", json={"nacionalidad_restringida": True}, headers=admin.headers)
     assert r.status_code == 200
 
@@ -370,7 +372,7 @@ async def test_cambio_de_catalogo_no_altera_solicitudes_enviadas(cliente, agenci
         assert {(c["documento_codigo"], c["tripulante_id"]) for c in detalle["checklist"]} == antes
         assert all(c["cubierta"] for c in detalle["checklist"]), "sigue completa: se juzga con las reglas con que se envió"
 
-        revisor = await crear_actor("Sector Pacífico", prefijo="revisor")
+        revisor = await crear_actor("UCVMM", prefijo="revisor")
         r = await cliente.post(f"/solicitudes/{s['id']}/devolver", json={"motivo": "Revisar la documentación"},
                                headers=revisor.headers)
         assert r.status_code == 200, r.text
@@ -430,7 +432,7 @@ async def test_pdf_sin_nombres_para_la_agencia(cliente, agencia):
     r = await enviar(cliente, naviera, datos, archivos)
     assert r.status_code == 201, r.text
     sid = r.json()["id"]
-    revisor = await crear_actor("Sector Pacífico", prefijo="revisor")
+    revisor = await crear_actor("UCVMM", prefijo="revisor")
     impedimentos = {"tripulantes": [{"tripulante_id": t["id"], "con_impedimento": False} for t in r.json()["tripulantes"]]}
     assert (await cliente.post(f"/solicitudes/{sid}/impedimentos", json=impedimentos, headers=revisor.headers)).status_code == 200
     assert (await cliente.post(f"/solicitudes/{sid}/aprobar", json={}, headers=revisor.headers)).status_code == 200

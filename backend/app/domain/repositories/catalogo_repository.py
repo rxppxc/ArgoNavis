@@ -2,16 +2,65 @@ from sqlalchemy import delete, exists, func, insert, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.domain.models.catalogo import AgenciaNaviera, Pais, PuestoControl, usuarios_puestos
+from app.domain.models.catalogo import (
+    AgenciaNaviera, Pais, PuestoControl, Sector, usuarios_puestos, usuarios_sectores,
+)
 from app.domain.models.solicitud import Solicitud
 from app.domain.models.user import EstadoUsuario, Usuario
 
 
 class RepositorioCatalogo:
-    """Puestos de control, agencias navieras (con sus usuarios) y países."""
+    """Sectores, puestos de control, agencias navieras (con sus usuarios) y países."""
 
     def __init__(self, sesion: AsyncSession):
         self.sesion = sesion
+
+    # ── Sectores de UCVMM ────────────────────────────────────────────────────
+
+    async def listar_sectores(self, *, con_usuarios: bool = False) -> list[Sector]:
+        consulta = select(Sector).order_by(Sector.id).options(selectinload(Sector.puestos))
+        if con_usuarios:
+            consulta = consulta.options(selectinload(Sector.usuarios))
+        return list((await self.sesion.execute(consulta)).scalars().all())
+
+    async def buscar_sector(self, sector_id: int, *, con_usuarios: bool = False) -> Sector | None:
+        consulta = select(Sector).where(Sector.id == sector_id).options(selectinload(Sector.puestos))
+        if con_usuarios:
+            consulta = consulta.options(selectinload(Sector.usuarios))
+        return (await self.sesion.execute(consulta)).scalar_one_or_none()
+
+    async def sectores_de_usuario(self, usuario_id: int) -> set[int]:
+        consulta = select(usuarios_sectores.c.sector_id).where(usuarios_sectores.c.usuario_id == usuario_id)
+        return {fila[0] for fila in (await self.sesion.execute(consulta)).all()}
+
+    async def puestos_de_sectores(self, sectores_ids: set[int]) -> set[int]:
+        """Los puestos de esos sectores (los de UCVMM y los supervisores de sector)."""
+        if not sectores_ids:
+            return set()
+        consulta = select(PuestoControl.id).where(PuestoControl.sector_id.in_(sorted(sectores_ids)))
+        return {fila[0] for fila in (await self.sesion.execute(consulta)).all()}
+
+    async def sector_por_puesto(self) -> dict[int, str]:
+        """El nombre del sector de cada puesto (pocos: se lee entero, para las bandejas)."""
+        consulta = select(PuestoControl.id, Sector.nombre).join(Sector, Sector.id == PuestoControl.sector_id)
+        return {pid: nombre for pid, nombre in (await self.sesion.execute(consulta)).all()}
+
+    async def correo_sector_de_puesto(self, puesto_id: int) -> str | None:
+        """El buzón del sector del puesto (el aviso de una solicitud nueva)."""
+        consulta = (
+            select(Sector.correo)
+            .join(PuestoControl, PuestoControl.sector_id == Sector.id)
+            .where(PuestoControl.id == puesto_id)
+        )
+        return (await self.sesion.execute(consulta)).scalar_one_or_none()
+
+    async def reemplazar_usuarios_de_sector(self, sector_id: int, usuario_ids: list[int]) -> None:
+        await self.sesion.execute(delete(usuarios_sectores).where(usuarios_sectores.c.sector_id == sector_id))
+        if usuario_ids:
+            await self.sesion.execute(
+                insert(usuarios_sectores),
+                [{"usuario_id": uid, "sector_id": sector_id} for uid in usuario_ids],
+            )
 
     # ── Puestos de control ───────────────────────────────────────────────────
 

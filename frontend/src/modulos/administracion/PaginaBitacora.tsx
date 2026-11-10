@@ -47,6 +47,7 @@ const ETIQUETA_ACCION: Record<string, string> = {
   PUESTO_CREADO: "Puesto de control creado",
   PUESTO_ACTUALIZADO: "Puesto de control actualizado",
   PUESTO_ELIMINADO: "Puesto de control eliminado",
+  SECTOR_ACTUALIZADO: "Sector actualizado",
   AGENCIA_CREADA: "Agencia naviera creada",
   AGENCIA_ACTUALIZADA: "Agencia naviera actualizada",
   AGENCIA_ELIMINADA: "Agencia naviera eliminada",

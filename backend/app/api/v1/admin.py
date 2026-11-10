@@ -8,7 +8,7 @@ from app.infrastructure.database import obtener_sesion_bd
 from app.core.config import obtener_configuracion
 from app.core.security import cerrar_sesiones, generar_contrasena_temporal, hashear_password
 from app.core.permisos import (
-    ROL_ADMIN, ROL_SYSADMIN, requerir_admin_o_sysadmin, requerir_algun_permiso,
+    PERMISO_SUPERVISAR_TODO, ROL_ADMIN, ROL_SYSADMIN, requerir_admin_o_sysadmin, requerir_algun_permiso,
 )
 from app.api.v1.dependencias import auditar_admin
 from app.domain.models.audit_log import AccionAuditoria
@@ -437,8 +437,11 @@ async def asignar_rol_a_usuario(
 
 @enrutador.get("/stats", response_model=SalidaUsoSistema)
 async def obtener_estadisticas(
-    # Admin entra por el atajo de usuario_tiene_permiso(); UCVMM por su permiso.
-    _: int = Depends(requerir_algun_permiso("T-PROCESAR-PACIFICO")),
+    # Los totales de todo el sistema (y las agencias con más solicitudes, de los dos
+    # sectores): solo quien ve todos los sectores, el supervisor general y el
+    # Administrador (por el atajo de usuario_tiene_permiso). Hasta el 2026-11-10
+    # los veía UCVMM, cuando había un solo sector.
+    _: int = Depends(requerir_algun_permiso(PERMISO_SUPERVISAR_TODO)),
     sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     """Cuentas, agencias y documentos almacenados (el flujo tiene sus propias

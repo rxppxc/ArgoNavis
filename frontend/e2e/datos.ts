@@ -5,10 +5,12 @@ import type { Browser, Page } from "@playwright/test";
 export const CLAVE = "Prueba-E2e-2026!";
 export const PUESTO = "Puesto E2E";
 export const CUENTAS = {
-  agencia: "e2e.agencia",
-  ucvmm:   "e2e.ucvmm",
-  puesto:  "e2e.puesto",
-  admin:   "e2e.admin",
+  agencia:    "e2e.agencia",
+  ucvmm:      "e2e.ucvmm",        // Sector Pacífico, el del puesto de las pruebas
+  atlantico:  "e2e.atlantico",    // UCVMM del Sector Atlántico: no ve las del Pacífico
+  supervisor: "e2e.supervisor",   // Supervisor general: ve todo, sin decidir
+  puesto:     "e2e.puesto",
+  admin:      "e2e.admin",
 } as const;
 /** Nombre completo del revisor de UCVMM: la agencia no debe verlo. */
 export const NOMBRE_REVISOR = "Ricardo Revisor";

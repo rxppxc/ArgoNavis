@@ -86,7 +86,7 @@ REGLAS = {
     "seamanbook_vencido": "el seamanbook vence el",
     "rango_no_permitido": "el rango debe ser",
     "marino_sin_seamanbook": "requiere el número de seamanbook",
-    "pasaporte_repetido": "ya está en el tripulante",
+    "pasaporte_repetido": "ya está en el pasajero",
 }
 
 

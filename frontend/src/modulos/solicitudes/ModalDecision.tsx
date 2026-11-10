@@ -46,7 +46,7 @@ function motivoPorVencimientos(s: SolicitudDetalle): string {
   return [
     "Documentación vencida a la fecha de la operación:",
     ...lineas,
-    "Adjunta la documentación vigente o retira a esos tripulantes de la solicitud.",
+    "Adjunta la documentación vigente o retira a esos pasajeros de la solicitud.",
   ].join("\n");
 }
 

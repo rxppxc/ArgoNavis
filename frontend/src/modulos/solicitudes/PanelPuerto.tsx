@@ -82,12 +82,12 @@ export function PanelPuerto({ solicitud, verificacion: v, onActualizada }: Props
             <strong className={styles.pasoTitulo}>Verifica los impedimentos en SIMPLUS</strong>
             <span className={styles.pasoTexto}>
               {v.corrigiendo
-                ? "Corrigiendo: guarda o cancela la corrección en la tabla de tripulantes."
+                ? "Corrigiendo: guarda o cancela la corrección en la tabla de pasajeros."
                 : v.registrada
                   ? (v.conImpedimento.length
                     ? <>Guardada. Con impedimento: <strong>{v.conImpedimento.join(", ")}</strong></>
-                    : "Guardada: ningún tripulante con impedimento.")
-                  : `Marca a cada tripulante en la tabla (${total - v.pendientes} de ${total}) y guarda la verificación.`}
+                    : "Guardada: ningún pasajero con impedimento.")
+                  : `Marca a cada pasajero en la tabla (${total - v.pendientes} de ${total}) y guarda la verificación.`}
             </span>
           </div>
         </li>
@@ -95,9 +95,9 @@ export function PanelPuerto({ solicitud, verificacion: v, onActualizada }: Props
           <span className={styles.pasoNumero} aria-hidden="true">{lista && comentarioListo ? "✓" : "2"}</span>
           <div className={styles.pasoCuerpo}>
             <label className={styles.pasoTitulo} htmlFor="comentario-puerto">Comentario de la operación *</label>
-            <span className={styles.pasoTexto}>Qué pasó en la operación, con lo que haya pasado con cada tripulante.</span>
+            <span className={styles.pasoTexto}>Qué pasó en la operación, con lo que haya pasado con cada pasajero.</span>
             <textarea id="comentario-puerto" className={styles.textarea} rows={3} maxLength={2000} value={comentario}
-              placeholder="Ej. Tripulantes presentados en garita, desembarque sin novedad…"
+              placeholder="Ej. Pasajeros presentados en garita, desembarque sin novedad…"
               onChange={(e) => setComentario(e.target.value)} />
           </div>
         </li>

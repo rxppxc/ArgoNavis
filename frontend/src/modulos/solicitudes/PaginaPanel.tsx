@@ -2,10 +2,12 @@
  * Panel principal — bandejas de Autorizaciones Marítimas según el rol:
  *
  *  - **Mi agencia** (Naviera): las solicitudes de su agencia naviera.
- *  - **Revisión** (UCVMM / Sector Pacífico): la cola de todas las solicitudes.
+ *  - **Revisión** (UCVMM): la cola de los puestos de su sector (Pacífico o Atlántico).
+ *  - **Supervisión** (supervisores, 2026-11-10): las de su sector, o las de los dos,
+ *    en solo lectura.
  *  - **Puesto de control**: las autorizaciones aprobadas de sus puestos.
  *
- * El admin ve las de revisión y puesto (y "Mi agencia" solo si tiene agencia).
+ * El admin ve las de revisión (todas) y puesto (y "Mi agencia" solo si tiene agencia).
  * Filtros, conteos por estado y páginas los resuelve el servidor. Cada fila
  * abre el expediente (/solicitudes/:id).
  */
@@ -30,9 +32,10 @@ type FiltroEstado = EstadoSolicitud | "todas";
 const POR_PAGINA = 20;
 
 const VISTAS: Record<Bandeja, { etiqueta: string; subtitulo: string }> = {
-  revision: { etiqueta: "Revisión UCVMM",    subtitulo: "Solicitudes de autorización de las agencias navieras" },
-  puerto:   { etiqueta: "Puesto de control", subtitulo: "Autorizaciones aprobadas de tus puestos" },
-  agencia:  { etiqueta: "Mi agencia",        subtitulo: "Solicitudes de autorización marítima de tu agencia" },
+  revision:    { etiqueta: "Revisión UCVMM",    subtitulo: "Solicitudes de los puestos de tu sector" },
+  supervision: { etiqueta: "Supervisión",       subtitulo: "Solicitudes de tu sector, en solo lectura" },
+  puerto:      { etiqueta: "Puesto de control", subtitulo: "Autorizaciones aprobadas de tus puestos" },
+  agencia:     { etiqueta: "Mi agencia",        subtitulo: "Solicitudes de autorización marítima de tu agencia" },
 };
 
 const PESTANAS: Record<Bandeja, { id: FiltroEstado; etiqueta: string }[]> = {
@@ -44,6 +47,15 @@ const PESTANAS: Record<Bandeja, { id: FiltroEstado; etiqueta: string }[]> = {
     { id: "denied", etiqueta: "Denegadas" },
     { id: "expired", etiqueta: "Expiradas" },
     { id: "todas", etiqueta: "Todas" },
+  ],
+  supervision: [
+    { id: "todas", etiqueta: "Todas" },
+    { id: "review", etiqueta: "En revisión" },
+    { id: "returned", etiqueta: "En corrección" },
+    { id: "approved", etiqueta: "Aprobadas" },
+    { id: "finalized", etiqueta: "Finalizadas" },
+    { id: "denied", etiqueta: "Denegadas" },
+    { id: "expired", etiqueta: "Expiradas" },
   ],
   puerto: [
     { id: "approved", etiqueta: "Por finalizar" },
@@ -88,6 +100,9 @@ function Panel({ bandejaPedida, estadoPedido }: { bandejaPedida: Bandeja | null;
 
   const tieneAgencia = usuario?.agencia_id != null;
   const puedeRevisar = esAdmin || tiene("T-PROCESAR-PACIFICO");
+  // Supervisión (2026-11-10): el Administrador no la necesita (su revisión ya muestra todo).
+  const veLosDos     = esAdmin || tiene("T-SUPERVISAR-TODO");
+  const supervisa    = !esAdmin && (tiene("T-SUPERVISAR-SECTOR") || tiene("T-SUPERVISAR-TODO"));
   const esPuerto     = esAdmin || tiene("T-FINALIZAR-PUERTO");
   // Las solicitudes son de una agencia: sin agencia el backend no deja enviar y
   // "Mi agencia" saldría vacía (le pasaba al Administrador, que tiene todos los permisos).
@@ -96,10 +111,11 @@ function Panel({ bandejaPedida, estadoPedido }: { bandejaPedida: Bandeja | null;
   const vistas = useMemo(() => {
     const lista: Bandeja[] = [];
     if (puedeRevisar) lista.push("revision");
+    if (supervisa) lista.push("supervision");
     if (esPuerto) lista.push("puerto");
     if (puedeCrear || lista.length === 0) lista.push("agencia");
     return lista;
-  }, [puedeRevisar, esPuerto, puedeCrear]);
+  }, [puedeRevisar, supervisa, esPuerto, puedeCrear]);
 
   const [vistaElegida, setVistaElegida] = useState<Bandeja | null>(bandejaPedida);
   const vista: Bandeja = vistaElegida && vistas.includes(vistaElegida) ? vistaElegida : vistas[0];
@@ -182,7 +198,9 @@ function Panel({ bandejaPedida, estadoPedido }: { bandejaPedida: Bandeja | null;
         titulo={<>Hola, {usuario?.full_name?.split(" ")[0] ?? usuario?.username}</>}
         tituloDocumento="Solicitudes"
         descripcion={<>
-          {VISTAS[vista].subtitulo}
+          {vista === "revision" && esAdmin ? "Solicitudes de los dos sectores"
+            : vista === "supervision" && veLosDos ? "Solicitudes de los dos sectores, en solo lectura"
+            : VISTAS[vista].subtitulo}
           {vista === "agencia" && usuario?.agencia && <> — {usuario.agencia.nombre}</>}
         </>}
         acciones={puedeCrear && (
@@ -257,7 +275,7 @@ function Panel({ bandejaPedida, estadoPedido }: { bandejaPedida: Bandeja | null;
         <>
           <div className={`${styles.lista} ${cargando ? styles.listaActualizando : ""}`} aria-busy={cargando}>
             {datos.items.map((s) => (
-              <TarjetaSolicitud key={s.id} s={s} vista={vista} />
+              <TarjetaSolicitud key={s.id} s={s} vista={vista} conSector={veLosDos && vista !== "agencia"} />
             ))}
           </div>
           {totalPaginas > 1 && (

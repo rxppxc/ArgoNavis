@@ -112,17 +112,37 @@ async def cliente(base_de_datos):
     await motor_bd.dispose()
 
 
+PACIFICO = "Sector Pacífico"
+ATLANTICO = "Sector Atlántico"
+# Los roles que trabajan por sector (2026-11-10): sin sector no ven nada.
+ROLES_CON_SECTOR = ("UCVMM", "Supervisor de sector")
+
+
+async def id_sector(nombre: str = PACIFICO) -> int:
+    from sqlalchemy import select
+    from app.domain.models.catalogo import Sector
+    from app.infrastructure.database import SesionLocal
+
+    async with SesionLocal() as s:
+        return (await s.execute(select(Sector.id).where(Sector.nombre == nombre))).scalar_one()
+
+
 async def crear_actor(
     rol: str | None, *, correo: str | None = None, agencia_id: int | None = None,
-    password: str | None = None, prefijo: str = "u", ad: bool = False,
+    password: str | None = None, prefijo: str = "u", ad: bool = False, sectores: tuple[str, ...] | None = None,
 ) -> Actor:
-    """Crea una cuenta (local, o del AD con `ad`) con el rol dado y devuelve su token."""
-    from sqlalchemy import select
+    """Crea una cuenta (local, o del AD con `ad`) con el rol dado y devuelve su token.
+    UCVMM y el supervisor de sector quedan en `sectores` (por defecto, el Pacífico,
+    donde están los puestos que crean las pruebas)."""
+    from sqlalchemy import insert, select
     from app.core.security import crear_token_acceso, hashear_password
+    from app.domain.models.catalogo import Sector, usuarios_sectores
     from app.domain.models.rol import Rol
     from app.domain.models.user import TipoUsuario, Usuario
     from app.infrastructure.database import SesionLocal
 
+    if sectores is None:
+        sectores = (PACIFICO,) if rol in ROLES_CON_SECTOR else ()
     username = f"{prefijo}.{secrets.token_hex(3)}"
     async with SesionLocal() as s:
         rol_id = None
@@ -134,6 +154,10 @@ async def crear_actor(
             password_hash=hashear_password(password) if password else None,
         )
         s.add(u)
+        await s.flush()
+        for nombre in sectores:
+            sector_id = (await s.execute(select(Sector.id).where(Sector.nombre == nombre))).scalar_one()
+            await s.execute(insert(usuarios_sectores).values(usuario_id=u.id, sector_id=sector_id))
         await s.commit()
         uid = u.id
     token = crear_token_acceso(subject=uid, extra={"username": username})

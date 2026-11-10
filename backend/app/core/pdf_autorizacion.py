@@ -254,7 +254,7 @@ def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
         ("FECHA DE LA SOLICITUD", _f(d.fecha_solicitud, True)),
         ("FECHA DE APROBACIÓN", _f(d.aprobada_en, True)),
         ("APROBADA POR", _t(d.aprobada_por)),
-        ("TRIPULANTES AUTORIZADOS", str(len(d.tripulantes))),
+        ("PASAJEROS AUTORIZADOS", str(len(d.tripulantes))),
     ]
     if d.estado == "finalized":
         pares += [
@@ -293,7 +293,7 @@ def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
         ]
 
     # ── Tripulantes ──
-    historia.append(Paragraph("TRIPULANTES", e_subtit))
+    historia.append(Paragraph("PASAJEROS", e_subtit))
     cabecera = ["N°", "Apellidos", "Nombres", "Nacionalidad", "Pasaporte", "Seamanbook", "Rango / Ocupación"]
     filas_tripulantes = [[Paragraph(c, e_cabecera) for c in cabecera]]
     hay_restringidos = False

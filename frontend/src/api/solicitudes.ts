@@ -3,7 +3,8 @@ import { clienteApi, guardarComoArchivo } from "./client";
 export type EstadoSolicitud = "review" | "returned" | "approved" | "denied" | "finalized" | "expired";
 export type RangoMarino = "marino" | "militar" | "tecnico" | "supernumerario" | "superintendente";
 export type Sexo = "M" | "F" | "X";
-export type Bandeja = "agencia" | "revision" | "puerto";
+/** «supervision»: solo lectura, las de sus sectores o las de los dos (2026-11-10). */
+export type Bandeja = "agencia" | "revision" | "puerto" | "supervision";
 
 /** Ficha del tripulante tal como se envía (formulario de registro del marino). */
 export interface TripulanteEntrada {
@@ -62,6 +63,8 @@ export interface SolicitudResumen {
   agencia_id: number;
   agencia_nombre: string;
   puesto_nombre: string;
+  /** El sector de UCVMM del puesto (2026-11-10). Solo para el SNM: a la agencia le llega null. */
+  sector_nombre: string | null;
   nombre_buque: string | null;
   imo: string | null;
   fecha_operacion: string;
@@ -288,6 +291,14 @@ export interface EstadisticasSolicitudes {
   por_mes: FilaSerie[];
   por_anio: FilaSerie[];
   por_puesto: { puesto: string; aprobadas: number; finalizadas: number; expiradas: number }[];
+  /** De qué sectores son las cifras (2026-11-10): "Todos los sectores", "Sector Pacífico"… */
+  alcance: string;
+  /** El sector elegido, si se eligió uno. */
+  sector_id: number | null;
+  /** Los que puede elegir quien consulta (uno solo si ve un sector). */
+  sectores: { id: number; nombre: string }[];
+  /** Si ve el uso del sistema: solo quien ve todos los sectores. */
+  uso_del_sistema: boolean;
 }
 
 function formularioMultipart(datos: unknown, archivos: File[]): FormData {
@@ -382,18 +393,18 @@ export const apiSolicitudes = {
     guardarComoArchivo(data, nombre ?? `Autorizacion-${numero ?? id}.pdf`);
   },
 
-  estadisticas: (desde?: string | null, hasta?: string | null) =>
+  estadisticas: (desde?: string | null, hasta?: string | null, sectorId?: number | null) =>
     clienteApi.get<EstadisticasSolicitudes>("/solicitudes/estadisticas", {
-      params: { desde: desde || undefined, hasta: hasta || undefined },
+      params: { desde: desde || undefined, hasta: hasta || undefined, sector_id: sectorId ?? undefined },
     }).then((r) => r.data),
 
   /** Las estadísticas del periodo (y el uso del sistema) en Excel, PDF o CSV, con
    *  la identidad del SNM; las arma el servidor. `unidad`: la serie que se ve en
    *  pantalla, que va en el PDF y en la hoja «Resumen». */
   async exportarEstadisticas(formato: FormatoExportacion, desde: string | null, hasta: string | null,
-    unidad: "dia" | "mes" | "anio"): Promise<string> {
+    unidad: "dia" | "mes" | "anio", sectorId: number | null = null): Promise<string> {
     const { data, headers } = await clienteApi.get<Blob>("/solicitudes/estadisticas/exportar", {
-      params: { formato, desde: desde || undefined, hasta: hasta || undefined, unidad },
+      params: { formato, desde: desde || undefined, hasta: hasta || undefined, unidad, sector_id: sectorId ?? undefined },
       responseType: "blob",
       timeout: 120_000,
     });

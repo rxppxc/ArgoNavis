@@ -20,7 +20,10 @@ from app.core.horario import ZONA_PANAMA
 from app.core.http_utils import obtener_agente, obtener_ip
 from app.core.informe_estadisticas import DatosInforme, generar_informe
 from app.core.pdf_autorizacion import generar_pdf_autorizacion
-from app.core.permisos import PERMISO_PUERTO, PERMISO_REVISAR, PERMISO_SOLICITAR, requerir_permiso
+from app.core.permisos import (
+    PERMISO_PUERTO, PERMISO_REVISAR, PERMISO_SOLICITAR, PERMISO_SUPERVISAR_SECTOR, PERMISO_SUPERVISAR_TODO,
+    requerir_algun_permiso, requerir_permiso,
+)
 from app.core.rate_limit import clave_usuario, limite_envios, limiter
 from app.domain.models.audit_log import AccionAuditoria
 from app.domain.models.solicitud import Solicitud
@@ -75,7 +78,7 @@ def _describir_errores(exc: ValidationError) -> str:
     for err in errores[:6]:
         loc = err.get("loc", ())
         if len(loc) >= 3 and loc[0] == "tripulantes" and isinstance(loc[1], int):
-            sujeto = f"Tripulante {loc[1] + 1}, {_ETIQUETAS_CAMPO.get(str(loc[2]), str(loc[2]))}"
+            sujeto = f"Pasajero {loc[1] + 1}, {_ETIQUETAS_CAMPO.get(str(loc[2]), str(loc[2]))}"
         elif loc:
             sujeto = _ETIQUETAS_CAMPO.get(str(loc[-1]), str(loc[-1]))
         else:
@@ -160,15 +163,33 @@ async def bandeja_puerto(
     return await svc.bandeja_puerto(ctx, consulta)
 
 
-@enrutador.get("/estadisticas", response_model=SalidaEstadisticasSolicitudes)
-async def estadisticas(
-    desde: date | None = Query(default=None),
-    hasta: date | None = Query(default=None),
-    _perm: int = Depends(requerir_permiso(PERMISO_REVISAR)),
+@enrutador.get("/supervision", response_model=PaginaSolicitudes)
+async def bandeja_supervision(
+    consulta: Annotated[ConsultaBandeja, Query()],
+    _perm: int = Depends(requerir_algun_permiso(PERMISO_SUPERVISAR_SECTOR, PERMISO_SUPERVISAR_TODO)),
+    ctx:   ContextoAcceso = Depends(_contexto),
     svc:   ServicioSolicitud = Depends(_servicio),
 ):
-    """Autorizaciones recibidas, aprobadas, denegadas y expiradas."""
-    return await svc.estadisticas(desde, hasta)
+    """Solo lectura (2026-11-10): las solicitudes de sus sectores, o las de los dos."""
+    return await svc.bandeja_supervision(ctx, consulta)
+
+
+# Quien ve estadísticas: UCVMM y los supervisores (el Administrador, por el atajo).
+_PUEDE_VER_ESTADISTICAS = requerir_algun_permiso(PERMISO_REVISAR, PERMISO_SUPERVISAR_SECTOR, PERMISO_SUPERVISAR_TODO)
+
+
+@enrutador.get("/estadisticas", response_model=SalidaEstadisticasSolicitudes)
+async def estadisticas(
+    desde:     date | None = Query(default=None),
+    hasta:     date | None = Query(default=None),
+    sector_id: int | None = Query(default=None, description="Un sector, si se ven varios."),
+    _perm: int = Depends(_PUEDE_VER_ESTADISTICAS),
+    ctx:   ContextoAcceso = Depends(_contexto),
+    svc:   ServicioSolicitud = Depends(_servicio),
+):
+    """Autorizaciones recibidas, aprobadas, denegadas y expiradas, de los sectores
+    que ve quien consulta."""
+    return await svc.estadisticas(desde, hasta, await svc.alcance_estadisticas(ctx, sector_id))
 
 
 @enrutador.get("/estadisticas/exportar")
@@ -178,19 +199,22 @@ async def exportar_estadisticas(
     hasta:   date | None = Query(default=None),
     unidad:  Literal["dia", "mes", "anio"] = Query(
         default="mes", description="La serie del PDF y de la hoja «Resumen»: la que se ve en pantalla."),
-    _perm:   int = Depends(requerir_permiso(PERMISO_REVISAR)),
-    usuario: Usuario = Depends(usuario_actual),
+    sector_id: int | None = Query(default=None, description="Un sector, si se ven varios."),
+    _perm:   int = Depends(_PUEDE_VER_ESTADISTICAS),
+    ctx:     ContextoAcceso = Depends(_contexto),
     svc:     ServicioSolicitud = Depends(_servicio),
     sesion:  AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
-    """Las estadísticas del periodo y el uso del sistema en un archivo con la
-    identidad del SNM, para informes (core/informe_estadisticas.py). Quién lo
-    generó va en el archivo. Se arma en un hilo aparte: es CPU-bound."""
+    """Las estadísticas del periodo (de los sectores que ve quien consulta) en un
+    archivo con la identidad del SNM, para informes (core/informe_estadisticas.py).
+    El uso del sistema va solo para quien ve todos los sectores. Quién lo generó va
+    en el archivo. Se arma en un hilo aparte: es CPU-bound."""
+    alcance = await svc.alcance_estadisticas(ctx, sector_id)
     datos = DatosInforme(
-        estadisticas=await svc.estadisticas(desde, hasta),
-        uso=await ServicioUsoSistema(sesion).resumen(),
+        estadisticas=await svc.estadisticas(desde, hasta, alcance),
+        uso=await ServicioUsoSistema(sesion).resumen() if alcance.uso_del_sistema else None,
         desde=desde, hasta=hasta, unidad=unidad,
-        generado_por=usuario.full_name, generado_en=datetime.now(ZONA_PANAMA),
+        generado_por=ctx.usuario.full_name, generado_en=datetime.now(ZONA_PANAMA),
     )
     archivo = await asyncio.to_thread(generar_informe, formato, datos)
     return Response(
@@ -222,7 +246,7 @@ async def crear_solicitud(
         sesion, request, ctx.usuario, AccionAuditoria.SOLICITUD_CREADA, s,
         tramite=datos.codigo_tramite, tripulantes=s.cantidad_tripulantes, documentos=len(s.documentos),
     )
-    await _programar(sesion, background_tasks, ServicioNotificacion(sesion).recibida(s, corregida=False))
+    await _programar(sesion, background_tasks, await ServicioNotificacion(sesion).recibida(s, corregida=False))
     return await svc.construir_detalle(ctx, s)
 
 
@@ -246,7 +270,7 @@ async def corregir_solicitud(
         sesion, request, ctx.usuario, AccionAuditoria.SOLICITUD_CORREGIDA, s,
         tripulantes=s.cantidad_tripulantes, documentos_nuevos=len(files),
     )
-    await _programar(sesion, background_tasks, ServicioNotificacion(sesion).recibida(s, corregida=True))
+    await _programar(sesion, background_tasks, await ServicioNotificacion(sesion).recibida(s, corregida=True))
     return await svc.construir_detalle(ctx, s)
 
 

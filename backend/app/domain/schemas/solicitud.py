@@ -273,6 +273,8 @@ class SalidaSolicitudResumen(BaseModel):
     agencia_id:           int
     agencia_nombre:       str
     puesto_nombre:        str
+    # El sector de UCVMM del puesto (2026-11-10). Solo para el SNM: a la agencia le llega None.
+    sector_nombre:        str | None = None
     nombre_buque:         str | None = None
     imo:                  str | None = None
     fecha_operacion:      date
@@ -425,6 +427,11 @@ class FilaPorHora(BaseModel):
     total: int
 
 
+class FilaSector(BaseModel):
+    id:     int
+    nombre: str
+
+
 class SalidaEstadisticasSolicitudes(BaseModel):
     recibidas:   int
     por_estado:  dict[str, int]
@@ -445,6 +452,13 @@ class SalidaEstadisticasSolicitudes(BaseModel):
     por_mes:     list[FilaEstadisticaSerie]  = Field(default_factory=list)
     por_anio:    list[FilaEstadisticaSerie]  = Field(default_factory=list)
     por_puesto:  list[FilaEstadisticaPuesto] = Field(default_factory=list)
+    # De qué sectores son las cifras (2026-11-10): UCVMM y el supervisor de sector
+    # ven las de sus sectores; el Administrador y el supervisor general, las de
+    # todos, y pueden elegir uno (`sectores`). El uso del sistema, solo ellos.
+    alcance:     str = "Todos los sectores"
+    sector_id:   int | None = None
+    sectores:    list[FilaSector] = Field(default_factory=list)
+    uso_del_sistema: bool = True
 
 
 class FilaTopAgencia(BaseModel):

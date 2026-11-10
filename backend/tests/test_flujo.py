@@ -22,7 +22,7 @@ from app.infrastructure import tareas
 from app.infrastructure.database import SesionLocal
 from app.infrastructure.tareas import expirar_solicitudes
 from ayudas import HOY, cabecera, enviar, pdf, tripulante
-from conftest import STORAGE, Actor, crear_actor
+from conftest import STORAGE, Actor, crear_actor, id_sector
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
@@ -83,8 +83,10 @@ async def escenario(cliente, admin) -> Escenario:
         assert r.status_code == 201, r.text
         return r.json()
 
-    puesto_a  = await crear("/admin/puestos", {"nombre": f"Puerto de Balboa {sufijo}", "correo": "balboa@prueba.pa"})
-    puesto_b  = await crear("/admin/puestos", {"nombre": f"Puerto de Rodman {sufijo}"})
+    pacifico  = await id_sector()
+    puesto_a  = await crear("/admin/puestos", {"nombre": f"Puerto de Balboa {sufijo}", "correo": "balboa@prueba.pa",
+                                               "sector_id": pacifico})
+    puesto_b  = await crear("/admin/puestos", {"nombre": f"Puerto de Rodman {sufijo}", "sector_id": pacifico})
     agencia_a = await crear("/admin/agencias", {"nombre": f"Agencia del Istmo {sufijo}", "correo": "istmo@prueba.pa"})
     agencia_b = await crear("/admin/agencias", {"nombre": f"Naviera del Pacífico {sufijo}"})
 
@@ -94,8 +96,8 @@ async def escenario(cliente, admin) -> Escenario:
         nav_a2=await crear_actor("Naviera", prefijo="naviera"),
         nav_b=await crear_actor("Naviera", prefijo="naviera"),
         nav_sin=await crear_actor("Naviera", prefijo="naviera"),
-        revisor=await crear_actor("Sector Pacífico", prefijo="revisor"),
-        revisor_a=await crear_actor("Sector Pacífico", prefijo="revisor"),
+        revisor=await crear_actor("UCVMM", prefijo="revisor"),
+        revisor_a=await crear_actor("UCVMM", prefijo="revisor"),
         puerto_a=await crear_actor("Puesto de Control", correo="p1@prueba.pa", prefijo="puerto"),
         puerto_b=await crear_actor("Puesto de Control", prefijo="puerto"),
     )
@@ -156,7 +158,7 @@ async def test_validaciones_de_creacion(cliente, escenario: Escenario):
 
     datos = cabecera("F3-EMBARQUE", pid, tripulantes=[{"nombre": "Juan"}], asignaciones=[])
     r = await enviar(cliente, e.nav_a1, datos, [])
-    assert r.status_code == 422 and "Tripulante 1" in r.json()["detail"]
+    assert r.status_code == 422 and "Pasajero 1" in r.json()["detail"]
 
     datos = cabecera("F3-EMBARQUE", pid, nombre_buque=None, tripulantes=[tripulante("Juan")], asignaciones=[])
     r = await enviar(cliente, e.nav_a1, datos, [])
@@ -171,7 +173,7 @@ async def test_validaciones_de_creacion(cliente, escenario: Escenario):
     # Más de 30 tripulantes: se rechaza antes de mirar los documentos
     tripulacion = [tripulante(f"Marino{i}") for i in range(MAX_TRIPULANTES + 1)]
     r = await enviar(cliente, e.nav_a1, cabecera("F3-CAMBIO-NAVE", pid, tripulantes=tripulacion, asignaciones=[]), [])
-    assert r.status_code == 400 and f"hasta {MAX_TRIPULANTES} tripulantes" in r.json()["detail"]
+    assert r.status_code == 400 and f"hasta {MAX_TRIPULANTES} pasajeros" in r.json()["detail"]
 
     # Más de 20 documentos adicionales
     asignaciones = [{"documento_codigo": None}] * 21
@@ -422,7 +424,7 @@ async def test_impedimentos_por_tripulante(cliente, escenario: Escenario, admin)
     r = await cliente.post(f"/solicitudes/{sid}/impedimentos", json=sin_comentario, headers=e.revisor.headers)
     assert r.status_code == 200, "el comentario de la acción tomada es opcional"
     assert r.json()["comentario_impedimentos"] is None
-    assert r.json()["eventos"][-1]["comentario"] == "Sin impedimentos (2 tripulantes)."
+    assert r.json()["eventos"][-1]["comentario"] == "Sin impedimentos (2 pasajeros)."
     eventos = len(r.json()["eventos"])
     r = await cliente.post(f"/solicitudes/{sid}/impedimentos", json=sin_comentario, headers=e.revisor.headers)
     assert r.status_code == 409, "repetir la misma verificación no suma otra entrada al historial"
@@ -767,7 +769,8 @@ async def test_protecciones_del_admin(cliente, escenario: Escenario, admin, sysa
     r = await cliente.delete(f"/admin/agencias/{e.agencia_a['id']}", headers=admin.headers)
     assert r.status_code == 409
 
-    r = await cliente.post("/admin/puestos", json={"nombre": f"Puesto Temporal {secrets.token_hex(2)}"}, headers=admin.headers)
+    r = await cliente.post("/admin/puestos", json={"nombre": f"Puesto Temporal {secrets.token_hex(2)}",
+                                                   "sector_id": await id_sector()}, headers=admin.headers)
     r = await cliente.delete(f"/admin/puestos/{r.json()['id']}", headers=admin.headers)
     assert r.status_code == 204
 

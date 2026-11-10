@@ -17,14 +17,14 @@ const FORMATOS: { id: FormatoExportacion; etiqueta: string; descripcion: string 
  *  identidad del SNM: los archivos los arma el servidor (core/informe_*.py). La
  *  serie va en la unidad que se ve en pantalla. Azul de contorno: descargar es
  *  consultar (Botones.module.css). */
-export default function BotonesExportar({ rango, unidad }: { rango: RangoFechas; unidad: Unidad }) {
+export default function BotonesExportar({ rango, unidad, sectorId }: { rango: RangoFechas; unidad: Unidad; sectorId: number | null }) {
   const { mostrar } = useNotificacion();
   const [generando, setGenerando] = useState<FormatoExportacion | null>(null);
 
   async function exportar(formato: FormatoExportacion) {
     setGenerando(formato);
     try {
-      const nombre = await apiSolicitudes.exportarEstadisticas(formato, rango.desde, rango.hasta, unidad);
+      const nombre = await apiSolicitudes.exportarEstadisticas(formato, rango.desde, rango.hasta, unidad, sectorId);
       mostrar(`Se descargó «${nombre}».`, "exito");
     } catch (e) {
       mostrar(mensajeDeError(e, "No se pudieron exportar las estadísticas."), "error");

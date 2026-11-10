@@ -17,7 +17,9 @@ export function MenuCabecera() {
   const [abierto, setAbierto] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const refBoton = useRef<HTMLButtonElement>(null);
-  const esPacifico = !esAdmin && tiene("T-PROCESAR-PACIFICO");
+  // UCVMM y los supervisores (2026-11-10) ven las estadísticas de su alcance; el admin las tiene en su bloque.
+  const veEstadisticas = !esAdmin
+    && (tiene("T-PROCESAR-PACIFICO") || tiene("T-SUPERVISAR-SECTOR") || tiene("T-SUPERVISAR-TODO"));
   // Quién está en la sesión y con qué rol: se ve junto al menú (escritorio) y arriba del panel.
   const nombre = usuario?.full_name?.trim() || usuario?.username || "";
   const detalle = [usuario?.rol_personalizado?.nombre, usuario?.agencia?.nombre].filter(Boolean).join(" · ");
@@ -117,7 +119,7 @@ export function MenuCabecera() {
                 <div className={styles.sep} />
               </>
             )}
-            {esPacifico && (
+            {veEstadisticas && (
               <>
                 <Link to="/admin/stats" className={styles.item} onClick={() => setAbierto(false)}>
                   <IconoEstadisticas />Estadísticas

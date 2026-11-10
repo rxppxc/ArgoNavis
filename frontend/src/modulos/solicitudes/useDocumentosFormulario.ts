@@ -56,7 +56,7 @@ export function useDocumentosFormulario(
       tipo,
       tripulantes.map((t) => ({
         clave: t.clave,
-        nombre: `${t.nombre} ${t.apellido}`.trim() || "Tripulante sin nombre",
+        nombre: `${t.nombre} ${t.apellido}`.trim() || "Pasajero sin nombre",
         es_panameno: t.nacionalidad === "PAN",
         rango: t.rango,
         restringida: paisesPorCodigo.get(t.nacionalidad)?.nacionalidad_restringida ?? false,

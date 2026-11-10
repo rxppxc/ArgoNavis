@@ -19,13 +19,28 @@ export interface CatalogoConUsuarios {
   total_solicitudes: number;
 }
 
-export type PuestoAdmin  = CatalogoConUsuarios;
+/** Un puesto es de un sector de UCVMM (2026-11-10): sus solicitudes las revisa ese sector. */
+export interface PuestoAdmin extends CatalogoConUsuarios {
+  sector_id: number;
+  sector_nombre: string;
+}
 export type AgenciaAdmin = CatalogoConUsuarios;
+
+/** Sector Pacífico o Atlántico, con su buzón, sus puestos y sus funcionarios (UCVMM y supervisores). */
+export interface SectorAdmin {
+  id: number;
+  nombre: string;
+  correo: string | null;
+  usuarios: { id: number; username: string; full_name: string }[];
+  puestos: CatalogoMini[];
+}
 
 export interface DatosCatalogo {
   nombre?: string;
   correo?: string | null;
   activo?: boolean;
+  /** Solo los puestos. */
+  sector_id?: number;
 }
 
 /** Ordena alfabéticamente en español y deja Panamá primero (el caso más común). */
@@ -48,8 +63,8 @@ export const apiCatalogos = {
   listarPuestosAdmin: () =>
     clienteApi.get<PuestoAdmin[]>("/admin/puestos").then((r) => r.data),
 
-  crearPuesto: (nombre: string, correo: string | null) =>
-    clienteApi.post<PuestoAdmin>("/admin/puestos", { nombre, correo }).then((r) => r.data),
+  crearPuesto: (nombre: string, correo: string | null, sector_id: number) =>
+    clienteApi.post<PuestoAdmin>("/admin/puestos", { nombre, correo, sector_id }).then((r) => r.data),
 
   actualizarPuesto: (id: number, datos: DatosCatalogo) =>
     clienteApi.patch<PuestoAdmin>(`/admin/puestos/${id}`, datos).then((r) => r.data),
@@ -59,6 +74,16 @@ export const apiCatalogos = {
 
   asignarUsuariosPuesto: (id: number, usuario_ids: number[]) =>
     clienteApi.put<PuestoAdmin>(`/admin/puestos/${id}/usuarios`, { usuario_ids }).then((r) => r.data),
+
+  // ── Administración: sectores de UCVMM ──
+  listarSectoresAdmin: () =>
+    clienteApi.get<SectorAdmin[]>("/admin/sectores").then((r) => r.data),
+
+  actualizarSector: (id: number, correo: string | null) =>
+    clienteApi.patch<SectorAdmin>(`/admin/sectores/${id}`, { correo }).then((r) => r.data),
+
+  asignarUsuariosSector: (id: number, usuario_ids: number[]) =>
+    clienteApi.put<SectorAdmin>(`/admin/sectores/${id}/usuarios`, { usuario_ids }).then((r) => r.data),
 
   // ── Administración: agencias navieras ──
   listarAgenciasAdmin: () =>

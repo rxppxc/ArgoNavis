@@ -55,6 +55,7 @@ def generar(datos: DatosInforme) -> bytes:
     fila(f"{INSTITUCION} — {SECCION}")
     fila(TITULO)
     fila("Periodo", datos.periodo)
+    fila("Sectores", datos.alcance)
     fila("Generado", datos.generado)
     fila(USO_INTERNO)
 
@@ -102,6 +103,8 @@ def generar(datos: DatosInforme) -> bytes:
     if e.aprobadas_fuera_horario > len(e.operaciones_fuera_horario):
         fila(f"Se muestran las {len(e.operaciones_fuera_horario)} más recientes de {e.aprobadas_fuera_horario}.")
 
+    if uso is None:   # solo para quien ve todos los sectores
+        return ("\ufeff" + salida.getvalue()).encode("utf-8")
     seccion("Uso del sistema (totales a hoy)", "Indicador", "Cantidad")
     fila("Usuarios registrados", uso.usuarios)
     fila("Usuarios activos", uso.usuarios_activos)

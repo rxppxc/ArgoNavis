@@ -1,6 +1,6 @@
 /**
  * El formulario de «Nueva solicitud», sin enviarlo: lo que hace con los
- * documentos al quitar un tripulante, cambiarle el rango o cambiar de trámite,
+ * documentos al quitar un pasajero, cambiarle el rango o cambiar de trámite,
  * el resumen de lo que falta, los adicionales y el aviso de lo que hay que revisar.
  */
 import type { Page } from "@playwright/test";
@@ -14,14 +14,14 @@ async function marinoPanameno(pagina: Page, indice: number, nombre: string) {
   await tarjeta(pagina, indice).getByLabel("Nacionalidad *").selectOption("PAN");
 }
 
-test("el formulario cuida los documentos al quitar un tripulante o cambiar de trámite", async ({ browser }) => {
+test("el formulario cuida los documentos al quitar un pasajero o cambiar de trámite", async ({ browser }) => {
   const agencia = await entrar(browser, CUENTAS.agencia);
   await agencia.goto("/new");
   await agencia.getByRole("button", { name: /^Embarque/ }).click();
 
   // Dos marinos panameños: Embarque pide tres documentos a cada uno, en su tarjeta.
   await marinoPanameno(agencia, 0, "Ana");
-  await agencia.getByRole("button", { name: "Agregar tripulante" }).click();
+  await agencia.getByRole("button", { name: "Agregar pasajero" }).click();
   await marinoPanameno(agencia, 1, "Beto");
   await expect(agencia.getByText("Faltan 6 documentos por adjuntar")).toBeVisible();
 
@@ -29,9 +29,9 @@ test("el formulario cuida los documentos al quitar un tripulante o cambiar de tr
   await agencia.getByLabel("Adjuntar Visa Especial de Marino de Beto").setInputFiles(pdf("visa-beto.pdf"));
   await expect(agencia.getByText("Faltan 4 documentos por adjuntar")).toBeVisible();
 
-  await test.step("al quitar un tripulante se van sus archivos", async () => {
+  await test.step("al quitar un pasajero se van sus archivos", async () => {
     await expect(agencia.getByText("visa-beto.pdf")).toBeVisible();
-    await agencia.getByRole("button", { name: "Quitar tripulante 2" }).click();
+    await agencia.getByRole("button", { name: "Quitar pasajero 2" }).click();
     await expect(agencia.getByText("Faltan 2 documentos por adjuntar")).toBeVisible();
     await expect(agencia.getByText("visa-beto.pdf")).toHaveCount(0);
   });
@@ -48,10 +48,10 @@ test("el formulario cuida los documentos al quitar un tripulante o cambiar de tr
   });
 
   await test.step("el resumen lleva a la tarjeta y la expande", async () => {
-    await agencia.getByRole("button", { name: "Contraer tripulante 1" }).click();
-    await expect(agencia.getByRole("button", { name: "Expandir tripulante 1" })).toBeVisible();
+    await agencia.getByRole("button", { name: "Contraer pasajero 1" }).click();
+    await expect(agencia.getByRole("button", { name: "Expandir pasajero 1" })).toBeVisible();
     await agencia.getByRole("button", { name: /^1\. Ana/ }).click();
-    await expect(agencia.getByRole("button", { name: "Contraer tripulante 1" })).toBeVisible();
+    await expect(agencia.getByRole("button", { name: "Contraer pasajero 1" })).toBeVisible();
   });
 
   await test.step("cambiar de trámite con archivos adjuntos pide confirmación y los quita", async () => {

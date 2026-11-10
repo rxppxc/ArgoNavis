@@ -56,8 +56,10 @@ class ServicioPendientes:
         ctx = await self.solicitudes.contexto(usuario)
         fuentes: list[_Fuente] = []
         if ctx.puede_revisar:
+            # Las de los puestos de sus sectores, como su bandeja (el admin, todas).
+            filtros = FiltrosBandeja(puestos_ids=None if ctx.es_admin else ctx.puestos_de_sectores)
             fuentes.append(_Fuente("por_revisar", "Por revisar", "revision", EstadoSolicitud.EN_REVISION.value,
-                                   FiltrosBandeja(), EVENTOS_REVISION))
+                                   filtros, EVENTOS_REVISION))
         if ctx.es_admin or ctx.es_puerto:
             filtros = FiltrosBandeja(puestos_ids=None if ctx.es_admin else ctx.puestos_ids, solo_aprobadas_alguna_vez=True)
             fuentes.append(_Fuente("por_finalizar", "Por finalizar", "puerto", EstadoSolicitud.APROBADA.value,

@@ -241,6 +241,23 @@ if [ "${fallidos:-0}" -gt 0 ]; then
   aviso "$fallidos correo(s) fallido(s). Para ver el motivo: select numero, asunto, ultimo_error from correos_salida where estado = 'fallido';"
 fi
 
+# ── Sectores de UCVMM (2026-11-10) ───────────────────────────────────────────
+# Al desplegar, todos los puestos y revisores quedan en el Pacífico (como antes):
+# el administrador pasa a Atlántico los suyos. Sin sector, un revisor no ve nada.
+seccion "Sectores de UCVMM"
+sectores=$(psql_bd "select s.nombre || ': ' || count(p.id) || ' puesto(s)' from sectores s left join puestos_control p on p.sector_id = s.id group by s.id, s.nombre order by s.id" | paste -sd ';' - | sed 's/;/; /g')
+info "Puestos por sector: ${sectores:-sin sectores (¿falta la migración?)}"
+sin_sector=$(psql_bd "select count(*) from users u join roles r on r.id = u.rol_id where r.nombre in ('UCVMM', 'Supervisor de sector') and u.status::text in ('ACTIVO', 'active') and not exists (select 1 from usuarios_sectores us where us.usuario_id = u.id)")
+if [ "${sin_sector:-0}" -gt 0 ]; then
+  aviso "$sin_sector usuario(s) de UCVMM o de supervisión de sector sin sector: no ven solicitudes (Catálogos → Sectores)"
+else
+  bien "Los usuarios de UCVMM y de supervisión de sector tienen su sector"
+fi
+atlantico=$(psql_bd "select count(p.id) from sectores s left join puestos_control p on p.sector_id = s.id where s.nombre = 'Sector Atlántico'")
+if [ "${atlantico:-0}" -eq 0 ]; then
+  aviso "El Sector Atlántico no tiene puestos: pasa los suyos en Catálogos → Puestos de control"
+fi
+
 # ── Respaldos ────────────────────────────────────────────────────────────────
 seccion "Respaldos"
 linea=$(crontab -l 2>/dev/null | grep 'backup.sh' | grep -v '^[[:space:]]*#')

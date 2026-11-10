@@ -34,7 +34,7 @@ const REGLAS: Record<string, string> = {
   seamanbook_vencido: "el seamanbook vence el",
   rango_no_permitido: "el rango debe ser",
   marino_sin_seamanbook: "falta N° de seamanbook",
-  pasaporte_repetido: "ya está registrado en el tripulante",
+  pasaporte_repetido: "ya está registrado en el pasajero",
 };
 
 function regla(mensaje: string): string {
@@ -43,11 +43,11 @@ function regla(mensaje: string): string {
   return claves[0];
 }
 
-describe("ficha del tripulante (espejo de validar_tripulantes)", () => {
+describe("ficha del pasajero (espejo de validar_pasajeros)", () => {
   it.each(espejo.casos)("$caso", ({ hoy, fecha_operacion, tramite, tripulantes, esperado }) => {
     const fichas = tripulantes.map((cambios, i) => ficha(cambios, `n${i}`));
     const errores = validarFormulario(tramiteDePrueba(tramite), { ...CABECERA_VACIA, fecha_operacion }, fichas, paises, hoy)
-      .filter((e) => e.startsWith("Tripulante"));
+      .filter((e) => e.startsWith("Pasajero"));
     expect(errores.map(regla).sort()).toEqual([...esperado].sort());
   });
 });
@@ -85,15 +85,15 @@ describe("datos del trámite", () => {
     ]);
   });
 
-  it("al menos un tripulante", () => {
-    expect(validarFormulario(tramiteDePrueba(), completa, [], paises, hoy)).toEqual(["Registra al menos un tripulante."]);
+  it("al menos un pasajero", () => {
+    expect(validarFormulario(tramiteDePrueba(), completa, [], paises, hoy)).toEqual(["Registra al menos un pasajero."]);
   });
 
-  it(`hasta ${MAX_TRIPULANTES} tripulantes`, () => {
+  it(`hasta ${MAX_TRIPULANTES} pasajeros`, () => {
     const tripulacion = (n: number) => Array.from({ length: n }, (_, i) => ficha({ pasaporte: `P${1000 + i}` }, `n${i}`));
     expect(validarFormulario(tramiteDePrueba(), completa, tripulacion(MAX_TRIPULANTES), paises, hoy)).toEqual([]);
     expect(validarFormulario(tramiteDePrueba(), completa, tripulacion(MAX_TRIPULANTES + 2), paises, hoy)).toEqual([
-      `Una solicitud admite hasta ${MAX_TRIPULANTES} tripulantes: quita 2 y preséntalos en otra solicitud.`,
+      `Una solicitud admite hasta ${MAX_TRIPULANTES} pasajeros: quita 2 y preséntalos en otra solicitud.`,
     ]);
   });
 });

@@ -52,7 +52,7 @@ def _campos(s: Solicitud) -> list[tuple[str, str]]:
         ("Trámite",         s.tipo_tramite.nombre if s.tipo_tramite else ""),
         ("Puesto",          s.puesto_nombre),
         ("Operación",       s.fecha_operacion.strftime("%d/%m/%Y")),
-        ("Tripulantes",     str(s.cantidad_tripulantes)),
+        ("Pasajeros",       str(s.cantidad_tripulantes)),
         ("Agencia naviera", s.agencia_nombre),
     ]
 
@@ -79,14 +79,15 @@ class ServicioNotificacion:
         correos += await self.repo_catalogos.correos_de_puesto(s.puesto_control_id)
         return list(dict.fromkeys(correos))
 
-    @staticmethod
-    def _correos_ucvmm() -> list[str]:
-        return [configuracion.CORREO_UCVMM] if configuracion.CORREO_UCVMM else []
+    async def _correos_ucvmm(self, s: Solicitud) -> list[str]:
+        """El buzón del sector del puesto (2026-11-10); sin él, el general de UCVMM."""
+        correo = await self.repo_catalogos.correo_sector_de_puesto(s.puesto_control_id) or configuracion.CORREO_UCVMM
+        return [correo] if correo else []
 
     # ── Avisos por paso ──────────────────────────────────────────────────────
 
-    def recibida(self, s: Solicitud, *, corregida: bool) -> list[Aviso]:
-        """Solicitud nueva o corregida: a la cola de UCVMM."""
+    async def recibida(self, s: Solicitud, *, corregida: bool) -> list[Aviso]:
+        """Solicitud nueva o corregida: a la cola de UCVMM de su sector."""
         tramite = s.tipo_tramite.nombre if s.tipo_tramite else "autorización"
         if corregida:
             estado = "Corregida"
@@ -99,7 +100,7 @@ class ServicioNotificacion:
             intro  = f"{s.agencia_nombre} envió una solicitud de {tramite} para revisión."
             previa = _vista_previa(s.agencia_nombre, tramite, _operacion(s))
         return self._con_destinatarios([Aviso(
-            destinatarios=self._correos_ucvmm(), numero=s.numero or "", estado=estado,
+            destinatarios=await self._correos_ucvmm(s), numero=s.numero or "", estado=estado,
             titulo=titulo, intro=intro, vista_previa=previa, campos=_campos(s), tono="azul",
             boton_texto="Revisar solicitud", boton_url=url_solicitud(s),
         )])

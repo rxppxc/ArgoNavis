@@ -138,7 +138,7 @@ export function useVerificacionImpedimentos(
 
   async function guardar() {
     if (pendientes) {
-      mostrar(`Falta marcar el resultado de ${pendientes} tripulante${pendientes === 1 ? "" : "s"}.`, "aviso");
+      mostrar(`Falta marcar el resultado de ${pendientes} pasajero${pendientes === 1 ? "" : "s"}.`, "aviso");
       return;
     }
     if (corrigiendo) {

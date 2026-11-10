@@ -1,6 +1,11 @@
 /* ─── Secciones de Estadísticas: encabezado, periodo, resumen y grilla ─── */
 .seccion { margin-bottom: 36px; }
-.cabeceraSeccion { margin-bottom: 12px; }
+.cabeceraSeccion { margin-bottom: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+/* El sector de las cifras, cuando se ve uno solo (2026-11-10). */
+.alcance {
+  padding: 3px 10px; border-radius: 20px; font-size: .78rem; font-weight: 700;
+  color: var(--text); background: var(--overlay); border: 1px solid var(--border-2);
+}
 .cabeceraSeccion h2 { color: var(--text); font-size: 1.15rem; font-weight: 800; }
 .cabeceraSeccion p { color: var(--text-2); font-size: .84rem; margin-top: 2px; }
 

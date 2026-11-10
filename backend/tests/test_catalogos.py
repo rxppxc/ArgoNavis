@@ -10,7 +10,7 @@ from app.domain.models.solicitud import Solicitud
 from app.domain.models.tramite import TipoTramite
 from app.domain.repositories.catalogo_repository import RepositorioCatalogo
 from app.infrastructure.database import SesionLocal
-from conftest import crear_actor
+from conftest import crear_actor, id_sector
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
@@ -22,8 +22,8 @@ async def _finalizada_en_otro_puesto() -> int:
     sufijo = secrets.token_hex(3)
     async with SesionLocal() as s:
         agencia = AgenciaNaviera(nombre=f"Agencia {sufijo}")
-        autorizado = PuestoControl(nombre=f"Puesto autorizado {sufijo}")
-        finalizacion = PuestoControl(nombre=f"Puesto de finalización {sufijo}")
+        autorizado = PuestoControl(nombre=f"Puesto autorizado {sufijo}", sector_id=await id_sector())
+        finalizacion = PuestoControl(nombre=f"Puesto de finalización {sufijo}", sector_id=await id_sector())
         s.add_all([agencia, autorizado, finalizacion])
         await s.flush()
         tipo_id = (await s.execute(select(TipoTramite.id).limit(1))).scalar_one()

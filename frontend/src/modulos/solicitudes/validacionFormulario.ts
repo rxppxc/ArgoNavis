@@ -92,10 +92,10 @@ export function validarFormulario(
   if (tipo.requiere_motivo && !c.motivo.trim()) errores.push("Indica el motivo.");
   if (tipo.requiere_clinica && !c.clinica_hospital.trim()) errores.push("Indica la clínica u hospital.");
 
-  if (tripulantes.length === 0) errores.push("Registra al menos un tripulante.");
+  if (tripulantes.length === 0) errores.push("Registra al menos un pasajero.");
   // Solo pasa al corregir una solicitud enviada antes del tope: el botón no deja agregar más.
   if (tripulantes.length > MAX_TRIPULANTES) {
-    errores.push(`Una solicitud admite hasta ${MAX_TRIPULANTES} tripulantes: quita ${tripulantes.length - MAX_TRIPULANTES} `
+    errores.push(`Una solicitud admite hasta ${MAX_TRIPULANTES} pasajeros: quita ${tripulantes.length - MAX_TRIPULANTES} `
       + "y preséntalos en otra solicitud.");
   }
 
@@ -104,7 +104,7 @@ export function validarFormulario(
   const rangos = tipo.rangos_permitidos;
   const rangosTexto = rangos?.map((r) => ETIQUETA_RANGO[r]).join(", ");
   tripulantes.forEach((t, i) => {
-    const quien = `Tripulante ${i + 1}${t.nombre.trim() ? ` (${t.nombre.trim()} ${t.apellido.trim()})` : ""}`;
+    const quien = `Pasajero ${i + 1}${t.nombre.trim() ? ` (${t.nombre.trim()} ${t.apellido.trim()})` : ""}`;
     const faltan: string[] = [];
     if (t.nombre.trim().length < 2) faltan.push("nombre");
     if (t.apellido.trim().length < 2) faltan.push("apellido");
@@ -149,7 +149,7 @@ export function validarFormulario(
     const clave = `${t.nacionalidad}|${t.pasaporte.trim().toUpperCase()}`;
     if (t.pasaporte.trim()) {
       const previo = pasaportes.get(clave);
-      if (previo !== undefined) errores.push(`${quien}: el pasaporte ya está registrado en el tripulante ${previo + 1}.`);
+      if (previo !== undefined) errores.push(`${quien}: el pasaporte ya está registrado en el pasajero ${previo + 1}.`);
       else pasaportes.set(clave, i);
     }
   });

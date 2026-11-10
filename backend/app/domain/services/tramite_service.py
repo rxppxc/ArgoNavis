@@ -229,7 +229,7 @@ class ServicioTramite:
         rangos_texto = ", ".join(ETIQUETA_RANGO.get(r, r) for r in tipo.rangos_permitidos or [])
 
         for indice, t in enumerate(tripulantes, start=1):
-            quien = f"Tripulante {indice} ({t.nombre} {t.apellido})"
+            quien = f"Pasajero {indice} ({t.nombre} {t.apellido})"
 
             if t.nacionalidad not in codigos_pais_validos:
                 errores.append(f"{quien}: la nacionalidad no es válida.")
@@ -248,7 +248,7 @@ class ServicioTramite:
 
             clave = (t.nacionalidad, t.pasaporte)
             if clave in pasaportes_vistos:
-                errores.append(f"{quien}: el pasaporte {t.pasaporte} ya está en el tripulante {pasaportes_vistos[clave]}.")
+                errores.append(f"{quien}: el pasaporte {t.pasaporte} ya está en el pasajero {pasaportes_vistos[clave]}.")
             else:
                 pasaportes_vistos[clave] = indice
 
