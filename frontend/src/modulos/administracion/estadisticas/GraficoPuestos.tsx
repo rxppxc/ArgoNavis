@@ -48,8 +48,8 @@ export default function GraficoPuestos({ puestos }: { puestos: Puesto[] }) {
 
   return (
     <TarjetaGrafico
-      titulo="¿Qué pasó en cada puesto de control?"
-      descripcion="Las autorizaciones aprobadas para cada puesto y en qué terminaron. La cifra es el total aprobado."
+      titulo="Por puesto de control"
+      descripcion="Autorizaciones aprobadas y cómo terminaron."
       tabla={conAprobadas.length > 0 ? tabla : undefined}
     >
       {conAprobadas.length === 0 ? <p className={styles.vacio}>Sin autorizaciones aprobadas en el periodo.</p> : (

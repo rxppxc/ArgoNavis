@@ -262,6 +262,9 @@ export interface FilaSerie {
   fuera_horario: number;
 }
 
+/** Los formatos en que se exportan las estadísticas. */
+export type FormatoExportacion = "xlsx" | "pdf" | "csv";
+
 export interface EstadisticasSolicitudes {
   recibidas: number;
   por_estado: Partial<Record<EstadoSolicitud, number>>;
@@ -383,6 +386,22 @@ export const apiSolicitudes = {
     clienteApi.get<EstadisticasSolicitudes>("/solicitudes/estadisticas", {
       params: { desde: desde || undefined, hasta: hasta || undefined },
     }).then((r) => r.data),
+
+  /** Las estadísticas del periodo (y el uso del sistema) en Excel, PDF o CSV, con
+   *  la identidad del SNM; las arma el servidor. `unidad`: la serie que se ve en
+   *  pantalla, que va en el PDF y en la hoja «Resumen». */
+  async exportarEstadisticas(formato: FormatoExportacion, desde: string | null, hasta: string | null,
+    unidad: "dia" | "mes" | "anio"): Promise<string> {
+    const { data, headers } = await clienteApi.get<Blob>("/solicitudes/estadisticas/exportar", {
+      params: { formato, desde: desde || undefined, hasta: hasta || undefined, unidad },
+      responseType: "blob",
+      timeout: 120_000,
+    });
+    const nombre = /filename="([^"]+)"/.exec(String(headers["content-disposition"] ?? ""))?.[1]
+      ?? `Estadisticas-autorizaciones.${formato}`;
+    guardarComoArchivo(data, nombre);
+    return nombre;
+  },
 
   /** Verificación pública del QR (no requiere sesión). */
   verificar: (codigo: string) =>

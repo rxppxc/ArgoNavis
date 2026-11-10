@@ -92,20 +92,27 @@ interface PropsIndicador {
   tono?: Serie;
   etiqueta: string;
   valor: string;
+  /** "77 %", junto a la cifra; la nota dice de qué ("de las recibidas"). */
+  porcentaje?: string;
   /** Qué parte es de qué: el medidor va en el color de su serie. */
   medidor?: { valor: number; total: number; serie: Serie };
   nota?: ReactNode;
 }
 
-/** Una cifra suelta (la forma correcta para un número: no hace falta un gráfico). */
-export function Indicador({ icono, tono, etiqueta, valor, medidor, nota }: PropsIndicador) {
+/** Una cifra suelta (la forma correcta para un número: no hace falta un gráfico).
+ *  Desde el 2026-11-10 el porcentaje va al lado de la cifra y la nota es corta
+ *  («de las recibidas»): antes era una frase debajo de cada una. */
+export function Indicador({ icono, tono, etiqueta, valor, porcentaje, medidor, nota }: PropsIndicador) {
   return (
     <div className={styles.indicador}>
       <div className={styles.indicadorCabeza}>
         <span className={`${styles.indicadorIcono} ${tono ? COLOR_ICONO[tono] : ""}`}>{icono}</span>
         <span className={styles.indicadorEtiqueta}>{etiqueta}</span>
       </div>
-      <span className={styles.indicadorValor}>{valor}</span>
+      <span className={styles.indicadorValor}>
+        {valor}
+        {porcentaje && <span className={styles.indicadorPorcentaje}>{porcentaje}</span>}
+      </span>
       {medidor && <Medidor {...medidor} />}
       {nota && <span className={styles.indicadorNota}>{nota}</span>}
     </div>

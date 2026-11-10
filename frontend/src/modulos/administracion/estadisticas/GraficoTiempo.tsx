@@ -1,47 +1,63 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import type { EstadisticasSolicitudes, FilaSerie } from "../../../api/solicitudes";
+import type { RangoFechas } from "../../../components/FiltroFechas";
 import { UNIDADES, cifra, escalaEje, mayuscula, partesPeriodo, proporcion, type Serie, type Unidad } from "./calculos";
 import { FilaGlobo, Globo, TarjetaGrafico } from "./Graficos";
 import { useGlobo } from "./useGlobo";
 import styles from "./Graficos.module.css";
 import seccion from "./Estadisticas.module.css";
 
-type ClaveDibujada = "recibidas" | "aprobadas" | "finalizadas" | "fuera_horario";
+type ClaveDibujada = "recibidas" | "aprobadas" | "finalizadas";
 
 /** Las que se dibujan, en este orden dentro de cada grupo; la leyenda las muestra
- *  u oculta (siempre queda una). «Fuera del horario» empieza apagada y va al lado
- *  de las aprobadas, de donde sale. No se ve junto con las recibidas: su morado y
- *  ese azul no se distinguen con daltonismo (ΔE 1,3 en claro y 0,9 en oscuro, con
- *  el validador de dataviz). Los demás pares, sí: ΔE 15 o más en los dos temas. */
+ *  u oculta (siempre queda una). Hasta el 2026-11-10 también se dibujaba «Fuera del
+ *  horario», que al encenderla apagaba las recibidas (su morado y ese azul no se
+ *  distinguen con daltonismo): confundía. Ahora va en el globo y en la tabla, y
+ *  tiene su cifra y su mapa de horas. Los tres colores, con ΔE 15 o más entre sí en
+ *  los dos temas (validador de dataviz). */
 const DIBUJADAS: { clave: ClaveDibujada; etiqueta: string; serie: Serie }[] = [
-  { clave: "recibidas",     etiqueta: "Recibidas",         serie: "revision" },
-  { clave: "aprobadas",     etiqueta: "Aprobadas",         serie: "aprobada" },
-  { clave: "fuera_horario", etiqueta: "Fuera del horario", serie: "fuera" },
-  { clave: "finalizadas",   etiqueta: "Finalizadas",       serie: "finalizada" },
+  { clave: "recibidas",   etiqueta: "Recibidas",   serie: "revision" },
+  { clave: "aprobadas",   etiqueta: "Aprobadas",   serie: "aprobada" },
+  { clave: "finalizadas", etiqueta: "Finalizadas", serie: "finalizada" },
 ];
 /** Las que van solo en el globo y en la tabla. */
-const OTRAS: { clave: "negadas" | "expiradas"; etiqueta: string; serie: Serie }[] = [
-  { clave: "negadas",   etiqueta: "Denegadas", serie: "denegada" },
-  { clave: "expiradas", etiqueta: "Expiradas", serie: "expirada" },
+const OTRAS: { clave: "negadas" | "expiradas" | "fuera_horario"; etiqueta: string; serie: Serie }[] = [
+  { clave: "negadas",       etiqueta: "Denegadas",         serie: "denegada" },
+  { clave: "expiradas",     etiqueta: "Expiradas",         serie: "expirada" },
+  { clave: "fuera_horario", etiqueta: "Fuera del horario", serie: "fuera" },
 ];
 const TODAS = [...DIBUJADAS, ...OTRAS];
 /** Lo que ocupa la cifra sobre la columna de las recibidas (.valorTope). */
 const ALTO_CIFRA = 18;
 /** Por día, el ancho mínimo de cada uno: en el celular el gráfico se desplaza de lado. */
 const ANCHO_DIA = 20;
-
-const ALCANCE: Record<Unidad, string> = {
-  dia:  "Los últimos 31 días del periodo, como mucho.",
-  mes:  "Los meses del periodo, hasta los últimos 12.",
-  anio: "Los años del periodo, hasta los últimos 10.",
+/** Cuántos periodos trae la serie como mucho (los últimos del periodo elegido). */
+const TOPE: Record<Unidad, { cantidad: number; plural: string }> = {
+  dia:  { cantidad: 31, plural: "días" },
+  mes:  { cantidad: 12, plural: "meses" },
+  anio: { cantidad: 10, plural: "años" },
 };
 
-/** Columnas agrupadas por día, mes o año: recibidas, aprobadas, finalizadas y, si
- *  se enciende, las aprobadas fuera del horario. Pasar el mouse (o el foco) por un
- *  periodo muestra todas sus cifras. */
-export default function GraficoTiempo({ datos }: { datos: EstadisticasSolicitudes }) {
-  const [unidad, setUnidad] = useState<Unidad>("mes");
-  const [ocultas, setOcultas] = useState<ReadonlySet<ClaveDibujada>>(() => new Set(["fuera_horario"]));
+/** Si la serie no llega al comienzo del periodo (con «Todo», o un periodo más largo que el tope). */
+function recortada(filas: FilaSerie[], rango: RangoFechas, unidad: Unidad): boolean {
+  if (filas.length < TOPE[unidad].cantidad) return false;
+  if (!rango.desde) return true;
+  const largo = { dia: 10, mes: 7, anio: 4 }[unidad];
+  return filas[0].periodo > rango.desde.slice(0, largo);
+}
+
+interface Props {
+  datos: EstadisticasSolicitudes;
+  rango: RangoFechas;
+  /** La lleva la página: cambia sola con el periodo y la usa la exportación. */
+  unidad: Unidad;
+  onUnidad: (u: Unidad) => void;
+}
+
+/** Columnas agrupadas por día, mes o año: recibidas, aprobadas y finalizadas.
+ *  Pasar el mouse (o el foco) por un periodo muestra todas sus cifras. */
+export default function GraficoTiempo({ datos, rango, unidad, onUnidad }: Props) {
+  const [ocultas, setOcultas] = useState<ReadonlySet<ClaveDibujada>>(() => new Set());
   const { lienzo, activo, mostrar, ocultar, alSalir } = useGlobo<FilaSerie>();
   const filas = unidad === "dia" ? datos.por_dia : unidad === "mes" ? datos.por_mes : datos.por_anio;
   const cada = UNIDADES.find((u) => u.id === unidad)?.cada ?? "mes";
@@ -60,20 +76,14 @@ export default function GraficoTiempo({ datos }: { datos: EstadisticasSolicitude
 
   function cambiarUnidad(nueva: Unidad) {
     ocultar();
-    setUnidad(nueva);
+    onUnidad(nueva);
   }
 
   function alternar(clave: ClaveDibujada) {
     setOcultas((antes) => {
       const despues = new Set(antes);
-      if (despues.has(clave)) {
-        despues.delete(clave);
-        // El morado de «Fuera del horario» y el azul de las recibidas no van juntos.
-        if (clave === "fuera_horario") despues.add("recibidas");
-        if (clave === "recibidas") despues.add("fuera_horario");
-      } else if (DIBUJADAS.length - despues.size > 1) {
-        despues.add(clave);
-      }
+      if (despues.has(clave)) despues.delete(clave);
+      else if (DIBUJADAS.length - despues.size > 1) despues.add(clave);
       return despues;
     });
   }
@@ -103,13 +113,13 @@ export default function GraficoTiempo({ datos }: { datos: EstadisticasSolicitude
     </table>
   );
 
+  const alcance = recortada(filas, rango, unidad) ? `Últimos ${TOPE[unidad].cantidad} ${TOPE[unidad].plural}. ` : "";
+
   return (
     <TarjetaGrafico
       ancha
-      titulo={`¿Cuántas llegaron cada ${cada} y qué pasó con ellas?`}
-      descripcion={<>{ALCANCE[unidad]} Cada cifra cuenta cuando ocurrió: la llegada, la aprobación o la finalización.
-        «Fuera del horario» son las aprobadas por UCVMM fuera del horario laboral: al encenderla se apagan las
-        recibidas.</>}
+      titulo={`Solicitudes por ${cada}`}
+      descripcion={`${alcance}Cada cifra cuenta en la fecha en que ocurrió.`}
       tabla={tabla}
     >
       <div className={styles.controlesSerie}>

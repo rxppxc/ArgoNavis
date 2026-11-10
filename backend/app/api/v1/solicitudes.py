@@ -6,8 +6,8 @@ se encolan los avisos, en la misma transacción (salen después del commit, en
 segundo plano).
 """
 import asyncio
-from datetime import date
-from typing import Annotated, TypeVar
+from datetime import date, datetime
+from typing import Annotated, Literal, TypeVar
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, Response
@@ -16,7 +16,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencias import usuario_actual
 from app.core.email import Aviso
+from app.core.horario import ZONA_PANAMA
 from app.core.http_utils import obtener_agente, obtener_ip
+from app.core.informe_estadisticas import DatosInforme, generar_informe
 from app.core.pdf_autorizacion import generar_pdf_autorizacion
 from app.core.permisos import PERMISO_PUERTO, PERMISO_REVISAR, PERMISO_SOLICITAR, requerir_permiso
 from app.core.rate_limit import clave_usuario, limite_envios, limiter
@@ -30,6 +32,7 @@ from app.domain.schemas.solicitud import (
 )
 from app.domain.services.notificacion_service import ServicioNotificacion
 from app.domain.services.solicitud_service import ContextoAcceso, ServicioSolicitud
+from app.domain.services.uso_service import ServicioUsoSistema
 from app.infrastructure import almacenamiento
 from app.infrastructure.cola_correos import despachar_correos, encolar_avisos
 from app.infrastructure.database import obtener_sesion_bd
@@ -166,6 +169,35 @@ async def estadisticas(
 ):
     """Autorizaciones recibidas, aprobadas, denegadas y expiradas."""
     return await svc.estadisticas(desde, hasta)
+
+
+@enrutador.get("/estadisticas/exportar")
+async def exportar_estadisticas(
+    formato: Literal["xlsx", "pdf", "csv"] = Query(..., description="Excel, PDF o CSV."),
+    desde:   date | None = Query(default=None),
+    hasta:   date | None = Query(default=None),
+    unidad:  Literal["dia", "mes", "anio"] = Query(
+        default="mes", description="La serie del PDF y de la hoja «Resumen»: la que se ve en pantalla."),
+    _perm:   int = Depends(requerir_permiso(PERMISO_REVISAR)),
+    usuario: Usuario = Depends(usuario_actual),
+    svc:     ServicioSolicitud = Depends(_servicio),
+    sesion:  AsyncSession = Depends(obtener_sesion_bd, scope="function"),
+):
+    """Las estadísticas del periodo y el uso del sistema en un archivo con la
+    identidad del SNM, para informes (core/informe_estadisticas.py). Quién lo
+    generó va en el archivo. Se arma en un hilo aparte: es CPU-bound."""
+    datos = DatosInforme(
+        estadisticas=await svc.estadisticas(desde, hasta),
+        uso=await ServicioUsoSistema(sesion).resumen(),
+        desde=desde, hasta=hasta, unidad=unidad,
+        generado_por=usuario.full_name, generado_en=datetime.now(ZONA_PANAMA),
+    )
+    archivo = await asyncio.to_thread(generar_informe, formato, datos)
+    return Response(
+        content=archivo.contenido,
+        media_type=archivo.tipo,
+        headers={"Content-Disposition": f'attachment; filename="{archivo.nombre}"', "Cache-Control": "no-store"},
+    )
 
 
 # ── Agencia: crear y corregir ────────────────────────────────────────────────

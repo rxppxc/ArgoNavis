@@ -25,10 +25,12 @@
   border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text); font-size: .82rem;
 }
 
-/* ─── Resumen: la cifra que encabeza, el relato y «¿En qué van?» ─── */
+/* ─── Resumen: la cifra que encabeza y, al lado, el estado actual ───
+   Hasta el 2026-11-10 había un párrafo con lo mismo en frases y una explicación
+   bajo cada estado: era mucho texto. */
 .resumen {
-  display: grid; grid-template-columns: minmax(190px, 250px) minmax(0, 1fr); gap: 16px 30px; align-items: center;
-  padding: 20px 22px; border-radius: var(--r-md);
+  display: grid; grid-template-columns: minmax(180px, 230px) minmax(0, 1fr); gap: 16px 28px; align-items: center;
+  padding: 18px 22px; border-radius: var(--r-md);
   background: var(--card); border: 1px solid var(--border);
 }
 .cifraPrincipal { display: flex; flex-direction: column; }
@@ -36,45 +38,62 @@
 .heroe { color: var(--text); font-size: 3.4rem; font-weight: 800; line-height: 1; letter-spacing: -.5px; }
 .heroeEtiqueta { color: var(--text); font-size: .95rem; font-weight: 700; margin-top: 8px; }
 .heroePeriodo { color: var(--text-2); font-size: .8rem; margin-top: 2px; }
-.frases { color: var(--text-2); font-size: .9rem; line-height: 1.7; max-width: 80ch; }
-.frases strong { color: var(--text); }
 
-.estados { grid-column: 1 / -1; border-top: 1px solid var(--border); padding-top: 16px; }
+.estados { border-left: 1px solid var(--border); padding-left: 28px; min-width: 0; }
 .estadosTitulo { color: var(--text); font-size: .9rem; font-weight: 800; margin-bottom: 10px; }
+.sinEstados { color: var(--muted); font-size: .84rem; font-style: italic; }
 .barraEstados { display: flex; gap: 2px; height: 20px; border-radius: 5px; overflow: hidden; }
 .segmentoEstado {
   flex-basis: 0; min-width: 4px; background: var(--serie);
   transition: opacity var(--t) var(--ease), flex-grow .45s var(--ease);
 }
 .apagado { opacity: .35; }
+/* Una línea por estado: la muestra, el nombre y la cifra con su porcentaje. */
 .leyendaEstados {
-  list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 14px; margin-top: 12px;
+  list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px 14px; margin-top: 10px;
 }
 .leyendaEstados li {
-  display: grid; grid-template-columns: 11px minmax(0, 1fr); gap: 9px;
-  padding: 7px 8px; border-radius: var(--r-sm); transition: opacity var(--t) var(--ease), background var(--t) var(--ease);
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  padding: 5px 8px; border-radius: var(--r-sm); cursor: default;
+  transition: opacity var(--t) var(--ease), background var(--t) var(--ease);
 }
 .leyendaResaltada { background: var(--hover); }
-.leyendaMuestra { margin-top: 4px; }
-.leyendaNombre { display: block; color: var(--text); font-size: .84rem; font-weight: 700; }
-.leyendaCifra { display: block; color: var(--text-2); font-size: .82rem; }
-.leyendaCifra strong { color: var(--text); font-size: .98rem; }
-.leyendaExplicacion { display: block; color: var(--muted); font-size: .74rem; line-height: 1.4; margin-top: 2px; }
+.leyendaNombre { color: var(--text); font-size: .82rem; font-weight: 700; }
+.leyendaCifra { margin-left: auto; color: var(--text-2); font-size: .8rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.leyendaCifra strong { color: var(--text); font-size: .9rem; }
 
 /* ─── Cifras sueltas y grilla de gráficos ─── */
-.indicadores { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.indicadores { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+/* Las del uso del sistema son cuatro. */
+.cuatro { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .grilla { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }
 .seccion > .grilla { margin-top: 14px; }
 
-@media (max-width: 960px) {
-  .indicadores { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .grilla { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 1080px) {
+  .indicadores { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .cuatro { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .leyendaEstados { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-@media (max-width: 640px) {
+@media (max-width: 960px) {
+  .grilla { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
   .resumen { grid-template-columns: minmax(0, 1fr); padding: 16px; }
+  .estados { border-left: 0; padding-left: 0; border-top: 1px solid var(--border); padding-top: 14px; }
   .heroe { font-size: 3rem; }
+  .indicadores, .cuatro { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* De a dos, la última que queda sola ocupa la fila (si no, «6 h 24 min» se partía). */
+  .indicadores > :last-child:nth-child(odd) { grid-column: 1 / -1; }
 }
 @media (max-width: 420px) {
-  .indicadores, .leyendaEstados { grid-template-columns: minmax(0, 1fr); }
+  .leyendaEstados { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ─── Exportar (en el encabezado de la página) ─── */
+.exportar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.exportarEtiqueta {
+  display: inline-flex; align-items: center; gap: 6px; margin-right: 2px;
+  color: var(--text-2); font-size: .8rem; font-weight: 700;
+}
+/* Descargar es consultar: azul de contorno (Botones.module.css). */
+.botonExportar { composes: boton consultar chico from "../../../components/Botones.module.css"; min-width: 64px; }

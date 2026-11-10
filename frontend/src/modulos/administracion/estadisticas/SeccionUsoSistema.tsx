@@ -42,14 +42,14 @@ export default function SeccionUsoSistema() {
     <section className={styles.seccion} aria-labelledby="titulo-uso">
       <div className={styles.cabeceraSeccion}>
         <h2 id="titulo-uso">Uso del sistema</h2>
-        <p>Totales a hoy: no dependen del periodo elegido arriba.</p>
+        <p>Totales a hoy (no dependen del periodo).</p>
       </div>
 
       {resultado?.error && <div className={styles.error} role="alert">{resultado.error}</div>}
 
       {!resultado ? <EstadoCarga texto="Cargando el uso del sistema…" /> : uso && (
         <>
-          <div className={styles.indicadores}>
+          <div className={`${styles.indicadores} ${styles.cuatro}`}>
             <Indicador
               icono={<IconoUsuarios />} etiqueta="Usuarios registrados" valor={cifra(uso.usuarios)}
               medidor={{ valor: uso.usuarios_activos, total: uso.usuarios, serie: "revision" }}
@@ -63,8 +63,8 @@ export default function SeccionUsoSistema() {
           <div className={styles.grilla}>
             <TarjetaGrafico
               ancha
-              titulo="¿Qué agencias envían más solicitudes?"
-              descripcion="Las cinco con más solicitudes desde el inicio."
+              titulo="Agencias con más solicitudes"
+              descripcion="Las cinco primeras, desde el inicio."
               tabla={agencias.length > 0 ? tabla : undefined}
             >
               {agencias.length === 0 ? <p className={graficos.vacio}>Sin solicitudes aún.</p> : (

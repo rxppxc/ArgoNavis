@@ -10,7 +10,7 @@ Nació como una herramienta de *storage* (transferencias de archivos con enlace 
 
 | Capa | Stack |
 |---|---|
-| **Backend** | Python 3.12 · FastAPI · SQLAlchemy 2 async · PostgreSQL · Alembic · LDAP (Active Directory) · JWT · reportlab (PDF + QR) |
+| **Backend** | Python 3.12 · FastAPI · SQLAlchemy 2 async · PostgreSQL · Alembic · LDAP (Active Directory) · JWT · reportlab (PDF + QR) · XlsxWriter (Excel) |
 | **Frontend** | React 19 · TypeScript estricto · Vite · CSS Modules · React Router v7 |
 | **Infraestructura** | Docker Compose (nginx + backend + PostgreSQL) o Windows (uvicorn + proxy) · slowapi (rate limit) |
 
@@ -88,7 +88,7 @@ Después de cada despliegue, `sudo bash verificar-despliegue.sh` revisa sin camb
 
 **Windows**: `APP_ENV=production` y `LOG_CARPETA=logs` en `backend\.env`, `migrate.bat`, compilar el frontend (`npm run build`) y `start-backend-prod.bat` (sirve también `frontend/dist`). Con `LOG_CARPETA`, los logs quedan en `backend\logs\argonavis-AAAA-MM-DD.log`, uno por día, y se borran a los `LOG_DIAS` días (30); sin ella, solo se ven en la consola y se pierden al cerrarla. En Docker no hace falta: Docker guarda y rota la salida.
 
-> **Al actualizar en Windows**, antes de `migrate.bat`: `venv\Scripts\python -m pip install -r requirements.txt` en `backend` y `npm ci` en `frontend` (luego `npm run build`). Docker lo hace solo al reconstruir. Desde el 27/10/2026 el backend usa PyJWT en lugar de python-jose: sin ese paso no arranca (`No module named 'jwt'`). Lo viejo se puede quitar después: `venv\Scripts\python -m pip uninstall python-jose ecdsa rsa`. Las sesiones abiertas siguen valiendo.
+> **Al actualizar en Windows**, antes de `migrate.bat`: `venv\Scripts\python -m pip install -r requirements.txt` en `backend` y `npm ci` en `frontend` (luego `npm run build`). Docker lo hace solo al reconstruir. Desde el 27/10/2026 el backend usa PyJWT en lugar de python-jose: sin ese paso no arranca (`No module named 'jwt'`). Desde el 10/11/2026 usa también XlsxWriter (exportar las estadísticas a Excel): sin él, la exportación a Excel responde 500 (el PDF y el CSV siguen). Lo viejo se puede quitar después: `venv\Scripts\python -m pip uninstall python-jose ecdsa rsa`. Las sesiones abiertas siguen valiendo.
 
 > **Servidores instalados antes de ARGO NAVIS** (una sola vez). Antes la base se llamaba `filetransfer` y los documentos vivían en `storage/transfers`. La revisión `b5c2e8f4a713` deja las rutas de los documentos relativas, así que solo cambian los nombres:
 > - **Docker:** el proyecto ahora se llama `argonavis` (`name:` en `docker-compose-prod.yml`) y sus volúmenes son nuevos. Con todo detenido (`docker compose -f docker-compose-prod.yml down` desde la carpeta vieja), copia los datos; `docker volume ls` muestra el prefijo viejo:
@@ -204,7 +204,8 @@ Administrador y SysAdmin se reconocen por el nombre del rol (`rol_personalizado.
   - Los nombres de los funcionarios: en su historial ve "UCVMM" o "Puesto de control".
   - Sí ve los motivos de devolución y de negación.
 - El PDF de la autorización no lleva observaciones. El de la agencia dice "Aprobada por: UCVMM"; el personal del SNM descarga una copia interna con el nombre de quien aprobó.
-- Las operaciones finalizadas antes de las 07:00, desde las 15:00 o en fin de semana (hora de Panamá) cuentan como fuera del horario laboral: lo muestran las estadísticas y, solo al SNM, una insignia en el expediente.
+- Las autorizaciones que UCVMM aprueba antes de las 07:00, desde las 15:01 o en fin de semana (hora de Panamá) cuentan como fuera del horario laboral: lo muestran las estadísticas y, solo al SNM, una insignia en el expediente.
+- **Estadísticas exportables:** Excel, PDF o CSV del periodo elegido, con el escudo del SNM, el logo de ARGO NAVIS, quién lo generó y «Uso interno del SNM» (`GET /api/v1/solicitudes/estadisticas/exportar`).
 - **Notificaciones internas:** la campana de la cabecera muestra lo que le toca hacer a cada rol (por revisar, por corregir, por finalizar) y las novedades de sus solicitudes. Consulta `GET /api/v1/pendientes` cada minuto con la pestaña a la vista.
 - **Separación de funciones:** nadie revisa una solicitud que creó o que es de su propia agencia.
 - Cada transición bloquea la fila de la solicitud: dos revisores no pueden aprobar y negar la misma a la vez.

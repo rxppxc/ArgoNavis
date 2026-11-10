@@ -102,7 +102,7 @@ class DatosPdfAutorizacion:
     tripulantes:         list[TripulantePdf] = field(default_factory=list)
 
 
-def _obtener_fuentes() -> tuple[str, str]:
+def obtener_fuentes() -> tuple[str, str]:
     global _fuentes
     if _fuentes is None:
         _fuentes = ("Helvetica", "Helvetica-Bold")
@@ -141,7 +141,7 @@ def _t(texto: str | None) -> str:
 
 
 def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
-    normal, negrita = _obtener_fuentes()
+    normal, negrita = obtener_fuentes()
 
     def estilo(nombre: str, **kw) -> ParagraphStyle:
         base = {"fontName": normal, "fontSize": 9, "leading": 12, "textColor": NEGRO}

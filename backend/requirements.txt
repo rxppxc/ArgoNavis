@@ -40,6 +40,9 @@ oletools==0.60.2
 # ── PDF de la Autorización Marítima (incluye el generador de QR) ──────────────
 reportlab==5.0.1
 
+# ── Exportar las estadísticas a Excel (solo escribe .xlsx, sin dependencias) ──
+XlsxWriter==3.2.9
+
 # ── Otros ───────────────────────────────────────────────────────────────────
 aiofiles==25.1.0
 aiosmtplib==5.1.2

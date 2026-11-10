@@ -1,21 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { EstadisticasSolicitudes } from "../../../api/solicitudes";
 import {
   duracion, enHorarioLaboral, escalaEje, horarioDeCasilla, nivelCalor, partesPeriodo, porcentaje, presetDeRango,
-  rangoDePreset, resumenEnPalabras, textoPeriodo, type Trozo,
+  rangoDePreset, textoPeriodo, unidadSugerida,
 } from "./calculos";
-
-const texto = (trozos: Trozo[]) => trozos.map((t) => (typeof t === "string" ? t : t.fuerte)).join("");
-
-function estadisticas(parcial: Partial<EstadisticasSolicitudes>): EstadisticasSolicitudes {
-  return {
-    recibidas: 0, por_estado: {}, aprobadas: 0, negadas: 0, expiradas: 0, finalizadas: 0,
-    horas_promedio_resolucion: null, aprobadas_fuera_horario: 0, horario_laboral: "",
-    operaciones_fuera_horario: [], aprobadas_por_hora: [], por_tipo: [],
-    por_dia: [], por_mes: [], por_anio: [], por_puesto: [],
-    ...parcial,
-  };
-}
 
 describe("porcentaje", () => {
   it.each([
@@ -122,35 +109,24 @@ describe("periodos", () => {
   });
 });
 
-describe("resumenEnPalabras", () => {
-  it("sin solicitudes", () => {
-    expect(texto(resumenEnPalabras(estadisticas({})))).toBe("No llegaron solicitudes en este periodo.");
+describe("unidadSugerida", () => {
+  const hoy = new Date(2026, 10, 10);   // martes 10 de noviembre de 2026
+
+  it("por día hasta un mes, por mes hasta un año y por año más allá", () => {
+    expect(unidadSugerida({ desde: null, hasta: null }, hoy)).toBe("mes");
+    expect(unidadSugerida(rangoDePreset("30d", hoy), hoy)).toBe("dia");
+    expect(unidadSugerida(rangoDePreset("mes", hoy), hoy)).toBe("dia");
+    expect(unidadSugerida(rangoDePreset("mesPasado", hoy), hoy)).toBe("dia");
+    expect(unidadSugerida(rangoDePreset("anio", hoy), hoy)).toBe("mes");
+    expect(unidadSugerida({ desde: "2026-10-01", hasta: "2026-11-01" }, hoy)).toBe("mes");   // 32 días
+    expect(unidadSugerida({ desde: "2025-01-01", hasta: "2025-12-31" }, hoy)).toBe("mes");
+    expect(unidadSugerida({ desde: "2024-01-01", hasta: "2025-12-31" }, hoy)).toBe("anio");
   });
 
-  it("cuenta lo que pasó, con los verbos en plural", () => {
-    const d = estadisticas({
-      recibidas: 128, aprobadas: 98, negadas: 7, expiradas: 10, finalizadas: 86, horas_promedio_resolucion: 6.4,
-      por_estado: { review: 9, returned: 4, approved: 12, finalized: 86, denied: 7, expired: 10 },
-    });
-    expect(texto(resumenEnPalabras(d))).toBe(
-      "UCVMM aprobó 98 (77 %) y denegó 7 (5 %). De las aprobadas, 86 ya se finalizaron en el puesto de " +
-      "control; quedan 12 por finalizar. 9 esperan la revisión de UCVMM y 4 están en corrección. 10 vencieron sin " +
-      "completarse. Tiempo promedio entre el envío y la decisión de UCVMM: 6 h 24 min.",
-    );
-  });
-
-  it("y en singular cuando es una", () => {
-    const d = estadisticas({
-      recibidas: 3, aprobadas: 1, expiradas: 1, por_estado: { approved: 1, returned: 1, expired: 1 },
-    });
-    expect(texto(resumenEnPalabras(d))).toBe(
-      "UCVMM aprobó 1 (33 %) y no denegó ninguna. 1 espera que el puesto de control la finalice. " +
-      "1 está en corrección por la agencia. 1 venció sin completarse.",
-    );
-  });
-
-  it("las cifras van en negrita", () => {
-    const trozos = resumenEnPalabras(estadisticas({ recibidas: 2, negadas: 2, por_estado: { denied: 2 } }));
-    expect(trozos.filter((t) => typeof t !== "string")).toEqual([{ fuerte: "2" }]);
+  it("sin «hasta», cuenta hasta hoy", () => {
+    expect(unidadSugerida({ desde: "2026-11-01", hasta: null }, hoy)).toBe("dia");
+    expect(unidadSugerida({ desde: "2025-12-01", hasta: null }, hoy)).toBe("mes");
+    // Más de un año: por mes se verían solo los últimos 12 (el tope de la serie).
+    expect(unidadSugerida({ desde: "2025-06-01", hasta: null }, hoy)).toBe("anio");
   });
 });

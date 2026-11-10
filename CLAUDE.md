@@ -13,6 +13,7 @@ El nombre del sistema es «ARGO NAVIS · Sistema Interno Marítimo» (logo, pest
 - Frontend: React 19 + TypeScript estricto + Vite + CSS Modules + React Router v7
 - Rate limit: `slowapi` (almacenamiento en memoria — para multi-worker mover a Redis)
 - MIME real: `python-magic` (binario `libmagic` en Windows via `python-magic-bin`)
+- PDF: `reportlab` (la autorización y el informe de estadísticas); Excel: `XlsxWriter` (solo escribe, desde el 2026-11-10)
 
 ## Convenciones críticas
 
@@ -305,20 +306,28 @@ Las agencias entran por la VPN, pero no son del SNM: se las trata como no confia
 - **Texto del permiso `T-FINALIZAR-PUERTO`:** decía «y las finaliza, indicando dónde terminó la operación». Lo corrige la misma `b2e7d4c9a160` («…y las finaliza en el puesto autorizado»), con su `downgrade`. La `d8c3f1a6b294` (2026-11-06) le suma la verificación de impedimentos.
 - **Documentación de la DTI a la v0.3** (`docs/`): el 00, 01, 03, 04 (sección N, RN-84 a RN-88, sin renumerar), 06, 08 y 09; el 02 y el 05 pasan a la 0.2, y se redibujaron los BPMN 01 y 05. El 07 no cambió. La 0.2 del 03 se había hecho editando el Word: desde esta versión, sus cambios están también en el generador.
 
-### Estadísticas rediseñadas (2026-11-02)
-Pedido del usuario: «más interesante, interactivo, llamativo, que cualquiera lo entienda». Todo en `modulos/administracion/estadisticas/`; `PaginaEstadisticas` solo arma las dos secciones.
+### Estadísticas (rediseño del 2026-11-02; menos texto y exportación, 2026-11-10)
+Pedidos del usuario: «más interesante, interactivo, llamativo, que cualquiera lo entienda» (2026-11-02) y «que se puedan exportar a Excel, a CSV o a PDF, que tengan identidad; hay mucho texto, siento que hasta enreda» (2026-11-10). Todo en `modulos/administracion/estadisticas/`. `PaginaEstadisticas` lleva el periodo y la unidad de la serie (los usan los gráficos y la exportación) y arma las dos secciones.
 - **Forma, de arriba abajo:**
+  - el encabezado con «Exportar: Excel · PDF · CSV» (`BotonesExportar`, azul de contorno: descargar es consultar);
   - el periodo (`SelectorPeriodo`: Todo, Últimos 30 días, Este mes, Mes pasado, Este año y «Otras fechas»), que acota toda la sección;
-  - la cifra que encabeza (recibidas) con lo que pasó contado en frases (`resumenEnPalabras`, en singular o plural);
-  - «¿En qué van?»: una barra que reparte el 100 % entre los estados de hoy, con leyenda explicada;
-  - cuatro cifras sueltas con medidor;
-  - columnas por día, mes o año (desde el 2026-11-06; antes solo por mes), con las series que se encienden y apagan;
+  - la cifra que encabeza (recibidas) y, al lado, el «Estado actual»: una barra que reparte el 100 % entre los estados de hoy, con su leyenda (nombre, cifra y porcentaje);
+  - cinco cifras sueltas con el porcentaje junto a la cifra, una nota corta («de las recibidas») y su medidor;
+  - columnas por día, mes o año (recibidas, aprobadas y finalizadas, que se encienden y apagan);
   - barras por trámite y por puesto (finalizadas, por finalizar y expiradas);
-  - el mapa de horas de las aprobaciones de UCVMM (antes, de las finalizaciones) con el horario laboral recuadrado, y la lista de las aprobadas fuera del horario.
+  - el mapa de horas de las aprobaciones de UCVMM con el horario laboral recuadrado, y la lista de las aprobadas fuera del horario.
+- **Menos texto (2026-11-10):** salieron el párrafo con lo mismo en frases (`resumenEnPalabras`), la explicación bajo cada estado (queda como `title` de la leyenda), las frases bajo cada cifra y las descripciones de varias líneas; los títulos son cortos («Por trámite», «Hora de aprobación de UCVMM»). **No vuelvas a contar las cifras en párrafos:** el detalle va en el globo y en «Ver tabla».
+- **La unidad de la serie sigue al periodo** (`unidadSugerida`, `calculos.ts`): por día hasta un mes, por mes hasta un año y por año más allá; con «Todo», por mes. Se puede cambiar a mano. Antes «Mes pasado» mostraba una sola columna. Cuando la serie no llega al comienzo del periodo, el gráfico dice «Últimos 31 días» o «Últimos 12 meses».
+- **Exportar** (`GET /solicitudes/estadisticas/exportar?formato=xlsx|pdf|csv&desde&hasta&unidad`, con el mismo permiso que las estadísticas). Lo arma el servidor en un hilo (`asyncio.to_thread`): lo común en `core/informe_estadisticas.py` (datos, textos, colores, nombre del archivo) y un módulo por formato (`informe_excel.py`, `informe_pdf.py`, `informe_csv.py`). Van las estadísticas del periodo y el uso del sistema (`ServicioUsoSistema`, `domain/services/uso_service.py`, que usa también `/admin/stats`).
+  - Identidad: el escudo del SNM y el logo de ARGO NAVIS (`app/recursos/logo-argo-navis.png`, PNG de 400 px: XlsxWriter no lee WebP), la franja amarilla, la paleta del PDF de la autorización y cada estado en el color de su insignia. Dicen el periodo, quién lo generó y cuándo, y «Uso interno del SNM» (la lista de fuera del horario lleva nombres de funcionarios).
+  - **Excel** (XlsxWriter 3.2.9, nueva dependencia): «Resumen» con las cifras, el estado actual y el gráfico de la serie que se veía en pantalla, y una hoja por tabla con gráficos nativos de Excel. El mapa de horas se pinta como en la pantalla (los 5 niveles y el recuadro). Las cifras son números y las fechas, fechas; ningún texto se convierte en fórmula (`strings_to_formulas: False`).
+  - **PDF** (reportlab, carta): la identidad del PDF de la autorización, recuadros con las cifras, la barra del estado actual, las columnas de la serie y el mapa de horas dibujados, y «Página N de M». Las tablas largas se parten (`seccion(..., partir=True)`): con `KeepTogether` la sección entera saltaba de página y dejaba un hueco.
+  - **CSV**: un archivo con secciones, UTF-8 con BOM (Excel lo abre con los acentos bien) y separado por comas. Lo que empieza con `=`, `+`, `-`, `@`, tabulador o retorno lleva un apóstrofo delante (OWASP, «CSV injection»).
+  - Lo prueban `tests/test_exportar_estadisticas.py` y `e2e/estadisticas.spec.ts`, que descarga los tres.
 - **Sin librería de gráficos:** HTML y CSS propios (la CSP no admite las que usan `eval`). Cada gráfico tiene «Ver tabla» con las mismas cifras, y el detalle (`Globo`) sale con el mouse, el foco y el dedo. El mapa de horas se recorre con las flechas.
-- **Colores:** `--graf-*` en `globals.css`, el de la insignia de cada estado en pasos para marcas, validados con el validador de dataviz en los dos temas. El verde de «aprobada» va oscuro y el verde azulado de «finalizada» claro: con la misma luminosidad no se distinguían. **Si cambias uno, vuelve a validarlos.**
+- **Colores:** `--graf-*` en `globals.css`, el de la insignia de cada estado en pasos para marcas, validados con el validador de dataviz en los dos temas. El verde de «aprobada» va oscuro y el verde azulado de «finalizada» claro: con la misma luminosidad no se distinguían. **Si cambias uno, vuelve a validarlos** (y los del tema claro en `informe_estadisticas.py`).
   - El mapa de horas va en `--graf-calor` (el verde de «aprobada», más claro en oscuro, para que sus pasos se distingan).
-  - El morado de «Fuera del horario» y el azul de las recibidas no se distinguen con daltonismo (ΔE ~1): en el gráfico por día, mes o año no se ven juntos (`GraficoTiempo`).
+  - El morado de «Fuera del horario» y el azul de las recibidas no se distinguen con daltonismo (ΔE ~1): desde el 2026-11-10, «Fuera del horario» no se dibuja en el gráfico por día, mes o año (va en su globo y en su tabla). Antes, al encenderla se apagaban las recibidas, y eso confundía.
 - **Dato de la API para el mapa de horas:** `aprobadas_por_hora` (día ISO y hora de Panamá, solo las casillas con alguna) en `/solicitudes/estadisticas`, de `RepositorioSolicitud.aprobadas_por_hora`. Hasta el 2026-11-06 era `finalizadas_por_hora`. Lo prueba `test_horario.py`.
 - **Horario laboral espejado:** `HORA_INICIO_LABORAL` / `HORA_FIN_LABORAL` en `calculos.ts`, contra `core/horario.py` en `test_constantes_iguales_en_el_frontend`. El mapa va por horas enteras: la casilla de las 15 es fuera salvo las 15:00 en punto (`horarioDeCasilla`, «borde»).
 - Los cálculos sin React (`calculos.ts`) tienen sus pruebas en `calculos.test.ts`. Las capturas se hacen con datos de ejemplo (guion en el scratchpad de la sesión).

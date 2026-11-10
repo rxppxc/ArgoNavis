@@ -1,9 +1,9 @@
 /**
  * Cálculos y textos de la página de Estadísticas, sin React (sus pruebas, en
  * calculos.test.ts): cifras y porcentajes, la escala de los ejes, los niveles
- * del mapa de horas, los periodos del filtro y el resumen en palabras.
+ * del mapa de horas, los periodos del filtro y la unidad de la serie.
  */
-import type { EstadisticasSolicitudes, EstadoSolicitud } from "../../../api/solicitudes";
+import type { EstadoSolicitud } from "../../../api/solicitudes";
 import type { RangoFechas } from "../../../components/FiltroFechas";
 
 const ESPACIO = " ";   // entre la cifra y el %, para que no se separen al cortar la línea
@@ -229,45 +229,19 @@ export const ESTADOS_BARRA: { estado: EstadoSolicitud; etiqueta: string; explica
   { estado: "denied",    etiqueta: "Denegadas",     explicacion: "UCVMM no las autorizó." },
 ];
 
-// ─── El resumen en palabras ──────────────────────────────────────────────────
+// ─── La unidad de la serie según el periodo ─────────────────────────────────
 
-/** Un trozo de texto; `fuerte` va en negrita (las cifras). */
-export type Trozo = string | { fuerte: string };
-
-/** Lo que pasó con las solicitudes del periodo, en frases cortas. */
-export function resumenEnPalabras(d: EstadisticasSolicitudes): Trozo[] {
-  if (d.recibidas === 0) return ["No llegaron solicitudes en este periodo."];
-  const n = (x: number): Trozo => ({ fuerte: cifra(x) });
-  const pct = (x: number) => ` (${porcentaje(x, d.recibidas)})`;
-  const t: Trozo[] = [];
-
-  const { aprobadas: a, negadas: neg } = d;
-  if (a > 0 && neg > 0) t.push("UCVMM aprobó ", n(a), pct(a), " y denegó ", n(neg), pct(neg), ".");
-  else if (a > 0) t.push("UCVMM aprobó ", n(a), pct(a), " y no denegó ninguna.");
-  else if (neg > 0) t.push("UCVMM denegó ", n(neg), pct(neg), " y no aprobó ninguna.");
-  else t.push("UCVMM todavía no aprobó ni denegó ninguna.");
-
-  const porFinalizar = d.por_estado.approved ?? 0;
-  if (d.finalizadas > 0) {
-    t.push(" De las aprobadas, ", n(d.finalizadas), segun(d.finalizadas, " ya se finalizó", " ya se finalizaron"),
-      " en el puesto de control");
-    t.push(...(porFinalizar > 0 ? ["; ", segun(porFinalizar, "queda ", "quedan "), n(porFinalizar), " por finalizar."] : ["."]));
-  } else if (porFinalizar > 0) {
-    t.push(" ", n(porFinalizar), segun(porFinalizar, " espera que el puesto de control la finalice.",
-      " esperan que el puesto de control las finalice."));
-  }
-
-  const enRevision = d.por_estado.review ?? 0, enCorreccion = d.por_estado.returned ?? 0;
-  if (enRevision > 0) {
-    t.push(" ", n(enRevision), segun(enRevision, " espera", " esperan"), " la revisión de UCVMM");
-    t.push(...(enCorreccion > 0 ? [" y ", n(enCorreccion), segun(enCorreccion, " está", " están"), " en corrección."] : ["."]));
-  } else if (enCorreccion > 0) {
-    t.push(" ", n(enCorreccion), segun(enCorreccion, " está", " están"), " en corrección por la agencia.");
-  }
-
-  if (d.expiradas > 0) t.push(" ", n(d.expiradas), segun(d.expiradas, " venció", " vencieron"), " sin completarse.");
-  if (d.horas_promedio_resolucion !== null) {
-    t.push(" Tiempo promedio entre el envío y la decisión de UCVMM: ", { fuerte: duracion(d.horas_promedio_resolucion) }, ".");
-  }
-  return t;
+/** Cómo conviene ver la serie de un periodo: por día hasta un mes, por mes hasta
+ *  un año y por año más allá; con «Todo» (sin desde), por mes. Cambia sola al
+ *  elegir otro periodo (antes «Mes pasado» mostraba una sola columna) y se puede
+ *  cambiar a mano; el PDF y la hoja «Resumen» del Excel usan la que se ve. */
+export function unidadSugerida(rango: RangoFechas, hoy: Date): Unidad {
+  if (!rango.desde) return "mes";
+  const dia = (iso: string) => {
+    const [a, m, d] = iso.split("-").map(Number);
+    return Date.UTC(a, m - 1, d);
+  };
+  const hasta = rango.hasta ? dia(rango.hasta) : Date.UTC(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  const dias = Math.round((hasta - dia(rango.desde)) / 86_400_000) + 1;
+  return dias <= 31 ? "dia" : dias <= 366 ? "mes" : "anio";
 }

@@ -15,10 +15,10 @@ from app.domain.models.audit_log import AccionAuditoria
 from app.core.ldap import servicio_ldap
 from app.domain.models.user import Usuario, EstadoUsuario, TipoUsuario
 from app.domain.models.rol import Rol, Permiso, RolPermiso
-from app.domain.repositories.catalogo_repository import RepositorioCatalogo
 from app.domain.repositories.solicitud_repository import RepositorioSolicitud
 from app.domain.repositories.user_repository import RepositorioUsuario
-from app.domain.schemas.solicitud import FilaTopAgencia, SalidaUsoSistema
+from app.domain.schemas.solicitud import SalidaUsoSistema
+from app.domain.services.uso_service import ServicioUsoSistema
 from app.domain.schemas.user import (
     SalidaUsuario, DatosCrearUsuario, DatosCambiarEstado, DatosCrearUsuarioLocal, RespuestaContrasenaTemporal,
 )
@@ -443,17 +443,4 @@ async def obtener_estadisticas(
 ):
     """Cuentas, agencias y documentos almacenados (el flujo tiene sus propias
     estadísticas en /solicitudes/estadisticas)."""
-    repo_solicitudes = RepositorioSolicitud(sesion)
-    usuarios, activos = await RepositorioUsuario(sesion).contar()
-    documentos, almacenamiento_bytes = await repo_solicitudes.totales_documentos()
-    return SalidaUsoSistema(
-        usuarios=usuarios,
-        usuarios_activos=activos,
-        agencias=await RepositorioCatalogo(sesion).contar_agencias(),
-        documentos=documentos,
-        almacenamiento_bytes=almacenamiento_bytes,
-        top_agencias=[
-            FilaTopAgencia(agencia_id=f.agencia_id, nombre=f.agencia_nombre, total=f.total)
-            for f in await repo_solicitudes.top_agencias()
-        ],
-    )
+    return await ServicioUsoSistema(sesion).resumen()

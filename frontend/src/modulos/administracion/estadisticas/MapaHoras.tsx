@@ -26,11 +26,12 @@ const HORARIO_GLOBO = {
   borde: "Fuera del horario desde las 15:01 (las 15:00 en punto son laborales)",
 };
 
-/** ¿A qué hora aprueba UCVMM? Una semana en casillas de una hora, más intensa
+/** Hora de aprobación de UCVMM. Una semana en casillas de una hora, más intensa
  *  (en oscuro, más brillante) cuantas más se aprobaron, con el horario laboral
- *  recuadrado: lo de afuera es fuera del horario. Debajo, la lista de las
- *  aprobadas fuera del horario, con enlace al expediente. Hasta el 2026-11-06
- *  contaba la finalización del puesto de control. */
+ *  recuadrado: lo de afuera es fuera del horario (las 15:00 en punto cuentan
+ *  dentro: lo dice el globo de esa casilla). Debajo, la lista de las aprobadas
+ *  fuera del horario, con enlace al expediente. Hasta el 2026-11-06 contaba la
+ *  finalización del puesto de control. */
 export default function MapaHoras({ datos }: { datos: EstadisticasSolicitudes }) {
   const totales = new Map(datos.aprobadas_por_hora.map((c) => [`${c.dia}-${c.hora}`, c.total]));
   const total = (c: Casilla) => totales.get(`${c.dia}-${c.hora}`) ?? 0;
@@ -101,17 +102,16 @@ export default function MapaHoras({ datos }: { datos: EstadisticasSolicitudes })
   return (
     <TarjetaGrafico
       ancha
-      titulo="¿A qué hora aprueba UCVMM?"
-      descripcion={<>Cada casilla es una hora de la semana: cuanto más intenso el color, más autorizaciones aprobó UCVMM
-        a esa hora. El recuadro es el horario laboral ({datos.horario_laboral}; las 15:00 en punto cuentan dentro);
-        desde las 15:01, antes de las 07:00 y el fin de semana es fuera del horario. Cuenta la hora de la aprobación.</>}
+      titulo="Hora de aprobación de UCVMM"
+      // Una línea (antes eran cinco): el detalle de cada casilla, en su globo y en «Ver tabla».
+      descripcion={`El recuadro es el horario laboral: ${datos.horario_laboral}.`}
       tabla={datos.aprobadas_por_hora.length > 0 ? tabla : undefined}
     >
       <div className={styles.fueraResumen}>
         <p>
           {datos.aprobadas === 0 ? "Ninguna autorización aprobada en el periodo." : (
-            <><strong>{cifra(fuera)}</strong> de {cifra(datos.aprobadas)} autorizaciones aprobadas fueron fuera del
-              horario laboral (<strong>{porcentaje(fuera, datos.aprobadas)}</strong>).</>
+            <><strong>{cifra(fuera)}</strong> fuera del horario · {porcentaje(fuera, datos.aprobadas)} de
+              las {cifra(datos.aprobadas)} aprobadas</>
           )}
         </p>
         <Medidor valor={fuera} total={datos.aprobadas} serie="fuera" />
@@ -182,7 +182,7 @@ export default function MapaHoras({ datos }: { datos: EstadisticasSolicitudes })
         <details className={styles.desplegable}>
           <summary>
             <IconoChevronDerecha tamano={14} className={styles.chevron} />
-            Ver {segun(fuera, "la autorización aprobada", `las ${cifra(fuera)} autorizaciones aprobadas`)} fuera del horario
+            Ver {segun(fuera, "la aprobada", `las ${cifra(fuera)} aprobadas`)} fuera del horario
           </summary>
           <div className={styles.envoltorioTabla}>
             <table className={styles.tabla}>

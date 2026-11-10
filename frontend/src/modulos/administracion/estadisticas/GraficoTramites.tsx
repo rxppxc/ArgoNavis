@@ -38,8 +38,8 @@ export default function GraficoTramites({ tramites }: { tramites: Tramite[] }) {
 
   return (
     <TarjetaGrafico
-      titulo="¿Qué trámites se piden más?"
-      descripcion="Solicitudes recibidas en el periodo, por tipo de trámite."
+      titulo="Por trámite"
+      descripcion="Solicitudes recibidas."
       tabla={ordenados.length > 0 ? tabla : undefined}
     >
       {ordenados.length === 0 ? <p className={styles.vacio}>Sin solicitudes en el periodo.</p> : (
