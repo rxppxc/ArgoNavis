@@ -4,6 +4,7 @@ estadísticas y en la insignia del expediente (reunión del 2026-10-30; desde el
 punto son laborales). También la serie por día, mes y año."""
 import secrets
 from datetime import date, datetime, time, timedelta, timezone
+from decimal import Decimal
 
 import pytest
 from sqlalchemy import DateTime, literal, select
@@ -143,17 +144,109 @@ async def test_estadisticas_e_insignia(cliente):
         assert celdas_despues[celda] == celdas_antes.get(celda, 0) + sumadas, celda
     assert sum(celdas_despues.values()) == est["aprobadas"]
 
-    # La insignia: el personal del SNM la ve; a la agencia le llega nula.
+    # La insignia: el personal del SNM y, desde el 2026-11-11, también la agencia.
     for clave in momentos:
-        r = await cliente.get(f"/solicitudes/{ids[clave]}", headers=revisor.headers)
-        assert r.status_code == 200 and r.json()["fuera_de_horario"] is (clave in fuera), clave
-        r = await cliente.get(f"/solicitudes/{ids[clave]}", headers=naviera.headers)
-        assert r.status_code == 200 and r.json()["fuera_de_horario"] is None, clave
+        for actor in (revisor, naviera):
+            r = await cliente.get(f"/solicitudes/{ids[clave]}", headers=actor.headers)
+            assert r.status_code == 200 and r.json()["fuera_de_horario"] is (clave in fuera), clave
+            # Cargadas en la BD sin pasar por la aprobación: sin costo, como las aprobadas antes del cambio.
+            assert r.json()["costo_fuera_de_horario"] is None, clave
     r = await cliente.get("/solicitudes/agencia", headers=naviera.headers)
-    assert {x["fuera_de_horario"] for x in r.json()["items"]} == {None}
+    assert {x["id"]: x["fuera_de_horario"] for x in r.json()["items"]} == {ids[c]: c in fuera for c in momentos}
     r = await cliente.get("/solicitudes/revision", params={"texto": puesto.nombre, "por_pagina": 100},
                           headers=revisor.headers)
     assert {x["id"]: x["fuera_de_horario"] for x in r.json()["items"]} == {ids[c]: c in fuera for c in momentos}
+
+
+async def test_aprobada_fuera_del_horario_lleva_el_costo(cliente, monkeypatch):
+    """Aprobada fuera del horario, la solicitud guarda el costo migratorio de ese
+    momento y la agencia lo ve en la bandeja, el expediente, el correo de
+    aprobación y el PDF (2026-11-11). Cambiar el costo no toca lo ya aprobado."""
+    from app.api.v1 import solicitudes as api_solicitudes
+    from app.core.pdf_autorizacion import generar_pdf_autorizacion
+    from app.domain.services import solicitud_service
+
+    sufijo = secrets.token_hex(3)
+    revisor = await crear_actor("UCVMM", prefijo="revisor")
+    async with SesionLocal() as s:
+        agencia = AgenciaNaviera(nombre=f"Agencia Costo {sufijo}", correo=f"agencia-{sufijo}@prueba.pa")
+        puesto = PuestoControl(nombre=f"Puesto Costo {sufijo}", sector_id=await id_sector(),
+                               correo=f"puesto-{sufijo}@prueba.pa")
+        s.add_all([agencia, puesto])
+        await s.commit()
+        tipo_id = (await s.execute(select(TipoTramite.id).limit(1))).scalar_one()
+    naviera = await crear_actor("Naviera", agencia_id=agencia.id, prefijo="naviera")
+
+    avisos: list = []
+
+    async def capturar_avisos(sesion, lista):
+        avisos.extend(lista)
+        return 0
+
+    armados: list = []
+
+    def capturar_pdf(datos):
+        armados.append(datos)
+        return generar_pdf_autorizacion(datos)
+
+    monkeypatch.setattr(api_solicitudes, "encolar_avisos", capturar_avisos)
+    monkeypatch.setattr(api_solicitudes, "generar_pdf_autorizacion", capturar_pdf)
+
+    async def aprobar_a_las(momento: datetime) -> dict:
+        """Aprueba una solicitud nueva con el reloj en `momento`; devuelve lo que ve la agencia."""
+        async with SesionLocal() as s:
+            solicitud = Solicitud(
+                agencia_id=agencia.id, agencia_nombre=agencia.nombre, creada_por_id=naviera.id,
+                tipo_tramite_id=tipo_id, puesto_control_id=puesto.id, puesto_nombre=puesto.nombre,
+                titulo="Prueba de costo", fecha_operacion=datetime.now(ZONA_PANAMA).date(),
+                cantidad_tripulantes=0, estado="review", enviada_en=momento - timedelta(hours=1),
+                impedimentos_verificados=True,
+            )
+            s.add(solicitud)
+            await s.commit()
+            sid = solicitud.id
+        monkeypatch.setattr(solicitud_service, "ahora_utc", lambda: momento.astimezone(timezone.utc))
+        avisos.clear()
+        r = await cliente.post(f"/solicitudes/{sid}/aprobar", json={"observacion": None}, headers=revisor.headers)
+        assert r.status_code == 200, r.text
+        r = await cliente.get(f"/solicitudes/{sid}", headers=naviera.headers)
+        assert r.status_code == 200
+        r_pdf = await cliente.get(f"/solicitudes/{sid}/autorizacion.pdf", headers=naviera.headers)
+        assert r_pdf.status_code == 200 and r_pdf.content[:5] == b"%PDF-"
+        return r.json()
+
+    sabado = datetime.combine(_ultimo(5), time(10, 0), ZONA_PANAMA)
+    horario = "Aprobada fuera del horario laboral (lunes a viernes, de 07:00 a 15:00)."
+
+    fuera = await aprobar_a_las(sabado)
+    assert fuera["fuera_de_horario"] is True and fuera["costo_fuera_de_horario"] == "B/.20.00"
+    agencia_aviso, puesto_aviso = avisos
+    assert f"{horario}\nCosto migratorio: B/.20.00." in agencia_aviso.destacado
+    assert "B/.20.00" in agencia_aviso.vista_previa
+    assert "Costo migratorio: B/.20.00." in puesto_aviso.destacado
+    assert armados[-1].fuera_de_horario and armados[-1].costo_fuera_de_horario == Decimal("20.00")
+    r = await cliente.get("/solicitudes/agencia", headers=naviera.headers)
+    assert {x["id"]: x["costo_fuera_de_horario"] for x in r.json()["items"]} == {fuera["id"]: "B/.20.00"}
+
+    # Con otro costo, la nueva lleva el nuevo y la anterior conserva el suyo (foto).
+    monkeypatch.setattr(solicitud_service.configuracion, "COSTO_FUERA_DE_HORARIO", Decimal("25.00"))
+    assert (await aprobar_a_las(sabado))["costo_fuera_de_horario"] == "B/.25.00"
+    r = await cliente.get(f"/solicitudes/{fuera['id']}", headers=naviera.headers)
+    assert r.json()["costo_fuera_de_horario"] == "B/.20.00"
+
+    # Sin costo (0): se avisa que fue fuera del horario, sin monto.
+    monkeypatch.setattr(solicitud_service.configuracion, "COSTO_FUERA_DE_HORARIO", Decimal("0"))
+    sin_costo = await aprobar_a_las(sabado)
+    assert sin_costo["fuera_de_horario"] is True and sin_costo["costo_fuera_de_horario"] is None
+    assert horario in avisos[0].destacado and "Costo migratorio" not in avisos[0].destacado
+    assert armados[-1].fuera_de_horario and armados[-1].costo_fuera_de_horario is None
+
+    # Dentro del horario: ni aviso ni costo.
+    monkeypatch.setattr(solicitud_service.configuracion, "COSTO_FUERA_DE_HORARIO", Decimal("20.00"))
+    dentro = await aprobar_a_las(datetime.combine(_ultimo(2), time(10, 0), ZONA_PANAMA))
+    assert dentro["fuera_de_horario"] is False and dentro["costo_fuera_de_horario"] is None
+    assert all("fuera del horario" not in (a.destacado or "") for a in avisos)
+    assert not armados[-1].fuera_de_horario and armados[-1].costo_fuera_de_horario is None
 
 
 async def test_series_del_periodo(cliente):

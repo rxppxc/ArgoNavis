@@ -20,6 +20,8 @@ export interface CasillaFormulario {
   descripcion: string | null;
   clave_tripulante: string | null;
   nombre_tripulante: string | null;
+  /** Opcional: se puede enviar sin ella y no cuenta como faltante (2026-11-11). */
+  obligatoria: boolean;
 }
 
 export function claveCasilla(documentoCodigo: string, claveTripulante: string | null): string {
@@ -32,6 +34,11 @@ export function claveCasilla(documentoCodigo: string, claveTripulante: string | 
 export function aplicaAlRango(d: Pick<TramiteDocumento, "rangos" | "requiere_libreta">, rango: RangoMarino): boolean {
   if (d.rangos && !d.rangos.includes(rango)) return false;
   return !d.requiere_libreta || RANGOS_CON_LIBRETA.includes(rango);
+}
+
+/** Si la fila es opcional para ese rango. Espeja opcional_para del backend. */
+export function opcionalPara(d: Pick<TramiteDocumento, "rangos_opcional">, rango: RangoMarino): boolean {
+  return !!d.rangos_opcional && d.rangos_opcional.includes(rango);
 }
 
 /** Casillas que la solicitud debe cubrir, ya resueltas las condiciones.
@@ -53,6 +60,7 @@ export function construirCasillas(tipo: TipoTramite, tripulantes: TripulanteChec
         descripcion: d.descripcion,
         clave_tripulante: null,
         nombre_tripulante: null,
+        obligatoria: true,
       });
       continue;
     }
@@ -68,6 +76,7 @@ export function construirCasillas(tipo: TipoTramite, tripulantes: TripulanteChec
         descripcion: d.descripcion,
         clave_tripulante: t.clave,
         nombre_tripulante: t.nombre,
+        obligatoria: !opcionalPara(d, t.rango),
       });
     }
   }

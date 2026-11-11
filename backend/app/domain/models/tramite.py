@@ -113,6 +113,10 @@ class TramiteDocumento(Base):
     # por documento: el boleto aéreo lo pide Desembarque a todos y el resto de
     # los trámites solo a los rangos distintos de Marino (reunión del 2026-10-30).
     rangos:    Mapped[list[str] | None] = mapped_column(ARRAY(String(20)))
+    # Rangos para los que el documento es opcional (nulo = obligatorio para todos
+    # a los que se pide). El boleto de Desembarque es obligatorio para el Marino y
+    # el militar, y opcional para los técnicos (pedido del usuario del 2026-11-11).
+    rangos_opcional: Mapped[list[str] | None] = mapped_column(ARRAY(String(20)))
 
     tipo_tramite: Mapped["TipoTramite"]         = relationship("TipoTramite", back_populates="documentos")
     documento:    Mapped["DocumentoRequerido"]  = relationship("DocumentoRequerido", back_populates="tramites")

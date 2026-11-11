@@ -1,5 +1,6 @@
 /** Textos y formatos compartidos por las pantallas de solicitudes. */
 import type { EstadoSolicitud, EventoSolicitud, RangoMarino, Sexo } from "../../api/solicitudes";
+import { HORA_FIN_LABORAL, HORA_INICIO_LABORAL } from "../administracion/estadisticas/calculos";
 
 export const ETIQUETA_ESTADO: Record<EstadoSolicitud, string> = {
   review:    "En revisión",
@@ -44,6 +45,11 @@ export const ETIQUETA_EVENTO: Record<EventoSolicitud["tipo"], string> = {
 
 /** Rangos que portan seamanbook (al resto no se le pide libreta). */
 export const RANGOS_CON_LIBRETA: RangoMarino[] = ["marino"];
+
+const dosCifras = (n: number) => String(n).padStart(2, "0");
+/** El horario laboral, como lo dicen el correo y el PDF (TEXTO_HORARIO, core/horario.py). */
+export const TEXTO_HORARIO_LABORAL =
+  `lunes a viernes, de ${dosCifras(HORA_INICIO_LABORAL)}:00 a ${dosCifras(HORA_FIN_LABORAL)}:00`;
 
 /** Aclaraciones del instructivo del Formulario No. 3 (pág. 3) para el buque y
  *  el puerto, según el trámite. Se muestran como placeholder del campo. */

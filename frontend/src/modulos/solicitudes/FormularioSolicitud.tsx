@@ -152,7 +152,7 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
         titulo={corrigiendo ? `Corregir solicitud ${original.numero ?? ""}` : "Nueva solicitud de autorización"}
         tituloDocumento={corrigiendo ? `Corregir ${original.numero ?? "solicitud"}` : "Nueva solicitud"}
         descripcion={corrigiendo
-          ? "Corrige lo que indicó UCVMM y reenvía. Los documentos ya cargados se conservan si no los reemplazas."
+          ? "Corrige lo indicado en la devolución y reenvía. Los documentos ya cargados se conservan si no los reemplazas."
           : "Formulario No. 3 en línea: elige el trámite y el sistema te indicará exactamente qué datos y documentos debes adjuntar."}
       />
 

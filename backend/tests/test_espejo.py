@@ -60,7 +60,7 @@ def test_checklist(caso):
         documento = DocumentoRequerido(id=i, codigo=d["codigo"], nombre=d["codigo"], requiere_libreta=d["requiere_libreta"])
         tipo.documentos.append(TramiteDocumento(
             documento_id=i, documento=documento, alcance=d["alcance"], condicion=d["condicion"], orden=d["orden"],
-            rangos=d.get("rangos"),
+            rangos=d.get("rangos"), rangos_opcional=d.get("rangos_opcional"),
         ))
     tripulantes = [
         TripulanteChecklist(nombre=t["nombre"], es_panameno=t["es_panameno"], rango=t["rango"],
@@ -69,6 +69,7 @@ def test_checklist(caso):
     ]
     casillas = ServicioTramite().construir_casillas(tipo, tripulantes)
     assert [[c.codigo_documento, c.indice_tripulante] for c in casillas] == caso["esperado"]
+    assert [[c.codigo_documento, c.indice_tripulante] for c in casillas if not c.obligatoria] == caso.get("opcionales", [])
 
 
 # ── Ficha del tripulante ─────────────────────────────────────────────────────
@@ -149,3 +150,8 @@ def test_constantes_iguales_en_el_frontend():
         == horario.INICIO_LABORAL.hour
     assert _constante_ts("modulos/administracion/estadisticas/calculos.ts", "HORA_FIN_LABORAL") \
         == horario.FIN_LABORAL.hour
+    # La pantalla arma la frase del horario con esas horas (TEXTO_HORARIO_LABORAL, presentacion.ts):
+    # el correo y el PDF tienen que decir lo mismo.
+    assert horario.TEXTO_HORARIO == (
+        f"lunes a viernes, de {horario.INICIO_LABORAL:%H:%M} a {horario.FIN_LABORAL:%H:%M}"
+    )

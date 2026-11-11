@@ -47,7 +47,7 @@ export function solicitudDePrueba(cambios: Partial<SolicitudDetalle> = {}): Soli
     creada_por: null, created_at: "2026-10-20T15:00:00Z", enviada_en: "2026-10-20T15:00:00Z",
     plazo_correccion: "2026-10-23T15:00:00Z", vigente_hasta: null, aprobada_en: null, negada_en: null,
     finalizada_en: null, expirada_en: null, veces_devuelta: 1, tripulantes_con_alerta: 0,
-    tiene_nacionalidad_restringida: false, fuera_de_horario: null,
+    tiene_nacionalidad_restringida: false, fuera_de_horario: null, costo_fuera_de_horario: null,
     tipo_tramite_nota: null, tipo_tramite_aviso_custodia: false,
     requiere_buque: false, requiere_puerto: false, requiere_puerto_desembarque: false,
     requiere_motivo: false, requiere_clinica: false, valida_vigencia: true,

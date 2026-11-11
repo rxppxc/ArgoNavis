@@ -1,0 +1,103 @@
+/* Consulta histórica (2026-11-11). La ficha de búsqueda es una tarjeta suelta con
+   la franja amarilla arriba (identidad «pase oficial»); los campos, los del
+   formulario; los resultados, una tabla con encabezados de formulario impreso que
+   en el celular pasa a fichas (data-etiqueta). Pestañas, avisos, vacío y
+   paginación son los de las bandejas (PaginaPanel.module.css). */
+
+.btnExportar { composes: boton consultar from "../../components/Botones.module.css"; }
+.btnLimpiar  { composes: boton texto chico from "../../components/Botones.module.css"; }
+
+.ficha {
+  background: var(--card); border: 1px solid var(--border); border-top: 4px solid var(--franja);
+  border-radius: var(--r-md); padding: 16px 18px 4px; margin-bottom: 18px;
+}
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0 13px; }
+.gridAncha { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0 13px; }
+
+.campo { display: flex; flex-direction: column; gap: 6px; margin-bottom: 13px; min-width: 0; }
+/* El rótulo, en mayúsculas espaciadas como en un formulario impreso (de CSS: el
+   nombre accesible del campo no cambia). */
+.campo > span {
+  color: var(--text-2);
+  font: 600 .66rem/1.35 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
+  letter-spacing: .12em; text-transform: uppercase;
+}
+.campo input, .campo select {
+  width: 100%; padding: 9px 11px;
+  border-radius: var(--r-sm); border: 1px solid var(--input-border);
+  background: var(--input-bg); color: var(--text);
+  font: inherit; font-size: .86rem;
+}
+.campo input::placeholder { color: var(--muted); }
+.campo input:focus, .campo select:focus { outline: 2px solid var(--foco); border-color: transparent; }
+.campo select { cursor: pointer; }
+.campo select option { background: var(--surface); color: var(--text); }
+
+.pie {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px;
+  padding: 2px 0 12px;
+}
+.casilla { display: inline-flex; align-items: center; gap: 8px; color: var(--text); font-size: .86rem; cursor: pointer; }
+.casilla input { width: 17px; height: 17px; margin: 0; accent-color: var(--acc-purple); cursor: pointer; }
+
+.resumen { color: var(--text-2); font-size: .82rem; margin: 0 0 10px; }
+
+/* En el celular, agencia, puesto, trámite y fechas van plegados («Más filtros»):
+   los nueve campos empujaban los resultados una pantalla entera hacia abajo. */
+.btnMasFiltros { composes: boton secundario chico from "../../components/Botones.module.css"; display: none; margin: 0 0 13px; }
+@media (max-width: 720px) {
+  .btnMasFiltros { display: inline-flex; }
+  .plegables:not(.plegablesAbiertos) { display: none; }
+}
+
+/* ─── Resultados ─── */
+.tablaMarco { background: var(--card); border: 1px solid var(--border); border-radius: var(--r-md); overflow-x: auto; }
+.tabla { width: 100%; border-collapse: collapse; font-size: .84rem; }
+.tabla th {
+  padding: 10px 12px; text-align: left; white-space: nowrap;
+  border-bottom: 1.5px solid var(--text);
+  color: var(--text-2);
+  font: 600 .64rem/1.3 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
+  letter-spacing: .12em; text-transform: uppercase;
+}
+.tabla td {
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
+  color: var(--text); vertical-align: top;
+  /* Nombres de buque y de agencia que escribe un usuario. En una tabla, «anywhere»
+     encoge la columna al mínimo y partía «KENSINGTON»; «break-word» respeta la palabra
+     más larga, y una larguísima hace desplazar la tabla dentro de su marco. */
+  overflow-wrap: break-word;
+}
+.tabla tbody tr:last-child td { border-bottom: 0; }
+.tabla tbody tr:hover { background: var(--hover); }
+.tabla small { display: block; margin-top: 2px; color: var(--muted); font-size: .74rem; }
+.mono { font-family: var(--letra-mono); }
+
+.numero { color: var(--acc-blue); font: 600 .82rem/1.3 var(--letra-mono); white-space: nowrap; }
+.numero:hover { text-decoration: underline; }
+
+/* Morado, como en las bandejas: no es el color de ningún estado. */
+.chipHorario {
+  display: inline-flex; align-items: center; gap: 4px; margin-top: 6px;
+  padding: 2px 8px; border-radius: var(--r-xs); border: 1px solid currentColor;
+  color: var(--acc-purple); font-size: .68rem; font-weight: 700; white-space: nowrap;
+}
+
+/* En el celular la tabla pasa a fichas, como la de pasajeros del expediente. */
+@media (max-width: 720px) {
+  .tablaMarco { overflow-x: visible; padding: 0 14px; }
+  .tabla thead { display: none; }
+  .tabla, .tabla tbody { display: block; }
+  .tabla tr {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px;
+    padding: 13px 0; border-bottom: 1px solid var(--border);
+  }
+  .tabla tbody tr:last-child { border-bottom: 0; }
+  .tabla tbody tr:hover { background: none; }
+  .tabla td { display: block; padding: 0; border: 0; }
+  .tabla td[data-etiqueta]::before {
+    content: attr(data-etiqueta); display: block; margin-bottom: 2px;
+    color: var(--muted); font: 600 .62rem/1.3 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
+    letter-spacing: .12em; text-transform: uppercase;
+  }
+}

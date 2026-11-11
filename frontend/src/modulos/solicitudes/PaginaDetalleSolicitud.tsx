@@ -24,17 +24,33 @@ import { HistorialSolicitud } from "./HistorialSolicitud";
 import { InsigniaEstado } from "./InsigniaEstado";
 import { PanelPuerto } from "./PanelPuerto";
 import { PanelRevision } from "./PanelRevision";
-import { formatearFecha, formatearFechaHora, tiempoRestante } from "./presentacion";
+import { formatearFecha, formatearFechaHora, TEXTO_HORARIO_LABORAL, tiempoRestante } from "./presentacion";
 import { SeccionTripulantes } from "./SeccionTripulantes";
 import { useVerificacionImpedimentos } from "./useVerificacionImpedimentos";
 import styles from "./DetalleSolicitud.module.css";
+
+/** Aprobada fuera del horario laboral: el aviso y el costo migratorio, también
+ *  para la agencia (2026-11-11). Lo mismo dicen el correo de aprobación y el PDF. */
+function AvisoFueraDeHorario({ s }: { s: SolicitudDetalle }) {
+  if (!s.fuera_de_horario) return null;
+  return (
+    <div className={styles.avisoHorario}>
+      <IconoReloj tamano={14} />
+      <span>
+        Aprobada fuera del horario laboral ({TEXTO_HORARIO_LABORAL}).
+        {s.costo_fuera_de_horario && <> Costo migratorio: <strong>{s.costo_fuera_de_horario}</strong>.</>}
+      </span>
+    </div>
+  );
+}
 
 function BannerEstado({ s }: { s: SolicitudDetalle }) {
   switch (s.estado) {
     case "review":
       return (
         <div className={`${styles.banner} ${styles.bannerRevision}`}>
-          En revisión por UCVMM — enviada el {formatearFechaHora(s.enviada_en)}
+          {/* Neutro: lo ve también la agencia, que no trabaja con las unidades internas (2026-11-11). */}
+          En revisión por el Servicio Nacional de Migración — enviada el {formatearFechaHora(s.enviada_en)}
           {s.veces_devuelta > 0 && <> · corregida {s.veces_devuelta} {s.veces_devuelta === 1 ? "vez" : "veces"}</>}
         </div>
       );
@@ -60,11 +76,11 @@ function BannerEstado({ s }: { s: SolicitudDetalle }) {
         <div className={`${styles.banner} ${styles.bannerAprobada}`}>
           <div className={styles.bannerTitulo}>Autorización aprobada</div>
           <div className={styles.bannerTexto}>
-            Aprobada el {formatearFechaHora(s.aprobada_en)} por {s.aprobada_por ?? "UCVMM"}. Vigente hasta el{" "}
+            Aprobada el {formatearFechaHora(s.aprobada_en)} por {s.aprobada_por ?? "el Servicio Nacional de Migración"}. Vigente hasta el{" "}
             {formatearFechaHora(s.vigente_hasta)}: el puesto de control debe finalizarla antes de esa fecha.
           </div>
           {s.observacion_aprobacion && <div className={styles.bannerPie}>Observación interna: {s.observacion_aprobacion}</div>}
-          {s.fuera_de_horario && <div className={styles.bannerPie}>Aprobada por UCVMM fuera del horario laboral.</div>}
+          <AvisoFueraDeHorario s={s} />
           {/* Al puesto que la finaliza se lo dice su panel. */}
           {!s.acciones.finalizar && (
             <div className={styles.bannerPie}>
@@ -92,7 +108,7 @@ function BannerEstado({ s }: { s: SolicitudDetalle }) {
           {s.puesto_finalizacion_nombre && s.puesto_finalizacion_nombre !== s.puesto_nombre && (
             <div className={styles.bannerPie}>La autorización era para {s.puesto_nombre}.</div>
           )}
-          {s.fuera_de_horario && <div className={styles.bannerPie}>Aprobada por UCVMM fuera del horario laboral.</div>}
+          <AvisoFueraDeHorario s={s} />
         </div>
       );
     case "denied":
@@ -300,7 +316,12 @@ function Expediente({ s, onActualizada }: { s: SolicitudDetalle; onActualizada: 
             {[buque, s.puesto_nombre, `Operación: ${formatearFecha(s.fecha_operacion)}`]
               .filter(Boolean).join(" — ")}
           </div>
-          {s.fuera_de_horario && <span className={styles.chipHorario}><IconoReloj tamano={12} /> Aprobada fuera del horario</span>}
+          {s.fuera_de_horario && (
+            <span className={styles.chipHorario}>
+              <IconoReloj tamano={12} /> Aprobada fuera del horario
+              {s.costo_fuera_de_horario && <> · {s.costo_fuera_de_horario}</>}
+            </span>
+          )}
         </div>
         <div className={styles.sello}><InsigniaEstado estado={s.estado} grande /></div>
         {(s.acciones.corregir || s.acciones.descargar_autorizacion) && (

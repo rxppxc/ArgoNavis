@@ -17,7 +17,7 @@ import {
   apiSolicitudes, type Bandeja, type ConsultaBandeja, type EstadoSolicitud, type PaginaSolicitudes,
 } from "../../api/solicitudes";
 import { useAutenticacion } from "../../hooks/useAutenticacion";
-import { usePermisos } from "../../hooks/usePermisos";
+import { PERMISOS_PERSONAL_SNM, usePermisos } from "../../hooks/usePermisos";
 import { MarcoPagina } from "../../components/MarcoPagina";
 import { EncabezadoPagina } from "../../components/EncabezadoPagina";
 import { EstadoCarga } from "../../components/EstadoCarga";
@@ -96,7 +96,7 @@ export default function PaginaPanel() {
 
 function Panel({ bandejaPedida, estadoPedido }: { bandejaPedida: Bandeja | null; estadoPedido: string | null }) {
   const { usuario } = useAutenticacion();
-  const { tiene, esAdmin, cargando: cargandoPermisos } = usePermisos();
+  const { tiene, tieneAlguno, esAdmin, cargando: cargandoPermisos } = usePermisos();
 
   const tieneAgencia = usuario?.agencia_id != null;
   const puedeRevisar = esAdmin || tiene("T-PROCESAR-PACIFICO");
@@ -104,6 +104,8 @@ function Panel({ bandejaPedida, estadoPedido }: { bandejaPedida: Bandeja | null;
   const veLosDos     = esAdmin || tiene("T-SUPERVISAR-TODO");
   const supervisa    = !esAdmin && (tiene("T-SUPERVISAR-SECTOR") || tiene("T-SUPERVISAR-TODO"));
   const esPuerto     = esAdmin || tiene("T-FINALIZAR-PUERTO");
+  // La consulta histórica (2026-11-11): para buscar en cualquier año, con más filtros.
+  const veHistorico  = tieneAlguno(...PERMISOS_PERSONAL_SNM);
   // Las solicitudes son de una agencia: sin agencia el backend no deja enviar y
   // "Mi agencia" saldría vacía (le pasaba al Administrador, que tiene todos los permisos).
   const puedeCrear   = (esAdmin || tiene("T-CREAR-BASICA")) && tieneAgencia;
@@ -204,10 +206,19 @@ function Panel({ bandejaPedida, estadoPedido }: { bandejaPedida: Bandeja | null;
         descripcion={vista === "revision" && esAdmin ? "Solicitudes de los dos sectores"
           : vista === "supervision" && veLosDos ? "Solicitudes de los dos sectores, en solo lectura"
           : VISTAS[vista].subtitulo}
-        acciones={puedeCrear && (
-          <Link to="/new" className={styles.btnNuevo}>
-            <IconoMas /> Nueva solicitud
-          </Link>
+        acciones={(puedeCrear || veHistorico) && (
+          <>
+            {veHistorico && (
+              <Link to="/historico" className={styles.btnHistorico}>
+                <IconoBuscar tamano={15} /> Consulta histórica
+              </Link>
+            )}
+            {puedeCrear && (
+              <Link to="/new" className={styles.btnNuevo}>
+                <IconoMas /> Nueva solicitud
+              </Link>
+            )}
+          </>
         )}
       />
 

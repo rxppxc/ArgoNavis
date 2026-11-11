@@ -107,6 +107,8 @@ services:
       - CORREO_UCVMM=${CORREO_UCVMM:-}
       - PLAZO_CORRECCION_DIAS=3        # 72 h para corregir
       - DIAS_GRACIA_FINALIZACION=2     # 72 h desde que empieza el día de la operación
+      # Costo migratorio (B/.) de una solicitud aprobada fuera del horario laboral (0 = sin costo).
+      - COSTO_FUERA_DE_HORARIO=${COSTO_FUERA_DE_HORARIO:-20.00}
       - VENCIMIENTOS_INTERVALO_MINUTOS=15
       # Cuentas locales (sin AD), p. ej. para los usuarios de las agencias navieras.
       - PERMITIR_LOGIN_LOCAL=${PERMITIR_LOGIN_LOCAL:-false}

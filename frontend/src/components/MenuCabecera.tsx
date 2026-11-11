@@ -1,18 +1,18 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAutenticacion } from "../hooks/useAutenticacion";
-import { usePermisos } from "../hooks/usePermisos";
+import { PERMISOS_PERSONAL_SNM, usePermisos } from "../hooks/usePermisos";
 import { RUTA_CAMBIAR_CONTRASENA } from "../api/client";
 import {
   IconoUsuarios, IconoEstadisticas, IconoEscudo, IconoArchivo, IconoAncla, IconoActividad,
-  IconoSalir, IconoChevronAbajo, IconoLlave, IconoMenu,
+  IconoSalir, IconoChevronAbajo, IconoLlave, IconoMenu, IconoBuscar,
 } from "./Iconos";
 import { SelectorTema } from "./SelectorTema";
 import styles from "./MenuCabecera.module.css";
 
 export function MenuCabecera() {
   const { usuario, cerrarSesion } = useAutenticacion();
-  const { tiene, esAdmin, esSysAdmin } = usePermisos();
+  const { tiene, tieneAlguno, esAdmin, esSysAdmin } = usePermisos();
   const navegar = useNavigate();
   const [abierto, setAbierto] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -20,6 +20,8 @@ export function MenuCabecera() {
   // UCVMM y los supervisores (2026-11-10) ven las estadísticas de su alcance; el admin las tiene en su bloque.
   const veEstadisticas = !esAdmin
     && (tiene("T-PROCESAR-PACIFICO") || tiene("T-SUPERVISAR-SECTOR") || tiene("T-SUPERVISAR-TODO"));
+  // La consulta histórica (2026-11-11): el personal del SNM; el admin la tiene en su bloque.
+  const veHistorico = !esAdmin && tieneAlguno(...PERMISOS_PERSONAL_SNM);
   // Quién está en la sesión y con qué rol: se ve junto al menú (escritorio) y arriba del panel.
   const nombre = usuario?.full_name?.trim() || usuario?.username || "";
   const detalle = [usuario?.rol_personalizado?.nombre, usuario?.agencia?.nombre].filter(Boolean).join(" · ");
@@ -111,6 +113,9 @@ export function MenuCabecera() {
                     <Link to="/admin/stats" className={styles.item} onClick={() => setAbierto(false)}>
                       <IconoEstadisticas />Estadísticas
                     </Link>
+                    <Link to="/historico" className={styles.item} onClick={() => setAbierto(false)}>
+                      <IconoBuscar />Consulta histórica
+                    </Link>
                   </>
                 )}
                 <Link to="/admin/bitacora" className={styles.item} onClick={() => setAbierto(false)}>
@@ -119,11 +124,18 @@ export function MenuCabecera() {
                 <div className={styles.sep} />
               </>
             )}
-            {veEstadisticas && (
+            {(veHistorico || veEstadisticas) && (
               <>
-                <Link to="/admin/stats" className={styles.item} onClick={() => setAbierto(false)}>
-                  <IconoEstadisticas />Estadísticas
-                </Link>
+                {veHistorico && (
+                  <Link to="/historico" className={styles.item} onClick={() => setAbierto(false)}>
+                    <IconoBuscar />Consulta histórica
+                  </Link>
+                )}
+                {veEstadisticas && (
+                  <Link to="/admin/stats" className={styles.item} onClick={() => setAbierto(false)}>
+                    <IconoEstadisticas />Estadísticas
+                  </Link>
+                )}
                 <div className={styles.sep} />
               </>
             )}

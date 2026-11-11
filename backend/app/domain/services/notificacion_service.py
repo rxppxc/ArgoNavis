@@ -11,6 +11,7 @@ El asunto es "Autorizaciones Marítimas · {número} · {estado}" (lo arma
 Destinatarios:
   - UCVMM: el buzón CORREO_UCVMM (solicitud nueva o corregida).
   - Agencia: su buzón + sus usuarios activos (aprobada, devuelta, denegada, expirada).
+    Sin unidades internas (UCVMM, sectores): la institución (2026-11-11).
   - Puesto de control: su buzón + sus funcionarios asignados (aprobada).
 """
 from datetime import datetime
@@ -20,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import obtener_configuracion
 from app.core.email import Aviso
+from app.core.horario import aviso_fuera_de_horario, fuera_de_horario, texto_costo
 from app.domain.models.solicitud import EstadoSolicitud, Solicitud
 from app.domain.repositories.catalogo_repository import RepositorioCatalogo
 
@@ -108,6 +110,10 @@ class ServicioNotificacion:
     async def aprobada(self, s: Solicitud) -> list[Aviso]:
         """A la agencia (con la autorización) y al puesto de control que la finaliza."""
         vigencia = f"Vigente hasta el {_fecha_hora(s.vigente_hasta)}."
+        # Aprobada fuera del horario: el aviso y el costo migratorio (2026-11-11),
+        # a la agencia y al puesto que la recibe.
+        fuera = s.aprobada_en is not None and fuera_de_horario(s.aprobada_en)
+        horario = "\n".join(aviso_fuera_de_horario(s.costo_fuera_de_horario)) if fuera else None
         # Solo en los trámites cuyo proceso lo indica (Desembarque, Urgencias,
         # Renovación y Shore Pass): los demás no mencionan la custodia.
         restringidos = (
@@ -117,13 +123,18 @@ class ServicioNotificacion:
         # La observación de aprobación es interna de UCVMM: no va a la agencia.
         nota_agencia = "\n".join(filter(None, [
             vigencia,
+            horario,
             f"Vale solo para {s.puesto_nombre}: si la operación se realiza en otro puesto, "
             "la agencia debe presentar una nueva solicitud.",
             ("Nacionalidad restringida: la agencia debe realizar el trámite de solicitud de custodia para "
              + ", ".join(restringidos) + ".")
             if restringidos else None,
         ]))
-        previa = _vista_previa(s.puesto_nombre, _operacion(s), f"vigente hasta el {_fecha_hora_corta(s.vigente_hasta)}")
+        previa = _vista_previa(
+            s.puesto_nombre, _operacion(s), f"vigente hasta el {_fecha_hora_corta(s.vigente_hasta)}",
+            (f"costo migratorio de {texto_costo(s.costo_fuera_de_horario)} (fuera del horario)"
+             if s.costo_fuera_de_horario else "fuera del horario laboral") if fuera else None,
+        )
         return self._con_destinatarios([
             Aviso(
                 destinatarios=await self._correos_agencia(s), numero=s.numero or "", estado="Aprobada",
@@ -139,8 +150,8 @@ class ServicioNotificacion:
                     "UCVMM aprobó una autorización marítima que se realizará en tu puesto de control. "
                     "Ingresa al sistema para registrar la operación y finalizarla."
                 ),
-                vista_previa=previa, campos=_campos(s), destacado=vigencia, tono="verde",
-                boton_texto="Abrir autorización", boton_url=url_solicitud(s),
+                vista_previa=previa, campos=_campos(s), destacado="\n".join(filter(None, [vigencia, horario])),
+                tono="verde", boton_texto="Abrir autorización", boton_url=url_solicitud(s),
             ),
         ])
 
@@ -148,7 +159,7 @@ class ServicioNotificacion:
         return self._con_destinatarios([Aviso(
             destinatarios=await self._correos_agencia(s), numero=s.numero or "", estado="Devuelta a corrección",
             titulo="La solicitud necesita correcciones",
-            intro="UCVMM revisó la solicitud y necesita que se corrija lo siguiente antes de aprobarla.",
+            intro="El Servicio Nacional de Migración revisó la solicitud y necesita que se corrija lo siguiente antes de aprobarla.",
             vista_previa=_vista_previa(f"Motivo: {s.motivo_devolucion}",
                                        f"corrige antes del {_fecha_hora_corta(s.plazo_correccion)}"),
             campos=_campos(s),
@@ -164,7 +175,7 @@ class ServicioNotificacion:
         return self._con_destinatarios([Aviso(
             destinatarios=await self._correos_agencia(s), numero=s.numero or "", estado="Denegada",
             titulo="La solicitud fue denegada",
-            intro="UCVMM revisó la solicitud de autorización y no fue aprobada.",
+            intro="El Servicio Nacional de Migración revisó la solicitud de autorización y no fue aprobada.",
             vista_previa=_vista_previa(f"Motivo: {s.motivo_negacion}"),
             campos=_campos(s), destacado=f"Motivo: {s.motivo_negacion}", tono="rojo",
             boton_texto="Ver solicitud", boton_url=url_solicitud(s),

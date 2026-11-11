@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import type { Bandeja, SolicitudResumen } from "../../api/solicitudes";
 import { IconoAlerta, IconoReloj } from "../../components/Iconos";
 import { InsigniaEstado } from "./InsigniaEstado";
-import { formatearFecha, formatearFechaHora, tiempoRestante } from "./presentacion";
+import { formatearFecha, formatearFechaHora, TEXTO_HORARIO_LABORAL, tiempoRestante } from "./presentacion";
 import styles from "./TarjetaSolicitud.module.css";
 
 /** Fila de las bandejas, como un pase (identidad «pase oficial», 2026-11-11): el
@@ -50,8 +50,13 @@ export function TarjetaSolicitud({ s, vista, conSector = false }: { s: Solicitud
                 </span>
               )}
               {s.tiene_nacionalidad_restringida && <span className={styles.chipRestringida}>Nacionalidad restringida</span>}
-              {/* Aprobada por UCVMM fuera del horario laboral (solo le llega al SNM). */}
-              {s.fuera_de_horario && <span className={styles.chipHorario}><IconoReloj tamano={11} /> Aprobada fuera del horario</span>}
+              {/* Aprobada fuera del horario laboral, con su costo: también para la agencia (2026-11-11). */}
+              {s.fuera_de_horario && (
+                <span className={styles.chipHorario} title={`Aprobada fuera del horario laboral (${TEXTO_HORARIO_LABORAL})`}>
+                  <IconoReloj tamano={11} /> Aprobada fuera del horario
+                  {s.costo_fuera_de_horario && <> · {s.costo_fuera_de_horario}</>}
+                </span>
+              )}
             </div>
           )}
 

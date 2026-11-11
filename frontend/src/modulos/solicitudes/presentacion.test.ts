@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { leerEspejo, type Caso } from "../../pruebas/espejo";
-import { fechaEnPalabras, normalizarImo } from "./presentacion";
+import { fechaEnPalabras, normalizarImo, TEXTO_HORARIO_LABORAL } from "./presentacion";
+
+describe("TEXTO_HORARIO_LABORAL", () => {
+  it("dice lo mismo que el correo y el PDF (TEXTO_HORARIO de core/horario.py)", () => {
+    expect(TEXTO_HORARIO_LABORAL).toBe("lunes a viernes, de 07:00 a 15:00");
+  });
+});
 
 interface CasoImo extends Caso {
   valor: string;

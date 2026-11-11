@@ -201,6 +201,12 @@
 
 .casillaInfo { flex: 1; min-width: 0; }
 .casillaDoc { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: .88rem; font-weight: 600; overflow-wrap: anywhere; }
+/* Documento opcional (el boleto de Desembarque de los técnicos, 2026-11-11). */
+.casillaOpcional {
+  padding: 1px 7px; border: 1px solid var(--border-2); border-radius: var(--r-xs);
+  color: var(--text-2); font: 600 .6rem/1.4 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
+  letter-spacing: .12em; text-transform: uppercase;
+}
 .casillaAlcance { color: var(--text-2); font-size: .77rem; margin-top: 3px; margin-left: 21px; }
 
 .casillaAccion { display: flex; align-items: center; gap: 9px; flex-shrink: 0; }

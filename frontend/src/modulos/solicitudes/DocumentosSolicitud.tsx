@@ -83,9 +83,12 @@ export function DocumentosSolicitud({ solicitud, onVer, tripulanteId }: Props) {
               <div className={styles.casillaCabecera}>
                 {c.cubierta
                   ? <span className={styles.casillaOk}><IconoCheck tamano={12} /></span>
-                  : <span className={styles.casillaFalta}><IconoX tamano={12} /></span>}
+                  : c.obligatoria && <span className={styles.casillaFalta}><IconoX tamano={12} /></span>}
                 <span className={styles.casillaNombre}>{c.documento_nombre}</span>
-                {!c.cubierta && <span className={styles.textoFalta}>Falta</span>}
+                {/* Una opcional sin archivo no falta: se dice que no se adjuntó. */}
+                {!c.cubierta && (c.obligatoria
+                  ? <span className={styles.textoFalta}>Falta</span>
+                  : <span className={styles.textoOpcional}>Opcional · no se adjuntó</span>)}
               </div>
               {c.documento_ids.map((id) => {
                 const documento = documentosPorId.get(id);

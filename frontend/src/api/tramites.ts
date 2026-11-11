@@ -20,6 +20,9 @@ export interface TramiteDocumento {
   /** Rangos a los que se pide (null = a todos). Desde el 30/10/2026, a los
    *  rangos distintos de Marino solo se les piden Generales y boleto aéreo. */
   rangos: RangoMarino[] | null;
+  /** Rangos para los que es opcional (null = obligatorio): el boleto de
+   *  Desembarque de los técnicos (2026-11-11). */
+  rangos_opcional: RangoMarino[] | null;
 }
 
 export interface TipoTramite {

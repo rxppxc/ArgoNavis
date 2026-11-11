@@ -33,7 +33,8 @@ from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import obtener_configuracion
-from app.core.horario import TEXTO_HORARIO, fuera_de_horario
+from app.core.horario import TEXTO_HORARIO, fuera_de_horario, texto_costo
+from app.core.informe_historico import DatosHistorico, FilaHistorico, FiltrosAplicados
 from app.core.pdf_autorizacion import DatosPdfAutorizacion, TripulantePdf
 from app.core.permisos import (
     PERMISO_PUERTO, PERMISO_REVISAR, PERMISO_SOLICITAR, PERMISO_SUPERVISAR_SECTOR, PERMISO_SUPERVISAR_TODO,
@@ -47,16 +48,16 @@ from app.domain.models.solicitud import (
 from app.domain.models.tramite import AlcanceDocumento, TipoTramite, TramiteDocumento
 from app.domain.models.user import Usuario
 from app.domain.repositories.catalogo_repository import RepositorioCatalogo
-from app.domain.repositories.solicitud_repository import FiltrosBandeja, RepositorioSolicitud
+from app.domain.repositories.solicitud_repository import AlcanceSnm, FiltrosBandeja, RepositorioSolicitud
 from app.domain.repositories.tramite_repository import RepositorioTramite
 from app.domain.schemas.solicitud import (
-    AccionesSolicitud, AsignacionArchivo, ConsultaBandeja, DatosCorregirSolicitud,
+    AccionesSolicitud, AsignacionArchivo, ConsultaBandeja, ConsultaHistorica, DatosCorregirSolicitud,
     DatosCrearSolicitud, DatosImpedimentos, DatosTripulanteEntrada, FilaEstadisticaPuesto, FilaSector,
     FilaEstadisticaSerie, FilaEstadisticaTipo, FilaFueraHorario, FilaPorHora, PaginaSolicitudes,
     SalidaCasilla,
     SalidaDocumentoSolicitud, SalidaEstadisticasSolicitudes, SalidaEvento, SalidaSolicitud,
-    SalidaSolicitudResumen, SalidaTripulante, SalidaTripulanteVerificacion, SalidaVerificacion,
-    _DatosFormularioSolicitud,
+    OpcionFiltro, SalidaOpcionesHistorico, SalidaSolicitudResumen, SalidaTripulante,
+    SalidaTripulanteVerificacion, SalidaVerificacion, _DatosFormularioSolicitud,
 )
 from app.domain.services.tramite_service import (
     CasillaChecklist, ServicioTramite, TripulanteChecklist, normalizar_imo,
@@ -87,6 +88,7 @@ MAX_ARCHIVOS_EN_UN_ENVIO = (MAX_TRIPULANTES * MAX_DOCUMENTOS_POR_TRIPULANTE + MA
                             + MAX_DOCUMENTOS_ADICIONALES)
 TOPE_CUERPO_ENVIO_MB = MAX_ARCHIVOS_EN_UN_ENVIO * almacenamiento.TAMANO_MAXIMO_MB + 1
 MAX_FUERA_HORARIO_LISTADAS = 50   # estadísticas: las aprobadas fuera del horario que se listan
+MAX_FILAS_EXPORTACION = 5000      # consulta histórica (2026-11-11): las primeras, según el orden
 # Estadísticas: cuántos días, meses y años muestra la serie, como mucho (los últimos del periodo).
 DIAS_EN_SERIE  = 31
 MESES_EN_SERIE = 12
@@ -104,10 +106,13 @@ _EVENTOS_INTERNOS = {
     TipoEventoSolicitud.COMENTARIO.value,   # ya no se registran: quedan los de antes
 }
 _SIN_TEXTO_PARA_AGENCIA = {TipoEventoSolicitud.APROBADA.value, TipoEventoSolicitud.FINALIZADA.value}
+# A la agencia no se le nombran las unidades internas (UCVMM, los sectores): ve
+# a la institución (2026-11-11; antes, "UCVMM").
+INSTITUCION = "Servicio Nacional de Migración"
 _AUTOR_PARA_AGENCIA = {
-    TipoEventoSolicitud.DEVUELTA.value:   "UCVMM",
-    TipoEventoSolicitud.APROBADA.value:   "UCVMM",
-    TipoEventoSolicitud.NEGADA.value:     "UCVMM",
+    TipoEventoSolicitud.DEVUELTA.value:   INSTITUCION,
+    TipoEventoSolicitud.APROBADA.value:   INSTITUCION,
+    TipoEventoSolicitud.NEGADA.value:     INSTITUCION,
     TipoEventoSolicitud.FINALIZADA.value: "Puesto de control",
 }
 
@@ -403,7 +408,7 @@ class ServicioSolicitud:
     # ── Bandejas ─────────────────────────────────────────────────────────────
 
     async def _pagina(
-        self, ctx: ContextoAcceso, filtros: FiltrosBandeja, consulta: ConsultaBandeja, orden: str,
+        self, ctx: ContextoAcceso, filtros: FiltrosBandeja, consulta: ConsultaBandeja | ConsultaHistorica, orden: str,
     ) -> PaginaSolicitudes:
         total, conteos, items = await self.repo.listar(
             filtros, pagina=consulta.pagina, por_pagina=consulta.por_pagina, orden=orden,
@@ -470,6 +475,106 @@ class ServicioSolicitud:
         )
         orden = "operacion" if consulta.estado == Estado.APROBADA.value else "recientes"
         return await self._pagina(ctx, filtros, consulta, orden)
+
+    # ── Consulta histórica (2026-11-11) ──────────────────────────────────────
+
+    def _alcance_historico(self, ctx: ContextoAcceso) -> AlcanceSnm | None:
+        """Lo que ve en la consulta histórica: lo mismo que `puede_ver`, sin la vía
+        de la agencia (la consulta es del personal del SNM). None = todas."""
+        if not ctx.es_personal_snm:
+            raise _error(status.HTTP_403_FORBIDDEN, "La consulta histórica es para el personal del SNM.")
+        if ctx.ve_todos_los_sectores:
+            return None
+        de_sector = ctx.es_revisor or ctx.es_supervisor_sector
+        if de_sector and not ctx.es_puerto:
+            self._exigir_sector(ctx)
+        return AlcanceSnm(
+            puestos=frozenset(ctx.puestos_de_sectores) if de_sector else frozenset(),
+            puestos_aprobadas=frozenset(ctx.puestos_ids) if ctx.es_puerto else frozenset(),
+        )
+
+    def _filtros_historico(self, ctx: ContextoAcceso, consulta: ConsultaHistorica) -> FiltrosBandeja:
+        return FiltrosBandeja(
+            alcance_snm=self._alcance_historico(ctx), agencia_id=consulta.agencia_id,
+            puesto_id=consulta.puesto_id, tipo_tramite_id=consulta.tipo_tramite_id, estado=consulta.estado,
+            texto=consulta.texto, pasajero=consulta.pasajero, fuera_de_horario=consulta.fuera_de_horario,
+            fecha_por=consulta.fecha, desde=consulta.desde, hasta=consulta.hasta,
+        )
+
+    @staticmethod
+    def _orden_historico(consulta: ConsultaHistorica) -> str:
+        return "operacion_reciente" if consulta.fecha == "operacion" else "recientes"
+
+    async def consulta_historica(self, ctx: ContextoAcceso, consulta: ConsultaHistorica) -> PaginaSolicitudes:
+        """Las solicitudes que ve, de cualquier año, de la más reciente a la más
+        antigua (por la fecha de envío o por la de la operación)."""
+        filtros = self._filtros_historico(ctx, consulta)
+        return await self._pagina(ctx, filtros, consulta, self._orden_historico(consulta))
+
+    async def opciones_historico(self, ctx: ContextoAcceso) -> SalidaOpcionesHistorico:
+        alcance = self._alcance_historico(ctx)
+        puestos = await self.repo_catalogos.listar_puestos()
+        if alcance is not None:
+            visibles = alcance.puestos | alcance.puestos_aprobadas
+            puestos = [p for p in puestos if p.id in visibles]
+        return SalidaOpcionesHistorico(
+            agencias=[OpcionFiltro(id=a.id, nombre=a.nombre, activo=a.activo)
+                      for a in await self.repo_catalogos.listar_agencias()],
+            puestos=[OpcionFiltro(id=p.id, nombre=p.nombre, activo=p.activo) for p in puestos],
+            tramites=[OpcionFiltro(id=t.id, nombre=t.nombre, activo=t.activo)
+                      for t in await self.repo_tramites.listar_tipos(solo_activos=False)],
+        )
+
+    async def _texto_alcance(self, ctx: ContextoAcceso) -> str:
+        if ctx.ve_todos_los_sectores:
+            return "Todos los sectores"
+        partes = []
+        if ctx.es_revisor or ctx.es_supervisor_sector:
+            sectores = [x.nombre for x in await self.repo_catalogos.listar_sectores() if x.id in ctx.sectores_ids]
+            if sectores:
+                partes.append(" y ".join(sectores))
+        if ctx.es_puerto:
+            puestos = [p.nombre for p in await self.repo_catalogos.listar_puestos() if p.id in ctx.puestos_ids]
+            if puestos:
+                partes.append("Puestos: " + ", ".join(puestos))
+        return " · ".join(partes) or "Sin puestos ni sectores asignados"
+
+    async def exportacion_historica(self, ctx: ContextoAcceso, consulta: ConsultaHistorica) -> DatosHistorico:
+        """Lo que cumple los filtros (hasta MAX_FILAS_EXPORTACION), en datos planos
+        para armar el Excel en un hilo."""
+        filtros = self._filtros_historico(ctx, consulta)
+        total, solicitudes = await self.repo.para_exportar(
+            filtros, orden=self._orden_historico(consulta), limite=MAX_FILAS_EXPORTACION,
+        )
+        agencia = await self.repo_catalogos.buscar_agencia(consulta.agencia_id) if consulta.agencia_id else None
+        puesto = await self.repo_catalogos.buscar_puesto(consulta.puesto_id) if consulta.puesto_id else None
+        tipo = await self.repo_tramites.buscar_tipo_por_id(consulta.tipo_tramite_id) if consulta.tipo_tramite_id else None
+        return DatosHistorico(
+            filas=[
+                FilaHistorico(
+                    numero=s.numero, estado=s.estado, tramite=s.tipo_tramite.nombre, agencia=s.agencia_nombre,
+                    puesto=s.puesto_nombre, sector=s.puesto.sector.nombre if s.puesto and s.puesto.sector else None,
+                    buque=s.nombre_buque, imo=s.imo, fecha_operacion=s.fecha_operacion,
+                    pasajeros=s.cantidad_tripulantes, enviada_en=s.enviada_en, aprobada_en=s.aprobada_en,
+                    finalizada_en=s.finalizada_en,
+                    fuera_de_horario=s.aprobada_en is not None and fuera_de_horario(s.aprobada_en),
+                    costo=s.costo_fuera_de_horario,
+                )
+                for s in solicitudes
+            ],
+            total=total,
+            filtros=FiltrosAplicados(
+                texto=consulta.texto, pasajero=consulta.pasajero,
+                agencia=agencia.nombre if agencia else (f"#{consulta.agencia_id}" if consulta.agencia_id else None),
+                puesto=puesto.nombre if puesto else (f"#{consulta.puesto_id}" if consulta.puesto_id else None),
+                tramite=tipo.nombre if tipo else (f"#{consulta.tipo_tramite_id}" if consulta.tipo_tramite_id else None),
+                estado=consulta.estado, fuera_de_horario=consulta.fuera_de_horario, fecha=consulta.fecha,
+                desde=consulta.desde, hasta=consulta.hasta,
+            ),
+            alcance=await self._texto_alcance(ctx),
+            generado_por=ctx.usuario.full_name, generado_en=datetime.now(TZ_PANAMA),
+            ordenadas_por="fecha de la operación" if consulta.fecha == "operacion" else "fecha de envío",
+        )
 
     # ── Validación del formulario ────────────────────────────────────────────
 
@@ -608,6 +713,7 @@ class ServicioSolicitud:
             tripulante_id = tripulantes_orm[c.indice_tripulante].id if c.indice_tripulante is not None else None
             self.repo.agregar_registro(CasillaSolicitud(
                 solicitud_id=s.id, documento_id=c.documento_id, tripulante_id=tripulante_id, orden=orden,
+                obligatoria=c.obligatoria,
             ))
 
     # ── Armado de la solicitud ───────────────────────────────────────────────
@@ -974,6 +1080,9 @@ class ServicioSolicitud:
         s.aprobada_en            = ahora_utc()
         s.aprobada_por_id        = ctx.usuario.id
         s.observacion_aprobacion = observacion
+        # Fuera del horario laboral lleva el costo migratorio de hoy (2026-11-11).
+        costo = configuracion.COSTO_FUERA_DE_HORARIO
+        s.costo_fuera_de_horario = costo if costo > 0 and fuera_de_horario(s.aprobada_en) else None
         s.vigente_hasta          = fin_del_dia(limite)
         s.codigo_verificacion    = secrets.token_urlsafe(24)
         self._registrar_evento(s, ctx.usuario, TipoEventoSolicitud.APROBADA, anterior, s.estado, observacion)
@@ -1126,8 +1235,10 @@ class ServicioSolicitud:
             veces_devuelta=s.veces_devuelta or 0,
             tripulantes_con_alerta=con_alerta,
             tiene_nacionalidad_restringida=s.tipo_tramite.aviso_custodia and alguno_restringido,
-            # Aprobada por UCVMM fuera del horario laboral (2026-11-06; antes, por la finalización).
-            fuera_de_horario=fuera_de_horario(s.aprobada_en) if interno and s.aprobada_en else None,
+            # Aprobada fuera del horario laboral (2026-11-06; antes, por la finalización).
+            # Desde el 2026-11-11 lo ve también la agencia, con el costo migratorio.
+            fuera_de_horario=fuera_de_horario(s.aprobada_en) if s.aprobada_en else None,
+            costo_fuera_de_horario=texto_costo(s.costo_fuera_de_horario) if s.costo_fuera_de_horario else None,
         )
 
     @staticmethod
@@ -1209,7 +1320,7 @@ class ServicioSolicitud:
                 documento_nombre=c.documento.nombre,
                 alcance=AlcanceDocumento.SOLICITUD.value if c.tripulante_id is None else AlcanceDocumento.MARINO.value,
                 tripulante_id=c.tripulante_id, tripulante_nombre=nombres.get(c.tripulante_id),
-                documento_ids=ids, cubierta=bool(ids),
+                documento_ids=ids, cubierta=bool(ids), obligatoria=c.obligatoria,
             ))
 
         interno = ctx.es_personal_snm
@@ -1280,8 +1391,10 @@ class ServicioSolicitud:
             clinica_hospital=s.clinica_hospital, motivo=s.motivo,
             fecha_solicitud=s.enviada_en.astimezone(TZ_PANAMA),
             aprobada_en=s.aprobada_en.astimezone(TZ_PANAMA),
-            aprobada_por=f"{aprobador} (UCVMM)" if aprobador else "UCVMM",
+            aprobada_por=f"{aprobador} (UCVMM)" if aprobador else INSTITUCION,
             copia_interna=interno,
+            fuera_de_horario=fuera_de_horario(s.aprobada_en),
+            costo_fuera_de_horario=s.costo_fuera_de_horario,
             vigente_hasta=s.vigente_hasta.astimezone(TZ_PANAMA) if s.vigente_hasta else None,
             finalizada_en=s.finalizada_en.astimezone(TZ_PANAMA) if s.finalizada_en else None,
             puesto_finalizacion=s.puesto_finalizacion_nombre,

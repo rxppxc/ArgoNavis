@@ -35,6 +35,7 @@ export function ChecklistDocumentos({ casillas, nuevos, existentes, sinTripulant
               <div className={styles.casillaDoc}>
                 {c.clave_tripulante === null ? <IconoArchivo tamano={13} /> : <IconoUsuario tamano={13} />}
                 {c.documento_nombre}
+                {!c.obligatoria && <span className={styles.casillaOpcional}>Opcional</span>}
               </div>
               {sinTripulante ? (
                 c.descripcion && <div className={styles.casillaAlcance}>{c.descripcion}</div>
@@ -73,7 +74,8 @@ export function ChecklistDocumentos({ casillas, nuevos, existentes, sinTripulant
                 {/* Nombre completo para lectores de pantalla: «Adjuntar» solo no dice cuál. */}
                 <input type="file" hidden accept={TIPOS_ACEPTADOS}
                   aria-label={`${nuevo || cargados.length ? "Reemplazar" : "Adjuntar"} ${c.documento_nombre}`
-                    + (c.nombre_tripulante ? ` de ${c.nombre_tripulante}` : "")}
+                    + (c.nombre_tripulante ? ` de ${c.nombre_tripulante}` : "")
+                    + (c.obligatoria ? "" : " (opcional)")}
                   onChange={(e) => {
                     const archivo = e.target.files?.[0];
                     if (archivo) onElegir(c.clave, archivo);

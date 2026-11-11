@@ -53,8 +53,10 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
   const rangos = rangosPermitidos ?? TODOS_LOS_RANGOS;
   const nombre = `${ficha.nombre} ${ficha.apellido}`.trim();
 
-  const cubiertas = casillas.filter((c) => nuevos[c.clave] || existentes[c.clave]?.length).length;
-  const completo = cubiertas === casillas.length;
+  // Las opcionales no cuentan: completo es tener todas las obligatorias.
+  const obligatorias = casillas.filter((c) => c.obligatoria);
+  const cubiertas = obligatorias.filter((c) => nuevos[c.clave] || existentes[c.clave]?.length).length;
+  const completo = cubiertas === obligatorias.length;
 
   const campo = (nombreCampo: keyof TripulanteEntrada) => ({
     value: (ficha[nombreCampo] as string | null | undefined) ?? "",
@@ -69,7 +71,7 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
         {restringida && <span className={styles.chipRestringida}>Nacionalidad restringida</span>}
         {casillas.length > 0 && (
           <span className={completo ? styles.chipDocsOk : styles.chipDocsFalta}>
-            {cubiertas}/{casillas.length} documentos
+            {cubiertas}/{obligatorias.length} documentos
           </span>
         )}
         <button type="button" className={styles.btnContraer} onClick={() => onAlternar(ficha.clave)}

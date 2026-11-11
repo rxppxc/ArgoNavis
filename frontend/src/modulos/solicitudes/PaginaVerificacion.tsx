@@ -48,7 +48,7 @@ export default function PaginaVerificacion() {
               <p className={styles.resultadoAyuda}>
                 {error.noExiste
                   ? "Si llegaste aquí escaneando el código QR de una autorización, el documento podría no ser "
-                    + "auténtico: confírmalo con UCVMM antes de aceptarlo."
+                    + "auténtico: confírmalo con el Servicio Nacional de Migración antes de aceptarlo."
                   : "Revisa la conexión e intenta de nuevo en unos minutos."}
               </p>
             </div>

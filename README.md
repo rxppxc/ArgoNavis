@@ -239,6 +239,7 @@ Administrador y SysAdmin se reconocen por el nombre del rol (`rol_personalizado.
   - Los documentos de cada trámite son los del Formulario No. 3 oficial.
   - Todos se suben por pasajero, salvo la Lista de Tripulantes (su nombre oficial en el Form. 3), que va a la solicitud.
   - Excepción (30/10/2026): a los rangos distintos de Marino solo se les piden las Generales de pasaporte y el boleto aéreo (`tramite_documentos.rangos`).
+  - Excepción (11/11/2026): a los técnicos, supernumerarios y superintendentes se les piden, en Desembarque, la Carta de Responsabilidad, las Generales de pasaporte, el Contrato de Trabajo y, opcional, el boleto aéreo; en Embarque, lo mismo sin el boleto (`tramite_documentos.rangos_opcional`). Un documento opcional se puede dejar sin adjuntar.
 - Una solicitud admite hasta 30 pasajeros.
 - Nacionalidad restringida:
   - En Desembarque se exige el Formulario No. 6 de custodia por pasajero.
@@ -251,11 +252,18 @@ Administrador y SysAdmin se reconocen por el nombre del rol (`rol_personalizado.
   - La verificación de impedimentos (por pasajero).
   - La observación de aprobación.
   - El comentario de cierre del puesto de control.
-  - Los nombres de los funcionarios: en su historial ve "UCVMM" o "Puesto de control".
+  - Los nombres de los funcionarios: en su historial ve «Servicio Nacional de Migración» o "Puesto de control".
   - Sí ve los motivos de devolución y de negación.
-- El PDF de la autorización no lleva observaciones. El de la agencia dice "Aprobada por: UCVMM"; el personal del SNM descarga una copia interna con el nombre de quien aprobó.
-- Las autorizaciones que UCVMM aprueba antes de las 07:00, desde las 15:01 o en fin de semana (hora de Panamá) cuentan como fuera del horario laboral: lo muestran las estadísticas y, solo al SNM, una insignia en el expediente.
+- **Nombre neutro para la agencia (11/11/2026):** en lo que ve la agencia (pantallas, correos y PDF) no se nombran las unidades internas (UCVMM, los sectores): dice «Servicio Nacional de Migración». Las pantallas y los informes del SNM no cambian.
+- El PDF de la autorización no lleva observaciones. El de la agencia dice "Aprobada por: Servicio Nacional de Migración"; el personal del SNM descarga una copia interna con el nombre de quien aprobó.
+- Las autorizaciones que UCVMM aprueba antes de las 07:00, desde las 15:01 o en fin de semana (hora de Panamá) cuentan como fuera del horario laboral. Lo muestran las estadísticas y una insignia en las bandejas y en el expediente.
+  - Desde el 11/11/2026 lo ve también la agencia, con el costo migratorio (`COSTO_FUERA_DE_HORARIO`, B/.20.00): en su bandeja, en el expediente, en el correo de aprobación y en el PDF.
+  - El costo se guarda en la solicitud al aprobar: cambiar el monto no toca lo ya aprobado.
 - **Estadísticas exportables:** Excel, PDF o CSV del periodo elegido, con el escudo del SNM, el logo de ARGO NAVIS, quién lo generó y «Uso interno del SNM» (`GET /api/v1/solicitudes/estadisticas/exportar`).
+- **Consulta histórica (11/11/2026):** el personal del SNM busca solicitudes de cualquier año en «Consulta histórica» (menú, o el botón de las bandejas).
+  - Filtros: texto, pasajero (nombre o pasaporte), agencia, puesto, trámite, estado, fecha de envío o de la operación (con un atajo por año) y «solo aprobadas fuera del horario».
+  - Cada uno ve lo mismo que en los expedientes: UCVMM y el supervisor de sector, su sector; el puesto de control, sus puestos desde que se aprueban.
+  - Exporta a Excel lo que cumple los filtros, hasta 5000 filas (`GET /api/v1/solicitudes/historico` y `/historico/exportar`).
 - **Notificaciones internas:** la campana de la cabecera muestra lo que le toca hacer a cada rol (por revisar, por corregir, por finalizar) y las novedades de sus solicitudes. Consulta `GET /api/v1/pendientes` cada minuto con la pestaña a la vista.
 - **Separación de funciones:** nadie revisa una solicitud que creó o que es de su propia agencia.
 - **Sectores:** cada puesto de control es del Sector Pacífico o del Atlántico (Catálogos → Sectores). UCVMM y el supervisor de sector ven solo las solicitudes de los puestos de su sector; el aviso de cada solicitud nueva va al correo de su sector.

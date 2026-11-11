@@ -81,8 +81,11 @@ export interface SolicitudResumen {
   veces_devuelta: number;
   tripulantes_con_alerta: number;
   tiene_nacionalidad_restringida: boolean;
-  /** Aprobada por UCVMM fuera del horario laboral (solo personal SNM: a la agencia le llega null). */
+  /** Aprobada fuera del horario laboral (null: sin aprobar). Desde el 2026-11-11
+   *  lo ve también la agencia, con el costo migratorio guardado al aprobar. */
   fuera_de_horario: boolean | null;
+  /** «B/.20.00»; null si no tiene costo (dentro del horario o aprobada antes del cambio). */
+  costo_fuera_de_horario: string | null;
 }
 
 export interface PaginaSolicitudes {
@@ -101,6 +104,35 @@ export interface ConsultaBandeja {
   hasta?: string;
   pagina?: number;
   por_pagina?: number;
+}
+
+/** Filtros de la consulta histórica (2026-11-11): solo para el personal del SNM. */
+export interface ConsultaHistorica {
+  texto?: string;
+  pasajero?: string;
+  agencia_id?: number;
+  puesto_id?: number;
+  tipo_tramite_id?: number;
+  estado?: EstadoSolicitud;
+  fuera_de_horario?: boolean;
+  fecha?: "envio" | "operacion";
+  desde?: string;
+  hasta?: string;
+  pagina?: number;
+  por_pagina?: number;
+}
+
+export interface OpcionFiltro {
+  id: number;
+  nombre: string;
+  activo: boolean;
+}
+
+/** Para los filtros de la consulta histórica, también lo desactivado. */
+export interface OpcionesHistorico {
+  agencias: OpcionFiltro[];
+  puestos: OpcionFiltro[];
+  tramites: OpcionFiltro[];
 }
 
 export interface TripulanteSolicitud {
@@ -153,6 +185,8 @@ export interface CasillaSolicitud {
   tripulante_nombre: string | null;
   documento_ids: number[];
   cubierta: boolean;
+  /** Opcional (2026-11-11): sin archivo no cuenta como faltante. */
+  obligatoria: boolean;
 }
 
 export interface EventoSolicitud {
@@ -314,10 +348,10 @@ const OPCIONES_SUBIDA = {
 };
 
 /** Quita los filtros vacíos para no mandarlos en la query string. */
-function parametros(consulta: ConsultaBandeja): Record<string, string | number> {
+function parametros(consulta: ConsultaBandeja | ConsultaHistorica): Record<string, string | number | boolean> {
   return Object.fromEntries(
-    Object.entries(consulta).filter(([, v]) => v !== undefined && v !== null && v !== ""),
-  ) as Record<string, string | number>;
+    Object.entries(consulta).filter(([, v]) => v !== undefined && v !== null && v !== "" && v !== false),
+  ) as Record<string, string | number | boolean>;
 }
 
 export const apiSolicitudes = {
@@ -335,6 +369,28 @@ export const apiSolicitudes = {
   bandeja: (bandeja: Bandeja, consulta: ConsultaBandeja) =>
     clienteApi.get<PaginaSolicitudes>(`/solicitudes/${bandeja}`, { params: parametros(consulta) })
       .then((r) => r.data),
+
+  /** Consulta histórica (personal del SNM): las que ve, de cualquier año. */
+  historico: (consulta: ConsultaHistorica) =>
+    clienteApi.get<PaginaSolicitudes>("/solicitudes/historico", { params: parametros(consulta) })
+      .then((r) => r.data),
+
+  opcionesHistorico: () =>
+    clienteApi.get<OpcionesHistorico>("/solicitudes/historico/opciones").then((r) => r.data),
+
+  /** Lo que cumple los filtros, en Excel con la identidad del SNM (lo arma el servidor). */
+  async exportarHistorico(consulta: ConsultaHistorica): Promise<string> {
+    // Todo lo que cumple los filtros, no una página.
+    const { data, headers } = await clienteApi.get<Blob>("/solicitudes/historico/exportar", {
+      params: parametros({ ...consulta, pagina: undefined, por_pagina: undefined }),
+      responseType: "blob",
+      timeout: 120_000,
+    });
+    const nombre = /filename="([^"]+)"/.exec(String(headers["content-disposition"] ?? ""))?.[1]
+      ?? "Consulta-historica.xlsx";
+    guardarComoArchivo(data, nombre);
+    return nombre;
+  },
 
   obtener: (id: number) =>
     clienteApi.get<SolicitudDetalle>(`/solicitudes/${id}`).then((r) => r.data),

@@ -66,7 +66,7 @@ def generar_contrasena_temporal(largo: int = 14) -> str:
             return clave
 
 
-AGENCIA_DESACTIVADA = "Tu agencia naviera está desactivada en ARGO NAVIS. Contacta a UCVMM."
+AGENCIA_DESACTIVADA = "Tu agencia naviera está desactivada en ARGO NAVIS. Contacta al Servicio Nacional de Migración."
 
 
 def crear_token_acceso(subject: str | Any, extra: dict | None = None, *, inicio_sesion: datetime | None = None) -> str:

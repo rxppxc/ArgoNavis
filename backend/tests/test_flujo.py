@@ -5,6 +5,7 @@ documentos con sesión, la separación de funciones, el bloqueo de fila, los
 vencimientos y las bandejas paginadas.
 """
 import asyncio
+import re
 import secrets
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
@@ -17,6 +18,7 @@ from app.api.v1 import solicitudes as api_solicitudes
 from app.core.pdf_autorizacion import generar_pdf_autorizacion
 from app.domain.models.solicitud import Solicitud, TripulanteSolicitud
 from app.domain.repositories.solicitud_repository import RepositorioSolicitud
+from app.domain.services.notificacion_service import ServicioNotificacion
 from app.domain.services.solicitud_service import MAX_TRIPULANTES, ServicioSolicitud
 from app.infrastructure import tareas
 from app.infrastructure.database import SesionLocal
@@ -323,7 +325,8 @@ async def test_ciclo_completo(cliente, escenario: Escenario, monkeypatch):
     r = await cliente.get(f"/solicitudes/{sid}/autorizacion.pdf", headers=e.nav_a2.headers)
     assert r.status_code == 200 and r.content[:5] == b"%PDF-" and r.headers["content-type"] == "application/pdf"
     assert r.headers["content-disposition"] == f'attachment; filename="Autorizacion-{s["numero"]}.pdf"'
-    assert armados[-1].aprobada_por == "UCVMM" and not armados[-1].copia_interna, "la agencia no ve nombres"
+    assert armados[-1].aprobada_por == "Servicio Nacional de Migración" and not armados[-1].copia_interna, \
+        "la agencia no ve nombres ni unidades internas"
     for actor in (e.revisor, e.puerto_a):
         r = await cliente.get(f"/solicitudes/{sid}/autorizacion.pdf", headers=actor.headers)
         assert r.status_code == 200 and r.content[:5] == b"%PDF-"
@@ -383,14 +386,34 @@ async def test_ciclo_completo(cliente, escenario: Escenario, monkeypatch):
     por_tipo = {ev["tipo"]: ev for ev in vista["eventos"]}
     assert por_tipo["devuelta"]["comentario"] == "La libreta de Raúl está ilegible", "el motivo de devolución sí se ve"
     assert por_tipo["aprobada"]["comentario"] is None and por_tipo["finalizada"]["comentario"] is None
-    assert por_tipo["aprobada"]["usuario_nombre"] == "UCVMM"
+    assert por_tipo["aprobada"]["usuario_nombre"] == "Servicio Nacional de Migración"
     assert por_tipo["finalizada"]["usuario_nombre"] == "Puesto de control"
-    assert por_tipo["devuelta"]["usuario_nombre"] == "UCVMM"
+    assert por_tipo["devuelta"]["usuario_nombre"] == "Servicio Nacional de Migración"
     assert vista["observacion_aprobacion"] is None and vista["comentario_finalizacion"] is None
     assert vista["aprobada_por"] is None and vista["finalizada_por"] is None
     assert all(t["con_impedimento"] is None and t["con_impedimento_puesto"] is None for t in vista["tripulantes"])
     assert not vista["impedimentos_puesto_verificados"] and vista["impedimentos_puesto_por"] is None
     assert vista["puesto_finalizacion_nombre"] == e.puesto_a["nombre"]
+
+    # Sin unidades internas (2026-11-11): ni UCVMM ni los sectores en nada de lo que
+    # recibe la agencia, tampoco en los correos que le llegan.
+    interno = re.compile(r"UCVMM|Sector (Pacífico|Atlántico)", re.IGNORECASE)
+    for ruta in (f"/solicitudes/{sid}", "/solicitudes/agencia", "/pendientes"):
+        r = await cliente.get(ruta, headers=e.nav_a1.headers)
+        assert r.status_code == 200 and not interno.search(r.text), ruta
+    monkeypatch.setattr(ServicioNotificacion, "_con_destinatarios", staticmethod(lambda avisos: avisos))
+    async with SesionLocal() as sesion:
+        solicitud = await RepositorioSolicitud(sesion).buscar_por_id(sid)
+        notificacion = ServicioNotificacion(sesion)
+        a_la_agencia = [
+            *await notificacion.devuelta(solicitud), *await notificacion.negada(solicitud),
+            (await notificacion.aprobada(solicitud))[0],
+            *await notificacion.expirada(solicitud, "approved", "Venció el plazo para finalizar."),
+        ]
+    for aviso in a_la_agencia:
+        texto = " ".join([aviso.asunto, aviso.titulo, aviso.intro, aviso.vista_previa, aviso.destacado or ""])
+        assert not interno.search(texto), aviso.estado
+
     interna = (await cliente.get(f"/solicitudes/{sid}", headers=e.revisor.headers)).json()
     assert {"impedimentos", "impedimentos_puesto"} <= {ev["tipo"] for ev in interna["eventos"]}
     assert interna["impedimentos_puesto_verificados"] and interna["impedimentos_puesto_por"] == "Puerto Prueba"

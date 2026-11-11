@@ -7,9 +7,10 @@ visible por rol y conservado como registro del trámite.
 """
 import enum
 from datetime import date, datetime
+from decimal import Decimal
 
 from sqlalchemy import (
-    BigInteger, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, String, Text,
+    BigInteger, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, Numeric, String, Text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -116,6 +117,10 @@ class Solicitud(Base):
     aprobada_en:            Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     aprobada_por_id:        Mapped[int | None]      = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     observacion_aprobacion: Mapped[str | None]      = mapped_column(Text)
+    # Costo migratorio por aprobarse fuera del horario laboral (2026-11-11): el de
+    # ese momento (foto), para que cambiar COSTO_FUERA_DE_HORARIO no toque lo ya
+    # aprobado. Nulo = dentro del horario, sin costo o aprobada antes del cambio.
+    costo_fuera_de_horario: Mapped[Decimal | None]  = mapped_column(Numeric(8, 2))
     vigente_hasta:          Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     # Código del QR del PDF: solo permite verificar la autorización, no abre el expediente.
     codigo_verificacion:    Mapped[str | None]      = mapped_column(String(64), unique=True, index=True)
@@ -266,6 +271,8 @@ class CasillaSolicitud(Base):
     documento_id:  Mapped[int]        = mapped_column(ForeignKey("documentos_requeridos.id", ondelete="RESTRICT"))
     tripulante_id: Mapped[int | None] = mapped_column(ForeignKey("solicitud_tripulantes.id", ondelete="CASCADE"), index=True)
     orden:         Mapped[int]        = mapped_column(Integer, default=0, server_default="0")
+    # Opcional (2026-11-11): se puede enviar sin ella y nunca queda como faltante.
+    obligatoria:   Mapped[bool]       = mapped_column(Boolean, default=True, server_default="true")
 
     solicitud:  Mapped["Solicitud"]                  = relationship(back_populates="casillas")
     tripulante: Mapped["TripulanteSolicitud | None"] = relationship(back_populates="casillas")

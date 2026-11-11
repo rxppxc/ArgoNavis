@@ -18,6 +18,7 @@ from app.core.email import Aviso
 from app.core.horario import ZONA_PANAMA
 from app.core.http_utils import obtener_agente, obtener_ip
 from app.core.informe_estadisticas import DatosInforme, generar_informe
+from app.core.informe_historico import generar_archivo as generar_excel_historico
 from app.core.pdf_autorizacion import generar_pdf_autorizacion
 from app.core.permisos import (
     PERMISO_PUERTO, PERMISO_REVISAR, PERMISO_SOLICITAR, PERMISO_SUPERVISAR_SECTOR, PERMISO_SUPERVISAR_TODO,
@@ -29,8 +30,9 @@ from app.domain.models.solicitud import Solicitud
 from app.domain.models.user import Usuario
 from app.domain.repositories.audit_repository import RepositorioAuditoria
 from app.domain.schemas.solicitud import (
-    ConsultaBandeja, DatosAprobacion, DatosCorregirSolicitud, DatosCrearSolicitud, DatosFinalizar,
-    DatosImpedimentos, DatosMotivo, PaginaSolicitudes, SalidaEstadisticasSolicitudes, SalidaSolicitud,
+    ConsultaBandeja, ConsultaHistorica, DatosAprobacion, DatosCorregirSolicitud, DatosCrearSolicitud,
+    DatosFinalizar, DatosImpedimentos, DatosMotivo, PaginaSolicitudes, SalidaEstadisticasSolicitudes,
+    SalidaOpcionesHistorico, SalidaSolicitud,
 )
 from app.domain.services.notificacion_service import ServicioNotificacion
 from app.domain.services.solicitud_service import ContextoAcceso, ServicioSolicitud
@@ -222,6 +224,52 @@ async def exportar_estadisticas(
     # de armar el archivo (no se escribió nada: el commit solo la suelta).
     await sesion.commit()
     archivo = await en_hilo_con_tope(generar_informe, formato, datos)
+    return Response(
+        content=archivo.contenido,
+        media_type=archivo.tipo,
+        headers={"Content-Disposition": f'attachment; filename="{archivo.nombre}"', "Cache-Control": "no-store"},
+    )
+
+
+# ── Consulta histórica (2026-11-11) ──────────────────────────────────────────
+# Antes de /{solicitud_id}: si no, «historico» se leería como un id (422).
+
+@enrutador.get("/historico", response_model=PaginaSolicitudes)
+async def consulta_historica(
+    consulta: Annotated[ConsultaHistorica, Query()],
+    ctx:      ContextoAcceso = Depends(_contexto),
+    svc:      ServicioSolicitud = Depends(_servicio),
+):
+    """Las solicitudes que ve el personal del SNM, de cualquier año, con filtros
+    que las bandejas no tienen (agencia, puesto, trámite, pasajero, fecha de la
+    operación, fuera del horario). La agencia usa su bandeja."""
+    return await svc.consulta_historica(ctx, consulta)
+
+
+@enrutador.get("/historico/opciones", response_model=SalidaOpcionesHistorico)
+async def opciones_historico(
+    ctx: ContextoAcceso = Depends(_contexto),
+    svc: ServicioSolicitud = Depends(_servicio),
+):
+    """Agencias, puestos (los de su alcance) y trámites para los filtros, también los desactivados."""
+    return await svc.opciones_historico(ctx)
+
+
+@enrutador.get("/historico/exportar")
+@limiter.limit(limite_exportaciones, key_func=clave_usuario)
+async def exportar_historico(
+    request:  Request,
+    consulta: Annotated[ConsultaHistorica, Query()],
+    ctx:      ContextoAcceso = Depends(_contexto),
+    svc:      ServicioSolicitud = Depends(_servicio),
+    sesion:   AsyncSession = Depends(obtener_sesion_bd, scope="function"),
+):
+    """Lo que cumple los filtros, en Excel con la identidad del SNM (hasta 5000
+    filas: el archivo dice si hay más). Se arma en un hilo, con turno."""
+    datos = await svc.exportacion_historica(ctx, consulta)
+    # Los datos ya están leídos: la conexión vuelve al pool antes de esperar turno.
+    await sesion.commit()
+    archivo = await en_hilo_con_tope(generar_excel_historico, datos)
     return Response(
         content=archivo.contenido,
         media_type=archivo.tipo,

@@ -72,8 +72,8 @@ async def test_campana_por_rol(cliente, admin, sysadmin):
     assert por_corregir["cantidad"] == 1 and por_corregir["vence_en"] and por_corregir["bandeja"] == "agencia"
     devuelta, = _novedades_de(campana, s["id"])
     assert (devuelta["tipo"], devuelta["comentario"], devuelta["usuario_nombre"]) == (
-        "devuelta", "La visa está ilegible", "UCVMM",
-    ), "el motivo sí lo ve; el nombre del funcionario, no"
+        "devuelta", "La visa está ilegible", "Servicio Nacional de Migración",
+    ), "el motivo sí lo ve; el nombre del funcionario y la unidad interna, no"
     assert _novedades_de(await _campana(cliente, revisor), s["id"])[0]["tipo"] == "creada"
 
     # ── Corrige otro usuario de la agencia; UCVMM verifica y aprueba ──
@@ -109,7 +109,7 @@ async def test_campana_por_rol(cliente, admin, sysadmin):
     campana = await _campana(cliente, nav1)
     assert [n["tipo"] for n in _novedades_de(campana, s["id"])] == ["aprobada", "devuelta"]
     aprobada = _novedades_de(campana, s["id"])[0]
-    assert aprobada["comentario"] is None and aprobada["usuario_nombre"] == "UCVMM"
+    assert aprobada["comentario"] is None and aprobada["usuario_nombre"] == "Servicio Nacional de Migración"
     assert all(n["tipo"] != "impedimentos" for n in campana["novedades"]), "lo interno no le llega"
     assert _pendiente(campana, "por_corregir")["cantidad"] == 0
 

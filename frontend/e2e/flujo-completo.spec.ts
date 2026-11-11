@@ -38,6 +38,13 @@ async function sinTextoDesbordado(pagina: Page) {
   expect(desbordadas, "texto largo sin espacios que se sale de su caja").toEqual([]);
 }
 
+/** Nada de lo que ve la agencia nombra a las unidades internas (2026-11-11): ni en el
+ *  texto ni en los atributos (title, aria-label, placeholder) de lo que hay en pantalla. */
+async function sinUnidadesInternas(pagina: Page) {
+  expect(await pagina.locator("body").innerHTML(), "la agencia no ve unidades internas del SNM")
+    .not.toMatch(/UCVMM|Sector (Pacífico|Atlántico)/i);
+}
+
 /** Marca al tripulante «Sin impedimento» y guarda la verificación (de UCVMM o del puesto). */
 async function verificarSinImpedimento(pagina: Page) {
   await pagina.getByRole("radiogroup", { name: `Impedimento de ${TRIPULANTE} en SIMPLUS` })
@@ -80,11 +87,14 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     }
     await agencia.getByRole("textbox", { name: "Observaciones", exact: true })
       .fill(`Se sube la documentación, ${SIN_ESPACIOS}`);
+    await sinUnidadesInternas(agencia);   // el formulario, con su checklist
     await agencia.getByRole("button", { name: "Enviar solicitud" }).click();
     await agencia.waitForURL(/\/solicitudes\/\d+$/);
     id = agencia.url().split("/").pop() ?? "";
     await expect(estado(agencia, "En revisión")).toBeVisible();
     await sinTextoDesbordado(agencia);   // las observaciones y el historial
+    await expect(agencia.getByText(/^En revisión por el Servicio Nacional de Migración/)).toBeVisible();
+    await sinUnidadesInternas(agencia);
   });
 
   await test.step("UCVMM la ve en su campana y el enlace abre «Por revisar»", async () => {
@@ -118,6 +128,8 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     const novedad = panel.locator(`a[href="/solicitudes/${id}"]`);
     await expect(novedad).toContainText("Devuelta a corrección");
     await expect(novedad).toContainText("La visa especial de marino está ilegible.");
+    await expect(novedad).toContainText("Servicio Nacional de Migración");   // quién la devolvió, sin nombres
+    await sinUnidadesInternas(agencia);   // la bandeja y la campana abierta
     await expect(campana).not.toHaveAccessibleName(/sin leer/);
     await agencia.keyboard.press("Escape");
     await expect(panel).toHaveCount(0);
@@ -128,7 +140,10 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     // El motivo sale en el aviso de la devolución y en el historial.
     await expect(agencia.getByText("La visa especial de marino está ilegible.").first()).toBeVisible();
     await sinTextoDesbordado(agencia);
+    await sinUnidadesInternas(agencia);   // el expediente devuelto, con su historial
     await agencia.getByRole("link", { name: "Corregir solicitud" }).click();
+    await expect(agencia.getByText("Corrige lo indicado en la devolución y reenvía.", { exact: false })).toBeVisible();
+    await sinUnidadesInternas(agencia);   // el formulario de la corrección
     await agencia.getByLabel(`Reemplazar Visa Especial de Marino de ${TRIPULANTE}`).setInputFiles(pdf("Visa corregida.pdf"));
     await agencia.getByRole("button", { name: "Reenviar a revisión" }).click();
     await agencia.waitForURL(/\/solicitudes\/\d+$/);
@@ -143,10 +158,12 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     await expect(estado(ucvmm, "Aprobada")).toBeVisible();
   });
 
-  await test.step("la agencia ve «UCVMM», no al funcionario, y descarga el PDF", async () => {
+  await test.step("la agencia ve a la institución, no al funcionario ni a UCVMM, y descarga el PDF", async () => {
     await agencia.goto(`/solicitudes/${id}`);
     await expect(estado(agencia, "Aprobada")).toBeVisible();
+    await expect(agencia.getByText(/por el Servicio Nacional de Migración\. Vigente hasta/)).toBeVisible();
     await expect(agencia.getByText(NOMBRE_REVISOR)).toHaveCount(0);
+    await sinUnidadesInternas(agencia);
     const [descarga] = await Promise.all([
       agencia.waitForEvent("download"),
       agencia.getByRole("button", { name: "Descargar autorización (PDF)" }).click(),
@@ -198,6 +215,32 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     await expect(supervisor.getByText("Sector Pacífico", { exact: true })).toBeVisible();
     await expect(supervisor.getByRole("button", { name: /^(Aprobar|Devolver|Denegar|Finalizar|Guardar verificación)/ }))
       .toHaveCount(0);
+  });
+
+  await test.step("UCVMM la encuentra en la consulta histórica por el pasajero y la exporta a Excel", async () => {
+    await ucvmm.goto("/dashboard");
+    await ucvmm.getByRole("link", { name: "Consulta histórica" }).click();
+    await expect(ucvmm.getByRole("heading", { name: "Consulta histórica" })).toBeVisible();
+    await ucvmm.getByLabel("Pasajero").fill("Pérez Gómez");
+    await ucvmm.getByLabel("Año").selectOption(String(new Date().getFullYear()));
+    await ucvmm.getByRole("tab", { name: /^Finalizadas/ }).click();
+    const fila = ucvmm.locator(`a[href="/solicitudes/${id}"]`);
+    await expect(fila).toBeVisible();
+    await expect(ucvmm).toHaveURL(/pasajero=P%C3%A9rez/);   // la búsqueda queda en la URL
+    const [descarga] = await Promise.all([
+      ucvmm.waitForEvent("download"),
+      ucvmm.getByRole("button", { name: "Exportar a Excel" }).click(),
+    ]);
+    expect(descarga.suggestedFilename()).toMatch(/^Consulta-historica-\d{4}-\d{2}-\d{2}\.xlsx$/);
+    // Un pasajero que no está: sin resultados.
+    await ucvmm.getByLabel("Pasajero").fill("Nadie Inexistente");
+    await expect(ucvmm.getByText("Ninguna solicitud coincide con los filtros.")).toBeVisible();
+    // La agencia usa su bandeja: la consulta es del personal del SNM.
+    await agencia.goto("/historico");
+    await expect(agencia).toHaveURL(/\/dashboard/);
+    await agencia.goto(`/solicitudes/${id}`);
+    await expect(estado(agencia, "Finalizada")).toBeVisible();
+    await sinUnidadesInternas(agencia);   // el expediente ya finalizado
   });
 
   await test.step("el Administrador ve usuarios y la bitácora", async () => {

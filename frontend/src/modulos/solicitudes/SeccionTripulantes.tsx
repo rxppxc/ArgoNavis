@@ -69,7 +69,7 @@ export function SeccionTripulantes({ solicitud: s, verificacion: v, onVerDocumen
           </thead>
           <tbody>
             {s.tripulantes.map((m, i) => {
-              const faltan = s.checklist.filter((c) => c.tripulante_id === m.id && !c.cubierta).length;
+              const faltan = s.checklist.filter((c) => c.tripulante_id === m.id && c.obligatoria && !c.cubierta).length;
               const adjuntos = s.documentos.filter((d) => d.tripulante_id === m.id).length;
               // Mientras se marca, lo que se va eligiendo; ya registrada, lo guardado.
               const resultado = v ? (v.editable ? v.resultados[m.id] : v.resultadoGuardado(m)) : null;

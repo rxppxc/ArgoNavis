@@ -19,16 +19,31 @@ from app.domain.models.tramite import TipoTramite
 _ZONA = "America/Panama"
 
 
+@dataclass(frozen=True)
+class AlcanceSnm:
+    """Lo que ve el personal del SNM fuera de sus bandejas (la consulta histórica,
+    2026-11-11): lo mismo que ServicioSolicitud.puede_ver, sin la vía de la agencia."""
+    puestos:           frozenset[int] = frozenset()   # todas sus solicitudes (UCVMM, supervisión de sector)
+    puestos_aprobadas: frozenset[int] = frozenset()   # desde que se aprueban (puesto de control)
+
+
 @dataclass
 class FiltrosBandeja:
     """Alcance (quién ve qué) + filtros de la bandeja."""
-    agencia_id:  int | None = None        # bandeja de la agencia
+    agencia_id:  int | None = None        # bandeja de la agencia (y filtro de la consulta histórica)
     puestos_ids: set[int] | None = None   # bandeja del puesto (None = todos)
     solo_aprobadas_alguna_vez: bool = False
     estado:      str | None = None
     texto:       str | None = None
     desde:       date | None = None
     hasta:       date | None = None
+    # Consulta histórica (2026-11-11)
+    alcance_snm:      AlcanceSnm | None = None
+    puesto_id:        int | None = None
+    tipo_tramite_id:  int | None = None
+    pasajero:         str | None = None   # nombre, apellido (o los dos) o pasaporte
+    fuera_de_horario: bool = False        # solo las aprobadas fuera del horario
+    fecha_por:        str = "envio"       # a qué fecha van desde y hasta: "envio" | "operacion"
 
 
 def _fecha_panama(columna):
@@ -100,6 +115,28 @@ class RepositorioSolicitud:
             condiciones.append(Solicitud.puesto_control_id.in_(sorted(filtros.puestos_ids) or [-1]))
         if filtros.solo_aprobadas_alguna_vez:
             condiciones.append(Solicitud.aprobada_en.isnot(None))
+        if filtros.alcance_snm is not None:
+            alcance = filtros.alcance_snm
+            condiciones.append(or_(
+                Solicitud.puesto_control_id.in_(sorted(alcance.puestos) or [-1]),
+                and_(Solicitud.puesto_control_id.in_(sorted(alcance.puestos_aprobadas) or [-1]),
+                     Solicitud.aprobada_en.isnot(None)),
+            ))
+        if filtros.puesto_id is not None:
+            condiciones.append(Solicitud.puesto_control_id == filtros.puesto_id)
+        if filtros.tipo_tramite_id is not None:
+            condiciones.append(Solicitud.tipo_tramite_id == filtros.tipo_tramite_id)
+        if filtros.pasajero:
+            # Alguno de sus pasajeros, por nombre, apellido, los dos juntos o pasaporte.
+            buscado = filtros.pasajero.strip()
+            t = TripulanteSolicitud
+            condiciones.append(select(t.id).where(
+                t.solicitud_id == Solicitud.id,
+                or_(*(columna.icontains(buscado, autoescape=True)
+                      for columna in (t.nombre, t.apellido, t.nombre + " " + t.apellido, t.pasaporte))),
+            ).exists())
+        if filtros.fuera_de_horario:
+            condiciones.append(and_(Solicitud.aprobada_en.isnot(None), _fuera_de_horario(Solicitud.aprobada_en)))
         if filtros.texto:
             # autoescape: un «_» o un «%» de lo que se escribe se busca tal cual, no como comodín.
             texto = filtros.texto.strip()
@@ -108,7 +145,13 @@ class RepositorioSolicitud:
                 for columna in (Solicitud.numero, Solicitud.titulo, Solicitud.nombre_buque, Solicitud.imo,
                                 Solicitud.agencia_nombre, Solicitud.puesto_nombre)
             )))
-        condiciones += entre_fechas_panama(Solicitud.enviada_en, filtros.desde, filtros.hasta)
+        if filtros.fecha_por == "operacion":   # la fecha de la operación ya es un día de Panamá
+            if filtros.desde:
+                condiciones.append(Solicitud.fecha_operacion >= filtros.desde)
+            if filtros.hasta:
+                condiciones.append(Solicitud.fecha_operacion <= filtros.hasta)
+        else:
+            condiciones += entre_fechas_panama(Solicitud.enviada_en, filtros.desde, filtros.hasta)
         if con_estado and filtros.estado:
             condiciones.append(Solicitud.estado == filtros.estado)
         return condiciones
@@ -147,21 +190,36 @@ class RepositorioSolicitud:
             select(func.count()).select_from(Solicitud).where(*condiciones)
         )).scalar() or 0
 
-        if orden == "cola":           # revisión: la más antigua primero (FIFO)
-            orden_por = (Solicitud.enviada_en.asc(), Solicitud.id.asc())
-        elif orden == "operacion":    # puerto: la operación más próxima primero
-            orden_por = (Solicitud.fecha_operacion.asc(), Solicitud.id.asc())
-        else:
-            orden_por = (Solicitud.enviada_en.desc(), Solicitud.id.desc())
-
         consulta: Select = (
             select(Solicitud)
             .where(*condiciones)
-            .order_by(*orden_por)
+            .order_by(*self._orden(orden))
             .offset((pagina - 1) * por_pagina)
             .limit(por_pagina)
         )
         return total, conteos, list((await self.sesion.execute(consulta)).scalars().all())
+
+    @staticmethod
+    def _orden(orden: str) -> tuple:
+        if orden == "cola":                  # revisión: la más antigua primero (FIFO)
+            return Solicitud.enviada_en.asc(), Solicitud.id.asc()
+        if orden == "operacion":             # puerto: la operación más próxima primero
+            return Solicitud.fecha_operacion.asc(), Solicitud.id.asc()
+        if orden == "operacion_reciente":    # consulta histórica por fecha de la operación
+            return Solicitud.fecha_operacion.desc(), Solicitud.id.desc()
+        return Solicitud.enviada_en.desc(), Solicitud.id.desc()
+
+    async def para_exportar(
+        self, filtros: FiltrosBandeja, *, orden: str, limite: int,
+    ) -> tuple[int, list[Solicitud]]:
+        """(cuántas cumplen los filtros, las primeras `limite` según el orden): la
+        exportación de la consulta histórica. Sin pasajeros ni documentos."""
+        condiciones = self._condiciones(filtros, con_estado=True)
+        total = (await self.sesion.execute(
+            select(func.count()).select_from(Solicitud).where(*condiciones)
+        )).scalar() or 0
+        consulta = select(Solicitud).where(*condiciones).order_by(*self._orden(orden)).limit(limite)
+        return total, list((await self.sesion.execute(consulta)).scalars().all())
 
     async def alertas_de(self, ids: list[int]) -> dict[int, tuple[int, bool]]:
         """Por solicitud: cuántos tripulantes tienen el pasaporte o el seamanbook

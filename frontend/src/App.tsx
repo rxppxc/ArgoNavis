@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback, Suspense, lazy } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAutenticacion } from "./hooks/useAutenticacion";
-import { usePermisos } from "./hooks/usePermisos";
+import { PERMISOS_PERSONAL_SNM, usePermisos } from "./hooks/usePermisos";
 import { RUTA_CAMBIAR_CONTRASENA, vencimientoDelToken } from "./api/client";
 import { CapturadorErrores } from "./components/CapturadorErrores";
 import { CargandoRuta } from "./components/EstadoCarga";
@@ -43,6 +43,7 @@ import "./styles/globals.css";
 // despliegue, main.tsx recarga la página (vite:preloadError).
 const PaginaSolicitud         = lazy(() => import("./modulos/solicitudes/PaginaSolicitud"));
 const PaginaDetalleSolicitud  = lazy(() => import("./modulos/solicitudes/PaginaDetalleSolicitud"));
+const PaginaConsultaHistorica = lazy(() => import("./modulos/solicitudes/PaginaConsultaHistorica"));
 // Solo admin (y UCVMM, las estadísticas) visita estas.
 const PaginaUsuarios        = lazy(() => import("./modulos/administracion/PaginaUsuarios"));
 const PaginaRoles           = lazy(() => import("./modulos/administracion/PaginaRoles"));
@@ -89,6 +90,19 @@ function RutaStats({ children }: { children: React.ReactNode }) {
       {/* Recién iniciada la sesión los permisos aún no llegan: esperar en vez de rebotar. */}
       {cargando ? <CargandoRuta />
         : esAdmin || tiene("T-PROCESAR-PACIFICO") || tiene("T-SUPERVISAR-SECTOR") || tiene("T-SUPERVISAR-TODO")
+          ? <Suspense fallback={<CargandoRuta />}>{children}</Suspense>
+          : <Navigate to="/dashboard" replace />}
+    </RutaPrivada>
+  );
+}
+
+/** La consulta histórica (2026-11-11): el personal del SNM que trabaja solicitudes. */
+function RutaPersonalSnm({ children }: { children: React.ReactNode }) {
+  const { tieneAlguno, cargando } = usePermisos();
+  return (
+    <RutaPrivada>
+      {cargando ? <CargandoRuta />
+        : tieneAlguno(...PERMISOS_PERSONAL_SNM)
           ? <Suspense fallback={<CargandoRuta />}>{children}</Suspense>
           : <Navigate to="/dashboard" replace />}
     </RutaPrivada>
@@ -211,6 +225,7 @@ export default function App() {
                           <Route path="/new"               element={<RutaSolicitudes><PaginaSolicitud /></RutaSolicitudes>} />
                           <Route path="/solicitudes/:id"          element={<RutaSolicitudes><PaginaDetalleSolicitud /></RutaSolicitudes>} />
                           <Route path="/solicitudes/:id/corregir" element={<RutaSolicitudes><PaginaSolicitud /></RutaSolicitudes>} />
+                          <Route path="/historico"         element={<RutaPersonalSnm><PaginaConsultaHistorica /></RutaPersonalSnm>} />
                           <Route path="/admin"             element={<RutaRol roles={["admin", "sysadmin"]}><PaginaUsuarios /></RutaRol>} />
                           <Route path="/admin/roles"       element={<RutaRol roles={["admin", "sysadmin"]}><PaginaRoles /></RutaRol>} />
                           <Route path="/admin/stats"       element={<RutaStats><PaginaEstadisticas /></RutaStats>} />

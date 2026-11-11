@@ -40,7 +40,10 @@ _CID_LOGO = "logo-argo-navis@argonavis.snm"
 
 # Etiquetas de los propios avisos que van en negrita al inicio de una línea del
 # recuadro destacado (el resto, lo que escribió el usuario, va tal cual, escapado).
-_ETIQUETAS = ("Motivo:", "Plazo para corregir:", "Nacionalidad restringida:")
+_ETIQUETAS = (
+    "Motivo:", "Plazo para corregir:", "Nacionalidad restringida:",
+    "Aprobada fuera del horario laboral", "Costo migratorio:",
+)
 
 # Tono de cada aviso = color del estado en la interfaz (InsigniaEstado): recibida
 # en azul, aprobada en verde, devuelta en naranja, denegada en rojo, expirada en gris.

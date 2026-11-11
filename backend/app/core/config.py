@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Literal
 from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -104,6 +105,10 @@ class Configuracion(BaseSettings):
     DIAS_GRACIA_FINALIZACION: int = 2
     # Con cuánta anticipación máxima se puede pedir una autorización (fecha de la operación).
     DIAS_MAXIMOS_ANTICIPACION: int = 365
+    # Costo migratorio, en balboas, de una solicitud aprobada fuera del horario
+    # laboral (2026-11-11). Se guarda en la solicitud al aprobar: cambiarlo no toca
+    # lo ya aprobado. 0 = sin costo (igual se avisa que fue fuera del horario).
+    COSTO_FUERA_DE_HORARIO: Decimal = Field(default=Decimal("20.00"), ge=0, max_digits=8, decimal_places=2)
     # Cada cuántos minutos se revisan plazos vencidos (corrección / finalización).
     VENCIMIENTOS_INTERVALO_MINUTOS: int = 15
 

@@ -2,7 +2,7 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 RangoMarino = Literal["marino", "militar", "tecnico", "supernumerario", "superintendente"]
 Sexo        = Literal["M", "F", "X"]
@@ -181,6 +181,50 @@ class ConsultaBandeja(BaseModel):
         return _texto_o_nada(v)
 
 
+class ConsultaHistorica(BaseModel):
+    """Filtros de la consulta histórica (2026-11-11): las solicitudes que ve el
+    personal del SNM, de cualquier año, con filtros que las bandejas no tienen.
+    Van en la query string; la exportación a Excel usa los mismos."""
+    texto:            str | None = Field(default=None, max_length=100)   # número, buque, IMO, agencia, puesto
+    pasajero:         str | None = Field(default=None, max_length=100)   # nombre, apellido o pasaporte
+    agencia_id:       int | None = Field(default=None, ge=1)
+    puesto_id:        int | None = Field(default=None, ge=1)
+    tipo_tramite_id:  int | None = Field(default=None, ge=1)
+    estado:           Estado | None = None
+    fuera_de_horario: bool = False
+    fecha:            Literal["envio", "operacion"] = "envio"   # a qué fecha van desde y hasta
+    desde:            date | None = None
+    hasta:            date | None = None
+    pagina:           int = Field(default=1, ge=1)
+    por_pagina:       int = Field(default=20, ge=5, le=100)
+
+    @field_validator("texto", "pasajero")
+    @classmethod
+    def _vacio_a_none(cls, v: str | None) -> str | None:
+        return _texto_o_nada(v)
+
+    @model_validator(mode="after")
+    def _rango(self) -> "ConsultaHistorica":
+        if self.desde and self.hasta and self.hasta < self.desde:
+            raise ValueError("La fecha «hasta» no puede ser anterior a «desde».")
+        return self
+
+
+class OpcionFiltro(BaseModel):
+    id:     int
+    nombre: str
+    activo: bool = True
+
+
+class SalidaOpcionesHistorico(BaseModel):
+    """Los filtros de la consulta histórica, con lo desactivado (una solicitud
+    vieja puede ser de un puesto que ya no existe). Los puestos, solo los del
+    alcance de quien consulta."""
+    agencias: list[OpcionFiltro]
+    puestos:  list[OpcionFiltro]
+    tramites: list[OpcionFiltro]
+
+
 # ── Salida ───────────────────────────────────────────────────────────────────
 
 class SalidaTripulante(BaseModel):
@@ -236,6 +280,8 @@ class SalidaCasilla(BaseModel):
     tripulante_nombre: str | None = None
     documento_ids:     list[int] = Field(default_factory=list)
     cubierta:          bool
+    # Opcional (2026-11-11): sin archivo no cuenta como faltante.
+    obligatoria:       bool = True
 
 
 class SalidaEvento(BaseModel):
@@ -292,8 +338,11 @@ class SalidaSolicitudResumen(BaseModel):
     tripulantes_con_alerta:         int = 0
     # Solo en los trámites con aviso de custodia (los demás procesos no la mencionan).
     tiene_nacionalidad_restringida: bool = False
-    # Aprobada por UCVMM fuera del horario laboral. Solo para el SNM: a la agencia le llega None.
+    # Aprobada fuera del horario laboral (None: sin aprobar). Desde el 2026-11-11
+    # lo ve también la agencia, con el costo migratorio guardado al aprobar
+    # ("B/.20.00"; None si no tiene).
     fuera_de_horario:               bool | None = None
+    costo_fuera_de_horario:         str | None = None
 
 
 class PaginaSolicitudes(BaseModel):

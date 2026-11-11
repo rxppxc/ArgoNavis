@@ -10,7 +10,7 @@ function casilla(documentoCodigo: string, claveTripulante: string | null = null)
   return {
     clave: claveCasilla(documentoCodigo, claveTripulante), documento_codigo: documentoCodigo,
     documento_nombre: documentoCodigo, descripcion: null,
-    clave_tripulante: claveTripulante, nombre_tripulante: claveTripulante,
+    clave_tripulante: claveTripulante, nombre_tripulante: claveTripulante, obligatoria: true,
   };
 }
 

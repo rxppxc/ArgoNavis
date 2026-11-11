@@ -80,5 +80,24 @@
       {"nombre": "Luis", "es_panameno": false, "rango": "tecnico", "restringida": false}
     ],
     "esperado": [["SOLO-TECNICOS", null]]
+  },
+  {
+    "caso": "boleto opcional para los técnicos (2026-11-11)",
+    "documentos": [
+      {"codigo": "GENERALES", "alcance": "marino", "condicion": "siempre", "requiere_libreta": false, "orden": 1},
+      {"codigo": "BOLETO", "alcance": "marino", "condicion": "siempre", "requiere_libreta": false, "orden": 2, "rangos_opcional": ["tecnico", "supernumerario", "superintendente"]},
+      {"codigo": "CONTRATO", "alcance": "marino", "condicion": "siempre", "requiere_libreta": false, "orden": 3, "rangos": ["tecnico", "supernumerario", "superintendente"]}
+    ],
+    "tripulantes": [
+      {"nombre": "Marino", "es_panameno": false, "rango": "marino", "restringida": false},
+      {"nombre": "Técnico", "es_panameno": false, "rango": "tecnico", "restringida": false},
+      {"nombre": "Militar", "es_panameno": false, "rango": "militar", "restringida": false}
+    ],
+    "esperado": [
+      ["GENERALES", 0], ["GENERALES", 1], ["GENERALES", 2],
+      ["BOLETO", 0], ["BOLETO", 1], ["BOLETO", 2],
+      ["CONTRATO", 1]
+    ],
+    "opcionales": [["BOLETO", 1]]
   }
 ]

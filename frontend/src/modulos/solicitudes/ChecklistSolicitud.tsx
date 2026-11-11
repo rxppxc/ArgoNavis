@@ -18,6 +18,8 @@ interface Props {
 export function ChecklistSolicitud({ documentos, tripulantes, onIrATripulante, onVer }: Props) {
   const { casillas, faltantes, casillasSolicitud, casillasPorTripulante, faltantesPorTripulante } = documentos;
   const faltantesSolicitud = faltantes.filter((c) => c.clave_tripulante === null).length;
+  // El contador cuenta las obligatorias: una opcional sin archivo no está «por adjuntar».
+  const obligatorias = casillas.filter((c) => c.obligatoria).length;
 
   return (
     <section className={styles.bloque}>
@@ -26,7 +28,7 @@ export function ChecklistSolicitud({ documentos, tripulantes, onIrATripulante, o
             decía «no pide documentos» junto a «0 / 3 en total» y se contradecía. */}
         <span className={styles.paso}>4</span> {casillasSolicitud.length ? "Documentos de la solicitud" : "Resumen de documentos"}
         <span className={faltantes.length === 0 ? styles.contadorOk : styles.contadorFalta}>
-          {casillas.length - faltantes.length} de {casillas.length} adjuntos
+          {obligatorias - faltantes.length} de {obligatorias} adjuntos
         </span>
       </div>
       <p className={styles.ayudaSeccion}>PDF, Word o Excel. Máximo permitido: {TAMANO_MAX_MB} MB por archivo.</p>

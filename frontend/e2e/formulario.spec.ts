@@ -1,6 +1,7 @@
 /**
  * El formulario de «Nueva solicitud», sin enviarlo: lo que hace con los
- * documentos al quitar un pasajero, cambiarle el rango o cambiar de trámite,
+ * documentos al quitar un pasajero, cambiarle el rango (con el boleto opcional
+ * de los técnicos en Desembarque) o cambiar de trámite,
  * el resumen de lo que falta, los adicionales y el aviso de lo que hay que revisar.
  */
 import type { Page } from "@playwright/test";
@@ -36,15 +37,22 @@ test("el formulario cuida los documentos al quitar un pasajero o cambiar de trá
     await expect(agencia.getByText("visa-beto.pdf")).toHaveCount(0);
   });
 
-  await test.step("a un rango distinto de Marino solo se le piden Generales y boleto", async () => {
-    await tarjeta(agencia, 0).getByLabel("Rango *").selectOption("tecnico");
+  await test.step("en Embarque, al militar se le piden Generales y boleto; al técnico, Carta, Generales y Contrato", async () => {
+    await tarjeta(agencia, 0).getByLabel("Rango *").selectOption("militar");
     await expect(agencia.getByLabel("Adjuntar Copia de Boleto Aéreo de Ana")).toBeAttached();
     await expect(agencia.getByText("visa-ana.pdf")).toHaveCount(0);
     await expect(agencia.getByText("Faltan 2 documentos por adjuntar")).toBeVisible();
+
+    await tarjeta(agencia, 0).getByLabel("Rango *").selectOption("tecnico");
+    await expect(agencia.getByLabel("Adjuntar Carta de Responsabilidad (Form. No. 7) de Ana")).toBeAttached();
+    await expect(agencia.getByLabel("Adjuntar Contrato de Trabajo de Ana")).toBeAttached();
+    await expect(agencia.getByLabel("Adjuntar Copia de Boleto Aéreo de Ana")).toHaveCount(0);
+    await expect(agencia.getByText("Faltan 3 documentos por adjuntar")).toBeVisible();
+
     // La visa no se pierde: vuelve a su casilla al volver a Marino.
     await tarjeta(agencia, 0).getByLabel("Rango *").selectOption("marino");
     await expect(agencia.getByText("visa-ana.pdf")).toBeVisible();
-    await expect(agencia.getByLabel("Adjuntar Copia de Boleto Aéreo de Ana")).toHaveCount(0);
+    await expect(agencia.getByLabel("Adjuntar Contrato de Trabajo de Ana")).toHaveCount(0);
   });
 
   await test.step("el resumen lleva a la tarjeta y la expande", async () => {
@@ -68,6 +76,18 @@ test("el formulario cuida los documentos al quitar un pasajero o cambiar de trá
     await agencia.getByRole("alertdialog").getByRole("button", { name: "Cambiar de trámite" }).click();
     await expect(agencia.getByRole("button", { name: "Cambiar", exact: true })).toBeVisible();
     await expect(agencia.getByText("visa-ana.pdf")).toHaveCount(0);
+  });
+
+  await test.step("en Desembarque, al técnico el boleto es opcional", async () => {
+    await tarjeta(agencia, 0).getByLabel("Rango *").selectOption("tecnico");
+    await expect(agencia.getByLabel("Adjuntar Copia de Boleto Aéreo de Ana (opcional)")).toBeAttached();
+    await expect(tarjeta(agencia, 0).getByText("Opcional", { exact: true })).toBeVisible();
+    await agencia.getByLabel("Adjuntar Generales de Pasaporte de Ana").setInputFiles(pdf("generales.pdf"));
+    await agencia.getByLabel("Adjuntar Carta de Responsabilidad (Form. No. 7) de Ana").setInputFiles(pdf("responsabilidad.pdf"));
+    await agencia.getByLabel("Adjuntar Contrato de Trabajo de Ana").setInputFiles(pdf("contrato.pdf"));
+    // Sin el boleto, su tarjeta queda completa: solo falta la Lista de Tripulantes, que es de la solicitud.
+    await expect(tarjeta(agencia, 0).getByText("3/3 documentos")).toBeVisible();
+    await expect(agencia.getByText("Falta 1 documento por adjuntar")).toBeVisible();
   });
 
   await test.step("los documentos adicionales se agregan y se quitan", async () => {

@@ -22,6 +22,8 @@ class SalidaTramiteDocumento(BaseModel):
     requiere_libreta: bool = False
     # Rangos a los que se pide (nulo = a todos): ver TramiteDocumento.rangos.
     rangos:       list[str] | None = None
+    # Rangos para los que es opcional (nulo = obligatorio): ver TramiteDocumento.rangos_opcional.
+    rangos_opcional: list[str] | None = None
 
 
 # ── Tipos de trámite ─────────────────────────────────────────────────────────

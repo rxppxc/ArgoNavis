@@ -304,13 +304,13 @@ Las agencias entran por la VPN, pero no son del SNM: se las trata como no confia
   - `enviar_mensaje` (`core/email.py`) es un solo intento; los reintentos son de la cola. Las pruebas de la cola la vacían antes y después (`cola_vacia`) e importan `app.main`, que registra todos los modelos.
 
 ### Puntos de la reunión del 2026-10-30 (revisiones `f7a2c9e4b136` y `b2e7d4c9a160`)
-- **Documentos según el rango:** a los rangos distintos de Marino (militar, técnico, supernumerario y superintendente) se les piden **solo** las Generales de pasaporte y la Copia de Boleto Aéreo, en todos los trámites. Al Marino, lo de antes. Es la tercera excepción a la lectura literal (ver «Reglas»).
+- **Documentos según el rango:** a los rangos distintos de Marino (militar, técnico, supernumerario y superintendente) se les piden **solo** las Generales de pasaporte y la Copia de Boleto Aéreo, en todos los trámites. Al Marino, lo de antes. Es la tercera excepción a la lectura literal (ver «Reglas»). Desde el 2026-11-11, en Embarque y Desembarque los técnicos, supernumerarios y superintendentes llevan otro juego (la cuarta excepción).
   - `tramite_documentos.rangos` (nulo = a todos). Va por fila y no por documento: el boleto lo pide Desembarque a todos y los demás trámites solo a los no marinos; y el Form. No. 6 combina nacionalidad y rango, y `condicion` admite una sola.
   - `aplica_al_rango` (`tramite_service.py`) está espejado en `aplicaAlRango` (`checklist.ts`). `TripulanteChecklist` lleva `rango` en vez de `porta_libreta`; la Libreta sigue con `requiere_libreta`.
   - Técnico ya no lleva la Carta Form. 7: solo admite rangos no marinos.
   - Las solicitudes enviadas conservan su foto del checklist; una corrección se valida con la regla nueva.
   - En el catálogo del Administrador, el alcance «marino» (valor de la API) se muestra «Por tripulante»: «Por marino» junto a un documento solo para técnicos se leía contradictorio.
-- **PDF interno:** el personal del SNM (`es_personal_snm`) descarga una copia con el nombre de quien aprobó («Nombre (UCVMM)», del historial), la leyenda «Copia interna del SNM — no entregar a la agencia» y el archivo `Autorizacion-{número}-interna.pdf`. La agencia sigue recibiendo «UCVMM».
+- **PDF interno:** el personal del SNM (`es_personal_snm`) descarga una copia con el nombre de quien aprobó («Nombre (UCVMM)», del historial), la leyenda «Copia interna del SNM — no entregar a la agencia» y el archivo `Autorizacion-{número}-interna.pdf`. La agencia recibe «Servicio Nacional de Migración» (hasta el 2026-11-11, «UCVMM»).
 - **Sin finalización en otro puesto:** se finaliza siempre en el puesto autorizado. Si la operación se hace en otro, la agencia presenta una nueva solicitud y la original vence sola. Lo dicen el formulario, el expediente aprobado, el PDF, el correo de aprobación y el panel del puesto.
   - `puesto_finalizacion_id` / `_nombre` se siguen llenando (con el autorizado), para las estadísticas por puesto y las finalizadas de antes, que se muestran como estaban.
   - `DatosFinalizar.puesto_finalizacion_id` queda solo para que una página abierta antes del cambio reciba el motivo (400) si manda otro puesto.
@@ -318,7 +318,7 @@ Las agencias entran por la VPN, pero no son del SNM: se las trata como no confia
 - **Fuera del horario laboral:** de lunes a viernes, de 07:00 a 15:00, hora de Panamá. Sin feriados. **Desde el 2026-11-06** (ver abajo) cuenta la hora en que UCVMM aprueba (`aprobada_en`) y las 15:00 en punto son laborales: fuera es de 15:01 a 06:59 y el fin de semana. Antes contaba la finalización del puesto y las 15:00 ya eran fuera.
   - La regla vive en `core/horario.py` y en SQL (`_fuera_de_horario`, `solicitud_repository.py`): tienen que coincidir. Lo prueba `tests/test_horario.py`, con los bordes (15:00:59 dentro, 15:01 fuera).
   - Estadísticas: la cifra, su medidor y el mapa de horas, con la lista de las 50 más recientes (rediseño del 2026-11-02, ver abajo).
-  - Insignia «Aprobada fuera del horario» en el expediente y en las bandejas, en morado (`--acc-purple`, no es el color de ningún estado). Solo para el SNM: `fuera_de_horario` le llega nulo a la agencia.
+  - Insignia «Aprobada fuera del horario» en el expediente y en las bandejas, en morado (`--acc-purple`, no es el color de ningún estado). Hasta el 2026-11-11 era solo para el SNM; desde entonces la ve también la agencia, con el costo migratorio (ver «Cambios del 2026-11-11»).
 - **Notificaciones internas (la campana de la cabecera):** lo que le toca hacer a cada rol (por revisar, por corregir, por finalizar, con enlace a su bandeja) y las novedades de sus solicitudes.
   - No hay tabla de notificaciones: los pendientes salen de los conteos de las bandejas (`contar_por_estado_en`) y las novedades, del historial, filtradas con `evento_para` (antes `_evento_para`). No cuentan las acciones propias; lo prueba `tests/test_pendientes.py`. Solo se guarda `users.novedades_vistas_hasta`.
   - `GET /pendientes` y `POST /pendientes/vistas` (`api/v1/pendientes.py`, `ServicioPendientes`). El SysAdmin no tiene campana.
@@ -499,6 +499,37 @@ Pedido del usuario: «¿no hay riesgo de sobrecarga de recursos, procesos que af
   - La restauración está en el README, probada con una base temporal (dropdb, createdb y psql con `ON_ERROR_STOP`).
 - En pantalla, «Máximo permitido: 2 MB por archivo» en las tres secciones donde se adjunta (la de adicionales no lo decía) y en el aviso al elegir uno más pesado.
 
+### Cambios del 2026-11-11 (revisiones `a8d4f2c6e913` y `c6f1d9a3b724`)
+Pedido del usuario: otros documentos para técnicos, supernumerarios y superintendentes; nada de unidades internas en lo que ve la agencia; la solicitud aprobada fuera del horario con su costo, también para la agencia; y una forma de buscar solicitudes de cualquier año. Decisiones del usuario: en Embarque, lo de Desembarque sin el boleto; el nombre neutro es «Servicio Nacional de Migración» («SNM» en espacios cortos); el aviso del costo va en pantalla, correo y PDF; y la búsqueda es una página aparte, «Consulta histórica», solo para el SNM.
+- **Documentos de técnicos, supernumerarios y superintendentes** (cuarta excepción del catálogo, ver «Reglas»):
+  - Desembarque: Carta de Responsabilidad (Form. No. 7), Generales de pasaporte, Contrato de Trabajo (documento nuevo, `DOC-CONTRATO-TRABAJO`, sin descripción: el pedido no pone condiciones) y, **opcional**, la Copia de Boleto Aéreo. Embarque: los tres primeros, sin boleto. El militar y los demás trámites, como estaban.
+  - `tramite_documentos.rangos_opcional` (nulo = obligatorio): los rangos para los que la fila es opcional. Va en otra columna y no en otra fila porque `uq_tramite_documento` admite una fila por documento y trámite.
+  - `solicitud_casillas.obligatoria` guarda la foto. Una casilla opcional sin archivo no es faltante: no bloquea el envío, no cuenta en «N de M adjuntos» y en el expediente dice «Opcional · no se adjuntó». En el formulario lleva el rótulo «Opcional» y su campo de archivo se llama «Adjuntar … (opcional)».
+  - `opcional_para` (`tramite_service.py`) está espejado en `opcionalPara` (`checklist.ts`), con su caso en `espejo/checklist.json` (`opcionales`).
+- **Nombre neutro para la agencia:** a la agencia no se le nombran las unidades internas (UCVMM, los sectores): ve «Servicio Nacional de Migración».
+  - Dónde: los avisos «En revisión por…» y «Aprobada … por…» del expediente, la corrección, la página pública del QR, la descripción de `index.html`, el mensaje de agencia desactivada, el autor de los pasos en el historial y en la campana (`INSTITUCION` y `_AUTOR_PARA_AGENCIA`, `solicitud_service.py`), el PDF de la agencia (encabezado «Sección de Autorizaciones Marítimas» y «Aprobada por») y los correos de devolución y de negación.
+  - Lo del SNM no cambia: sus pantallas, la copia interna del PDF («Nombre (UCVMM)»), el correo al puesto y los informes siguen diciendo UCVMM.
+  - **Un texto nuevo que vea la agencia no nombra a UCVMM ni a los sectores.** Lo prueban `test_ciclo_completo` (expediente, bandeja, campana y los cuatro correos de la agencia, con una expresión regular) y el E2E (`sinUnidadesInternas`, en cada pantalla de la agencia: el texto y también los atributos, como `title` o `placeholder`).
+  - Los textos de las pantallas del SNM viajan en el mismo JavaScript: a la agencia no se le muestran, pero no son un secreto.
+- **Fuera del horario, también para la agencia, con su costo migratorio:**
+  - `COSTO_FUERA_DE_HORARIO` (B/.20.00). Se guarda en `solicitudes.costo_fuera_de_horario` al aprobar (foto: cambiar el monto no toca lo ya aprobado). Con 0 no hay costo, pero igual se avisa. Las aprobadas antes de la revisión quedan sin monto.
+  - `fuera_de_horario` y `costo_fuera_de_horario` («B/.20.00», `texto_costo`) llegan a todos, en las bandejas y en el expediente.
+  - Pantalla: la insignia morada con el monto en la bandeja y en la cabeza del expediente, y un aviso morado en el banner de aprobada y de finalizada (`AvisoFueraDeHorario`).
+  - Correo de aprobación (a la agencia y al puesto): dos líneas, «Aprobada fuera del horario laboral (…)» y «Costo migratorio: …» (`aviso_fuera_de_horario`, `core/horario.py`). PDF: un recuadro morado bajo el estado, en las dos copias.
+  - `TEXTO_HORARIO` está espejado en `TEXTO_HORARIO_LABORAL` (`presentacion.ts`), armado con las horas de `calculos.ts` (`test_constantes_iguales_en_el_frontend`).
+  - Lo prueba `test_aprobada_fuera_del_horario_lleva_el_costo` (`tests/test_horario.py`), con el reloj simulado.
+- **Consulta histórica** (`/historico`, `PaginaConsultaHistorica`): todas las solicitudes que ve el personal del SNM, de cualquier año, con filtros que las bandejas no tienen y exportación a Excel. La agencia sigue con su bandeja.
+  - API: `GET /solicitudes/historico`, `/historico/opciones` (agencias, puestos de su alcance y trámites, también los desactivados) y `/historico/exportar`. Van **antes** de `/{solicitud_id}` en el enrutador: si no, «historico» se leería como un id.
+  - Alcance: el de `puede_ver`, sin la vía de la agencia (`_alcance_historico` → `AlcanceSnm` en `FiltrosBandeja`). El Administrador y el supervisor general, todo; UCVMM y el supervisor de sector, los puestos de sus sectores; el puesto de control, sus puestos desde que se aprueban. **Si cambias `puede_ver`, cambia `_alcance_historico`.**
+  - Filtros (`ConsultaHistorica`): texto, pasajero (nombre, apellido, los dos juntos o pasaporte, con un EXISTS sobre `solicitud_tripulantes`), agencia, puesto, trámite, estado, fecha de envío o de la operación con desde y hasta (y un atajo por año, desde `PRIMER_ANIO`) y «solo aprobadas fuera del horario».
+  - Los filtros van en la URL, sin sumar entradas al historial: se puede recargar o compartir la búsqueda. La lógica sin React está en `consultaHistorica.ts`, con sus pruebas.
+  - En el celular, agencia, puesto, trámite y fechas van plegados en «Más filtros». El sector de cada fila se muestra solo a quien ve los dos.
+  - Excel (`core/informe_historico.py`): la identidad del informe de estadísticas, una fila por solicitud, el estado con el color de su insignia, filtros de Excel y encabezado fijo. Hasta `MAX_FILAS_EXPORTACION` (5000): si hay más, el archivo lo dice. Lleva el tope `LIMITE_EXPORTACIONES_POR_HORA` y va por `en_hilo_con_tope`.
+  - Se entra por el menú y por un botón en las bandejas del SNM (`PERMISOS_PERSONAL_SNM`, `hooks/usePermisos.ts`, espejo de `es_personal_snm`).
+  - Lo prueban `tests/test_historico.py`, `consultaHistorica.test.ts` y el E2E `flujo-completo.spec.ts`.
+- **En las celdas de una tabla, `overflow-wrap: break-word`, no `anywhere`:** con `anywhere` la columna se encoge al mínimo y parte palabras normales («KENSINGTO-N»). `anywhere` sigue siendo lo indicado en los bloques de texto libre.
+- **Vitest y la letra de unidad (Windows):** si todas las pruebas fallan con «Cannot read properties of undefined (reading 'config')», la carpeta de trabajo llegó como `c:\…` en minúscula y Vitest cargó dos copias de sí mismo. Se corre desde `C:\…`.
+
 ### Lo que sigue pendiente (no urgente)
 1. **HTTPS y TLS con el AD** — la configuración está lista (README → "Producción"); falta el certificado del servidor y el del controlador de dominio (infraestructura).
 2. **JWT en cookie httpOnly** — actualmente en localStorage, con la CSP como barrera (regla 15). Plan en README → "Decisiones documentadas".
@@ -520,12 +551,15 @@ Pedido del usuario: «¿no hay riesgo de sobrecarga de recursos, procesos que af
 15. **De la auditoría del 2026-11-08, para decidir:**
     - Retención de la bitácora (`audit_logs`): es la tabla que más crece (cada documento visto, cada login) y no se purga. Va con la política de retención (punto 7).
     - Búsqueda por texto de las bandejas y la bitácora: `ILIKE '%…%'` recorre la tabla. Con muchos miles de filas, un índice trigram (`pg_trgm`) la acelera; hoy no hace falta.
+    - Lo mismo la consulta histórica (2026-11-11): busca pasajeros con `ILIKE` y filtra por `fecha_operacion`, que no tiene índice.
     - Tope global del login y de la verificación en nginx (`limit_req`): el de slowapi es por proceso. Antes, confirmar si las agencias salen de la VPN con una sola IP (las frenaría a todas juntas).
 16. **Menos consultas por pedido, si crece el uso** (prueba de carga del 2026-11-08). Hoy cada pedido hace 6 consultas solo para saber quién es el usuario:
     - `obtener_id_usuario_actual` y `usuario_actual` leen el mismo usuario dos veces;
     - los permisos se consultan en cada pedido (a veces dos veces);
     - el expediente vuelve a leer el catálogo (trámites, documentos y países) y carga `creada_por` con su rol y su agencia.
     Juntar la verificación del token con la carga del usuario y cachear el catálogo por proceso ahorraría entre 10 y 20 %. Correr `tests/carga.py` antes y después.
+17. **Documentación de la DTI, juego 0.7:** `docs/` no tiene todavía la identidad «pase oficial» ni los cambios del 2026-11-11 (documentos de los técnicos, nombre neutro para la agencia, costo fuera del horario y consulta histórica).
+18. **Validar con UCVMM, del 2026-11-11:** cómo y dónde paga la agencia el costo migratorio (el sistema solo lo avisa: no dice dónde se paga ni registra el pago), y si el Contrato de Trabajo debe cumplir alguna condición (hoy se pide sin ninguna).
 
 ### Flujo actual: Autorizaciones Marítimas (UCVMM)
 
@@ -578,10 +612,11 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
   - Qué documentos: el recuadro del trámite en el **Formulario No. 3 oficial**. Por eso Desembarque lleva Generales de pasaporte, aunque el documento de proceso no la liste.
   - Por tripulante o por solicitud: cada proceso dice "para cada tripulante…". La única excepción escrita es la Lista de Tripulantes, que "debe subirse al trámite" (pág. 9). Por eso la Carta de responsabilidad y el Reporte médico van por tripulante.
   - Flujo y requisitos del sistema: págs. 9–10 del documento de proceso.
-  - **Tres excepciones decididas por el usuario** sobre la lectura literal:
+  - **Cuatro excepciones decididas por el usuario** sobre la lectura literal:
     - La vigencia se valida en los 8 trámites, no solo en los 3 que la mencionan (2026-10-14).
     - La libreta de Embarque se pide a todo Marino (`siempre`), no solo a los panameños. La condición `solo_panamenos` queda en el enum sin uso (2026-10-14).
-    - A los rangos distintos de Marino solo se les piden las Generales de pasaporte y el boleto aéreo, en todos los trámites (reunión del 2026-10-30, `tramite_documentos.rangos`).
+    - A los rangos distintos de Marino solo se les piden las Generales de pasaporte y el boleto aéreo, en todos los trámites (reunión del 2026-10-30, `tramite_documentos.rangos`), salvo lo de la cuarta.
+    - A los técnicos, supernumerarios y superintendentes, en Desembarque: Carta de Responsabilidad, Generales de pasaporte, Contrato de Trabajo y, opcional, el boleto aéreo. En Embarque, lo mismo sin el boleto (2026-11-11, `tramite_documentos.rangos_opcional`). El militar sigue con Generales y boleto.
 - Nacionalidad restringida (`paises.nacionalidad_restringida`):
   - El Form. No. 6 se adjunta **solo en Desembarque** ("cuando aplique", como en el Form. 3).
   - `tipos_tramite.aviso_custodia` marca los trámites cuyo proceso dice que, al aprobar, se avisa a la agencia que debe realizar el trámite de solicitud de custodia: Desembarque, Urgencias, Renovación y Shore Pass.
@@ -596,11 +631,12 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
 - Lo interno no le llega a la agencia. Lo filtra el backend (`ContextoAcceso.es_personal_snm`, `evento_para` en `solicitud_service.py`, que usan también las novedades de la campana), no la vista:
   - Los eventos de las verificaciones de impedimentos (de UCVMM y del puesto, con sus correcciones) y `comentario`.
   - El texto de `aprobada` y `finalizada`.
-  - `observacion_aprobacion`, `comentario_finalizacion`, `aprobada_por`, `finalizada_por`, `con_impedimento`, `con_impedimento_puesto`, los `impedimentos_puesto_*` y `fuera_de_horario`.
-  - Los nombres de los funcionarios: el autor sale como "UCVMM" o "Puesto de control".
+  - `observacion_aprobacion`, `comentario_finalizacion`, `aprobada_por`, `finalizada_por`, `con_impedimento`, `con_impedimento_puesto` y los `impedimentos_puesto_*`.
+  - Los nombres de los funcionarios: el autor sale como «Servicio Nacional de Migración» (hasta el 2026-11-11, "UCVMM") o "Puesto de control". Tampoco se le nombran las unidades internas (UCVMM, los sectores).
   - Los motivos de devolución y de negación **sí** los ve.
+  - Desde el 2026-11-11 **sí** ve si se aprobó fuera del horario y su costo (`fuera_de_horario`, `costo_fuera_de_horario`).
 - La observación de aprobación es interna: no va en el PDF ni en el correo de aprobación. El PDF no tiene sección de observaciones.
-- El PDF de la agencia dice "Aprobada por: UCVMM", sin el nombre del funcionario: tampoco ve esos nombres en el expediente (decisión del usuario del 2026-10-15). El personal del SNM descarga una copia interna con el nombre de quien aprobó (reunión del 2026-10-30, ver arriba).
+- El PDF de la agencia dice "Aprobada por: Servicio Nacional de Migración" (hasta el 2026-11-11, "UCVMM"), sin el nombre del funcionario: tampoco ve esos nombres en el expediente (decisión del usuario del 2026-10-15). El personal del SNM descarga una copia interna con el nombre de quien aprobó (reunión del 2026-10-30, ver arriba).
 - `agencia_nombre`, `puesto_nombre` y `puesto_finalizacion_nombre` son una foto (al enviar o al finalizar): renombrar la agencia o el puesto no cambia expedientes viejos.
 - Las solicitudes no se eliminan; un usuario (FK RESTRICT), agencia o puesto con solicitudes no se borra (se desactiva).
 - El PDF (`core/pdf_autorizacion.py`, reportlab) lleva un QR a `/verificar/{codigo_verificacion}` (público, con rate limit). Ese código solo verifica: no abre el expediente.

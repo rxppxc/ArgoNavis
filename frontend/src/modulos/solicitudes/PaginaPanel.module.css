@@ -1,5 +1,7 @@
 /* El encabezado (saludo y subtítulo) es el común de EncabezadoPagina. */
 .btnNuevo { composes: boton primario grande from "../../components/Botones.module.css"; }
+/* Azul de contorno: buscar es consultar (2026-11-11). */
+.btnHistorico { composes: boton consultar grande from "../../components/Botones.module.css"; }
 
 /* ─── Selector de bandeja (rol): las mismas pestañas subrayadas de Catálogos ─── */
 .vistas {

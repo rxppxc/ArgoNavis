@@ -65,7 +65,8 @@ export function useDocumentosFormulario(
   }, [tipo, tripulantes, paisesPorCodigo]);
 
   const faltantes = useMemo(
-    () => casillas.filter((c) => !nuevos[c.clave] && !(existentes[c.clave]?.length)),
+    // Las opcionales nunca faltan (el boleto de Desembarque de los técnicos, 2026-11-11).
+    () => casillas.filter((c) => c.obligatoria && !nuevos[c.clave] && !(existentes[c.clave]?.length)),
     [casillas, nuevos, existentes],
   );
 

@@ -5,13 +5,15 @@ Recibe datos planos (no objetos ORM) porque se genera en un hilo aparte
 El QR apunta a /verificar/{codigo}, una página pública que confirma que la
 autorización existe y si sigue vigente — sin exponer el expediente.
 
-Hay dos versiones: la de la agencia ("Aprobada por: UCVMM") y la copia
-interna del personal del SNM, con el nombre de quien aprobó y una leyenda que
-la distingue si alguien la reenvía (reunión del 2026-10-30).
+Hay dos versiones: la de la agencia ("Aprobada por: Servicio Nacional de
+Migración", sin unidades internas desde el 2026-11-11) y la copia interna del
+personal del SNM, con el nombre de quien aprobó y una leyenda que la distingue
+si alguien la reenvía (reunión del 2026-10-30).
 """
 import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
 from xml.sax.saxutils import escape
@@ -28,6 +30,8 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+from app.core.horario import aviso_fuera_de_horario
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +65,9 @@ TURQUESA = colors.HexColor("#0F766E")
 BORDE    = colors.HexColor("#CAD5E1")
 FONDO    = colors.HexColor("#F6F9FC")
 CREMA    = colors.HexColor("#FFF8D8")
+# Fuera del horario: el morado de su insignia en la pantalla (--acc-purple del tema claro).
+MORADO   = colors.HexColor("#7E22CE")
+LILA     = colors.HexColor("#F2E9FA")   # el morado al 10 % sobre blanco
 
 RANGOS = {
     "marino": "Marino", "militar": "Militar", "tecnico": "Técnico",
@@ -99,7 +106,7 @@ class DatosPdfAutorizacion:
     motivo:              str | None
     fecha_solicitud:     datetime
     aprobada_en:         datetime
-    aprobada_por:        str | None    # "UCVMM" para la agencia; el nombre, en la copia interna
+    aprobada_por:        str | None    # la institución para la agencia; el nombre, en la copia interna
     vigente_hasta:       datetime | None
     finalizada_en:       datetime | None
     # Donde se finalizó: desde el 2026-10-30, siempre el autorizado (antes podía ser otro).
@@ -107,6 +114,9 @@ class DatosPdfAutorizacion:
     url_verificacion:    str
     codigo_verificacion: str
     copia_interna:       bool = False  # la descarga el personal del SNM
+    # Aprobada fuera del horario laboral, con su costo migratorio (2026-11-11).
+    fuera_de_horario:       bool = False
+    costo_fuera_de_horario: Decimal | None = None
     tripulantes:         list[TripulantePdf] = field(default_factory=list)
 
 
@@ -187,7 +197,7 @@ def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
     institucion = [
         Paragraph("REPÚBLICA DE PANAMÁ", e_pais),
         Paragraph("SERVICIO NACIONAL DE MIGRACIÓN", e_org),
-        Paragraph("Sección de Autorizaciones Marítimas — UCVMM", e_seccion),
+        Paragraph("Sección de Autorizaciones Marítimas", e_seccion),
     ]
     bloque_qr = [_qr(d.url_verificacion, 26 * mm), Paragraph("Escanee para verificar", e_qr)]
     encabezado = Table([[logo, institucion, bloque_qr]], colWidths=[23 * mm, ancho - 23 * mm - 30 * mm, 30 * mm])
@@ -240,6 +250,21 @@ def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
             ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
         ]))
         historia += [interna, Spacer(1, 2 * mm)]
+
+    # ── Fuera del horario laboral: el aviso y el costo (2026-11-11) ──
+    if d.fuera_de_horario:
+        fuera = Table(
+            [[Paragraph(escape(" ".join(aviso_fuera_de_horario(d.costo_fuera_de_horario))),
+                        estilo("fuera", fontName=negrita, fontSize=8.5, leading=11, alignment=TA_CENTER))]],
+            colWidths=[ancho],
+        )
+        fuera.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), LILA),
+            ("BOX", (0, 0), (-1, -1), 0.8, MORADO),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        historia += [fuera, Spacer(1, 2 * mm)]
 
     # ── Datos del trámite (rejilla de dos columnas) ──
     pares: list[tuple[str, str]] = [

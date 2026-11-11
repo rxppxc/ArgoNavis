@@ -62,6 +62,8 @@ class CasillaChecklist:
     alcance:           str
     indice_tripulante: int | None = None
     nombre_tripulante: str | None = None
+    # Opcional: se puede enviar sin ella (el boleto de Desembarque de los técnicos).
+    obligatoria:       bool = True
 
 
 @dataclass
@@ -82,6 +84,11 @@ def aplica_al_rango(td: TramiteDocumento, rango: str) -> bool:
     if td.rangos and rango not in td.rangos:
         return False
     return not td.documento.requiere_libreta or rango in RANGOS_CON_LIBRETA
+
+
+def opcional_para(td: TramiteDocumento, rango: str) -> bool:
+    """Si la fila es opcional para un tripulante de ese rango (espejo: `opcionalPara`, checklist.ts)."""
+    return bool(td.rangos_opcional) and rango in td.rangos_opcional
 
 
 @dataclass
@@ -159,6 +166,7 @@ class ServicioTramite:
                     alcance=td.alcance,
                     indice_tripulante=indice,
                     nombre_tripulante=tripulante.nombre,
+                    obligatoria=not opcional_para(td, tripulante.rango),
                 ))
 
         return casillas
@@ -173,9 +181,10 @@ class ServicioTramite:
         indice_tripulante en None para los documentos de alcance solicitud.
         """
         requeridas = self.construir_casillas(tipo, tripulantes)
+        # Las opcionales nunca faltan (2026-11-11).
         faltantes = [
             casilla for casilla in requeridas
-            if (casilla.documento_id, casilla.indice_tripulante) not in cubiertas
+            if casilla.obligatoria and (casilla.documento_id, casilla.indice_tripulante) not in cubiertas
         ]
         return ResultadoChecklist(requeridas=requeridas, faltantes=faltantes)
 
