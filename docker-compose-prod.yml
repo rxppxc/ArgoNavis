@@ -52,7 +52,8 @@ services:
     # Memoria medida el 2026-11-10 con 100 usuarios (tests/carga.py): ~150 MB por proceso
     # de uvicorn y ~110 MB el maestro, ~410 MB en total; 1 GB deja margen para envíos y
     # exportaciones. Con más UVICORN_WORKERS, ~200 MB más por proceso. CPU: tantos núcleos
-    # como procesos, para que PostgreSQL y nginx tengan CPU aunque el backend esté a tope.
+    # como procesos si la VM tiene más (en una de 2 núcleos, 1.5), para que PostgreSQL y
+    # nginx tengan CPU aunque el backend esté a tope.
     mem_limit: ${BACKEND_MEMORIA:-1g}
     cpus: ${BACKEND_CPUS:-2}
     pids_limit: 512            # cuenta también los hilos (bcrypt, PDF, AD, subidas)

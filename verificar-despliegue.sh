@@ -72,10 +72,13 @@ for c in snm_postgres snm_backend snm_frontend; do
   IFS='|' read -r usado porcentaje <<<"$(docker stats --no-stream --format '{{.MemUsage}}|{{.MemPerc}}' "$c" 2>/dev/null)"
   pct=${porcentaje%%.*}; pct=${pct%\%}
   case "$pct" in ''|*[!0-9]*) pct=0 ;; esac
+  nano=$(docker inspect -f '{{.HostConfig.NanoCpus}}' "$c" 2>/dev/null)
+  cpu=""
+  if [ "${nano:-0}" -gt 0 ]; then cpu="; CPU: hasta $(awk -v n="$nano" 'BEGIN { print n / 1e9 }') núcleo(s)"; fi
   if [ "$pct" -lt 80 ]; then
-    bien "$c: memoria $usado ($porcentaje de su límite)"
+    bien "$c: memoria $usado ($porcentaje de su límite)$cpu"
   else
-    aviso "$c usa el $porcentaje de su límite de memoria ($usado): súbelo en el .env (README → Producción → Recursos)"
+    aviso "$c usa el $porcentaje de su límite de memoria ($usado): súbelo en el .env (README → Producción → Recursos)$cpu"
   fi
   if [ "$(docker inspect -f '{{.State.OOMKilled}}' "$c" 2>/dev/null)" = true ]; then
     aviso "Docker cortó a $c por falta de memoria: súbele el límite en el .env"

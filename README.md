@@ -99,7 +99,7 @@ Después de cada despliegue, `sudo bash verificar-despliegue.sh` revisa sin camb
 > |---|---|---|
 > | `POSTGRES_MEMORIA` | `1g` | PostgreSQL (con `shm_size` de 256 MB para sus consultas en paralelo) |
 > | `BACKEND_MEMORIA` | `1g` | El backend. Medido con 100 usuarios (`tests/carga.py`): ~410 MB con 2 procesos; ~200 MB más por cada proceso extra |
-> | `BACKEND_CPUS` | `2` | Núcleos del backend: tantos como `UVICORN_WORKERS`, para que PostgreSQL y nginx tengan CPU aunque el backend esté a tope |
+> | `BACKEND_CPUS` | `2` | Núcleos del backend: tantos como `UVICORN_WORKERS` si la VM tiene más núcleos que procesos; en una de 2 núcleos, `1.5`. Así a PostgreSQL y nginx siempre les queda CPU, aunque el backend esté a tope |
 > | `FRONTEND_MEMORIA` | `256m` | nginx |
 >
 > La suma de los topes debería dejar unos 500 MB libres para el sistema: con los valores por defecto (2,25 GB), una VM de 3 GB o más. `verificar-despliegue.sh` muestra el uso de cada contenedor contra su tope, avisa si alguno pasa del 80 % o si Docker lo cortó, y si se cayó algún proceso de uvicorn en las últimas 24 h.

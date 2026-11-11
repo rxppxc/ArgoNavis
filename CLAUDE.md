@@ -466,7 +466,7 @@ Pedido del usuario: «¿no hay riesgo de sobrecarga de recursos, procesos que af
 - **reportlab sin ASCII85** (`rl_config.useA85 = 0`, `pdf_autorizacion.py`): ~15 % menos de CPU y PDF más chicos.
 - **Subidas al disco desde los 64 KB** (`MultiPartParser.spool_max_size`, `main.py`): Starlette dejaba en memoria cada archivo de hasta 1 MB, y un envío máximo ocupaba ~140 MB del proceso. Si Starlette deja de usar ese atributo, `test_los_archivos_de_un_envio_pasan_al_disco_temporal` falla.
 - **Disco:** con menos de `ESPACIO_MINIMO_LIBRE_MB` (1024) libres en el disco de los documentos, no se reciben archivos (507 y error en el log). Es el mismo disco de PostgreSQL y de los respaldos.
-- **Topes de cada contenedor** (`docker-compose-prod.yml`, ajustables en el `.env`): memoria (`POSTGRES_MEMORIA` y `BACKEND_MEMORIA`, 1g; `FRONTEND_MEMORIA`, 256m), CPU del backend (`BACKEND_CPUS`, tantos como workers), `pids_limit` en los tres y `shm_size` de 256 MB en PostgreSQL.
+- **Topes de cada contenedor** (`docker-compose-prod.yml`, ajustables en el `.env`): memoria (`POSTGRES_MEMORIA` y `BACKEND_MEMORIA`, 1g; `FRONTEND_MEMORIA`, 256m), CPU del backend (`BACKEND_CPUS`: tantos como workers, o 1.5 en una VM de 2 núcleos, como la de pruebas), `pids_limit` en los tres y `shm_size` de 256 MB en PostgreSQL.
   - Medido con 100 usuarios: el backend usa ~410 MB (~150 por proceso de uvicorn y ~110 el maestro).
   - Si un proceso de uvicorn se pasa, Docker lo corta y uvicorn lo levanta. `verificar-despliegue.sh` muestra el uso contra el límite y los procesos caídos.
 - **Respaldo incremental** (`backup.sh`). La base, como antes. Los documentos, una copia por día:
