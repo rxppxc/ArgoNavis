@@ -32,13 +32,20 @@ copy backend\.env.example backend\.env
 cd backend
 python -m venv venv
 :: Siempre "venv\Scripts\python -m ...": los .exe del venv (pip, uvicorn...) guardan la ruta de la carpeta y fallan si se mueve.
+:: Primero las de producción, exactas y con hash (requirements.lock); después, las de desarrollo.
+venv\Scripts\python -m pip install --require-hashes -r requirements.lock
 venv\Scripts\python -m pip install -r requirements-dev.txt
 venv\Scripts\python -I -m alembic upgrade head
 
 :: Frontend
 cd ..\frontend
-npm install
+npm ci
 ```
+
+**De dónde salen las librerías.** Con la aplicación instalada, nada se descarga de internet: el frontend lleva sus librerías empaquetadas (sin CDN ni fuentes web, y la CSP solo deja cargar lo del propio servidor) y el backend solo habla con PostgreSQL, el Active Directory y el servidor de correo. Las librerías se descargan una sola vez, al instalar, y siempre las mismas:
+- Python: `requirements.lock`, con la versión exacta y el hash de cada una (también las que arrastran las de `requirements.txt`), para Linux y Windows. Si PyPI entregara otro archivo, pip se detiene. Para cambiar una, se edita `requirements.txt` y se regenera el bloqueo con el comando que trae al principio; `tests/test_dependencias.py` falla si los dos no coinciden.
+- Node: `package-lock.json`, también con hashes (`npm ci`, nunca `npm install` en un servidor).
+- Docker: imágenes base con la versión exacta (`python:3.12.16-slim-trixie`, `node:24.22.2-alpine3.24`, `nginx:1.31.8-alpine`, `postgres:15.19-alpine3.24`). Para actualizarlas, se cambia la etiqueta (y la de PostgreSQL también en `.github/workflows/ci.yml`).
 
 ### Desarrollo (dos terminales)
 ```bat
@@ -71,7 +78,7 @@ npm run test:e2e
 ```
 Recorre en el navegador una autorización completa: la agencia la envía, UCVMM la devuelve, la agencia la corrige, UCVMM la aprueba, un tercero verifica el QR, el puesto la finaliza y el Administrador la ve en la bitácora. También prueba el formulario sin enviarlo: cambiar de trámite, quitar un pasajero y los documentos adicionales. Y los sectores: UCVMM del Atlántico no ve una solicitud del Pacífico y el supervisor general la ve sin poder decidir. Levanta su propio backend (`backend/tests/servidor_e2e.py`, puerto 8001, con la base temporal `argonavis_e2e`, que borra al terminar) y su propio Vite (puerto 5174): no choca con los de desarrollo. Usa el Chrome instalado; en un equipo sin Chrome, `npx playwright install chromium` y `set PLAYWRIGHT_CHROMIUM=1`. Además prueba con el teclado el enlace «Saltar al contenido» y que los controles tengan nombre (`accesibilidad.spec.ts`), y la sesión con dos pestañas abiertas, adelantando el reloj del navegador (`sesion.spec.ts`).
 
-En GitHub, `.github/workflows/ci.yml` corre todo lo anterior en cada push a main, más un análisis de vulnerabilidades en las dependencias, que se repite cada lunes. Una vulnerabilidad nueva deja ese análisis en rojo. Para correrlo en el equipo: en `backend`, `venv\Scripts\python -m pip_audit -r requirements.txt` (con `set PYTHONUTF8=1`), y en `frontend`, `npm audit --omit=dev`.
+En GitHub, `.github/workflows/ci.yml` corre todo lo anterior en cada push a main, más un análisis de vulnerabilidades en las dependencias, que se repite cada lunes. Una vulnerabilidad nueva deja ese análisis en rojo. Para correrlo en el equipo: en `backend`, `venv\Scripts\python -m pip_audit -r requirements.lock --require-hashes` (con `set PYTHONUTF8=1`), y en `frontend`, `npm audit --omit=dev`. Se audita el bloqueo, no `requirements.txt`: así se revisan también las librerías indirectas (el 10/11/2026, eso encontró avisos en pillow y pyasn1, que con `requirements.txt` no se veían).
 
 ### Producción
 **Docker** (`docker-compose-prod.yml`): copiar `.env.example` como `.env` en la raíz y completar. El backend aplica las migraciones al arrancar (`docker-entrypoint.sh`) y solo es accesible a través de nginx (`/api/`); su puerto no se publica.
@@ -84,11 +91,52 @@ El backend corre con `UVICORN_WORKERS` procesos (2 por defecto) y con un usuario
 docker compose -f docker-compose-prod.yml run --rm --no-deps --user root --entrypoint chown backend -R 10001:10001 /app/storage/documentos
 ```
 
-Después de cada despliegue, `sudo bash verificar-despliegue.sh` revisa sin cambiar nada los contenedores, la salud, las cabeceras de seguridad, los puertos, el esquema, los topes de la base, el Active Directory, el correo, los respaldos, el reloj y los errores del log, y termina con «todo bien» o con la lista de fallas.
+Después de cada despliegue, `sudo bash verificar-despliegue.sh` revisa sin cambiar nada los contenedores (y su memoria contra su límite), la salud, las cabeceras de seguridad, los puertos, el esquema, los topes de la base, el Active Directory, el correo, los respaldos, el reloj y los errores del log, y termina con «todo bien» o con la lista de fallas.
+
+> **Recursos de cada contenedor** (desde el 10/11/2026). Cada uno tiene un tope de memoria y de procesos, y el backend además de CPU. Sin topes, uno que se desboca se lleva a los demás: sin memoria, el kernel mata al proceso más grande de la VM, que suele ser PostgreSQL. Con ellos, Docker corta solo dentro del contenedor que se pasó y se levanta solo (uvicorn levanta sus procesos; los contenedores tienen `restart: always`). Se ajustan en el `.env`:
+>
+> | Variable | Por defecto | Qué es |
+> |---|---|---|
+> | `POSTGRES_MEMORIA` | `1g` | PostgreSQL (con `shm_size` de 256 MB para sus consultas en paralelo) |
+> | `BACKEND_MEMORIA` | `1g` | El backend. Medido con 100 usuarios (`tests/carga.py`): ~410 MB con 2 procesos; ~200 MB más por cada proceso extra |
+> | `BACKEND_CPUS` | `2` | Núcleos del backend: tantos como `UVICORN_WORKERS`, para que PostgreSQL y nginx tengan CPU aunque el backend esté a tope |
+> | `FRONTEND_MEMORIA` | `256m` | nginx |
+>
+> La suma de los topes debería dejar unos 500 MB libres para el sistema: con los valores por defecto (2,25 GB), una VM de 3 GB o más. `verificar-despliegue.sh` muestra el uso de cada contenedor contra su tope, avisa si alguno pasa del 80 % o si Docker lo cortó, y si se cayó algún proceso de uvicorn en las últimas 24 h.
+
+> **Respaldos** (`backup.sh`, cron de root a las 2 AM; la línea del cron está en el script). Cada noche:
+> 1. **La base:** `pg_dump` comprimido en `DIR_BACKUPS/argonavis_bd_FECHA.sql.gz`. PostgreSQL lo saca de una foto consistente sin frenar a nadie: el sistema sigue funcionando mientras tanto.
+> 2. **Los documentos:** una copia por día en `DIR_BACKUPS/documentos/FECHA/`, en la que solo se copian los archivos nuevos; los que ya estaban en la copia anterior se enlazan (*hard link*) y no ocupan espacio otra vez. Cada copia se ve completa. Sirve porque un documento nunca se modifica: reemplazarlo es guardar otro.
+> 3. **Retención:** las últimas `RETENER_DIAS` (14) de cada uno.
+>
+> Corre con la prioridad más baja de CPU y de disco, para no frenar a quien trabaje a esa hora (los puestos operan de noche). Hasta el 10/11/2026 empaquetaba todos los documentos en un `.tar.gz` cada noche y guardaba 14: ocupaban 14 veces lo que pesan los documentos y cada noche tardaba más. Esos `.tar.gz` se borran solos a los 14 días.
+>
+> **Restaurar** (probado el 10/11/2026 con una base temporal; conviene probarlo una vez en el servidor de pruebas): con la base y los documentos **de la misma noche** (los documentos se copian después de la base, así que están todos los que ella nombra), y el backend detenido. En una VM nueva, primero `docker compose -f docker-compose-prod.yml up -d` una vez: crea la base y la cuenta de la aplicación, a la que el respaldo le devuelve sus permisos.
+> ```bash
+> docker compose -f docker-compose-prod.yml stop backend
+> # La base: se borra y se vuelve a crear vacía antes de cargar el respaldo.
+> docker exec snm_postgres sh -c 'dropdb -U "$POSTGRES_USER" "$POSTGRES_DB" && createdb -U "$POSTGRES_USER" "$POSTGRES_DB"'
+> gunzip -c ~/backups/argonavis_bd_<FECHA>.sql.gz | docker exec -i snm_postgres sh -c 'psql -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+> # Los documentos (a un volumen vacío queda igual a la copia; sobre uno con datos, agrega lo que falte).
+> sudo cp -a ~/backups/documentos/<FECHA>/. "$(docker volume inspect argonavis_documentos --format '{{ .Mountpoint }}')/"
+> docker compose -f docker-compose-prod.yml start backend   # al arrancar, vuelve a dar los permisos de la cuenta de la app
+> ```
+> Los respaldos quedan en el mismo servidor: si se pierde el disco, se pierden con él. Cópialos a otra máquina con `rsync -aH --delete ~/backups/ usuario@otro-servidor:/ruta/argonavis/` (la `H` conserva los enlaces: sin ella, cada copia de los documentos ocuparía todo).
 
 **Windows**: `APP_ENV=production` y `LOG_CARPETA=logs` en `backend\.env`, `migrate.bat`, compilar el frontend (`npm run build`) y `start-backend-prod.bat` (sirve también `frontend/dist`). Con `LOG_CARPETA`, los logs quedan en `backend\logs\argonavis-AAAA-MM-DD.log`, uno por día, y se borran a los `LOG_DIAS` días (30); sin ella, solo se ven en la consola y se pierden al cerrarla. En Docker no hace falta: Docker guarda y rota la salida.
 
-> **Al actualizar en Windows**, antes de `migrate.bat`: `venv\Scripts\python -m pip install -r requirements.txt` en `backend` y `npm ci` en `frontend` (luego `npm run build`). Docker lo hace solo al reconstruir. Desde el 27/10/2026 el backend usa PyJWT en lugar de python-jose: sin ese paso no arranca (`No module named 'jwt'`). Desde el 10/11/2026 usa también XlsxWriter (exportar las estadísticas a Excel): sin él, la exportación a Excel responde 500 (el PDF y el CSV siguen). Lo viejo se puede quitar después: `venv\Scripts\python -m pip uninstall python-jose ecdsa rsa`. Las sesiones abiertas siguen valiendo.
+> **Al actualizar en Windows**, antes de `migrate.bat`: `venv\Scripts\python -m pip install --require-hashes -r requirements.lock` en `backend` y `npm ci` en `frontend` (luego `npm run build`). Docker lo hace solo al reconstruir. Desde el 27/10/2026 el backend usa PyJWT en lugar de python-jose: sin ese paso no arranca (`No module named 'jwt'`). Desde el 10/11/2026 usa también XlsxWriter (exportar las estadísticas a Excel): sin él, la exportación a Excel responde 500 (el PDF y el CSV siguen). Lo viejo se puede quitar después: `venv\Scripts\python -m pip uninstall python-jose ecdsa rsa`. Las sesiones abiertas siguen valiendo.
+
+> **Servidor sin salida a internet.** Se prepara el paquete en un equipo que sí la tenga y se lleva al servidor:
+> - **Docker:** en el equipo con internet y Docker, en el commit que se va a instalar, `bash empaquetar-sin-internet.sh`. Deja en `paquete-sin-internet/` las imágenes ya construidas (backend, frontend y PostgreSQL, con todas las librerías adentro), el código de ese commit y `SHA256SUMS`. En el servidor:
+>   ```bash
+>   sha256sum -c SHA256SUMS
+>   tar xzf argonavis-codigo-<commit>.tar.gz -C ~/argonavis
+>   docker load -i argonavis-imagenes-<commit>.tar.gz
+>   cd ~/argonavis && docker compose -f docker-compose-prod.yml up -d --no-build --pull never
+>   ```
+>   El `.env` del servidor no va en el paquete: se conserva el que ya está.
+> - **Windows:** en un equipo con internet y la **misma versión de Python** que el servidor, en `backend`: `venv\Scripts\python -m pip download --require-hashes -r requirements.lock -d paquetes-python` y, además, `venv\Scripts\python -m pip download setuptools -d paquetes-python` (una librería, win-unicode-console, viene sin compilar y se arma al instalarla). Compila también el frontend (`npm ci` y `npm run build`). Lleva `backend\paquetes-python` y `frontend\dist` al servidor e instala sin internet: `venv\Scripts\python -m pip install --no-index --find-links paquetes-python --require-hashes -r requirements.lock`.
 
 > **Servidores instalados antes de ARGO NAVIS** (una sola vez). Antes la base se llamaba `filetransfer` y los documentos vivían en `storage/transfers`. La revisión `b5c2e8f4a713` deja las rutas de los documentos relativas, así que solo cambian los nombres:
 > - **Docker:** el proyecto ahora se llama `argonavis` (`name:` en `docker-compose-prod.yml`) y sus volúmenes son nuevos. Con todo detenido (`docker compose -f docker-compose-prod.yml down` desde la carpeta vieja), copia los datos; `docker volume ls` muestra el prefijo viejo:
@@ -247,7 +295,8 @@ La vista previa muestra PDF, .docx y .xlsx; los .doc y .xls del formato viejo se
 Las agencias entran por la VPN, pero no son del SNM: ARGO NAVIS las trata como usuarios no confiables.
 - **Archivos:** PDF, Word y Excel de hasta 2 MB cada uno, comprobados por su contenido; los de Office con macros se rechazan. La vista previa del Word va en un marco aislado (sin scripts, sin enlaces, sin acceso a la sesión).
 - **Navegador:** Content-Security-Policy (solo código propio de ARGO NAVIS), `X-Frame-Options: DENY` y `nosniff`, en nginx y en el backend cuando sirve el frontend.
-- **Topes:** login por IP (10 por minuto), envíos por cuenta (`LIMITE_ENVIOS_POR_HORA`, 30) y 2 MB por archivo, en cualquier formato. Se cuentan en memoria, por proceso: con varios workers, cada uno lleva su cuenta.
+- **Topes:** login por IP (10 por minuto), por cuenta y por hora los envíos (`LIMITE_ENVIOS_POR_HORA`, 30), las exportaciones de las estadísticas (`LIMITE_EXPORTACIONES_POR_HORA`, 30) y las descargas del PDF (`LIMITE_PDF_POR_HORA`, 120), y 2 MB por archivo, en cualquier formato. Se cuentan en memoria, por proceso: con varios workers, cada uno lleva su cuenta.
+- **Tamaño de cada petición:** 1 MB en la API y, al crear o corregir una solicitud (todos los archivos van juntos), 283 MB: lo más que pesa un envío válido (30 pasajeros × 4 documentos + 1 de la solicitud + 20 adicionales, de 2 MB). nginx y el backend cortan lo que pase de ahí sin leerlo; antes nginx aceptaba 200 MB en cualquier ruta, también en el login, y el backend los leía enteros antes de comprobar la sesión.
 - **Rutas sin sesión:** solo el login, la verificación del QR y el health check; una prueba falla si aparece otra.
 - **Producción:** no arranca con una `SECRET_KEY` corta o de ejemplo.
 
@@ -260,6 +309,9 @@ Cada `VENCIMIENTOS_INTERVALO_MINUTOS` se expiran las solicitudes con plazos venc
 - **Con la base caída, lenta o sin conexiones libres** (más de `BD_POOL_ESPERA` segundos esperando), la API responde 503 con el motivo, y el frontend lo muestra; antes era un 500 sin explicación.
 - **`/api/health`** comprueba la base: con la base caída responde 503 y Docker marca el servicio como no sano. Reusa la respuesta 5 segundos, para no cargar la base.
 - **Correos:** un solo despacho a la vez en cada proceso, y cada envío espera al servidor de correo como mucho `MAIL_TIEMPO_ESPERA` segundos (20).
+- **Trabajos pesados** (exportar las estadísticas, el PDF de una autorización): cada proceso arma como mucho `TRABAJOS_PESADOS_A_LA_VEZ` (2) a la vez y el resto espera su turno, sin retener la conexión a la base. El peor caso, el PDF de las estadísticas, son ~0,6 s de CPU y ~10 MB.
+- **Subidas:** cada archivo pasa al disco temporal desde los 64 KB (Starlette los dejaba en memoria hasta 1 MB): un envío grande ocupa ~9 MB de memoria en vez de ~140. Con menos de `ESPACIO_MINIMO_LIBRE_MB` (1024) libres en el disco de los documentos, no se reciben archivos (507, «avisa a la DTI») y queda un error en el log: que las subidas no llenen el disco que comparten la base y los respaldos.
+- **Memoria y CPU de cada contenedor:** topes en el compose (ver *Producción → Recursos*).
 - **nginx** resuelve el nombre del backend en cada petición (el DNS de Docker): si el contenedor del backend se recrea con otra IP, sigue funcionando sin reiniciar nginx.
 - **Código de cada pedido** (`X-Request-ID`): va en cada línea del log y en los errores 5xx que ve el usuario («… (código 3f2a1b9c0d4e)»). Con ese código se encuentra su traza en el log.
 - **Prueba de carga** (`backend/tests/carga.py`; no la corre pytest):
@@ -309,7 +361,7 @@ Frontend (opcionales):
 ## Pendiente (decisiones del equipo)
 - HTTPS en el servidor, y TLS con el Active Directory y con el correo (la configuración ya está; ver *Producción*).
 - Edición del catálogo de trámites desde la interfaz.
-- Envío por partes para tripulaciones muy grandes (nginx corta en 200 MB por envío).
+- Envío por partes para tripulaciones muy grandes: un envío lleva todos sus archivos juntos (hasta 283 MB), y por una VPN lenta uno así puede pasar los 5 minutos que espera el navegador.
 - Política de retención de datos personales (Ley 81 de 2019) y copia de los respaldos fuera del servidor.
 - Solicitud de Custodia y Solicitud de Transbordos (el documento de UCVMM dice que faltan por levantar).
 - Segundo factor (código TOTP) para las cuentas de las agencias: decidido para más adelante.

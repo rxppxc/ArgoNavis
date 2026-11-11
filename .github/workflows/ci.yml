@@ -8,7 +8,8 @@
 # Corre en cada push a main y en los pull request. La auditoría corre además
 # cada lunes, para avisar de vulnerabilidades nuevas aunque no haya cambios.
 # Versiones como en producción: Python 3.12 y Node 24 (los Dockerfile),
-# PostgreSQL 15 (docker-compose-prod.yml).
+# PostgreSQL 15 con la misma imagen exacta (docker-compose-prod.yml) y las
+# librerías de Python de requirements.lock, verificadas con su hash.
 name: CI
 
 on:
@@ -37,7 +38,7 @@ jobs:
     timeout-minutes: 20
     services:
       postgres:
-        image: postgres:15
+        image: postgres:15.19-alpine3.24   # la de docker-compose-prod.yml
         env:
           POSTGRES_PASSWORD: postgres
         ports: ["5432:5432"]
@@ -49,13 +50,15 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: backend/requirements*.txt
+          cache-dependency-path: backend/requirements*
       - name: Paquetes del sistema (como el Dockerfile)
         run: sudo apt-get update && sudo apt-get install -y libmagic1 fonts-dejavu-core
       - name: Dependencias
         working-directory: backend
+        # Las de producción, exactas y con hash (como el Dockerfile); después, las de pruebas.
         run: |
           python -m venv venv
+          venv/bin/pip install --require-hashes --only-binary :all: -r requirements.lock
           venv/bin/pip install -r requirements-dev.txt
       - name: Pruebas
         working-directory: backend
@@ -84,6 +87,9 @@ jobs:
         run: npm test
       - name: Build de producción
         run: npm run build
+      - name: Configuración de nginx (nginx -t, con la imagen de frontend/Dockerfile)
+        # Con un error en nginx.conf el contenedor no arranca y el sitio queda caído al desplegar.
+        run: docker run --rm -v "$PWD/nginx.conf:/etc/nginx/conf.d/default.conf:ro" nginx:1.31.8-alpine nginx -t
 
   e2e:
     if: github.event_name != 'schedule'
@@ -91,7 +97,7 @@ jobs:
     timeout-minutes: 30
     services:
       postgres:
-        image: postgres:15
+        image: postgres:15.19-alpine3.24   # la de docker-compose-prod.yml
         env:
           POSTGRES_PASSWORD: postgres
         ports: ["5432:5432"]
@@ -103,14 +109,14 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: backend/requirements*.txt
+          cache-dependency-path: backend/requirements*
       - name: Paquetes del sistema (como el Dockerfile)
         run: sudo apt-get update && sudo apt-get install -y libmagic1 fonts-dejavu-core
       - name: Backend (en backend/venv, donde lo busca playwright.config.ts)
         working-directory: backend
         run: |
           python -m venv venv
-          venv/bin/pip install -r requirements.txt
+          venv/bin/pip install --require-hashes --only-binary :all: -r requirements.lock
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -147,10 +153,12 @@ jobs:
           node-version: 24
       # Un aviso nuevo deja el job en rojo: hay que actualizar o, si no aplica,
       # omitirlo aquí (--ignore-vuln <id>) explicando por qué, y anotarlo en CLAUDE.md.
+      # Sobre requirements.lock: todas las librerías que se instalan, también las que
+      # arrastran las directas (con requirements.txt solo se revisaban las directas).
       - name: Backend (pip-audit)
         run: |
-          python -m pip install --quiet pip-audit
-          pip-audit -r backend/requirements.txt --desc on
+          python -m pip install --quiet "pip-audit==2.10.1"
+          pip-audit -r backend/requirements.lock --require-hashes --no-deps --desc on
       - name: Frontend (npm audit)
         working-directory: frontend
         run: npm audit --omit=dev --audit-level=high

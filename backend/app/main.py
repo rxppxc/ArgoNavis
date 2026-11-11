@@ -13,6 +13,7 @@ from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError, IntegrityError, InterfaceError, OperationalError
 from sqlalchemy.exc import TimeoutError as PoolAgotado
+from starlette.formparsers import MultiPartParser
 from app.core.config import obtener_configuracion
 from app.core.rate_limit import limiter
 from app.core.registro import configurar_registro, id_pedido
@@ -20,6 +21,8 @@ from app.core.security import CABECERA_CAMBIO_CONTRASENA
 from app.api.v1 import auth, admin, tramites, solicitudes, verificacion, catalogos, bitacora, pendientes
 # Registrar todos los modelos en el registry del ORM (relaciones por nombre).
 from app.domain.models import rol, tramite, catalogo, solicitud, correo  # noqa: F401
+from app.domain.services.solicitud_service import TOPE_CUERPO_ENVIO_MB
+from app.infrastructure.almacenamiento import TAMANO_MAXIMO_MB
 from app.infrastructure.cola_correos import tarea_correos
 from app.infrastructure.database import motor_bd
 from app.infrastructure.tareas import tarea_vencimientos
@@ -134,6 +137,80 @@ async def servicio_no_disponible(request: Request, exc: ConnectionError) -> JSON
     reporta así al conectar). 503 con motivo en vez de un 500."""
     logger.error("[red] Conexión rechazada en %s %s: %s", request.method, request.url.path, exc)
     return _no_disponible(_BD_NO_RESPONDE)
+
+TOPE_CUERPO_MB = 1   # el resto de la API: sus cuerpos son JSON de pocos KB
+_RUTA_DE_ENVIO = re.compile(r"/api/v1/solicitudes(/[0-9]+)?/?")
+
+
+def _es_envio(metodo: str, ruta: str) -> bool:
+    """Crear (POST /solicitudes) o corregir (PUT /solicitudes/{id}): llevan juntos
+    todos los archivos de la solicitud."""
+    return metodo in ("POST", "PUT") and _RUTA_DE_ENVIO.fullmatch(ruta) is not None
+
+
+def tope_del_cuerpo(metodo: str, ruta: str) -> int:
+    """Bytes que admite el cuerpo de una petición."""
+    return (TOPE_CUERPO_ENVIO_MB if _es_envio(metodo, ruta) else TOPE_CUERPO_MB) * 1024 * 1024
+
+
+def _cuerpo_demasiado_grande(metodo: str, ruta: str, tope: int) -> HTTPException:
+    logger.warning("[tope] %s %s: el cuerpo pasa de %d MB", metodo, ruta, tope // (1024 * 1024))
+    if _es_envio(metodo, ruta):
+        detalle = (f"El envío pesa más de {TOPE_CUERPO_ENVIO_MB} MB, lo máximo para una solicitud. "
+                   f"Cada archivo puede pesar hasta {TAMANO_MAXIMO_MB} MB.")
+    else:
+        detalle = "El contenido de la petición supera el máximo permitido."
+    return HTTPException(status_code=413, detail=detalle)
+
+
+class TopeDelCuerpo:
+    """Corta un cuerpo más grande que su tope sin leerlo (revisión de recursos del 2026-11-10).
+
+    FastAPI lee el cuerpo entero ANTES de comprobar la sesión y el límite de envíos:
+    sin tope, cualquiera, sin cuenta, hacía que el backend leyera cientos de MB por
+    petición en cualquier ruta, también en el login (un JSON va entero a la memoria; un
+    formulario, al disco temporal). Con Content-Length se responde 413 sin leer nada; sin
+    él (envío por partes), se cuenta lo que llega y se corta al pasar el tope. nginx tiene
+    los mismos topes (frontend/nginx.conf), pero en Windows el backend atiende solo."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        metodo, ruta = scope["method"], scope["path"]
+        tope = tope_del_cuerpo(metodo, ruta)
+        declarado = dict(scope["headers"]).get(b"content-length", b"")
+        if declarado.isdigit() and int(declarado) > tope:
+            error = _cuerpo_demasiado_grande(metodo, ruta, tope)
+            await JSONResponse(status_code=error.status_code, content={"detail": error.detail})(scope, receive, send)
+            return
+
+        leidos = 0
+
+        async def recibir():
+            nonlocal leidos
+            mensaje = await receive()
+            if mensaje["type"] == "http.request":
+                leidos += len(mensaje.get("body", b""))
+                if leidos > tope:
+                    # FastAPI deja pasar la HTTPException que sale de leer el cuerpo: es un 413 con detail.
+                    raise _cuerpo_demasiado_grande(metodo, ruta, tope)
+            return mensaje
+
+        await self.app(scope, recibir, send)
+
+
+# El primero que se agrega queda por dentro de todos: el 413 lleva CORS y el código de pedido.
+aplicacion.add_middleware(TopeDelCuerpo)
+
+# Cada archivo de un envío pasa al disco temporal desde los 64 KB (Starlette deja en
+# memoria cada uno de hasta 1 MB): un envío de 141 archivos de casi 1 MB ocupaba ~140 MB
+# del proceso mientras se procesaba; así, ~9 MB. Cuenta para el límite de memoria del
+# contenedor (docker-compose-prod.yml). Lo comprueba tests/test_recursos.py.
+MultiPartParser.spool_max_size = 64 * 1024
 
 # CORS: en desarrollo permite el frontend de Vite (no usamos "*" para poder enviar credenciales).
 # En producción el frontend viene del mismo servidor → solo el FRONTEND_URL configurado.

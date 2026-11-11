@@ -74,6 +74,18 @@ Estado        = EstadoSolicitud
 MAX_ERRORES_MOSTRADOS      = 8
 MAX_DOCUMENTOS_ADICIONALES = 20
 MAX_TRIPULANTES            = 30   # por solicitud (reunión del 2026-10-30); espejo en el frontend
+# Lo más que pesa un envío válido (crear o corregir), que lleva juntos todos los archivos
+# de la solicitud: es el tope del cuerpo de esas dos rutas (TopeDelCuerpo en main.py y
+# client_max_body_size en frontend/nginx.conf, revisión de recursos del 2026-11-10). Con
+# el catálogo de hoy, a un pasajero se le piden como mucho 4 documentos (Desembarque,
+# Urgencia médica y Renovación) y a la solicitud, 1 (la Lista de Tripulantes):
+# 30 × 4 + 1 + 20 adicionales = 141 archivos de 2 MB, más 1 MB para los datos y los
+# separadores. tests/test_recursos.py falla si el catálogo pide más, o si nginx no coincide.
+MAX_DOCUMENTOS_POR_TRIPULANTE  = 4
+MAX_DOCUMENTOS_DE_LA_SOLICITUD = 1
+MAX_ARCHIVOS_EN_UN_ENVIO = (MAX_TRIPULANTES * MAX_DOCUMENTOS_POR_TRIPULANTE + MAX_DOCUMENTOS_DE_LA_SOLICITUD
+                            + MAX_DOCUMENTOS_ADICIONALES)
+TOPE_CUERPO_ENVIO_MB = MAX_ARCHIVOS_EN_UN_ENVIO * almacenamiento.TAMANO_MAXIMO_MB + 1
 MAX_FUERA_HORARIO_LISTADAS = 50   # estadísticas: las aprobadas fuera del horario que se listan
 # Estadísticas: cuántos días, meses y años muestra la serie, como mucho (los últimos del periodo).
 DIAS_EN_SERIE  = 31

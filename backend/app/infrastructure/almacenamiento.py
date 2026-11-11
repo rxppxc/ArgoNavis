@@ -303,9 +303,29 @@ async def _escribir(subida: UploadFile, ruta: Path, nombre_original: str) -> int
     if tamano > max_bytes:
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-            detail=f"El archivo '{nombre_original}' pesa más de {TAMANO_MAXIMO_MB} MB, el máximo por archivo.",
+            detail=f"El archivo '{nombre_original}' pesa más de {TAMANO_MAXIMO_MB} MB, el máximo permitido por archivo.",
         )
     return tamano
+
+
+def _verificar_espacio_libre(carpeta: Path) -> None:
+    """Con menos de ESPACIO_MINIMO_LIBRE_MB libres en el disco de los documentos,
+    no se recibe nada (507) y queda un error en el log (lo ve verificar-despliegue.sh).
+    Ese disco es también el de PostgreSQL (en Docker, los dos volúmenes) y el de los
+    respaldos: lleno, la base deja de escribir y se cae todo, no solo las subidas
+    (revisión de recursos del 2026-11-10)."""
+    minimo = configuracion.ESPACIO_MINIMO_LIBRE_MB
+    if minimo <= 0:
+        return
+    libre = shutil.disk_usage(carpeta).free
+    if libre < minimo * 1024 * 1024:
+        logger.error("[almacenamiento] Quedan %d MB libres en el disco de los documentos (mínimo %d MB): "
+                     "no se reciben archivos hasta liberar espacio.", libre // (1024 * 1024), minimo)
+        raise HTTPException(
+            status_code=status.HTTP_507_INSUFFICIENT_STORAGE,
+            detail="El servidor se está quedando sin espacio en disco y no puede recibir documentos. "
+                   "Avisa a la Dirección de Tecnología e Innovación.",
+        )
 
 
 async def guardar_archivos(destino: Path, archivos_subidos: list[UploadFile]) -> list[ArchivoGuardado]:
@@ -313,6 +333,8 @@ async def guardar_archivos(destino: Path, archivos_subidos: list[UploadFile]) ->
     disco los que ya había escrito en esta llamada (también el que falló) y
     relanza el error."""
     destino.mkdir(parents=True, exist_ok=True)
+    if archivos_subidos:
+        _verificar_espacio_libre(destino)
     escritos: list[Path] = []
     guardados: list[ArchivoGuardado] = []
     try:

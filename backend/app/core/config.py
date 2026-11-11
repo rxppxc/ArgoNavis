@@ -116,6 +116,20 @@ class Configuracion(BaseSettings):
     # por hora: frena que una cuenta (p. ej. de una agencia comprometida) llene
     # el disco o sature la validación de archivos. 0 = sin límite.
     LIMITE_ENVIOS_POR_HORA: int = 30
+    # Lo que ocupa la CPU unos cientos de milisegundos (2026-11-10), por usuario y
+    # por hora: exportar las estadísticas (un PDF del peor caso, ~0,6 s) y
+    # descargar el PDF de una autorización (~0,2 s). Frena un ciclo o un script,
+    # no el uso normal. 0 = sin límite.
+    LIMITE_EXPORTACIONES_POR_HORA: int = 30
+    LIMITE_PDF_POR_HORA: int = 120
+    # Cuántos de esos archivos se arman a la vez en cada proceso: el resto espera
+    # su turno. Son Python puro: muchos a la vez le quitarían la CPU (y el GIL) a
+    # las demás peticiones del proceso.
+    TRABAJOS_PESADOS_A_LA_VEZ: int = 2
+    # Con menos espacio libre que esto en el disco de los documentos, no se
+    # reciben archivos nuevos (507): las subidas no deben llenar el disco que
+    # comparten PostgreSQL y los respaldos. 0 = sin control.
+    ESPACIO_MINIMO_LIBRE_MB: int = 1024
 
     # Cuentas locales (sin AD): las de usuarios externos, como las agencias
     # navieras. Interruptor independiente de APP_ENV. Con False solo entran

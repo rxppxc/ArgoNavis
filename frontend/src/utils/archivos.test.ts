@@ -17,7 +17,7 @@ describe("validarArchivos", () => {
   it(`admite hasta ${TAMANO_MAX_MB} MB por archivo`, () => {
     expect(validarArchivos([archivo("justo.pdf", TAMANO_MAX_BYTES)])).toBeNull();
     expect(validarArchivos([archivo("grande.pdf", TAMANO_MAX_BYTES + 1)]))
-      .toBe(`Cada archivo puede pesar hasta ${TAMANO_MAX_MB} MB. Pesan más: grande.pdf (2.00 MB).`);
+      .toBe(`El máximo permitido es ${TAMANO_MAX_MB} MB por archivo. Pesan más: grande.pdf (2.00 MB).`);
   });
 
   it("el selector de archivos ofrece las mismas extensiones", () => {

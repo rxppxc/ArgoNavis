@@ -5,7 +5,6 @@ correos en ServicioNotificacion. Acá se registra la bitácora de cada acción y
 se encolan los avisos, en la misma transacción (salen después del commit, en
 segundo plano).
 """
-import asyncio
 from datetime import date, datetime
 from typing import Annotated, Literal, TypeVar
 
@@ -24,7 +23,7 @@ from app.core.permisos import (
     PERMISO_PUERTO, PERMISO_REVISAR, PERMISO_SOLICITAR, PERMISO_SUPERVISAR_SECTOR, PERMISO_SUPERVISAR_TODO,
     requerir_algun_permiso, requerir_permiso,
 )
-from app.core.rate_limit import clave_usuario, limite_envios, limiter
+from app.core.rate_limit import clave_usuario, limite_envios, limite_exportaciones, limite_pdf, limiter
 from app.domain.models.audit_log import AccionAuditoria
 from app.domain.models.solicitud import Solicitud
 from app.domain.models.user import Usuario
@@ -39,6 +38,7 @@ from app.domain.services.uso_service import ServicioUsoSistema
 from app.infrastructure import almacenamiento
 from app.infrastructure.cola_correos import despachar_correos, encolar_avisos
 from app.infrastructure.database import obtener_sesion_bd
+from app.infrastructure.trabajo_pesado import en_hilo_con_tope
 
 enrutador = APIRouter(prefix="/solicitudes", tags=["solicitudes"])
 
@@ -193,7 +193,9 @@ async def estadisticas(
 
 
 @enrutador.get("/estadisticas/exportar")
+@limiter.limit(limite_exportaciones, key_func=clave_usuario)
 async def exportar_estadisticas(
+    request: Request,
     formato: Literal["xlsx", "pdf", "csv"] = Query(..., description="Excel, PDF o CSV."),
     desde:   date | None = Query(default=None),
     hasta:   date | None = Query(default=None),
@@ -208,7 +210,7 @@ async def exportar_estadisticas(
     """Las estadísticas del periodo (de los sectores que ve quien consulta) en un
     archivo con la identidad del SNM, para informes (core/informe_estadisticas.py).
     El uso del sistema va solo para quien ve todos los sectores. Quién lo generó va
-    en el archivo. Se arma en un hilo aparte: es CPU-bound."""
+    en el archivo. Se arma en un hilo, con turno (trabajo_pesado.py): es CPU-bound."""
     alcance = await svc.alcance_estadisticas(ctx, sector_id)
     datos = DatosInforme(
         estadisticas=await svc.estadisticas(desde, hasta, alcance),
@@ -216,7 +218,10 @@ async def exportar_estadisticas(
         desde=desde, hasta=hasta, unidad=unidad,
         generado_por=ctx.usuario.full_name, generado_en=datetime.now(ZONA_PANAMA),
     )
-    archivo = await asyncio.to_thread(generar_informe, formato, datos)
+    # Los datos ya están leídos: la conexión vuelve al pool antes de esperar turno y
+    # de armar el archivo (no se escribió nada: el commit solo la suelta).
+    await sesion.commit()
+    archivo = await en_hilo_con_tope(generar_informe, formato, datos)
     return Response(
         content=archivo.contenido,
         media_type=archivo.tipo,
@@ -318,6 +323,7 @@ async def obtener_documento(
 
 
 @enrutador.get("/{solicitud_id}/autorizacion.pdf")
+@limiter.limit(limite_pdf, key_func=clave_usuario)
 async def descargar_autorizacion(
     solicitud_id: int,
     request: Request,
@@ -329,7 +335,10 @@ async def descargar_autorizacion(
     personal del SNM recibe la copia interna (con el nombre de quien aprobó)."""
     s = await svc.obtener(ctx, solicitud_id)
     datos = await svc.preparar_pdf(ctx, s)
-    contenido = await asyncio.to_thread(generar_pdf_autorizacion, datos)
+    # La conexión vuelve al pool mientras se arma el PDF (con turno, trabajo_pesado.py);
+    # la bitácora la vuelve a pedir después. Los objetos siguen sirviendo: expire_on_commit=False.
+    await sesion.commit()
+    contenido = await en_hilo_con_tope(generar_pdf_autorizacion, datos)
 
     await _auditar(sesion, request, ctx.usuario, AccionAuditoria.AUTORIZACION_DESCARGADA, s,
                    copia_interna=datos.copia_interna)

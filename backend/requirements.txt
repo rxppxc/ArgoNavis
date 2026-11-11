@@ -1,7 +1,16 @@
 # ════════════════════════════════════════════════════════════════════════════
-# ARGO NAVIS (SNM) — Dependencias del backend
-# Versiones fijas (==) para reproducibilidad. Actualizar con revisión manual.
-# Regenerar con: pip freeze > requirements.txt (revisando previamente)
+# ARGO NAVIS (SNM) — Dependencias directas del backend (lo que se edita)
+#
+# Lo que se INSTALA es requirements.lock (2026-11-10): estas y todas las que
+# ellas arrastran, con la versión exacta y el hash de cada archivo, para Linux
+# (Docker) y Windows. Así cada instalación trae exactamente lo mismo, y si PyPI
+# entregara otro archivo, pip se detiene.
+#   Instalar:  pip install --require-hashes -r requirements.lock
+#   Al cambiar este archivo, regenera el bloqueo (uv está en requirements-dev.txt):
+#     uv pip compile requirements.txt --universal --python-version 3.12 --generate-hashes -o requirements.lock
+#   Para subir una librería indirecta, agrega «-P nombre» (sin eso, uv conserva
+#   las versiones del bloqueo). tests/test_dependencias.py comprueba que los dos
+#   archivos coincidan.
 # ════════════════════════════════════════════════════════════════════════════
 
 # ── Núcleo web ──────────────────────────────────────────────────────────────
@@ -47,9 +56,11 @@ XlsxWriter==3.2.9
 aiofiles==25.1.0
 aiosmtplib==5.1.2
 
-# ── Transitivas con parche de seguridad (pip-audit, 2026-10) ────────────────
-# No se usan directo: el mínimo hace que `pip install -r requirements.txt`
-# actualice también una instalación existente.
-pyasn1>=0.6.4          # ldap3: decodifica las respuestas del Active Directory
+# ── Transitivas con parche de seguridad (pip-audit) ─────────────────────────
+# No se usan directo: el mínimo impide que el bloqueo vuelva a una versión con
+# el aviso. Las de pillow y pyasn1 salieron al auditar el bloqueo completo
+# (2026-11-10): con requirements.txt, pip-audit solo revisaba las directas.
+pyasn1>=0.6.5          # ldap3: decodifica las respuestas del Active Directory (4 avisos en 0.6.4)
+pillow>=13.0.0         # reportlab: las imágenes del PDF (39 avisos en 12.3.0)
 cryptography>=50.0.0   # oletools (msoffcrypto-tool)
 anyio>=4.14.2          # starlette

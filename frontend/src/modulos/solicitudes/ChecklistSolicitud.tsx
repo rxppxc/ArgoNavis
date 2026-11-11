@@ -29,7 +29,7 @@ export function ChecklistSolicitud({ documentos, tripulantes, onIrATripulante, o
           {casillas.length - faltantes.length} de {casillas.length} adjuntos
         </span>
       </div>
-      <p className={styles.ayudaSeccion}>PDF, Word o Excel, de hasta {TAMANO_MAX_MB} MB cada uno.</p>
+      <p className={styles.ayudaSeccion}>PDF, Word o Excel. Máximo permitido: {TAMANO_MAX_MB} MB por archivo.</p>
       {tripulantes.some((t) => casillasPorTripulante.has(t.clave)) && (
         <div className={styles.resumenTripulantes} aria-label="Documentos por pasajero">
           {tripulantes.map((t, i) => {

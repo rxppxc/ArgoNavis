@@ -44,7 +44,7 @@ export function validarArchivos(archivos: File[]): string | null {
   const grandes = archivos.filter(a => a.size > TAMANO_MAX_BYTES);
   if (grandes.length) {
     const detalle = grandes.map(a => `${a.name} (${formatBytes(a.size)})`).join(", ");
-    return `Cada archivo puede pesar hasta ${TAMANO_MAX_MB} MB. Pesan más: ${detalle}.`;
+    return `El máximo permitido es ${TAMANO_MAX_MB} MB por archivo. Pesan más: ${detalle}.`;
   }
 
   return null;

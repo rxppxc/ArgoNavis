@@ -44,6 +44,18 @@ def limite_envios() -> str:
     return f"{n}/hour" if n > 0 else "100000/hour"
 
 
+def limite_exportaciones() -> str:
+    """Exportaciones de las estadísticas (Excel, PDF o CSV) por usuario y por hora."""
+    n = _config.LIMITE_EXPORTACIONES_POR_HORA
+    return f"{n}/hour" if n > 0 else "100000/hour"
+
+
+def limite_pdf() -> str:
+    """Descargas del PDF de una autorización por usuario y por hora."""
+    n = _config.LIMITE_PDF_POR_HORA
+    return f"{n}/hour" if n > 0 else "100000/hour"
+
+
 def limite_verificacion() -> str:
     """Devuelve la cadena de límite (p. ej. "30/minute") según configuración.
     Si `LIMITE_VERIFICACIONES_POR_MINUTO` es 0, retorna un límite muy alto

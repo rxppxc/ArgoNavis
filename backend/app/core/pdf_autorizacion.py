@@ -17,6 +17,7 @@ from pathlib import Path
 from xml.sax.saxutils import escape
 from zoneinfo import ZoneInfo
 
+from reportlab import rl_config
 from reportlab.graphics.barcode.qr import QrCodeWidget
 from reportlab.graphics.shapes import Drawing
 from reportlab.lib import colors
@@ -29,6 +30,13 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 logger = logging.getLogger(__name__)
+
+# Sin ASCII85 (2026-11-10): reportlab, por defecto, pasa cada imagen y cada página
+# comprimidas a texto ASCII85, un paso en Python puro que no hace falta (el PDF admite
+# binario). Sin él, el PDF de las estadísticas tarda ~0,6 s en vez de ~0,7, el de la
+# autorización ~0,19 en vez de ~0,23, y los dos pesan menos. Vale para todo el proceso:
+# también para el informe (informe_pdf.py importa este módulo).
+rl_config.useA85 = 0
 
 _LOGO = Path(__file__).resolve().parent.parent / "recursos" / "logo-snm.png"
 _TZ_PANAMA = ZoneInfo("America/Panama")

@@ -62,6 +62,35 @@ for c in snm_postgres snm_backend snm_frontend; do
   if [ "$reinicios" -gt 0 ]; then aviso "$c se reinició solo $reinicios vez/veces (docker logs $c)"; fi
   if [ "$politica" != always ]; then aviso "$c sin «restart: always» ($politica)"; fi
 done
+# Límites de memoria (2026-11-10): sin ellos, un contenedor desbocado se lleva a los
+# demás. Cerca del límite, Docker corta procesos de ese contenedor: hay que subirlo.
+suma_mb=0
+for c in snm_postgres snm_backend snm_frontend; do
+  limite=$(docker inspect -f '{{.HostConfig.Memory}}' "$c" 2>/dev/null) || continue
+  if [ "${limite:-0}" -eq 0 ]; then aviso "$c sin límite de memoria (mem_limit en docker-compose-prod.yml)"; continue; fi
+  suma_mb=$((suma_mb + limite / 1048576))
+  IFS='|' read -r usado porcentaje <<<"$(docker stats --no-stream --format '{{.MemUsage}}|{{.MemPerc}}' "$c" 2>/dev/null)"
+  pct=${porcentaje%%.*}; pct=${pct%\%}
+  case "$pct" in ''|*[!0-9]*) pct=0 ;; esac
+  if [ "$pct" -lt 80 ]; then
+    bien "$c: memoria $usado ($porcentaje de su límite)"
+  else
+    aviso "$c usa el $porcentaje de su límite de memoria ($usado): súbelo en el .env (README → Producción → Recursos)"
+  fi
+  if [ "$(docker inspect -f '{{.State.OOMKilled}}' "$c" 2>/dev/null)" = true ]; then
+    aviso "Docker cortó a $c por falta de memoria: súbele el límite en el .env"
+  fi
+done
+total_mb=$(free -m | awk '/^Mem:/{print $2}')
+if [ "$suma_mb" -gt "$total_mb" ]; then
+  aviso "Los límites de memoria suman $suma_mb MB y la VM tiene $total_mb MB: bájalos en el .env"
+elif [ "$suma_mb" -gt 0 ]; then
+  info "Límites de memoria: $suma_mb MB en total; la VM tiene $total_mb MB y $(nproc) núcleo(s)"
+fi
+murieron=$(docker logs --since 24h snm_backend 2>&1 | grep -c 'Child process .* died')
+if [ "$murieron" -gt 0 ]; then
+  aviso "En 24 h se cayeron $murieron proceso(s) de uvicorn, y uvicorn los levantó (¿límite de memoria?): docker logs --since 24h snm_backend 2>&1 | grep -B5 died"
+fi
 if [ "$(systemctl is-enabled docker 2>/dev/null)" = enabled ]; then
   bien "Docker arranca solo al encender la máquina"
 else
@@ -122,6 +151,10 @@ c=$(codigo http://localhost/api/docs)
 if [ "$c" = 404 ]; then bien "La documentación de la API está oculta"; else aviso "/api/docs responde $c"; fi
 sk=$(env_de SECRET_KEY)
 if [ "${#sk}" -ge 32 ]; then bien "SECRET_KEY de ${#sk} caracteres"; else mal "SECRET_KEY corta (${#sk} caracteres)"; fi
+# Tope del cuerpo (2026-11-10): nginx corta sin leer lo que pase de 1 MB en la API (y
+# de 283 MB al enviar una solicitud). No llega al backend: no deja rastro.
+c=$(head -c 2097152 /dev/zero | codigo -X POST -H 'Content-Type: application/json' --data-binary @- http://localhost/api/v1/auth/login)
+if [ "$c" = 413 ]; then bien "nginx corta las peticiones de más de 1 MB en la API (413)"; else mal "Un cuerpo de 2 MB en el login respondió $c (se esperaba 413): revisa client_max_body_size en nginx.conf"; fi
 frenado=""
 for i in $(seq 1 25); do
   c=$(codigo -X POST -H 'Content-Type: application/json' \
@@ -278,7 +311,23 @@ else
   horas=$(( ( $(date +%s) - $(stat -c %Y "$ultimo") ) / 3600 ))
   if [ "$horas" -le 26 ]; then bien "Último respaldo de la base: $(basename "$ultimo"), hace $horas h, íntegro"; else aviso "El último respaldo de la base tiene $horas h: ¿corre el cron?"; fi
 fi
-info "Los respaldos quedan en este mismo disco: cópialos también a otro servidor."
+# Los documentos, en una copia por día que solo agrega lo nuevo (desde el 2026-11-10;
+# antes, un .tar.gz con todo cada noche).
+copia=$(find "$dir/documentos" -mindepth 1 -maxdepth 1 -type d -name '20*' 2>/dev/null | sort | tail -n 1)
+if [ -n "$copia" ]; then
+  horas=$(( ( $(date +%s) - $(stat -c %Y "$copia") ) / 3600 ))
+  if [ "$horas" -le 26 ]; then bien "Última copia de los documentos: $(basename "$copia"), hace $horas h"; else aviso "La última copia de los documentos tiene $horas h: ¿corre el cron?"; fi
+elif ls "$dir"/argonavis_documentos_*.tar.gz >/dev/null 2>&1; then
+  aviso "Los documentos se respaldan todavía con el formato anterior (.tar.gz): el próximo respaldo pasa a la copia diaria"
+else
+  mal "No hay respaldos de los documentos en $dir/documentos"
+fi
+if [ -d "$dir" ]; then
+  # Puede ser otro disco que el de Docker (en Rocky, /home suele ir aparte de /).
+  uso_respaldos=$(df --output=pcent "$dir" | tail -1 | tr -dc '0-9')
+  if [ "$uso_respaldos" -ge 85 ]; then aviso "El disco de los respaldos ($dir) está al ${uso_respaldos}%: baja RETENER_DIAS o llévalos a otro servidor"; fi
+  info "Los respaldos ocupan $(du -sh "$dir" 2>/dev/null | cut -f1) y quedan en este mismo servidor: cópialos también a otro (rsync -aH)."
+fi
 
 # ── Sistema ──────────────────────────────────────────────────────────────────
 seccion "Sistema"

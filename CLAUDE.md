@@ -88,6 +88,7 @@ constants/          → números mágicos.
 14. Lo que sube una agencia es **no confiable**: entran por la VPN, pero no son del SNM. El Word se previsualiza en un `<iframe sandbox="">` con su propia CSP, sin enlaces, sin altChunks y con las imágenes como `data:` (`ModalPreview.tsx`). **Nunca** pintes en la página HTML que salga de un documento (docx-preview directo en el DOM, `dangerouslySetInnerHTML`): un enlace `javascript:` dentro de un .docx corría en ARGO NAVIS con la sesión de quien revisaba.
 15. CSP en `frontend/nginx.conf` y en `_CABECERAS_SPA` (`backend/app/main.py`), iguales: si cambias una, cambia la otra. Solo código propio: nada en línea, nada de CDN, nada que use `eval` o `new Function`. Si una librería lo necesita, busca otra; no aflojes la CSP.
 16. Crear y corregir solicitudes (lo que sube archivos) tienen tope por cuenta: `@limiter.limit(limite_envios, key_func=clave_usuario)` y `LIMITE_ENVIOS_POR_HORA`. Un endpoint nuevo que suba archivos lleva el mismo decorador.
+    - Y entra en `_RUTA_DE_ENVIO` (`main.py`) y en el `location` de los envíos de `frontend/nginx.conf`: el resto de la API admite cuerpos de 1 MB (`TopeDelCuerpo`, 2026-11-10).
 17. En producción el backend no arranca con una `SECRET_KEY` de menos de 32 caracteres o de ejemplo (validador en `core/config.py`).
 18. Los servidores de desarrollo escuchan solo en este equipo (`start-backend.bat` en 127.0.0.1, Vite en `localhost`): no tienen las protecciones de producción. `VITE_HOST=0.0.0.0` solo para probar desde otro equipo, y por un rato.
 19. La aplicación entra a PostgreSQL con **su propia cuenta** (`DATABASE_URL`, en Docker `argonavis_app`), no con la dueña de las tablas ni con un superusuario (2026-11-08):
@@ -230,8 +231,8 @@ Las agencias entran por la VPN, pero no son del SNM: se las trata como no confia
   - pytest;
   - tipos, lint, Vitest y build;
   - el E2E con Chromium (`PLAYWRIGHT_CHROMIUM=1`);
-  - la auditoría de dependencias (`pip-audit` y `npm audit`).
-  - Usa las versiones de producción: Python 3.12 y Node 24 (los Dockerfile) y PostgreSQL 15 (el compose). Si cambias una allá, cámbiala en el flujo.
+  - la auditoría de dependencias (`pip-audit` sobre `requirements.lock` desde el 2026-11-10, y `npm audit`).
+  - Usa las versiones de producción: Python 3.12 y Node 24 (los Dockerfile), la misma imagen de PostgreSQL que el compose y las librerías de `requirements.lock`, con sus hashes. Si cambias una allá, cámbiala en el flujo (`test_dependencias.py` lo comprueba con PostgreSQL).
   - La auditoría corre además los lunes y bloquea: un aviso nuevo deja el job en rojo. Se actualiza o, si no aplica, se documenta en el flujo con `--ignore-vuln` y su porqué (hoy no hay ninguno).
   - Sin pull requests de Dependabot: el usuario es el único autor en GitHub, y esos PR salen a nombre del bot. Solo las alertas.
 - **Topes de entrada:** todo texto libre y toda lista de los esquemas llevan tope acorde a su columna (`Field(max_length=...)`).
@@ -434,6 +435,49 @@ Pedido del usuario: dos sectores de UCVMM que no ven lo del otro, roles de super
   - El documento del Formulario No. 3 conserva su nombre oficial, «Lista de Tripulantes», hasta que UCVMM cambie el formulario.
   - Los ids de las tarjetas del formulario (`tripulante-${clave}`) no se ven: siguen igual (los usa el desplazamiento y la E2E).
 
+### Dependencias: de dónde salen y fijadas (2026-11-10)
+Pedido del usuario: «¿las librerías son descargadas, nada se saca de internet?». Revisado a fondo:
+- **En ejecución no se descarga nada.** El frontend lleva sus librerías en el paquete compilado (sin CDN ni fuentes web: usa Segoe UI y las del sistema) y la CSP solo deja cargar lo del propio servidor. El backend habla solo con PostgreSQL, el AD (ldap3) y el SMTP (aiosmtplib). Los correos llevan el logo incrustado (`cid:`). Las URLs que aparecen en el paquete compilado son espacios de nombres XML de Office y enlaces en mensajes de error, no descargas.
+  - Única excepción, solo en desarrollo: `/api/docs` (Swagger de FastAPI) se carga desde un CDN. En producción está apagado.
+  - requests y httpx están en el venv de desarrollo por pip-audit y las pruebas: no entran en producción.
+- **Al instalar sí se descarga, y siempre lo mismo:**
+  - **Python: se instala desde `backend/requirements.lock`**, con `pip install --require-hashes -r requirements.lock`; en Docker, además, `--only-binary :all:` (todas traen rueda para Linux y 3.12).
+    - Trae todas las librerías (directas e indirectas) con la versión exacta y el hash, para Linux y Windows (`uv pip compile --universal`). `requirements.txt` es lo que se edita.
+    - **No vuelvas a instalar desde `requirements.txt`:** las 36 indirectas tomaban la última versión de PyPI en cada build.
+    - Al cambiar `requirements.txt`, regenera el bloqueo (el comando está al principio del archivo; `uv` está en `requirements-dev.txt`). Para subir una indirecta, `-P nombre`.
+    - `tests/test_dependencias.py` falla si los dos archivos no coinciden, si falta un hash o si el Dockerfile deja de instalar desde el bloqueo.
+  - Node: `package-lock.json` (con hashes); en un servidor, `npm ci`, nunca `npm install`.
+  - **Imágenes Docker con la versión exacta:** `python:3.12.16-slim-trixie` (`ARG IMAGEN_PYTHON` en el Dockerfile), `node:24.22.2-alpine3.24`, `nginx:1.31.8-alpine` y `postgres:15.19-alpine3.24`, también en la CI. Con `nginx:alpine` o `python:3.12-slim`, cada build traía lo último sin que nadie lo decidiera. La misma prueba falla con una etiqueta flotante o si la CI usa otro PostgreSQL. Para actualizar, cambia la etiqueta.
+- **La auditoría revisa el bloqueo** (`pip-audit -r requirements.lock --require-hashes`, en la CI y en el equipo). Con `requirements.txt` solo veía las directas.
+  - Al cambiarla aparecieron 39 avisos en pillow 12.3.0 (la usa reportlab) y 4 en pyasn1 0.6.4 (la usa ldap3), que no se veían. Se subieron a 13.0.0 y 0.6.5, con su mínimo en `requirements.txt`.
+- **Servidor sin salida a internet:**
+  - Docker: `empaquetar-sin-internet.sh` (en un equipo con internet y Docker) guarda las imágenes ya construidas y el código del commit; en el servidor, `docker load` y `docker compose up -d --no-build --pull never`. Por eso el compose les da nombre fijo (`argonavis-backend`, `argonavis-frontend`, los mismos que ya ponía).
+  - Windows: `pip download` del bloqueo, más setuptools (win-unicode-console viene sin compilar), e instalación con `--no-index --find-links`. Probado el 2026-11-10. Detalle en README → Producción.
+- Las acciones de la CI siguen fijadas por etiqueta (`@v4`), no por commit: sin los PR de Dependabot nadie las actualizaría, y solo corren las pruebas.
+
+### Recursos y topes (2026-11-10)
+Pedido del usuario: «¿no hay riesgo de sobrecarga de recursos, procesos que afecten la operación?», y después: «¿por qué 200 MB si el máximo es 2 MB por archivo?», «los contenedores deben estar limitados» y «¿el respaldo nocturno ralentiza todo?». Lo prueba `tests/test_recursos.py`.
+- **Tope del cuerpo de cada petición** (`TopeDelCuerpo`, `main.py`): 1 MB en la API (`TOPE_CUERPO_MB`) y `TOPE_CUERPO_ENVIO_MB` (283) al crear y corregir una solicitud (`_RUTA_DE_ENVIO`). Es lo más que pesa un envío válido: 30 pasajeros × 4 documentos + 1 de la solicitud + 20 adicionales, de 2 MB, más 1 MB.
+  - FastAPI lee el cuerpo **antes** de comprobar la sesión y el rate limit. Sin tope, cualquiera, sin cuenta, hacía leer al backend cientos de MB por petición, también en el login (un JSON va entero a la memoria). Con Content-Length se corta sin leer; sin él, se cuenta lo que llega.
+  - nginx tiene los mismos: `client_max_body_size 1m` en `/api/` y un `location` anidado para los envíos, con el 413 en JSON. Antes eran 200 MB para todo `/api/`, que encima no alcanzaban para un envío máximo.
+  - Si el catálogo pide más documentos, `test_el_tope_de_un_envio_alcanza_para_el_catalogo` falla: sube `MAX_DOCUMENTOS_*` (`solicitud_service.py`) y nginx. `test_nginx_tiene_los_mismos_topes_que_el_backend` compara los dos, y la CI corre `nginx -t` con la imagen de producción.
+- **Topes por cuenta:** `LIMITE_EXPORTACIONES_POR_HORA` (30) y `LIMITE_PDF_POR_HORA` (120), como el de los envíos.
+- **Trabajos pesados con turno** (`en_hilo_con_tope`, `infrastructure/trabajo_pesado.py`): el PDF y las exportaciones, como mucho `TRABAJOS_PESADOS_A_LA_VEZ` (2) por proceso. Los endpoints sueltan antes la conexión (`await sesion.commit()`: los datos ya están leídos y `expire_on_commit=False`). **Un trabajo nuevo de cientos de ms de CPU va por ahí**, no por `asyncio.to_thread`.
+- **reportlab sin ASCII85** (`rl_config.useA85 = 0`, `pdf_autorizacion.py`): ~15 % menos de CPU y PDF más chicos.
+- **Subidas al disco desde los 64 KB** (`MultiPartParser.spool_max_size`, `main.py`): Starlette dejaba en memoria cada archivo de hasta 1 MB, y un envío máximo ocupaba ~140 MB del proceso. Si Starlette deja de usar ese atributo, `test_los_archivos_de_un_envio_pasan_al_disco_temporal` falla.
+- **Disco:** con menos de `ESPACIO_MINIMO_LIBRE_MB` (1024) libres en el disco de los documentos, no se reciben archivos (507 y error en el log). Es el mismo disco de PostgreSQL y de los respaldos.
+- **Topes de cada contenedor** (`docker-compose-prod.yml`, ajustables en el `.env`): memoria (`POSTGRES_MEMORIA` y `BACKEND_MEMORIA`, 1g; `FRONTEND_MEMORIA`, 256m), CPU del backend (`BACKEND_CPUS`, tantos como workers), `pids_limit` en los tres y `shm_size` de 256 MB en PostgreSQL.
+  - Medido con 100 usuarios: el backend usa ~410 MB (~150 por proceso de uvicorn y ~110 el maestro).
+  - Si un proceso de uvicorn se pasa, Docker lo corta y uvicorn lo levanta. `verificar-despliegue.sh` muestra el uso contra el límite y los procesos caídos.
+- **Respaldo incremental** (`backup.sh`). La base, como antes. Los documentos, una copia por día:
+  - se enlaza la copia anterior (`cp -al`), se copia lo nuevo (`cp -a -u --remove-destination`, que no escribe sobre la anterior) y sale lo que ya no está en el volumen;
+  - con `nice`/`ionice`, `flock` y archivos parciales que no quedan con nombre de bueno;
+  - antes era un `.tar.gz` de todo, cada noche, ×14.
+  - **No vuelvas al tar de todo:** con los años llena el disco que comparte con PostgreSQL.
+  - Sirve porque los documentos no se modifican (reemplazar es guardar otro). Si eso cambia, revisa el respaldo.
+  - La restauración está en el README, probada con una base temporal (dropdb, createdb y psql con `ON_ERROR_STOP`).
+- En pantalla, «Máximo permitido: 2 MB por archivo» en las tres secciones donde se adjunta (la de adicionales no lo decía) y en el aviso al elegir uno más pesado.
+
 ### Lo que sigue pendiente (no urgente)
 1. **HTTPS y TLS con el AD** — la configuración está lista (README → "Producción"); falta el certificado del servidor y el del controlador de dominio (infraestructura).
 2. **JWT en cookie httpOnly** — actualmente en localStorage, con la CSP como barrera (regla 15). Plan en README → "Decisiones documentadas".
@@ -451,7 +495,7 @@ Pedido del usuario: dos sectores de UCVMM que no ven lo del otro, roles de super
     - Subirlas cuando se asiente: solas, y probando el envío (pytest y E2E).
 12. **De la reunión del 2026-10-30, para más adelante:** los feriados en el horario laboral (necesitan un catálogo que mantenga el Administrador) y la notificación de Windows de la campana (el navegador pide permiso).
 13. **Validar con UCVMM:** el aviso de custodia al aprobar no es un documento, así que sigue saliendo para todos los rangos; a los no marinos ya no se les pide el Form. No. 6. Confirmar si les aplica.
-14. **Respaldos fuera del servidor, con la restauración probada** (de la revisión del 2026-10-27). Hoy `backup.sh` es solo para Docker. El contenedor sin root, los índices y las bandejas sin tripulantes se hicieron en la auditoría del 2026-11-08.
+14. **Respaldos fuera del servidor** (de la revisión del 2026-10-27). Hoy `backup.sh` es solo para Docker y deja todo en el mismo servidor; se copian con `rsync -aH` (README). Desde el 2026-11-10 es incremental y la restauración está documentada y probada con una base temporal; falta probarla entera en el servidor de pruebas.
 15. **De la auditoría del 2026-11-08, para decidir:**
     - Retención de la bitácora (`audit_logs`): es la tabla que más crece (cada documento visto, cada login) y no se purga. Va con la política de retención (punto 7).
     - Búsqueda por texto de las bandejas y la bitácora: `ILIKE '%…%'` recorre la tabla. Con muchos miles de filas, un índice trigram (`pg_trgm`) la acelera; hoy no hace falta.
@@ -571,6 +615,11 @@ cd backend && venv\Scripts\python -c "from app.main import aplicacion"
 
 :: Backend: pruebas (BD temporal en el servidor de DATABASE_URL; no envía correos)
 cd backend && venv\Scripts\python -m pytest
+
+:: Backend: dependencias (se instalan desde el bloqueo; se edita requirements.txt y se regenera)
+cd backend && venv\Scripts\python -m pip install --require-hashes -r requirements.lock
+cd backend && venv\Scripts\uv pip compile requirements.txt --universal --python-version 3.12 --generate-hashes -o requirements.lock
+cd backend && set PYTHONUTF8=1 && venv\Scripts\python -m pip_audit -r requirements.lock --require-hashes
 
 :: Frontend: typecheck y lint
 cd frontend && node node_modules/typescript/bin/tsc -b --noEmit

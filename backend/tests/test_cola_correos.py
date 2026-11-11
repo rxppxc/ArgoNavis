@@ -2,6 +2,7 @@
 operación, salen después y, si el servidor de correo falla, se reintentan sin
 perderse. Con un SMTP falso: no envía nada."""
 import asyncio
+import contextlib
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -31,17 +32,28 @@ def _numero() -> str:
 
 
 class SmtpFalso:
-    """Registra los asuntos enviados; `fallas` cuenta cuántos envíos fallan antes de andar."""
-    def __init__(self, fallas: int = 0, demora: float = 0):
+    """Registra los asuntos enviados; `fallas` cuenta cuántos envíos fallan antes de andar.
+    Con `esperar_a`, cada envío espera (hasta 2 s) a que haya esos envíos en curso a la
+    vez: así una prueba de despachos en paralelo no depende de la velocidad del equipo.
+    Con la máquina cargada, un despacho terminaba todo antes de que arrancaran los otros
+    y la prueba fallaba sin que hubiera duplicados (visto una vez, el 2026-11-10)."""
+    def __init__(self, fallas: int = 0, demora: float = 0, esperar_a: int = 0):
         self.asuntos: list[str] = []
         self.fallas = fallas
         self.demora = demora
         self.a_la_vez = self.maximo_a_la_vez = 0   # envíos en curso al mismo tiempo
+        self.esperar_a = esperar_a
+        self.juntos = asyncio.Event()
 
     async def __call__(self, mensaje, **_):
         self.a_la_vez += 1
         self.maximo_a_la_vez = max(self.maximo_a_la_vez, self.a_la_vez)
+        if self.a_la_vez >= self.esperar_a:
+            self.juntos.set()
         try:
+            if self.esperar_a:
+                with contextlib.suppress(TimeoutError):
+                    await asyncio.wait_for(self.juntos.wait(), timeout=2)
             await asyncio.sleep(self.demora)
         finally:
             self.a_la_vez -= 1
@@ -167,7 +179,7 @@ async def test_un_aviso_que_no_se_puede_armar_queda_fallido_sin_reintentos(monke
 async def test_varios_despachos_a_la_vez_no_envian_dos_veces(monkeypatch):
     """Como los workers de producción, cada uno con su despacho (_despachar_lote,
     sin el «uno a la vez» del proceso): cada correo se toma con FOR UPDATE SKIP LOCKED."""
-    smtp = SmtpFalso(demora=0.05)
+    smtp = SmtpFalso(demora=0.05, esperar_a=2)
     monkeypatch.setattr(email.aiosmtplib, "send", smtp)
     numeros = [_numero() for _ in range(6)]
     await _encolar(*(_aviso(n) for n in numeros))

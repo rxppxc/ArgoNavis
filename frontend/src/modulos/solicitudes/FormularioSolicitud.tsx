@@ -18,7 +18,7 @@ import { mensajeDeError } from "../../utils/errores";
 import type { CasillaFormulario } from "./checklist";
 import { ChecklistSolicitud } from "./ChecklistSolicitud";
 import { DatosTramite } from "./DatosTramite";
-import { DocumentosAdicionales } from "./DocumentosAdicionales";
+import { DocumentosAdicionales, MAX_ADICIONALES } from "./DocumentosAdicionales";
 import { armarEnvio, desdeSolicitud } from "./envioSolicitud";
 import { formatearFechaHora, hoyISO, tiempoRestante } from "./presentacion";
 import { SelectorTramite } from "./SelectorTramite";
@@ -203,8 +203,8 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
               </div>
               <p className={styles.ayudaSeccion}>
                 Escribe nombres, apellidos y números de pasaporte y de libreta tal como aparecen en esos
-                documentos. Los documentos de cada pasajero se adjuntan en su propia tarjeta (PDF, Word o
-                Excel, de hasta {TAMANO_MAX_MB} MB cada uno).
+                documentos. Los documentos de cada pasajero se adjuntan en su propia tarjeta: PDF, Word o
+                Excel, con un máximo permitido de {TAMANO_MAX_MB} MB por archivo.
               </p>
               {tripulantes.map((t, i) => (
                 <TarjetaTripulante
@@ -260,6 +260,10 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
                   {documentos.adicionalesExistentes.length + documentos.adicionalesNuevos.length}
                 </span>
               </div>
+              <p className={styles.ayudaSeccion}>
+                Cartas, oficios u otros soportes, hasta {MAX_ADICIONALES}. PDF, Word o Excel. Máximo permitido:
+                {" "}{TAMANO_MAX_MB} MB por archivo.
+              </p>
               <DocumentosAdicionales
                 existentes={documentos.adicionalesExistentes}
                 nuevos={documentos.adicionalesNuevos}

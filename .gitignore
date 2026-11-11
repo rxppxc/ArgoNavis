@@ -73,3 +73,8 @@ desktop.ini
 .cache/
 dist/
 build/
+
+# El paquete para instalar sin internet (empaquetar-sin-internet.sh): imágenes de cientos de MB.
+paquete-sin-internet/
+# Las librerías de Python descargadas para instalar sin internet en Windows (README).
+backend/paquetes-python/

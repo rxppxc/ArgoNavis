@@ -4,9 +4,21 @@ name: argonavis
 
 services:
   postgres_db:
-    image: postgres:15-alpine
+    # Versión exacta (2026-11-10): «postgres:15-alpine» podía cambiar de versión
+    # menor en cada pull. Dentro de la 15 los datos sirven igual; para actualizar,
+    # cambia la etiqueta (y la del flujo de CI, .github/workflows/ci.yml).
+    image: postgres:15.19-alpine3.24
     container_name: snm_postgres
     restart: always
+    # Límites de cada contenedor (revisión de recursos del 2026-11-10). Sin ellos, uno
+    # que se desboca se lleva a los demás: sin memoria, el kernel mata al proceso más
+    # grande de la VM, que suele ser PostgreSQL. Con ellos, Docker corta solo dentro del
+    # contenedor que se pasó, y "restart: always" (o uvicorn, con sus procesos) lo
+    # levanta. Se ajustan en el .env al tamaño de la VM (README → Producción → Recursos);
+    # verificar-despliegue.sh muestra el uso de cada uno contra su límite.
+    mem_limit: ${POSTGRES_MEMORIA:-1g}
+    pids_limit: 300            # un proceso por conexión: la app abre como mucho 30
+    shm_size: 256m             # los 64 MB de Docker se quedan cortos en las consultas en paralelo
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -32,8 +44,18 @@ services:
 
   backend:
     build: ./backend
+    # Con nombre fijo: así se puede guardar y llevar a un servidor sin internet
+    # (empaquetar-sin-internet.sh y docker compose up --no-build).
+    image: argonavis-backend:latest
     container_name: snm_backend
     restart: always
+    # Memoria medida el 2026-11-10 con 100 usuarios (tests/carga.py): ~150 MB por proceso
+    # de uvicorn y ~110 MB el maestro, ~410 MB en total; 1 GB deja margen para envíos y
+    # exportaciones. Con más UVICORN_WORKERS, ~200 MB más por proceso. CPU: tantos núcleos
+    # como procesos, para que PostgreSQL y nginx tengan CPU aunque el backend esté a tope.
+    mem_limit: ${BACKEND_MEMORIA:-1g}
+    cpus: ${BACKEND_CPUS:-2}
+    pids_limit: 512            # cuenta también los hilos (bcrypt, PDF, AD, subidas)
     # Sin "ports": el backend solo es accesible por la red interna de Docker, a
     # través de nginx (servicio frontend, /api/). Por eso uvicorn puede confiar
     # en los encabezados X-Forwarded-* (ver docker-entrypoint.sh).
@@ -110,8 +132,11 @@ services:
 
   frontend:
     build: ./frontend
+    image: argonavis-frontend:latest
     container_name: snm_frontend
     restart: always
+    mem_limit: ${FRONTEND_MEMORIA:-256m}
+    pids_limit: 200
     ports:
       - "80:80"
     depends_on:
