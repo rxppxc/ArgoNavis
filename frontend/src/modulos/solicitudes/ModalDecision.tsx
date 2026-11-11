@@ -1,26 +1,39 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { apiSolicitudes, releerSiCambio, type SolicitudDetalle } from "../../api/solicitudes";
-import { useNotificacion } from "../../components/Notificaciones";
+import { useNotificacion, type SelloSolicitud } from "../../components/Notificaciones";
 import { useAtraparFoco } from "../../hooks/useAtraparFoco";
 import { mensajeDeError } from "../../utils/errores";
-import { formatearFecha } from "./presentacion";
+import { formatearFecha, formatearFechaHora } from "./presentacion";
 import styles from "./DetalleSolicitud.module.css";
 
 export type Decision = "aprobar" | "devolver" | "negar";
 
-const TEXTOS: Record<Decision, { titulo: string; etiqueta: string; boton: string; clase: string; hecho: string }> = {
+/** El número, si ya lo tiene, para el aviso de lo hecho. */
+const conNumero = (s: SolicitudDetalle) => (s.numero ? ` ${s.numero}` : "");
+
+/** `hecho`: el aviso con la solicitud ya actualizada; `sello`: el del estado al que pasó. */
+const TEXTOS: Record<Decision, {
+  titulo: string; etiqueta: string; boton: string; clase: string;
+  sello: SelloSolicitud; hecho: (s: SolicitudDetalle) => string;
+}> = {
   aprobar: {
     titulo: "Aprobar autorización", etiqueta: "Observación interna (opcional — la agencia no la ve)",
-    boton: "Aprobar", clase: styles.btnExito, hecho: "Autorización aprobada.",
+    boton: "Aprobar", clase: styles.btnExito,
+    sello: "aprobada", hecho: (s) => `Autorización${conNumero(s)} aprobada.`,
   },
   devolver: {
     titulo: "Devolver a corrección", etiqueta: "¿Qué debe corregir la agencia? *",
-    boton: "Devolver", clase: styles.btnAviso, hecho: "Solicitud devuelta a la agencia.",
+    boton: "Devolver", clase: styles.btnAviso,
+    sello: "devuelta",
+    // La hora ya termina en punto («a. m.»): el plazo va en medio de la frase.
+    hecho: (s) => `Solicitud${conNumero(s)} devuelta a la agencia.`
+      + (s.plazo_correccion ? ` Tiene hasta el ${formatearFechaHora(s.plazo_correccion)} para corregirla.` : ""),
   },
   negar: {
     titulo: "Denegar solicitud", etiqueta: "Motivo de la denegación *",
-    boton: "Denegar", clase: styles.btnPeligro, hecho: "Solicitud denegada.",
+    boton: "Denegar", clase: styles.btnPeligro,
+    sello: "denegada", hecho: (s) => `Solicitud${conNumero(s)} denegada.`,
   },
 };
 
@@ -90,7 +103,7 @@ export function ModalDecision({ decision, solicitud, conImpedimento, onCerrar, o
         decision === "aprobar" ? await apiSolicitudes.aprobar(solicitud.id, motivo || null)
         : decision === "devolver" ? await apiSolicitudes.devolver(solicitud.id, motivo)
         : await apiSolicitudes.negar(solicitud.id, motivo);
-      mostrar(t.hecho, "exito");
+      mostrar(t.hecho(actualizada), "exito", { sello: t.sello });
       onCerrar();
       onActualizada(actualizada);
     } catch (error) {

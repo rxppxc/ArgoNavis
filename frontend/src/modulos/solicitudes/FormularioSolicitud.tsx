@@ -130,10 +130,10 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
       let resultado: SolicitudDetalle;
       if (original) {
         resultado = await apiSolicitudes.corregir(original.id, { ...datos, documentos_conservados: conservados }, archivos);
-        mostrar(`Solicitud ${resultado.numero} corregida y reenviada a revisión.`, "exito");
+        mostrar(`Solicitud ${resultado.numero} corregida y reenviada a revisión.`, "exito", { sello: "reenviada" });
       } else {
         resultado = await apiSolicitudes.crear({ ...datos, codigo_tramite: tipo.codigo }, archivos);
-        mostrar(`Solicitud ${resultado.numero} enviada a revisión.`, "exito");
+        mostrar(`Solicitud ${resultado.numero} enviada a revisión.`, "exito", { sello: "enviada" });
       }
       navegar(`/solicitudes/${resultado.id}`);
     } catch (error) {

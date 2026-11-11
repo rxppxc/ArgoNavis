@@ -89,7 +89,7 @@ export function useDocumentosFormulario(
   const elegir = useCallback((clave: string, archivo: File) => {
     const problema = validarArchivos([archivo]);
     if (problema) {
-      mostrar(problema, "error");
+      mostrar(problema, "aviso");
       return;
     }
     setNuevos((prev) => ({ ...prev, [clave]: archivo }));
@@ -115,7 +115,7 @@ export function useDocumentosFormulario(
   function agregarAdicionales(archivos: File[]) {
     const problema = validarArchivos(archivos);
     if (problema) {
-      mostrar(problema, "error");
+      mostrar(problema, "aviso");
       return;
     }
     const libres = MAX_ADICIONALES - adicionalesExistentes.length - adicionalesNuevos.length;

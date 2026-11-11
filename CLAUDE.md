@@ -131,6 +131,18 @@ Pedido del usuario: «el diseño es genérico, típico de IAs; necesitamos ident
   - Expediente: la **cabeza del documento** (franja, rótulo, trámite, «N.º» y el sello grande ladeado), las secciones de la columna principal numeradas con contadores de CSS (`content: counter() / ""`, que el lector de pantalla no lee), los datos con su rótulo encima y el valor sobre la línea, y al pie la **línea de lectura mecánica** de los pasaportes (`lineasMecanicas`, decorativa, `aria-hidden`).
   - Login: un **pasaporte abierto** sobre la carta animada: la tapa marino con guilloche dorado y el emblema de ARGO NAVIS, y la hoja con el acceso.
   - Modales, resumen de estadísticas y tarjetas sueltas: la franja amarilla arriba. Pestañas como separadores de expediente, con la franja en la activa.
+  - **Avisos emergentes «sello centrado»** (elegidos por el usuario el 2026-11-11, entre «sello», «comprobante», «cinta» y dos mezclas): una cinta centrada bajo la cabecera, del ancho de su mensaje (hasta 860 px), con el sello de tinta del resultado a la izquierda. En el celular va de borde a borde, con el sello y la X arriba (`Notificaciones.tsx`; lo que no es React, en `avisos.ts`, con sus pruebas).
+    - **El sello:**
+      - si la acción cambió el estado de una solicitud, el de ese estado, en el color de su insignia: ENVIADA, REENVIADA, DEVUELTA, APROBADA, DENEGADA o FINALIZADA (`mostrar(texto, "exito", { sello: "devuelta" })`);
+      - si no, el del tipo: LISTO, REVISA (validaciones, en tinta con el amarillo de la franja), NO SE PUDO y AVISO.
+    - **El número de solicitud** del texto va en letra de máquina y sin partirse; la hora («10:30 a. m.») tampoco se parte.
+    - **El tiempo:** 4 s los éxitos, 6 s los que llevan sello y 10 s los errores y las validaciones. Una barra lo muestra y se detiene con el mouse encima o con el foco adentro. El aviso se cierra cuando la barra termina su animación.
+      - Por eso la barra lleva `data-movimiento`: con «reducir movimiento», la regla global la dejaría en 0 s y el aviso se cerraría al aparecer.
+      - Lo prueban `formulario.spec.ts` (con `reducedMotion`) y `flujo-completo.spec.ts` (la pausa con el mouse).
+    - **Cuántos:** como mucho tres, el más nuevo arriba; uno repetido no se apila.
+    - **Ubicación:** justo bajo la cabecera, que se mide (`data-cabecera`). Así no tapan la campana, el menú, el «Volver» ni el panel de decisión. Si la cabecera ya no se ve, van arriba.
+    - **Lector de pantalla:** dos regiones siempre presentes, `alert` (errores y validaciones) y `status` (éxitos).
+    - Un archivo que no cumple (formato o 2 MB) es una validación (REVISA), no un error.
 - **Reglas:**
   - El guilloche va solo en lo que identifica a un documento (cabecera, cabeza del expediente, tapa del pasaporte, hoja del login): sobre la carta del fondo, dos texturas juntas ensucian.
   - El amarillo sigue siendo relleno. La única excepción como texto es la tapa del pasaporte: dorado sobre marino, 10:1.
@@ -178,7 +190,7 @@ Pedido del usuario: «el diseño es genérico, típico de IAs; necesitamos ident
 - Accesibilidad (2026-10-27):
   - Enlace «Saltar al contenido» (clase global `.saltar-contenido`) en `MarcoPagina` y en el login, hacia `<main id="contenido">`.
   - Los íconos son decorativos (`aria-hidden` en `crearIcono`). Todo botón de solo ícono lleva `aria-label` con qué hace y sobre qué: «Ver informe.pdf», «Quitar tripulante 2».
-  - Errores y avisos quedan 10 s en pantalla; éxitos e informativos, 4 s (`Notificaciones`).
+  - Errores y avisos quedan 10 s en pantalla; éxitos e informativos, 4 s, y 6 s los que llevan el sello de un estado (`Notificaciones`, diseño «sello centrado» del 2026-11-11, en «Identidad»).
 - Si cambias un color, recalcula el contraste también sobre los fondos teñidos (insignias, avisos, contadores).
 - El correo (`core/email.py`) y el PDF (`core/pdf_autorizacion.py`) usan la misma paleta (2026-10-20). El color de cada estado es el de su insignia (`InsigniaEstado`): recibida en azul, aprobada en verde, devuelta en naranja, denegada en rojo, expirada en gris y, en el PDF, finalizada en verde azulado.
 - Revisión de UCVMM (propuesta 1A, elegida por el usuario el 2026-10-19):

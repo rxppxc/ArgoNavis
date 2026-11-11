@@ -20,7 +20,8 @@ const MICROTEXTO = "Servicio Nacional de Migración · ARGO NAVIS · República 
  *  usuario; en el login y en las páginas públicas, nada). */
 export function CabeceraInstitucional({ derecha, inicio }: Props) {
   return (
-    <header className={styles.cabecera}>
+    // data-cabecera: los avisos emergentes salen justo debajo (Notificaciones.tsx la mide).
+    <header className={styles.cabecera} data-cabecera="">
       <div className={styles.franja} aria-hidden="true" />
       <div className={styles.interior}>
         {inicio ? (

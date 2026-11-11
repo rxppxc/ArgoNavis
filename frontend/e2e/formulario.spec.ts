@@ -99,8 +99,15 @@ test("el formulario cuida los documentos al quitar un pasajero o cambiar de trá
   });
 
   await test.step("con datos faltantes no se envía: dice qué revisar", async () => {
+    // Muchos equipos del SNM traen las animaciones de Windows apagadas: el aviso igual tiene
+    // que durar (su barra de tiempo lleva data-movimiento; sin eso, se cerraba al aparecer).
+    await agencia.emulateMedia({ reducedMotion: "reduce" });
     await agencia.getByRole("button", { name: "Enviar solicitud" }).click();
     await expect(agencia.getByRole("alert").filter({ hasText: "Revisa antes de enviar" })).toBeVisible();
     await expect(agencia).toHaveURL(/\/new$/);
+    const aviso = agencia.getByText("Revisa los datos marcados antes de enviar.");
+    await expect(aviso).toBeVisible();
+    await agencia.waitForTimeout(1500);
+    await expect(aviso, "con «reducir movimiento», el aviso no se cierra solo al aparecer").toBeVisible();
   });
 });

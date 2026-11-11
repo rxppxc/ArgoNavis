@@ -115,6 +115,20 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     await modal.locator("textarea").fill(`La visa especial de marino está ilegible. ${SIN_ESPACIOS}`);
     await modal.getByRole("button", { name: "Devolver" }).click();
     await expect(estado(ucvmm, "En corrección")).toBeVisible();
+    // El aviso lleva el sello del estado al que pasó, el número y el plazo (2026-11-11).
+    const aviso = ucvmm.getByRole("status").locator("> div").filter({ hasText: "Devuelta" });
+    await expect(aviso.getByText("Devuelta", { exact: true })).toBeVisible();
+    await expect(aviso).toContainText(/AM-\d{4}-\d+ devuelta a la agencia\. Tiene hasta el .+ para corregirla\./);
+    // Con el mouse encima, su tiempo se detiene; y se cierra con «Cerrar aviso».
+    await aviso.hover();
+    const barra = aviso.locator("[data-movimiento]");
+    const tiempo = () => barra.evaluate((e) => Number(e.getAnimations()[0]?.currentTime ?? -1));
+    await ucvmm.waitForTimeout(150);
+    const antes = await tiempo();
+    await ucvmm.waitForTimeout(600);
+    expect(await tiempo(), "con el mouse encima, el tiempo del aviso no corre").toBe(antes);
+    await aviso.getByRole("button", { name: "Cerrar aviso" }).click();
+    await expect(aviso).toHaveCount(0);
     await sinTextoDesbordado(ucvmm);   // el motivo, en el aviso y en el historial
   });
 

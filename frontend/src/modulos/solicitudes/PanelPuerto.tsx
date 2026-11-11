@@ -52,9 +52,10 @@ export function PanelPuerto({ solicitud, verificacion: v, onActualizada }: Props
     if (!ok) return;
     setTrabajando(true);
     try {
-      onActualizada(await apiSolicitudes.finalizar(solicitud.id, texto));
+      const finalizada = await apiSolicitudes.finalizar(solicitud.id, texto);
+      onActualizada(finalizada);
       setComentario("");
-      mostrar("Solicitud finalizada.", "exito");
+      mostrar(`Solicitud${finalizada.numero ? ` ${finalizada.numero}` : ""} finalizada.`, "exito", { sello: "finalizada" });
     } catch (error) {
       mostrar(mensajeDeError(error, "No se pudo finalizar."), "error");
       await releerSiCambio(error, solicitud.id, onActualizada);   // ya finalizada o vencida (409)

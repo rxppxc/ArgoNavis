@@ -1,61 +1,132 @@
+/* Avisos emergentes con el diseño «sello centrado» (elegido por el usuario el 2026-11-11):
+   una cinta centrada bajo la cabecera (el top lo pone Notificaciones.tsx), del ancho de su
+   mensaje, con el sello de tinta del resultado a la izquierda, como InsigniaEstado.
+   El color va en --c: el sello, el borde izquierdo y la barra de tiempo. Las validaciones,
+   en tinta con el amarillo de la franja (--borde y --barra): el amarillo, siempre de relleno. */
 .contenedor {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(860px, calc(100vw - 32px));
   display: flex;
   flex-direction: column;
-  gap: 10px;
   z-index: 9999;
   pointer-events: none;
 }
+/* Las dos regiones (alert y status) están siempre, aunque vacías: sin display: none, para
+   que el lector de pantalla las vigile desde el principio. */
+.grupo { display: flex; flex-direction: column; gap: 8px; }
+.grupo:not(:empty) + .grupo:not(:empty) { margin-top: 8px; }
 
-.toast {
+.cinta {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-width: 280px;
-  max-width: 420px;
-  padding: 12px 14px;
+  gap: 16px;
+  padding: 10px 12px 13px 0;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border-2);
+  border-left: 5px solid var(--borde, var(--c));
   border-radius: var(--r-md);
-  font-size: .9rem;
-  font-weight: 600;
-  color: var(--sobre-fuerte);
   box-shadow: var(--sh-lg);
+  overflow: hidden;
   pointer-events: auto;
-  animation: entrar 0.18s ease-out;
-  border: 1px solid color-mix(in srgb, var(--sobre-fuerte) 14%, transparent);
+  animation: entrar .18s ease-out;
+}
+
+/* Una columna fija: varios avisos juntos quedan con los sellos alineados. */
+.columnaSello { flex: none; width: 136px; display: flex; justify-content: center; }
+/* El sello de tinta de las bandejas (InsigniaEstado), un poco ladeado. */
+.sello {
+  display: inline-flex;
+  align-items: center;
+  margin: 3px;
+  padding: 3px 9px;
+  border: 2px solid currentColor;
+  outline: 1px solid currentColor;
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+  color: var(--c);
+  font: 800 .64rem/1.25 var(--letra-titulo);
+  font-stretch: var(--ancho-etiqueta);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transform: rotate(-3deg);
 }
 
 .texto {
   flex: 1;
   min-width: 0;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
+  font: 500 .9rem/1.45 var(--letra-texto);
+  overflow-wrap: anywhere;   /* un nombre de archivo larguísimo no se sale de la cinta */
 }
+/* El número de solicitud, en letra de máquina y sin partirse. */
+.texto b { font-family: var(--letra-mono); font-weight: 600; white-space: nowrap; }
 
 .cerrar {
-  display: flex; align-items: center; justify-content: center;
-  width: 26px; height: 26px; flex: none; border-radius: var(--r-sm);
-  background: transparent; border: 0; color: var(--sobre-fuerte); opacity: .85; cursor: pointer;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  font: 700 .64rem/1 var(--letra-titulo);
+  font-stretch: var(--ancho-etiqueta);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  cursor: pointer;
 }
-.cerrar:hover { opacity: 1; background: color-mix(in srgb, var(--sobre-fuerte) 14%, transparent); }
-/* Sobre el relleno de color el foco va en blanco. */
-.cerrar:focus-visible { outline-color: var(--sobre-fuerte); outline-offset: 1px; }
+.cerrar:hover { color: var(--text); border-color: var(--input-border); background: var(--hover); }
+.cerrar svg { display: none; }
 
-/* En el celular, de borde a borde (con margen): 280 px fijos se salían. */
-@media (max-width: 480px) {
-  .contenedor { left: 12px; right: 12px; top: 12px; }
-  .toast { min-width: 0; max-width: none; }
+/* El tiempo que queda: se consume de derecha a izquierda y se detiene con el mouse encima o
+   con el foco adentro (al terminar, el aviso se cierra). La duración va en el estilo. */
+.tiempo {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--barra, var(--c));
+  opacity: .75;
+  transform-origin: left;
+  animation: consumir linear forwards;
 }
+.cinta:hover .tiempo, .cinta:focus-within .tiempo { animation-play-state: paused; }
 
-/* Rellenos planos de la paleta (texto blanco a 5:1 o más); la información, en
-   el azul institucional. */
-.exito { background: var(--exito-fuerte); }
-.error { background: var(--peligro-fuerte); }
-.aviso { background: var(--aviso-fuerte); }
-.info  { background: var(--info-fuerte); }
+/* El color de cada tipo y, al cambiar de estado una solicitud, el de su insignia. */
+.exito { --c: var(--acc-green); }
+.error { --c: var(--acc-red); }
+.info  { --c: var(--acc-blue); }
+.aviso { --c: var(--text); --borde: var(--franja); --barra: var(--franja); }
+.enRevision { --c: var(--acc-blue); }
+.devuelta   { --c: var(--acc-orange); }
+.aprobada   { --c: var(--acc-green); }
+.denegada   { --c: var(--acc-red); }
+.finalizada { --c: var(--acc-teal); }
+
+/* En el celular no cabe a lo largo: el sello y la X arriba, el mensaje debajo, de borde a borde. */
+@media (max-width: 520px) {
+  .contenedor { left: 12px; right: 12px; transform: none; width: auto; max-width: none; }
+  .cinta { flex-wrap: wrap; gap: 6px 10px; padding: 10px 8px 13px 12px; }
+  .columnaSello { flex: 1; width: auto; justify-content: flex-start; }
+  .texto { flex-basis: 100%; order: 3; }
+  .cerrar { width: 32px; height: 32px; padding: 0; border: 0; }
+  .cerrarTexto { display: none; }
+  .cerrar svg { display: block; }
+}
 
 @keyframes entrar {
-  from { transform: translateY(-8px); opacity: 0; }
-  to   { transform: translateY(0);    opacity: 1; }
+  from { transform: translateY(-6px); opacity: 0; }
+  to   { transform: none;             opacity: 1; }
+}
+@keyframes consumir {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
 }
