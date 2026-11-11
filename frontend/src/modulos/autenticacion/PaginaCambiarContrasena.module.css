@@ -3,8 +3,9 @@
   padding: 28px 28px 24px;
   border-radius: var(--r-md);
   border: 1px solid var(--border); background: var(--card);
+  border-top: 6px solid var(--franja);   /* identidad «pase oficial» */
 }
-.tarjeta h1 { color: var(--text); font-size: 1.35rem; font-weight: 800; margin-bottom: 8px; }
+.tarjeta h1 { color: var(--text); font: 800 1.3rem/1.15 var(--letra-titulo); font-stretch: var(--ancho-titulo); text-transform: uppercase; margin-bottom: 8px; }
 
 .icono {
   width: 42px; height: 42px; margin-bottom: 12px;

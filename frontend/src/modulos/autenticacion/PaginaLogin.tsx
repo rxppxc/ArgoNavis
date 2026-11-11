@@ -62,14 +62,21 @@ export default function PaginaLogin() {
       <div className={styles.medio}>
       <FondoPagina coordenadas={false} animado />
       <main id="contenido" tabIndex={-1} className={styles.cuerpo}>
-        <section className={styles.insignia}>
+        {/* Un pasaporte abierto sobre la carta (identidad «pase oficial», 2026-11-11):
+            la tapa con el emblema de ARGO NAVIS y, en la hoja, el acceso. */}
+        <div className={styles.libreta}>
+        <section className={styles.tapa}>
+          <p className={styles.pais}>República de Panamá</p>
           <h1 className={styles.titulo}>
             <img src="/images/logo-argo-navis.webp" alt="ARGO NAVIS · Sistema Interno Marítimo - SNM" className={styles.logoGrande} />
           </h1>
-          <div className={styles.coordenadas}>09° 01′ N · 079° 32′ O</div>
+          <p className={styles.coordenadas}>09° 01′ N · 079° 32′ O</p>
+          <span className={styles.chip} aria-hidden="true" />
+          <p className={styles.mrz} aria-hidden="true">P&lt;PANARGO&lt;NAVIS&lt;&lt;SERVICIO&lt;NACIONAL&lt;DE&lt;MIGRACION&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</p>
         </section>
 
         <section className={styles.acceso} aria-labelledby="titulo-acceso">
+          <p className={styles.antetitulo}>Acceso al sistema</p>
           <h2 id="titulo-acceso">Iniciar sesión</h2>
           <p className={styles.intro}>Ingresa con tu usuario de dominio o con la cuenta asignada a tu agencia naviera.</p>
 
@@ -139,6 +146,7 @@ export default function PaginaLogin() {
             </a>
           </p>
         </section>
+        </div>
       </main>
       </div>
 

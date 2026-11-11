@@ -36,7 +36,7 @@
   font-size: .70rem;
   font-weight: 700;
   padding: 1px 8px;
-  border-radius: 99px;
+  border-radius: var(--r-xs);
 }
 .panelBody { padding: 20px; }
 
@@ -207,7 +207,7 @@
   align-items: center;
   gap: 4px;
   padding: 3px 10px;
-  border-radius: 99px;
+  border-radius: var(--r-xs);
   font-size: .72rem;
   font-weight: 700;
 }
@@ -283,7 +283,7 @@
 @media (max-width: 720px) { .formLocal { grid-template-columns: 1fr; } }
 .ayudaLocal { margin: 0 0 14px; color: var(--text-2); font-size: .82rem; line-height: 1.5; }
 .badgeTipo {
-  display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 99px;
+  display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: var(--r-xs);
   border: 1px solid var(--border); color: var(--text-2); font-size: .66rem; font-weight: 700;
 }
 .claveTemporal { border-color: var(--y-border); }

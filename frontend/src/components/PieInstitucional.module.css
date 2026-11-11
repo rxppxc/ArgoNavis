@@ -1,11 +1,16 @@
-/* Pie de todas las páginas (el del login): una línea debajo de otra, centradas.
-   En la pizarra del pie de migracion.gob.pa, en los dos temas. */
+/* Pie de todas las páginas (identidad «pase oficial», 2026-11-11): marino con la
+   franja amarilla del escudo, como la cabecera, igual en los dos temas. */
 .pie {
-  background: var(--pie);
-  padding: 14px 24px; display: flex; flex-direction: column; align-items: center; gap: 4px;
-  text-align: center; font-size: .76rem; color: var(--pie-texto);
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 16px;
+  padding: 12px 28px;
+  background: var(--pie); border-top: 4px solid var(--franja);
+  font-size: .76rem; color: var(--pie-texto);
+}
+.sello {
+  font: 600 .58rem/1.4 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
+  letter-spacing: .22em; text-transform: uppercase;
 }
 
-@media (max-width: 880px) {
-  .pie { padding: 12px 16px; }
+@media (max-width: 720px) {
+  .pie { padding: 12px 16px; justify-content: center; text-align: center; }
 }

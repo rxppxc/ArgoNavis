@@ -1,12 +1,12 @@
 .filtros {
   display: grid; grid-template-columns: 1.4fr 1fr 1.6fr 1fr 1fr auto; gap: 10px; align-items: end;
   padding: 14px; margin-bottom: 14px;
-  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--r-md);
 }
 .filtros label { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .filtros label span { color: var(--text-2); font-size: .74rem; font-weight: 600; }
 .filtros input, .filtros select {
-  padding: 8px 10px; border-radius: 8px;
+  padding: 8px 10px; border-radius: var(--r-sm);
   border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text);
   font-size: .84rem; min-width: 0;
 }
@@ -14,7 +14,7 @@
 .filtros select option { background: var(--surface); color: var(--text); }
 .botones { display: flex; gap: 6px; }
 
-.panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+.panel { background: var(--card); border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 14px; }
 .resumen { display: flex; align-items: center; gap: 12px; color: var(--text-2); font-size: .82rem; margin-bottom: 8px; }
 .cargando { color: var(--muted); font-style: italic; }
 
@@ -30,7 +30,7 @@
 .fila:hover td { background: var(--hover); }
 .nowrap { white-space: nowrap; }
 .accion {
-  display: inline-block; padding: 2px 9px; border-radius: 100px;
+  display: inline-block; padding: 2px 9px; border-radius: var(--r-xs);
   background: var(--overlay-2); font-size: .74rem; font-weight: 700; white-space: nowrap;
 }
 .detalle { color: var(--text-2); max-width: 520px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -45,7 +45,7 @@
 .btnPagina { composes: boton secundario from "../../components/Botones.module.css"; }
 /* El resumen del detalle es el botón que abre el JSON completo. */
 .verDetalle { all: unset; cursor: pointer; display: block; max-width: 100%; text-align: left; overflow: hidden; text-overflow: ellipsis; }
-.verDetalle:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; border-radius: 3px; }
+.verDetalle:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; border-radius: var(--r-xs); }
 
 @media (max-width: 1000px) {
   .filtros { grid-template-columns: 1fr 1fr; }

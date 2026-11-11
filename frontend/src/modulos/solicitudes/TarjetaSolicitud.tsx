@@ -1,12 +1,14 @@
 import { Link } from "react-router-dom";
 import type { Bandeja, SolicitudResumen } from "../../api/solicitudes";
-import { IconoAlerta, IconoBarco, IconoReloj, IconoUsuario } from "../../components/Iconos";
+import { IconoAlerta, IconoReloj } from "../../components/Iconos";
 import { InsigniaEstado } from "./InsigniaEstado";
 import { formatearFecha, formatearFechaHora, tiempoRestante } from "./presentacion";
 import styles from "./TarjetaSolicitud.module.css";
 
-/** Fila de las bandejas: lleva al expediente de la solicitud. `conSector`: para
- *  quien ve los dos sectores (Administrador, supervisor general), el del puesto. */
+/** Fila de las bandejas, como un pase (identidad «pase oficial», 2026-11-11): el
+ *  talón con el número y el sello del estado, y los datos del trámite. Lleva al
+ *  expediente. `conSector`: para quien ve los dos sectores (Administrador,
+ *  supervisor general), el del puesto. */
 export function TarjetaSolicitud({ s, vista, conSector = false }: { s: SolicitudResumen; vista: Bandeja; conSector?: boolean }) {
   const deAgencia = vista === "agencia";
   // Quien finaliza es el puesto de control: a la agencia le basta saber hasta cuándo vale.
@@ -15,45 +17,52 @@ export function TarjetaSolicitud({ s, vista, conSector = false }: { s: Solicitud
     : s.estado === "approved" ? { etiqueta: deAgencia ? "Vigente hasta el" : "Finalizar antes del", fecha: s.vigente_hasta }
     : null;
   const restante = plazo ? tiempoRestante(plazo.fecha) : null;
+  const conMarcas = s.tripulantes_con_alerta > 0 || s.tiene_nacionalidad_restringida || s.fuera_de_horario;
 
   return (
-    <Link to={`/solicitudes/${s.id}`} className={`${styles.tarjeta} ${styles[s.estado] ?? ""}`}>
-      <div className={styles.filaSuperior}>
-        <span className={styles.numero}>{s.numero ?? `#${s.id}`}</span>
-        <InsigniaEstado estado={s.estado} />
-        {s.tripulantes_con_alerta > 0 && (
-          <span className={styles.chipAlerta}>
-            <IconoAlerta tamano={11} /> {s.tripulantes_con_alerta} con documento vencido
-          </span>
-        )}
-        {s.tiene_nacionalidad_restringida && <span className={styles.chipRestringida}>Nacionalidad restringida</span>}
-        {/* Aprobada por UCVMM fuera del horario laboral (solo le llega al SNM). */}
-        {s.fuera_de_horario && <span className={styles.chipHorario}><IconoReloj tamano={11} /> Aprobada fuera del horario</span>}
-      </div>
-
-      <div className={styles.titulo}>
-        {s.tipo_tramite_nombre}
-        {s.nombre_buque && <span className={styles.buque}><IconoBarco tamano={14} /> {s.nombre_buque}{s.imo && ` · IMO ${s.imo}`}</span>}
-      </div>
-
-      <div className={styles.meta}>
-        {/* La agencia solo ve las suyas: su nombre en cada tarjeta sobraba. */}
-        {!deAgencia && <span>{s.agencia_nombre}</span>}
-        <span>{s.puesto_nombre}{conSector && s.sector_nombre && <> · {s.sector_nombre}</>}</span>
-        <span>Operación: {formatearFecha(s.fecha_operacion)}</span>
-        <span><IconoUsuario tamano={12} /> {s.cantidad_tripulantes} pasajero{s.cantidad_tripulantes === 1 ? "" : "s"}</span>
-        <span>
-          Enviada {formatearFechaHora(s.enviada_en)}
-          {!deAgencia && s.creada_por && <> por {s.creada_por}</>}
-        </span>
-      </div>
-
-      {plazo && restante && (
-        <div className={restante.vencido ? styles.plazoVencido : styles.plazo}>
-          <IconoReloj tamano={12} /> {plazo.etiqueta} {formatearFechaHora(plazo.fecha)}
-          {restante.vencido ? " — plazo vencido" : ` (${restante.frase})`}
+    // El enlace lleva el foco; el pase, dentro, lleva las muescas (una máscara
+    // recortaría también el anillo de foco).
+    <Link to={`/solicitudes/${s.id}`} className={styles.enlace}>
+      <div className={`${styles.pase} ${styles[s.estado] ?? ""}`}>
+        <div className={styles.talon}>
+          <span className={styles.numero}><small>N.º</small>{s.numero ?? `#${s.id}`}</span>
+          <InsigniaEstado estado={s.estado} inclinado />
         </div>
-      )}
+
+        <div className={styles.cuerpo}>
+          <span className={styles.titulo}>{s.tipo_tramite_nombre}</span>
+          <dl className={styles.datos}>
+            {s.nombre_buque && <div><dt>Buque</dt><dd>{s.nombre_buque}</dd></div>}
+            {s.imo && <div><dt>IMO</dt><dd className={styles.mono}>{s.imo}</dd></div>}
+            {/* La agencia solo ve las suyas: su nombre en cada pase sobraba. */}
+            {!deAgencia && <div><dt>Agencia</dt><dd>{s.agencia_nombre}</dd></div>}
+            <div><dt>Puesto</dt><dd>{s.puesto_nombre}{conSector && s.sector_nombre && <> · {s.sector_nombre}</>}</dd></div>
+            <div><dt>Operación</dt><dd className={styles.mono}>{formatearFecha(s.fecha_operacion)}</dd></div>
+            <div><dt>Pasajeros</dt><dd className={styles.mono}>{s.cantidad_tripulantes}</dd></div>
+            <div><dt>Enviada</dt><dd>{formatearFechaHora(s.enviada_en)}{!deAgencia && s.creada_por && <> por {s.creada_por}</>}</dd></div>
+          </dl>
+
+          {conMarcas && (
+            <div className={styles.marcas}>
+              {s.tripulantes_con_alerta > 0 && (
+                <span className={styles.chipAlerta}>
+                  <IconoAlerta tamano={11} /> {s.tripulantes_con_alerta} con documento vencido
+                </span>
+              )}
+              {s.tiene_nacionalidad_restringida && <span className={styles.chipRestringida}>Nacionalidad restringida</span>}
+              {/* Aprobada por UCVMM fuera del horario laboral (solo le llega al SNM). */}
+              {s.fuera_de_horario && <span className={styles.chipHorario}><IconoReloj tamano={11} /> Aprobada fuera del horario</span>}
+            </div>
+          )}
+
+          {plazo && restante && (
+            <div className={restante.vencido ? styles.plazoVencido : styles.plazo}>
+              <IconoReloj tamano={12} /> {plazo.etiqueta} {formatearFechaHora(plazo.fecha)}
+              {restante.vencido ? " — plazo vencido" : ` (${restante.frase})`}
+            </div>
+          )}
+        </div>
+      </div>
     </Link>
   );
 }

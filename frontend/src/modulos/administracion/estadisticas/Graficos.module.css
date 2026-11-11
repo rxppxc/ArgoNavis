@@ -19,26 +19,26 @@
 /* ─── Tarjeta ─── */
 .tarjeta {
   min-width: 0;
-  background: var(--card); border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--card); border: 1px solid var(--border-2); border-radius: var(--r-md);
   padding: 16px 18px 18px;
 }
 .ancha { grid-column: 1 / -1; }
 .cabecera { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .titulos { min-width: 0; }
-.titulos h3 { color: var(--text); font-size: .98rem; font-weight: 800; line-height: 1.3; }
+.titulos h3 { color: var(--text); font: 700 .82rem/1.3 var(--letra-titulo); font-stretch: var(--ancho-titulo); letter-spacing: .1em; text-transform: uppercase; }
 .titulos p { color: var(--text-2); font-size: .8rem; line-height: 1.5; margin-top: 3px; max-width: 70ch; }
 
 .botonTabla {
   flex-shrink: 0;
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 5px 11px; border-radius: 20px;
+  padding: 5px 11px; border-radius: var(--r-sm);
   border: 1.5px solid var(--border-2); background: var(--overlay);
   color: var(--text-2); font-size: .76rem; font-weight: 700; white-space: nowrap;
   transition: background var(--t) var(--ease), border-color var(--t) var(--ease), color var(--t) var(--ease);
 }
 .botonTabla:hover { border-color: var(--input-border); color: var(--text); }
-/* Como los filtros: lo seleccionado lleva el amarillo de relleno. */
-.botonTabla[aria-pressed="true"] { background: var(--y-soft); border-color: var(--y); color: var(--text); }
+/* Como los filtros: lo seleccionado lleva borde de tinta y la franja amarilla. */
+.botonTabla[aria-pressed="true"] { background: var(--card); border-color: var(--text); color: var(--text); box-shadow: inset 0 -3px 0 var(--franja); }
 
 .vacio { color: var(--muted); font-size: .84rem; font-style: italic; padding: 8px 0; }
 
@@ -80,7 +80,7 @@
 /* ─── Leyenda ─── */
 .leyenda { display: flex; flex-wrap: wrap; gap: 6px 16px; list-style: none; margin-bottom: 12px; }
 .leyenda li { display: inline-flex; align-items: center; gap: 7px; color: var(--text-2); font-size: .78rem; font-weight: 600; }
-.muestra { width: 11px; height: 11px; border-radius: 3px; background: var(--serie); flex-shrink: 0; }
+.muestra { width: 11px; height: 11px; border-radius: var(--r-xs); background: var(--serie); flex-shrink: 0; }
 
 /* La de las columnas por día, mes o año: cada serie se muestra o se oculta. */
 .leyendaBotones { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -89,7 +89,7 @@
 .verPor { color: var(--text-2); font-size: .78rem; font-weight: 700; margin-right: 2px; align-self: center; }
 .botonSerie {
   display: inline-flex; align-items: center; gap: 7px;
-  padding: 5px 11px; border-radius: 20px;
+  padding: 5px 11px; border-radius: var(--r-sm);
   border: 1.5px solid var(--border-2); background: var(--card);
   color: var(--text); font-size: .78rem; font-weight: 600;
   transition: opacity var(--t) var(--ease), border-color var(--t) var(--ease);
@@ -120,15 +120,15 @@
 .iconoExpirada   { color: var(--acc-gray); }
 .iconoFuera      { color: var(--acc-purple); }
 .indicadorEtiqueta { color: var(--text-2); font-size: .78rem; font-weight: 700; line-height: 1.3; }
-/* Cifras proporcionales en los valores grandes (tabulares solo en columnas). */
-.indicadorValor { color: var(--text); font-size: 1.7rem; font-weight: 800; line-height: 1.1; }
+/* Las cifras, en la letra de máquina de los documentos. */
+.indicadorValor { color: var(--text); font: 600 1.6rem/1.1 var(--letra-mono); letter-spacing: -.02em; }
 /* El porcentaje junto a la cifra (desde el 2026-11-10; antes iba en una frase debajo). */
 .indicadorPorcentaje { color: var(--text-2); font-size: .95rem; font-weight: 700; margin-left: 8px; }
 .indicadorNota { color: var(--text-2); font-size: .76rem; line-height: 1.45; }
 
 /* ─── Medidor ─── */
 .medidor {
-  height: 8px; border-radius: 4px; overflow: hidden;
+  height: 8px; border-radius: var(--r-xs); overflow: hidden;
   background: color-mix(in srgb, var(--serie) 18%, var(--card));
 }
 .medidorRelleno {
@@ -210,7 +210,7 @@
 }
 .horaEje { color: var(--muted); font-size: .66rem; text-align: center; font-variant-numeric: tabular-nums; padding-bottom: 3px; }
 .diaEje { color: var(--text-2); font-size: .74rem; font-weight: 700; align-self: center; }
-.celda { border-radius: 3px; background: var(--overlay); }
+.celda { border-radius: var(--r-xs); background: var(--overlay); }
 /* De menos a más: el verde de «aprobada» (--graf-calor) sobre la tarjeta (en
    oscuro, más es más brillante): el mapa cuenta las aprobaciones de UCVMM desde
    el 2026-11-06 (antes, las finalizaciones, en el verde azulado). Cero queda
@@ -226,7 +226,7 @@
 .recuadro {
   position: absolute; inset: -3px; z-index: 1;
   grid-row: 2 / 7;   /* lunes a viernes; las columnas, desde el código (el horario laboral) */
-  border: 2px solid var(--text-2); border-radius: 6px; pointer-events: none;
+  border: 2px solid var(--text-2); border-radius: var(--r-sm); pointer-events: none;
 }
 /* En el celular, solo las horas que sirven de referencia. */
 @media (max-width: 640px) {
@@ -238,7 +238,7 @@
 .escalaPasos { display: inline-flex; align-items: center; gap: 4px; }
 .escalaPasos .celda { width: 14px; height: 14px; }
 .escalaRecuadro { display: inline-flex; align-items: center; gap: 7px; }
-.escalaRecuadro::before { content: ""; width: 16px; height: 12px; border: 2px solid var(--text-2); border-radius: 4px; }
+.escalaRecuadro::before { content: ""; width: 16px; height: 12px; border: 2px solid var(--text-2); border-radius: var(--r-xs); }
 
 .fueraResumen { display: grid; grid-template-columns: minmax(0, 1fr) minmax(160px, 34%); align-items: center; gap: 10px 22px; margin-bottom: 18px; }
 .fueraResumen p { color: var(--text-2); font-size: .86rem; line-height: 1.5; }

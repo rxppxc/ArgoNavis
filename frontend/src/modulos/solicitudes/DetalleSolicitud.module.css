@@ -1,36 +1,62 @@
 .error {
   display: flex; align-items: center; gap: 10px;
-  padding: 16px 18px; border-radius: 10px;
+  padding: 16px 18px; border-radius: var(--r-md);
   background: var(--red-soft); border: 1px solid color-mix(in srgb, var(--acc-red) 40%, transparent);
   color: var(--acc-red); font-size: .9rem;
 }
 
-/* ─── Encabezado ─── */
+/* ─── Encabezado: la cabeza del documento (identidad «pase oficial», 2026-11-11).
+   Franja amarilla, guilloche al pie, el rótulo, el trámite, el número de
+   documento y el sello grande del estado, ladeado como uno puesto a mano. ─── */
 .encabezado {
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; flex-wrap: wrap;
-  margin-bottom: 16px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px 24px;
+  margin-bottom: 16px; padding: 20px 26px;
+  background: var(--guilloche) center bottom / 240px 80px repeat-x, var(--card);
+  border: 1px solid var(--border-2); border-top: 8px solid var(--franja); border-radius: var(--r-lg);
 }
 .encabezadoTexto { min-width: 0; }
-.numero {
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  color: var(--text-2); font-weight: 800; font-size: .95rem; letter-spacing: .4px;
+.antetitulo {
+  font: 600 .64rem/1.4 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
+  letter-spacing: .18em; text-transform: uppercase; color: var(--muted);
 }
-.encabezado h1 { color: var(--text); font-size: 1.55rem; font-weight: 800; margin-top: 6px; }
+.encabezado h1 {
+  margin-top: 2px; color: var(--text); overflow-wrap: anywhere;
+  font: 800 2.05rem/1.08 var(--letra-titulo); font-stretch: var(--ancho-titulo); text-transform: uppercase;
+}
+.numero { margin-top: 6px; color: var(--text); font: 600 1rem/1.3 var(--letra-mono); letter-spacing: .05em; }
+.numero small {
+  margin-right: 8px; color: var(--muted);
+  font: 600 .6rem var(--letra-titulo); font-stretch: var(--ancho-etiqueta); letter-spacing: .18em;
+}
 /* Morado, como en las bandejas: no es el color de ningún estado. */
 .chipHorario {
-  display: inline-flex; align-items: center; gap: 4px;
+  display: inline-flex; align-items: center; gap: 4px; margin-top: 10px;
   font-size: .72rem; font-weight: 700; letter-spacing: 0;
-  padding: 2px 9px; border-radius: 100px; border: 1px solid currentColor;
+  padding: 2px 9px; border-radius: var(--r-xs); border: 1px solid currentColor;
   color: var(--acc-purple);
 }
-.subtitulo { color: var(--text-2); font-size: .88rem; margin-top: 4px; }
-.encabezadoAcciones { display: flex; gap: 10px; flex-wrap: wrap; }
+.subtitulo { color: var(--text-2); font-size: .88rem; margin-top: 6px; }
+/* El sello del estado, grande y ladeado. */
+.sello { justify-self: end; padding: 6px 10px; }
+.sello > span {
+  font-size: 1rem; padding: 7px 16px; border-width: 3px;
+  outline-width: 1.5px; outline-offset: 3px; transform: rotate(-6deg);
+}
+.encabezadoAcciones {
+  grid-column: 1 / -1; display: flex; gap: 10px; flex-wrap: wrap;
+  padding-top: 14px; border-top: 1px solid var(--border);
+}
+@media (max-width: 640px) {
+  .encabezado { grid-template-columns: 1fr; padding: 16px; }
+  .encabezado h1 { font-size: 1.5rem; }
+  .sello { justify-self: start; }
+}
 
 
 /* ─── Banners de estado ─── */
 .banner {
   padding: 13px 17px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   margin-bottom: 18px;
   border: 1px solid var(--border);
   border-left-width: 4px;
@@ -62,48 +88,81 @@
 
 .panel {
   background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 13px;
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-lg);
   padding: 18px 20px;
 }
-.panelAccion { border-color: var(--y-border); box-shadow: 0 0 0 1px var(--y-border) inset; }
+/* El panel de la decisión (UCVMM, puesto): con la franja amarilla arriba. */
+.panelAccion { border-top: 6px solid var(--franja); }
+/* Títulos de sección como en un formulario impreso: mayúsculas espaciadas y,
+   en la columna principal, numerados (1 Datos del trámite, 2 Pasajeros…). */
 .panelTitulo {
-  display: flex; align-items: center; gap: 9px;
-  color: var(--text); font-size: .98rem; font-weight: 800;
-  margin-bottom: 12px;
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 14px; color: var(--text);
+  font: 700 .8rem/1.3 var(--letra-titulo); font-stretch: var(--ancho-titulo);
+  letter-spacing: .1em; text-transform: uppercase;
+}
+.principal { counter-reset: seccion; }
+.principal .panelTitulo::before {
+  counter-increment: seccion;
+  content: counter(seccion) / "";   /* el número es decorativo: no se lee */
+  display: inline-grid; place-items: center; flex: none; width: 24px; height: 24px;
+  border: 1.5px solid var(--text); letter-spacing: 0; font: 700 .76rem/1 var(--letra-mono);
 }
 .contador {
-  font-size: .74rem; font-weight: 700;
-  padding: 2px 9px; border-radius: 100px;
+  font: 600 .74rem/1.2 var(--letra-mono); letter-spacing: 0;
+  padding: 2px 8px; border-radius: var(--r-xs);
   background: var(--overlay); color: var(--text-2);
 }
 .vacio { color: var(--muted); font-size: .85rem; font-style: italic; }
 .ayuda { color: var(--text-2); font-size: .8rem; line-height: 1.5; margin-bottom: 10px; }
 
 /* ─── Datos ─── */
-.datos { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px 18px; }
-.dato dt { color: var(--muted); font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
-.dato dd { color: var(--text); font-size: .9rem; margin-top: 2px; overflow-wrap: anywhere; }
+.datos { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px 24px; }
+/* Cada dato con su rótulo arriba y el valor sobre la línea, como un formulario impreso. */
+.dato { padding-bottom: 6px; border-bottom: 1px solid var(--border-2); }
+.dato dt {
+  color: var(--muted);
+  font: 600 .6rem/1.4 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
+  letter-spacing: .16em; text-transform: uppercase;
+}
+.dato dd { color: var(--text); font-size: .9rem; margin-top: 3px; overflow-wrap: anywhere; }
 /* Nota informativa del trámite: neutra con acento azul, como el resto de las notas. */
 .nota {
-  margin-top: 14px; padding: 10px 13px; border-radius: 8px;
+  margin-top: 14px; padding: 10px 13px; border-radius: var(--r-sm);
   background: var(--overlay); border: 1px solid var(--border); border-left: 3px solid var(--acc-blue);
   color: var(--text); font-size: .82rem;
 }
+/* Lo que escribió la agencia, con la franja amarilla al costado: crema en claro,
+   neutro en oscuro (el amarillo mezclado con el fondo oscuro se veía oliva). */
 .observaciones {
-  margin-top: 12px; padding: 10px 13px; border-radius: 8px;
-  background: var(--overlay); border-left: 3px solid var(--y-border);
-  color: var(--text); font-size: .85rem; white-space: pre-wrap; overflow-wrap: anywhere;
+  margin-top: 14px; padding: 10px 14px; border-radius: var(--r-sm);
+  background: var(--overlay); border-left: 4px solid var(--franja);
+  color: var(--text); font-size: .86rem; white-space: pre-wrap; overflow-wrap: anywhere;
 }
-.observaciones span { display: block; color: var(--muted); font-size: .7rem; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; }
+:global([data-theme="light"]) .observaciones { background: var(--y-soft); }
+.observaciones span {
+  display: block; margin-bottom: 4px; color: var(--muted);
+  font: 600 .6rem/1.4 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
+  letter-spacing: .16em; text-transform: uppercase;
+}
+
+/* El pie del documento: la línea de lectura mecánica de un pasaporte (decorativa). */
+.mrz {
+  padding: 12px 18px; border: 1px dashed var(--border-2); border-radius: var(--r-md);
+  background: var(--card); color: var(--muted);
+  font: 500 .8rem/1.7 var(--letra-mono); letter-spacing: .2em;
+  white-space: pre; overflow: hidden;
+}
 
 /* ─── Tripulantes ─── */
 .tablaScroll { overflow-x: auto; }
 .tabla { width: 100%; border-collapse: collapse; font-size: .84rem; }
 .tabla th {
-  text-align: left; color: var(--muted); font-size: .7rem; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .4px;
-  padding: 8px 10px; border-bottom: 1px solid var(--border);
+  text-align: left; color: var(--muted);
+  font: 600 .6rem/1.4 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
+  letter-spacing: .16em; text-transform: uppercase;
+  padding: 8px 10px; border-bottom: 2px solid var(--text);
 }
 .tabla td { padding: 10px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: top; }
 .tabla tr:last-child td { border-bottom: 0; }
@@ -113,7 +172,7 @@
 .chipRestringida {
   display: block; width: fit-content; margin-top: 4px;
   font-size: .68rem; font-weight: 700;
-  padding: 1px 8px; border-radius: 100px;
+  padding: 1px 8px; border-radius: var(--r-xs);
   color: var(--acc-orange); border: 1px solid currentColor;
 }
 
@@ -121,7 +180,7 @@
 .documentos { display: flex; flex-direction: column; gap: 14px; }
 .grupoTitulo { color: var(--muted); font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
 .grupoDocs { display: flex; flex-direction: column; gap: 6px; }
-.casilla { border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; background: var(--card-2); }
+.casilla { border: 1px solid var(--border); border-radius: var(--r-sm); padding: 8px 10px; background: var(--card-2); }
 .casillaCabecera { display: flex; align-items: center; gap: 8px; }
 .casillaNombre { color: var(--text); font-size: .85rem; font-weight: 600; flex: 1; }
 .casillaOk, .casillaFalta {
@@ -134,7 +193,7 @@
 .archivo {
   display: flex; align-items: center; gap: 8px;
   margin-top: 6px; padding: 6px 9px;
-  border-radius: 7px; background: var(--overlay);
+  border-radius: var(--r-sm); background: var(--overlay);
   color: var(--text-2); font-size: .8rem;
 }
 .archivoNombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
@@ -160,7 +219,7 @@
 .eventoMeta { color: var(--muted); font-size: .74rem; margin-top: 1px; }
 .eventoComentario {
   margin-top: 5px; color: var(--text); font-size: .8rem; white-space: pre-wrap; overflow-wrap: anywhere;
-  background: var(--overlay); padding: 6px 9px; border-radius: 6px;
+  background: var(--overlay); padding: 6px 9px; border-radius: var(--r-sm);
 }
 .evento_creada .eventoPunto,
 .evento_corregida .eventoPunto  { background: var(--acc-blue); }
@@ -187,7 +246,7 @@
 .progreso { display: flex; align-items: center; gap: 8px; margin-top: 5px; color: var(--text-2); font-size: .78rem; }
 .progresoBarra { display: flex; width: 140px; }
 /* Sin | Con: radios nativos (teclado y lector de pantalla) pintados como un control segmentado. */
-.segmento { display: inline-flex; border: 1px solid var(--border-2); border-radius: 8px; overflow: hidden; }
+.segmento { display: inline-flex; border: 1px solid var(--border-2); border-radius: var(--r-sm); overflow: hidden; }
 .segmentoOpcion {
   padding: 6px 13px; cursor: pointer;
   font-size: .78rem; font-weight: 700; color: var(--text-2); background: var(--card);
@@ -223,12 +282,12 @@
 .modalAngosto { width: min(500px, 100%); }
 .modalMensaje { color: var(--text-2); font-size: .86rem; line-height: 1.55; margin-bottom: 14px; }
 .chipImpedimento {
-  display: inline-block; margin: 4px 4px 0 0; padding: 1px 8px; border-radius: 999px; white-space: nowrap;
+  display: inline-block; margin: 4px 4px 0 0; padding: 1px 8px; border-radius: var(--r-xs); white-space: nowrap;
   font-size: .68rem; font-weight: 700; color: var(--acc-red); border: 1px solid var(--acc-red);
 }
 .etiqueta { display: block; color: var(--text-2); font-size: .78rem; font-weight: 600; margin-bottom: 6px; }
 .textarea {
-  width: 100%; padding: 9px 11px; border-radius: 8px;
+  width: 100%; padding: 9px 11px; border-radius: var(--r-sm);
   border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text);
   font: inherit; font-size: .85rem; resize: vertical;
 }
@@ -237,7 +296,7 @@
 .textarea[aria-invalid="true"] { border-color: var(--acc-red); }
 .textarea + .etiqueta { margin-top: 10px; }
 .select {
-  width: 100%; padding: 8px 10px; border-radius: 8px;
+  width: 100%; padding: 8px 10px; border-radius: var(--r-sm);
   border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text);
   font: inherit; font-size: .85rem; cursor: pointer;
 }
@@ -264,7 +323,7 @@
 
 /* ─── Pasos del panel del puesto (revisión de UX del 2026-11-08) ─── */
 .plazoPanel, .plazoPanelVencido {
-  margin: 0 0 14px; padding: 8px 11px; border-radius: 8px; font-size: .8rem; line-height: 1.45;
+  margin: 0 0 14px; padding: 8px 11px; border-radius: var(--r-sm); font-size: .8rem; line-height: 1.45;
   color: var(--text); background: color-mix(in srgb, var(--acc-teal) 10%, transparent);
 }
 .plazoPanelVencido { background: color-mix(in srgb, var(--acc-red) 12%, transparent); color: var(--acc-red); }
@@ -292,7 +351,7 @@
 /* «Marcar todos sin impedimento»: en verde, como la opción «Sin» que marca. */
 .btnPequeno {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 5px 11px; border-radius: 999px;
+  padding: 5px 11px; border-radius: var(--r-xs);
   border: 1px solid color-mix(in srgb, var(--acc-green) 50%, transparent);
   background: color-mix(in srgb, var(--acc-green) 6%, var(--card));
   color: var(--acc-green); font-size: .76rem; font-weight: 700;
@@ -330,13 +389,13 @@
   }
   .tabla td.celdaOrden { display: none; }
   .tabla td.celdaAncha { grid-column: 1 / -1; }
-  .tabla tr.filaConImpedimento { padding-left: 10px; padding-right: 10px; border-radius: 8px; }
+  .tabla tr.filaConImpedimento { padding-left: 10px; padding-right: 10px; border-radius: var(--r-sm); }
   .segmentoOpcion { padding: 8px 20px; }
 }
 
 /* Columna "Documentos" de la tabla de tripulantes y su modal */
 .btnDocumentacion {
-  display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: var(--r-xs);
   border: 1px solid var(--border-2); color: var(--text); font-size: .76rem; font-weight: 700; white-space: nowrap;
   transition: background var(--t), border-color var(--t);
 }
@@ -350,6 +409,7 @@
 .modal {
   width: min(640px, 100%); max-height: calc(100vh - 32px); overflow: auto;
   background: var(--surface); border: 1px solid var(--border-2); border-radius: var(--r-lg);
+  border-top: 6px solid var(--franja);   /* identidad «pase oficial» */
   box-shadow: var(--sh-lg); padding: 18px 20px;
 }
 .modalCabecera { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }

@@ -11,7 +11,7 @@ Nació como una herramienta de *storage* (transferencias de archivos con enlace 
 | Capa | Stack |
 |---|---|
 | **Backend** | Python 3.12 · FastAPI · SQLAlchemy 2 async · PostgreSQL · Alembic · LDAP (Active Directory) · JWT · reportlab (PDF + QR) · XlsxWriter (Excel) |
-| **Frontend** | React 19 · TypeScript estricto · Vite · CSS Modules · React Router v7 |
+| **Frontend** | React 19 · TypeScript estricto · Vite · CSS Modules · React Router v7 · letras propias en el paquete (Archivo, Public Sans, IBM Plex Mono; `@fontsource`, sin CDN) |
 | **Infraestructura** | Docker Compose (nginx + backend + PostgreSQL) o Windows (uvicorn + proxy) · slowapi (rate limit) |
 
 ---

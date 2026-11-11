@@ -16,6 +16,6 @@
   document.documentElement.setAttribute("data-theme", tema);
 
   var barra = document.querySelector('meta[name="theme-color"]');
-  // El color de la cabecera, que es el mismo en los dos temas.
-  if (barra) barra.setAttribute("content", "#1B252F");
+  // El color de la cabecera de cada tema (--cabecera): blanca en claro, marino en oscuro.
+  if (barra) barra.setAttribute("content", tema === "light" ? "#FFFFFF" : "#131E2B");
 })();

@@ -27,8 +27,8 @@
 .chip {
   padding: 6px 13px;
   border: 1.5px solid var(--border-2);
-  border-radius: 20px;
-  background: var(--overlay);
+  border-radius: var(--r-sm);
+  background: var(--card);
   color: var(--text-2);
   font-size: .8rem;
   font-weight: 600;
@@ -39,10 +39,12 @@
   border-color: var(--input-border);
   color: var(--text);
 }
-/* Igual que la pestaña de estado activa: amarillo de relleno, texto normal. */
+/* Como la pestaña de estado activa: borde de tinta y la franja amarilla. */
 .chipActivo, .chipActivo:hover {
-  background: var(--y-soft);
-  border-color: var(--y);
+  background: var(--card);
+  border-color: var(--text);
+  box-shadow: inset 0 -3px 0 var(--franja);
   color: var(--text);
+  font-weight: 700;
 }
 

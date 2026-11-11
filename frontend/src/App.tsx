@@ -25,6 +25,14 @@ import {
   REVISION_RENOVACION_MS,
 } from "./constants/sesion";
 import { CLAVE_ACTIVIDAD, anotarActividad, leerActividad } from "./utils/actividad";
+// Letras de la identidad «pase oficial» (elegida por el usuario el 2026-11-11):
+// van en el paquete compilado y las sirve el propio servidor, como pide la CSP
+// (font-src 'self'): nada de CDN. Archivo con el eje de ancho (títulos extendidos).
+import "@fontsource-variable/archivo/wdth.css";
+import "@fontsource-variable/public-sans";
+import "@fontsource/ibm-plex-mono/400.css";
+import "@fontsource/ibm-plex-mono/500.css";
+import "@fontsource/ibm-plex-mono/600.css";
 import "./styles/globals.css";
 
 // El login, las bandejas y las páginas chicas van en el paquete inicial. La

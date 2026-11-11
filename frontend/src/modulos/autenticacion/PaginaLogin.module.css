@@ -1,38 +1,81 @@
-/* Login de ARGO NAVIS: el logo de ARGO NAVIS con las coordenadas de la sede y la
-   tarjeta de acceso. La franja y el pie son los de todas las páginas
-   (CabeceraInstitucional y PieInstitucional). Todo con los tokens de tema. */
+/* Login de ARGO NAVIS (identidad «pase oficial», 2026-11-11): un pasaporte
+   abierto sobre la carta celeste animada (FondoPagina). La tapa, marino con
+   guilloche dorado, lleva el emblema de ARGO NAVIS, las coordenadas de la sede
+   y la línea de lectura mecánica; la hoja, la franja amarilla y el acceso. La
+   cabecera y el pie son los de todas las páginas. */
 .pagina { min-height: 100vh; display: flex; flex-direction: column; background: var(--bg); color: var(--text); }
 
 /* ─── Cuerpo: la carta celeste (FondoPagina) va detrás ─── */
 .medio { flex: 1; position: relative; overflow: clip; display: flex; }
 .cuerpo {
-  position: relative; flex: 1; display: grid; grid-template-columns: 1fr 440px; gap: 56px; align-items: center;
-  max-width: 1200px; width: 100%; margin: 0 auto; padding: 28px 24px;
-}
-/* El logo ya dice "ARGO NAVIS" y "Sistema Interno Marítimo - SNM": aquí no se repite en texto. */
-.insignia { display: flex; flex-direction: column; align-items: center; text-align: center; }
-.titulo { line-height: 0; }
-.logoGrande { width: 360px; max-width: 100%; height: auto; animation: aparecer .7s var(--ease) both; }
-@keyframes aparecer { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
-.coordenadas {
-  margin-top: 20px; padding-top: 12px; min-width: 260px; border-top: 1px solid var(--border);
-  font: 600 .8rem Consolas, "Cascadia Mono", monospace; letter-spacing: .5px; color: var(--text-2);
+  position: relative; flex: 1; display: flex; align-items: center; justify-content: center;
+  padding: 36px 24px;
 }
 
-/* ─── Tarjeta de acceso (texto centrado; las etiquetas de los campos, a la izquierda) ─── */
-.acceso {
-  text-align: center;
-  background: var(--surface); border: 1px solid var(--border); border-top: 4px solid var(--y);
-  border-radius: var(--r-md); padding: 34px 36px 26px; box-shadow: var(--sh-lg);
+.libreta {
+  position: relative; display: grid; grid-template-columns: 1fr 1fr;
+  width: min(940px, 100%); border-radius: var(--r-xl); overflow: hidden;
+  box-shadow: 0 30px 60px -28px color-mix(in srgb, var(--pie) 75%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--text) 16%, transparent);
 }
-.acceso h2 { font-size: 1.4rem; font-weight: 750; }
-.intro { color: var(--text-2); font-size: .9rem; margin: 4px 0 22px; }
+/* El lomo: la sombra donde se dobla la libreta. */
+.libreta::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 30px; margin-left: -15px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, black 16%, transparent) 44%,
+    color-mix(in srgb, black 26%, transparent) 50%, color-mix(in srgb, black 8%, transparent) 56%, transparent);
+  pointer-events: none;
+}
+
+/* ─── La tapa: marino en los dos temas, letras doradas como las de un pasaporte
+   (el amarillo de marca sobre el marino da 10:1). ─── */
+.tapa {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  padding: 44px 36px 74px; text-align: center;
+  background: var(--guilloche-oro) center / 240px 80px, var(--pie); color: var(--y);
+}
+.pais {
+  font: 600 .72rem/1.3 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
+  letter-spacing: .34em; text-transform: uppercase;
+}
+.titulo { line-height: 0; }
+.logoGrande { width: 270px; max-width: 100%; height: auto; animation: aparecer .7s var(--ease) both; }
+@keyframes aparecer { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+.coordenadas { font: 500 .78rem/1.3 var(--letra-mono); letter-spacing: .16em; opacity: .9; }
+/* El símbolo de los pasaportes con chip. */
+.chip { position: relative; width: 40px; height: 26px; border: 1.5px solid currentColor; border-radius: var(--r-xs); opacity: .7; }
+.chip::before { content: ""; position: absolute; inset: 6px 13px; border: 1.5px solid currentColor; border-radius: 50%; }
+.mrz {
+  position: absolute; left: 0; right: 0; bottom: 16px; overflow: hidden; white-space: nowrap;
+  font: 500 .7rem/1 var(--letra-mono); letter-spacing: .2em; opacity: .42;
+}
+
+/* ─── La hoja: franja amarilla arriba y el guilloche detrás del título ─── */
+.acceso {
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 38px 40px 28px;
+  background: var(--guilloche) top center / 240px 80px repeat-x, var(--surface);
+  border-top: 8px solid var(--franja);
+}
+.antetitulo {
+  font: 600 .64rem/1.4 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
+  letter-spacing: .18em; text-transform: uppercase; color: var(--muted);
+}
+.acceso h2 {
+  margin-top: 2px;
+  font: 800 1.6rem/1.15 var(--letra-titulo); font-stretch: var(--ancho-titulo); text-transform: uppercase;
+}
+.intro { color: var(--text-2); font-size: .9rem; margin: 8px 0 22px; }
 .error {
-  display: flex; align-items: flex-start; justify-content: center; gap: 8px; margin-bottom: 16px; padding: 10px 12px;
-  border-radius: var(--r-sm); background: var(--red-soft); color: var(--acc-red); font-size: .86rem; font-weight: 600;
+  display: flex; align-items: flex-start; gap: 8px; margin-bottom: 16px; padding: 10px 12px;
+  border-radius: var(--r-sm); border-left: 4px solid var(--acc-red);
+  background: var(--red-soft); color: var(--acc-red); font-size: .86rem; font-weight: 600;
 }
 .error svg { flex-shrink: 0; margin-top: 2px; }
-.etiqueta { display: block; text-align: left; font-size: .78rem; font-weight: 700; color: var(--text-2); margin-bottom: 6px; }
+.etiqueta {
+  display: block; margin-bottom: 6px;
+  font: 600 .64rem/1.3 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
+  letter-spacing: .16em; text-transform: uppercase; color: var(--text-2);
+}
 .campo {
   display: flex; align-items: center; gap: 8px; margin-bottom: 16px; padding: 0 12px;
   background: var(--input-bg); border: 1.5px solid var(--input-border); border-radius: var(--r-sm); color: var(--muted);
@@ -49,7 +92,7 @@
 .ingresar { composes: boton primario grande from "../../components/Botones.module.css"; width: 100%; margin-top: 4px; }
 .spinner {
   width: 15px; height: 15px; border-radius: 50%;
-  border: 2px solid color-mix(in srgb, var(--on-accent) 30%, transparent); border-top-color: var(--on-accent);
+  border: 2px solid color-mix(in srgb, var(--sobre-principal) 30%, transparent); border-top-color: var(--sobre-principal);
   animation: girar .7s linear infinite;
 }
 @keyframes girar { to { transform: rotate(360deg); } }
@@ -62,12 +105,13 @@
 .soporte a { display: inline-block; color: var(--acc-blue); font-weight: 600; }   /* el correo no se parte */
 .soporte a:hover { text-decoration: underline; }
 
-@media (max-width: 1080px) {
-  .logoGrande { width: 290px; }
-}
+/* Pantallas angostas: la tapa queda arriba, como una franja con el emblema. */
 @media (max-width: 880px) {
-  .cuerpo { grid-template-columns: 1fr; gap: 20px; padding: 18px 16px; }
+  .cuerpo { padding: 18px 16px; }
+  .libreta { grid-template-columns: 1fr; }
+  .libreta::after { display: none; }
+  .tapa { gap: 10px; padding: 22px 20px 40px; }
   .logoGrande { width: 150px; }
-  .coordenadas { display: none; }
-  .acceso { padding: 24px 20px; }
+  .coordenadas, .chip { display: none; }
+  .acceso { padding: 26px 22px 22px; }
 }

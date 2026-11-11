@@ -196,6 +196,23 @@ function ResumenImpedimentos({ s }: { s: SolicitudDetalle }) {
   );
 }
 
+/** Las dos líneas de lectura mecánica del pie del expediente, como las de un
+ *  pasaporte: mayúsculas sin tildes, campos separados por «<<» y 44 caracteres. */
+function lineasMecanicas(s: SolicitudDetalle): string[] {
+  const linea = (...campos: (string | number | null | undefined)[]) => {
+    const texto = campos
+      .map((c) => String(c ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase()
+        .replace(/[^A-Z0-9]+/g, "<").replace(/^<|<$/g, ""))
+      .filter(Boolean).join("<<");
+    return (texto + "<".repeat(44)).slice(0, 44);
+  };
+  const operacion = (s.fecha_operacion ?? "").split("-").reverse().join("");
+  return [
+    linea("AM", (s.numero ?? String(s.id)).replace(/^AM-/, "").replace(/-/g, ""), s.tipo_tramite_nombre, s.puesto_nombre),
+    linea(s.agencia_nombre, operacion, s.tripulantes.length),
+  ];
+}
+
 function Dato({ etiqueta, valor }: { etiqueta: string; valor: string | null | undefined }) {
   if (!valor) return null;
   return (
@@ -272,19 +289,21 @@ function Expediente({ s, onActualizada }: { s: SolicitudDetalle; onActualizada: 
 
   return (
     <MarcoPagina volverA="/dashboard" ancho="amplio">
+      {/* La cabeza del documento (identidad «pase oficial», 2026-11-11): la franja
+          amarilla, el rótulo, el trámite, el número y el sello del estado. */}
       <header className={styles.encabezado}>
         <div className={styles.encabezadoTexto}>
-          <div className={styles.numero}>
-            <span>{s.numero ?? `Solicitud ${s.id}`}</span>
-            <InsigniaEstado estado={s.estado} grande />
-            {s.fuera_de_horario && <span className={styles.chipHorario}><IconoReloj tamano={12} /> Aprobada fuera del horario</span>}
-          </div>
+          <p className={styles.antetitulo}>Autorización marítima · Formulario No. 3</p>
           <h1>{s.tipo_tramite_nombre}</h1>
+          <p className={styles.numero}><small>N.º</small>{s.numero ?? `Solicitud ${s.id}`}</p>
           <div className={styles.subtitulo}>
             {[buque, s.puesto_nombre, `Operación: ${formatearFecha(s.fecha_operacion)}`]
               .filter(Boolean).join(" — ")}
           </div>
+          {s.fuera_de_horario && <span className={styles.chipHorario}><IconoReloj tamano={12} /> Aprobada fuera del horario</span>}
         </div>
+        <div className={styles.sello}><InsigniaEstado estado={s.estado} grande /></div>
+        {(s.acciones.corregir || s.acciones.descargar_autorizacion) && (
         <div className={styles.encabezadoAcciones}>
           {s.acciones.corregir && (
             <Link to={`/solicitudes/${s.id}/corregir`} className={styles.btnPrimario}>
@@ -299,6 +318,7 @@ function Expediente({ s, onActualizada }: { s: SolicitudDetalle; onActualizada: 
             </button>
           )}
         </div>
+        )}
       </header>
 
       <BannerEstado s={s} />
@@ -340,6 +360,8 @@ function Expediente({ s, onActualizada }: { s: SolicitudDetalle; onActualizada: 
               <DocumentosSolicitud solicitud={s} onVer={setVistaPrevia} />
             </section>
           )}
+          {/* El pie del documento: una línea de lectura mecánica, como la de un pasaporte (decorativa). */}
+          <p className={styles.mrz} aria-hidden="true">{lineasMecanicas(s).join("\n")}</p>
         </div>
 
         {/* Para UCVMM y el puesto la columna queda fija al bajar por la tabla: la decisión siempre a la vista. */}

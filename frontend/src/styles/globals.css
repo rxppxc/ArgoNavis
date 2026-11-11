@@ -11,7 +11,19 @@
      (--on-accent), como los botones de la web.
    - Todos los pares texto/fondo cumplen WCAG AA (4.5:1 en texto, 3:1 en bordes
      de campos), también sobre los fondos teñidos: si cambias un valor, recalcula.
-   El tema se fija en <html data-theme> antes de pintar (public/tema-inicial.js). */
+   El tema se fija en <html data-theme> antes de pintar (public/tema-inicial.js).
+
+   ─── Identidad «pase oficial» (elegida por el usuario el 2026-11-11) ───
+   Cada pantalla como un documento oficial sobre la carta celeste del fondo
+   (FondoPagina, que no cambia): la franja amarilla del escudo (--franja), el
+   guilloche de seguridad (--guilloche, solo en lo que identifica un documento:
+   cabecera, encabezado del expediente, tapa del pasaporte del login, informe),
+   sellos de tinta para los estados (InsigniaEstado) y letras propias:
+   Archivo extendida en títulos y etiquetas (--letra-titulo), Public Sans en el
+   texto (--letra-texto) e IBM Plex Mono en números de documento (--letra-mono).
+   El botón principal es marino en claro y amarillo en oscuro (--principal); el
+   amarillo de marca sigue siendo relleno: la franja, lo seleccionado y el foco
+   en oscuro. Esquinas casi rectas (--r-*). */
 
 /* ─── Tema oscuro (por defecto): la pizarra de la cabecera de la web ─── */
 :root {
@@ -49,14 +61,32 @@
   --foco:         #F2C94C;                /* anillo de foco: amarillo, como en la web */
   --velo:         rgba(4,9,15,.66);       /* fondo detrás de un modal */
 
-  /* Cabecera y pie: la pizarra de migracion.gob.pa, igual en los dos temas.
-     Sus textos no cambian con el tema (el fondo tampoco). */
-  --cabecera:         #1B252F;
-  --cabecera-texto:   #FFFFFF;
-  --cabecera-texto-2: #DCE7F0;   /* el texto del pie de la web: 12:1 */
-  --cabecera-borde:   rgba(220,231,240,.38);
-  --pie:              #2D363F;
-  --pie-texto:        #DCE7F0;   /* 9.8:1 */
+  /* Identidad «pase oficial» (2026-11-11, ver arriba). */
+  --letra-texto:  "Public Sans Variable", "Segoe UI", system-ui, sans-serif;
+  --letra-titulo: "Archivo Variable", "Segoe UI", system-ui, sans-serif;
+  --letra-mono:   "IBM Plex Mono", Consolas, ui-monospace, monospace;
+  --ancho-titulo:   118%;   /* font-stretch de los títulos: Archivo extendida */
+  --ancho-etiqueta: 125%;   /* etiquetas en mayúsculas espaciadas */
+  --franja:        #F2C94C; /* la franja del escudo; en oscuro, el amarillo de la web */
+  --celeste-texto: #6FCDF0; /* el celeste del escudo, legible sobre oscuro (7.9:1 sobre --card) */
+  --principal:       #F2C94C;   /* botón principal: amarillo en oscuro, marino en claro */
+  --principal-hover: #FFD633;
+  --sobre-principal: #10233F;
+  /* Guilloche: ondas finas como las de un pasaporte o un billete (celeste del escudo). */
+  --guilloche: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='80' viewBox='0 0 240 80'%3E%3Cg fill='none' stroke='%2338BDE8' stroke-opacity='.2' stroke-width='.7'%3E%3Cpath d='M0 40C30 10 90 10 120 40S210 70 240 40'/%3E%3Cpath d='M0 40C30 70 90 70 120 40S210 10 240 40'/%3E%3Cpath d='M0 30C30 4 90 4 120 30S210 56 240 30'/%3E%3Cpath d='M0 50C30 76 90 76 120 50S210 24 240 50'/%3E%3Cpath d='M0 20C40 0 80 0 120 20S200 40 240 20'/%3E%3Cpath d='M0 60C40 80 80 80 120 60S200 40 240 60'/%3E%3Cpath d='M0 40C60 0 60 80 120 40S180 0 240 40'/%3E%3Cpath d='M0 40C60 80 60 0 120 40S180 80 240 40'/%3E%3C/g%3E%3C/svg%3E");
+  /* El mismo guilloche en dorado, para la tapa azul del pasaporte (login). */
+  --guilloche-oro: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='80' viewBox='0 0 240 80'%3E%3Cg fill='none' stroke='%23F2C94C' stroke-opacity='.2' stroke-width='.7'%3E%3Cpath d='M0 40C30 10 90 10 120 40S210 70 240 40'/%3E%3Cpath d='M0 40C30 70 90 70 120 40S210 10 240 40'/%3E%3Cpath d='M0 30C30 4 90 4 120 30S210 56 240 30'/%3E%3Cpath d='M0 50C30 76 90 76 120 50S210 24 240 50'/%3E%3Cpath d='M0 20C40 0 80 0 120 20S200 40 240 20'/%3E%3Cpath d='M0 60C40 80 80 80 120 60S200 40 240 60'/%3E%3Cpath d='M0 40C60 0 60 80 120 40S180 0 240 40'/%3E%3Cpath d='M0 40C60 80 60 0 120 40S180 80 240 40'/%3E%3C/g%3E%3C/svg%3E");
+
+  /* Cabecera y pie (identidad «pase oficial», 2026-11-11). La cabecera es la
+     hoja del documento: marino profundo en oscuro y blanca en claro, con la
+     franja amarilla arriba y el guilloche detrás. El pie, marino con la
+     franja, igual en los dos temas. */
+  --cabecera:         #131E2B;
+  --cabecera-texto:   #E8EDF3;
+  --cabecera-texto-2: #B2BFCD;   /* 8.9:1 sobre la cabecera */
+  --cabecera-borde:   #5F7089;   /* bordes de la campana y el menú: 3.2:1 */
+  --pie:              #10233F;   /* --snm-navy */
+  --pie-texto:        #DCE7F0;   /* 12:1 */
 
   /* Texto de acento sobre tintes suaves (badges, botones outline). Brillante en
      oscuro; el modo claro los reemplaza por tonos legibles sobre blanco. */
@@ -107,11 +137,12 @@
   --naranja-boton:  #FB923C;
   --sobre-fuerte:   #FFFFFF;
 
-  --r-xs: 5px;
-  --r-sm: 8px;
-  --r-md: 12px;
-  --r-lg: 12px;
-  --r-xl: 16px;
+  /* Esquinas casi rectas, de documento (2026-11-11; antes 5 a 16 px). */
+  --r-xs: 3px;
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 8px;
+  --r-xl: 10px;
 
   --sh-xs: 0 1px 2px rgba(3,8,14,.40);
   --sh-sm: 0 1px 3px rgba(3,8,14,.45);
@@ -151,6 +182,20 @@
   --foco:         #003DA5;   /* --snm-blue */
   --velo:         rgba(16,35,63,.48);
 
+  /* Identidad «pase oficial»: la franja con el amarillo puro del escudo, el
+     botón principal en marino (como la tinta de un documento) y la cabecera
+     blanca. Sobre ella, el foco va en el azul institucional (--foco). */
+  --franja:          #FFE400;
+  --celeste-texto:   #0A6F94;   /* 5.8:1 sobre blanco */
+  --principal:       #10233F;   /* --snm-navy: 15.6:1 con blanco */
+  --principal-hover: #1D3A63;
+  --sobre-principal: #FFFFFF;
+  --guilloche: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='80' viewBox='0 0 240 80'%3E%3Cg fill='none' stroke='%2315B0DE' stroke-opacity='.3' stroke-width='.7'%3E%3Cpath d='M0 40C30 10 90 10 120 40S210 70 240 40'/%3E%3Cpath d='M0 40C30 70 90 70 120 40S210 10 240 40'/%3E%3Cpath d='M0 30C30 4 90 4 120 30S210 56 240 30'/%3E%3Cpath d='M0 50C30 76 90 76 120 50S210 24 240 50'/%3E%3Cpath d='M0 20C40 0 80 0 120 20S200 40 240 20'/%3E%3Cpath d='M0 60C40 80 80 80 120 60S200 40 240 60'/%3E%3Cpath d='M0 40C60 0 60 80 120 40S180 0 240 40'/%3E%3Cpath d='M0 40C60 80 60 0 120 40S180 80 240 40'/%3E%3C/g%3E%3C/svg%3E");
+  --cabecera:         #FFFFFF;
+  --cabecera-texto:   #10233F;
+  --cabecera-texto-2: #4E5D72;   /* 6.8:1 sobre blanco */
+  --cabecera-borde:   #7C8BA1;   /* 3.5:1 */
+
   /* Un tono más oscuros que los "-700": sobre sus propios fondos teñidos
      (insignias, avisos, contadores) los -700 quedaban entre 3.8 y 4.49:1. */
   --acc-green:  #166534;
@@ -186,7 +231,7 @@
 html { scroll-behavior: smooth; height: 100%; }
 
 body {
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: var(--letra-texto);
   background: var(--bg);
   color: var(--text);
   line-height: 1.55;
@@ -197,6 +242,11 @@ body {
      se corta en vez de salirse. Donde escribe el usuario va además «anywhere». */
   overflow-wrap: break-word;
 }
+
+/* Títulos en Archivo extendida (identidad «pase oficial»). Cada módulo fija su
+   tamaño; las mayúsculas van solo donde el diseño las pide (títulos de página,
+   etiquetas), no en todos los encabezados. */
+h1, h2, h3, h4 { font-family: var(--letra-titulo); font-stretch: var(--ancho-titulo); }
 
 a { color: inherit; text-decoration: none; }
 button { cursor: pointer; font-family: inherit; border: none; background: none; }

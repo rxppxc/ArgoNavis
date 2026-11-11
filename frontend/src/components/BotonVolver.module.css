@@ -1,23 +1,24 @@
 /* Secundario y no amarillo: no compite con la acción principal de la página
    (corregir, finalizar, enviar). Con fondo sólido y sombra: transparente se
-   perdía sobre la carta celeste del fondo. */
+   perdía sobre la carta celeste del fondo. En mayúsculas, como los demás botones
+   (identidad «pase oficial»). */
 .btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   justify-self: start;
   color: var(--text);
-  font-size: .84rem;
-  font-weight: 700;
-  padding: 7px 14px 7px 10px;
+  font: 700 .7rem/1 var(--letra-titulo);
+  font-stretch: var(--ancho-titulo);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 8px 14px 8px 10px;
   border-radius: var(--r-sm);
   border: 1.5px solid var(--border-2);
   background: var(--card);
   box-shadow: var(--sh-xs);
   text-decoration: none;
   cursor: pointer;
-  font-family: inherit;
-  line-height: 1;
   white-space: nowrap;
   transition: background var(--t), border-color var(--t), color var(--t);
 }

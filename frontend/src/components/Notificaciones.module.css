@@ -16,7 +16,7 @@
   min-width: 280px;
   max-width: 420px;
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   font-size: .9rem;
   font-weight: 600;
   color: var(--sobre-fuerte);
@@ -35,7 +35,7 @@
 
 .cerrar {
   display: flex; align-items: center; justify-content: center;
-  width: 26px; height: 26px; flex: none; border-radius: 6px;
+  width: 26px; height: 26px; flex: none; border-radius: var(--r-sm);
   background: transparent; border: 0; color: var(--sobre-fuerte); opacity: .85; cursor: pointer;
 }
 .cerrar:hover { opacity: 1; background: color-mix(in srgb, var(--sobre-fuerte) 14%, transparent); }

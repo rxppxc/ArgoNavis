@@ -1,57 +1,75 @@
-.tarjeta {
-  display: block;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--border-2);
-  border-radius: 12px;
-  padding: 14px 18px;
-  text-decoration: none;
-  transition: border-color var(--t) var(--ease), background var(--t) var(--ease), box-shadow var(--t) var(--ease);
+/* Fila de las bandejas como un pase (identidad «pase oficial», 2026-11-11): el
+   talón perforado a la izquierda, con el número y el sello del estado, y los
+   datos a la derecha, con su rótulo encima, como en un formulario impreso. Las
+   muescas son huecos de verdad (máscara): por ellas se ve la carta del fondo. */
+.enlace { display: block; border-radius: var(--r-lg); color: inherit; text-decoration: none; }
+.enlace:focus-visible { outline: 2px solid var(--foco); outline-offset: 3px; }
+
+.pase {
+  --talon: 210px;
+  display: grid; grid-template-columns: var(--talon) minmax(0, 1fr);
+  background: var(--card); border: 1px solid var(--border-2); border-radius: var(--r-lg);
+  /* Solo transparencia: no es un color de la interfaz. */
+  -webkit-mask: radial-gradient(circle 9px at var(--talon) 0, #0000 96%, #000) top / 100% 51% no-repeat,
+    radial-gradient(circle 9px at var(--talon) 100%, #0000 96%, #000) bottom / 100% 51% no-repeat;
+  mask: radial-gradient(circle 9px at var(--talon) 0, #0000 96%, #000) top / 100% 51% no-repeat,
+    radial-gradient(circle 9px at var(--talon) 100%, #0000 96%, #000) bottom / 100% 51% no-repeat;
+  transition: background var(--t) var(--ease), border-color var(--t) var(--ease);
 }
-.tarjeta:hover { background: var(--surface-2); box-shadow: var(--sh-sm); }
-.tarjeta:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+.enlace:hover .pase { background: var(--surface-2); border-color: var(--input-border); }
+.expired { opacity: .8; }
 
-.review    { border-left-color: var(--acc-blue); }
-.returned  { border-left-color: var(--acc-orange); }
-.approved  { border-left-color: var(--acc-green); }
-.denied    { border-left-color: var(--acc-red); }
-.finalized { border-left-color: var(--acc-teal); }
-.expired   { border-left-color: var(--acc-gray); opacity: .8; }
+.talon {
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 10px;
+  padding: 14px 18px; border-right: 1.5px dashed var(--border-2);
+}
+.numero { font: 600 .9rem/1.25 var(--letra-mono); letter-spacing: .03em; color: var(--text); }
+.numero small {
+  display: block;
+  font: 600 .58rem/1.4 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
+  letter-spacing: .2em; color: var(--muted);
+}
 
-.filaSuperior { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.numero { color: var(--text-2); font-weight: 800; font-size: .86rem; letter-spacing: .3px; }
+.cuerpo { display: grid; gap: 8px; min-width: 0; padding: 13px 20px 14px; }
+.titulo {
+  font: 800 1.02rem/1.2 var(--letra-titulo); font-stretch: 112%;
+  text-transform: uppercase; color: var(--text); overflow-wrap: anywhere;
+}
+.datos { display: flex; flex-wrap: wrap; gap: 6px 24px; }
+.datos div { min-width: 0; }
+.datos dt {
+  font: 600 .6rem/1.4 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
+  letter-spacing: .16em; text-transform: uppercase; color: var(--muted);
+}
+.datos dd { font-size: .84rem; color: var(--text); overflow-wrap: anywhere; }
+.mono { font-family: var(--letra-mono); font-size: .8rem; }
 
+.marcas { display: flex; flex-wrap: wrap; gap: 6px; }
 .chipAlerta, .chipRestringida, .chipHorario {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: .68rem; font-weight: 700;
-  padding: 2px 8px; border-radius: 100px; border: 1px solid currentColor;
+  padding: 2px 8px; border-radius: var(--r-xs); border: 1px solid currentColor;
 }
 .chipAlerta      { color: var(--acc-red); }
 .chipRestringida { color: var(--acc-orange); }
 /* Morado: no es el color de ningún estado (finalizada va en verde azulado). */
 .chipHorario     { color: var(--acc-purple); }
 
-.titulo {
-  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
-  color: var(--text); font-weight: 800; font-size: 1rem;
-  margin-top: 7px; overflow-wrap: anywhere;
-}
-.buque {
-  display: inline-flex; align-items: center; gap: 5px;
-  color: var(--text-2); font-weight: 600; font-size: .86rem; overflow-wrap: anywhere; min-width: 0;
-}
-
-.meta {
-  display: flex; flex-wrap: wrap; gap: 4px 16px;
-  margin-top: 6px;
-  color: var(--text-2); font-size: .78rem;
-}
-.meta span { display: inline-flex; align-items: center; gap: 4px; }
-
+/* El plazo, como una anotación en tinta sobre el pase. */
 .plazo, .plazoVencido {
-  display: inline-flex; align-items: center; gap: 6px;
-  margin-top: 8px; padding: 3px 10px; border-radius: 6px;
-  font-size: .76rem; font-weight: 600;
+  justify-self: start; display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 9px; border: 1px dashed currentColor; border-radius: var(--r-xs);
+  font: 600 .74rem/1.35 var(--letra-mono);
 }
-.plazo        { color: var(--acc-amber); background: color-mix(in srgb, var(--acc-amber) 10%, transparent); }
-.plazoVencido { color: var(--acc-red);   background: color-mix(in srgb, var(--acc-red) 10%, transparent); }
+.plazo        { color: var(--acc-amber); }
+.plazoVencido { color: var(--acc-red); }
+
+/* Teléfonos: el talón va arriba, en una franja, y sin muescas. */
+@media (max-width: 640px) {
+  .pase { grid-template-columns: 1fr; -webkit-mask: none; mask: none; }
+  .talon {
+    flex-direction: row; align-items: center; flex-wrap: wrap;
+    padding: 11px 14px; border-right: 0; border-bottom: 1.5px dashed var(--border-2);
+  }
+  .cuerpo { padding: 12px 14px; }
+}

@@ -1,12 +1,13 @@
 .tarjeta {
-  background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--r-lg);
   padding: 32px 28px; text-align: center;
+  border-top: 6px solid var(--franja);   /* identidad «pase oficial» */
 }
 .icono { display: inline-flex; color: var(--acc-blue); margin-bottom: 10px; }
-.titulo { color: var(--text); font-size: 1.4rem; font-weight: 800; margin-bottom: 10px; }
+.titulo { color: var(--text); font: 800 1.35rem/1.15 var(--letra-titulo); font-stretch: var(--ancho-titulo); text-transform: uppercase; margin-bottom: 10px; }
 .texto { color: var(--text-2); font-size: .92rem; line-height: 1.6; margin: 0 0 22px; }
 .ruta {
-  color: var(--text); background: var(--overlay); padding: 1px 6px; border-radius: 6px;
+  color: var(--text); background: var(--overlay); padding: 1px 6px; border-radius: var(--r-sm);
   word-break: break-all;
 }
 .boton { composes: boton primario from "../../components/Botones.module.css"; text-decoration: none; }

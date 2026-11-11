@@ -18,8 +18,8 @@
 .identidadDetalle { color: var(--cabecera-texto-2); font-size: .72rem; }
 @media (max-width: 1000px) { .identidad { display: none; } }
 
-/* ── Botón Menú: contorno claro sobre la cabecera oscura (el amarillo queda
-   para la acción principal de cada página) ── */
+/* ── Botón Menú: contorno sobre la cabecera, en mayúsculas como los botones
+   del documento (identidad «pase oficial») ── */
 .dropdown { position: relative; }
 
 .menuBtn {
@@ -31,9 +31,10 @@
   border-radius: var(--r-sm);
   color: var(--cabecera-texto);
   padding: 7px 14px;
-  font-size: .84rem;
-  font-weight: 700;
-  font-family: inherit;
+  font: 700 .74rem/1.2 var(--letra-titulo);
+  font-stretch: var(--ancho-titulo);
+  letter-spacing: .1em;
+  text-transform: uppercase;
   cursor: pointer;
   user-select: none;
   transition: background var(--t), border-color var(--t);
@@ -43,9 +44,8 @@
   background: color-mix(in srgb, var(--cabecera-texto-2) 10%, transparent);
   border-color: color-mix(in srgb, var(--cabecera-texto-2) 65%, transparent);
 }
-/* Sobre la cabecera oscura el foco va en amarillo, como en la web: el azul del
-   tema claro no se vería. */
-.menuBtn:focus-visible { outline-color: var(--y); }
+/* El foco del tema: azul sobre la cabecera blanca, amarillo sobre la marino. */
+.menuBtn:focus-visible { outline-color: var(--foco); }
 
 .chevron {
   display: flex;

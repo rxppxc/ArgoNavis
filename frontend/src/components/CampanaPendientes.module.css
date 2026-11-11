@@ -1,6 +1,6 @@
 /* La campana de la cabecera (notificaciones internas). El botón, como el de
-   «Menú»: contorno claro sobre la pizarra. El número va en blanco con texto
-   pizarra (neutro); el punto de novedades sin leer, en amarillo (relleno). */
+   «Menú»: contorno sobre la cabecera. El número va en el color del texto de la
+   cabecera (neutro); el punto de novedades sin leer, en amarillo (relleno). */
 .dropdown { position: relative; }
 
 .boton {
@@ -19,7 +19,7 @@
   background: color-mix(in srgb, var(--cabecera-texto-2) 10%, transparent);
   border-color: color-mix(in srgb, var(--cabecera-texto-2) 65%, transparent);
 }
-.boton:focus-visible { outline-color: var(--y); }
+.boton:focus-visible { outline-color: var(--foco); }
 @media (max-width: 520px) { .boton { width: 36px; } }
 
 .numero {
@@ -85,7 +85,7 @@
 .itemFila { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .itemTitulo { font-size: .84rem; font-weight: 600; overflow-wrap: anywhere; }
 .cantidad {
-  min-width: 22px; padding: 1px 7px; border-radius: 100px;
+  min-width: 22px; padding: 1px 7px; border-radius: var(--r-xs);
   background: var(--overlay-2); color: var(--text);
   font-size: .74rem; font-weight: 800; text-align: center;
 }

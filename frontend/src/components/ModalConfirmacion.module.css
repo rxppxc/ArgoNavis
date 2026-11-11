@@ -12,8 +12,9 @@
 .modal {
   background: var(--surface);
   color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  border: 1px solid var(--border-2);
+  border-top: 6px solid var(--franja);   /* identidad «pase oficial» */
+  border-radius: var(--r-lg);
   padding: 22px 24px;
   width: min(420px, 92vw);
   box-shadow: var(--sh-lg);
@@ -22,8 +23,9 @@
 
 .titulo {
   margin: 0 0 10px;
-  font-size: 1.05rem;
-  font-weight: 700;
+  font: 800 1rem/1.25 var(--letra-titulo);
+  font-stretch: var(--ancho-titulo);
+  text-transform: uppercase;
 }
 
 .mensaje {

@@ -7,7 +7,7 @@
   position: relative;
   display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
   padding: 16px; text-align: left;
-  border-radius: 14px; border: 1.5px solid var(--border-2); background: var(--card);
+  border-radius: var(--r-lg); border: 1.5px solid var(--border-2); background: var(--card);
   box-shadow: var(--sh-sm);
   color: var(--text); cursor: pointer;
   transition: border-color var(--t), background var(--t), box-shadow var(--t), transform var(--t);
@@ -45,7 +45,7 @@
 .icono {
   width: 46px; height: 46px; flex-shrink: 0;
   display: grid; place-items: center;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: var(--tono);
   color: var(--card);
 }
@@ -63,7 +63,7 @@
 /* Elegido: una línea con «Cambiar» */
 .elegido {
   display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
-  padding: 12px 14px; border-radius: 14px;
+  padding: 12px 14px; border-radius: var(--r-lg);
   border: 1.5px solid var(--y); background: var(--y-soft);
 }
 .elegido:focus { outline: none; }

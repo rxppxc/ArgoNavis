@@ -116,14 +116,35 @@ constants/          → números mágicos.
 - TS quita `noUnusedLocals` y `noUnusedParameters`. Si una variable sale, eliminarla.
 - `eslint-plugin-react-hooks` en exhaustive deps. Si quitas una dep, deja `// eslint-disable-next-line` con el porqué.
 
+### Identidad «pase oficial» (elegida por el usuario el 2026-11-11)
+Pedido del usuario: «el diseño es genérico, típico de IAs; necesitamos identidad». Entre tres propuestas (carta náutica, pase oficial y código de señales) eligió **la B, «pase oficial», con el fondo de hoy**: cada pantalla como un documento oficial sobre la carta celeste (`FondoPagina`, que no cambia, con su animación en el login).
+- **Letras propias**, servidas por el propio servidor (`@fontsource`, importadas en `App.tsx`; licencia OFL; la CSP no cambia):
+  - Archivo extendida en títulos, rótulos y botones (`--letra-titulo`, `--ancho-titulo` / `--ancho-etiqueta`);
+  - Public Sans en el texto (`--letra-texto`);
+  - IBM Plex Mono en números de documento, cifras y la línea mecánica (`--letra-mono`).
+  - Solo se baja el subconjunto latino (~160 KB, en caché). **No vuelvas a Segoe UI ni a fuentes de un CDN.**
+- **Tokens nuevos** (`globals.css`): `--franja` (el amarillo del escudo, `#FFE400` en claro), `--guilloche` / `--guilloche-oro` (ondas de seguridad en SVG), `--principal` / `--sobre-principal` / `--principal-hover`, `--celeste-texto`, y esquinas casi rectas (`--r-*`, de 3 a 10 px).
+- **Piezas:**
+  - Cabecera blanca en claro y marino en oscuro: franja amarilla arriba, guilloche detrás, escudo, institución, marca ARGO NAVIS y una línea de microtexto decorativa. Pie marino con la franja, igual en los dos temas. Se quitó la franja de la bandera de la cabecera.
+  - Estados como **sellos de tinta** (`InsigniaEstado`: doble borde, mayúsculas; `inclinado` en el talón del pase). El color de cada estado no cambia.
+  - Bandejas: cada solicitud es un **pase con talón perforado** (`TarjetaSolicitud`). Las muescas son una máscara en el `.pase` interior: el anillo de foco va en el enlace exterior, porque la máscara lo recortaría.
+  - Expediente: la **cabeza del documento** (franja, rótulo, trámite, «N.º» y el sello grande ladeado), las secciones de la columna principal numeradas con contadores de CSS (`content: counter() / ""`, que el lector de pantalla no lee), los datos con su rótulo encima y el valor sobre la línea, y al pie la **línea de lectura mecánica** de los pasaportes (`lineasMecanicas`, decorativa, `aria-hidden`).
+  - Login: un **pasaporte abierto** sobre la carta animada: la tapa marino con guilloche dorado y el emblema de ARGO NAVIS, y la hoja con el acceso.
+  - Modales, resumen de estadísticas y tarjetas sueltas: la franja amarilla arriba. Pestañas como separadores de expediente, con la franja en la activa.
+- **Reglas:**
+  - El guilloche va solo en lo que identifica a un documento (cabecera, cabeza del expediente, tapa del pasaporte, hoja del login): sobre la carta del fondo, dos texturas juntas ensucian.
+  - El amarillo sigue siendo relleno. La única excepción como texto es la tapa del pasaporte: dorado sobre marino, 10:1.
+  - Las mayúsculas son siempre de CSS (`text-transform`): el texto leído y los nombres accesibles no cambian, y el E2E los busca tal cual.
+- Maquetas y capturas de la elección: en el scratchpad de la sesión (`diseno/`).
+
 ### Interfaz (revisión de UI/UX del 2026-10-19)
 - **Paleta SNM** (pedido del usuario del 2026-10-19: «basate en los colores del logo y en el estándar de la página web»). Sale del escudo (amarillo `#FFE400`, negro, celeste `#15B0DE`) y de los tokens propios de migracion.gob.pa (`--snm-*`):
   - Marino `#10233F` / `#17283E` para los textos, azul institucional `#003DA5`, amarillo `#F2C94C` (hover `#FFD633`), líneas `#DCE4ED` / `#CAD5E1`, fondos `#F6F9FC` / `#EEF4F8` y crema `#FFF8D8`.
   - El tema claro es el de la web. El oscuro, la pizarra de su cabecera. El detalle, con cada valor y su contraste, está en el comentario de `styles/globals.css`.
-  - Cabecera y pie en pizarra (`#1B252F` / `#2D363F`) en los **dos** temas, como en la web: sus textos van en `--cabecera-texto*` / `--pie-texto`, no en `--text`.
-  - El foco va en azul institucional en claro y en amarillo en oscuro y sobre la cabecera.
-  - Sin colores fijos en los CSS: los tintes de estado se arman con `color-mix(in srgb, var(--acc-*) N%, transparent)`. Quedan fijos solo la bandera, la hoja del visor de documentos y la barra del navegador (`#1B252F`: `index.html`, `tema-inicial.js` y `ContextoTema.tsx`).
-- El amarillo de marca (`--y`) es solo **relleno**: el botón principal de cada pantalla, lo seleccionado (pestaña, filtro, tema) y el foco en oscuro. **Nunca como color de texto** (en claro da 1.6:1 y el dorado se ve oliva): textos con `--text` / `--text-2` / `--muted`, estados con `--acc-*`. Sobre el amarillo, texto marino (`--on-accent`), como los botones de la web.
+  - Cabecera y pie: desde el 2026-11-11, los de la identidad «pase oficial» (arriba). Sus textos van en `--cabecera-texto*` / `--pie-texto`, no en `--text`.
+  - El foco va en azul institucional en claro y en amarillo en oscuro, también sobre la cabecera (`--foco`).
+  - Sin colores fijos en los CSS: los tintes de estado se arman con `color-mix(in srgb, var(--acc-*) N%, transparent)`. Quedan fijos solo la hoja del visor de documentos y la barra del navegador, que sigue a la cabecera de cada tema (`#FFFFFF` / `#131E2B`: `index.html`, `tema-inicial.js` y `ContextoTema.tsx`).
+- El amarillo de marca (`--y`) es solo **relleno**: la franja, lo seleccionado (pestaña, filtro, tema), el foco en oscuro y, en oscuro, el botón principal. **Nunca como color de texto** (en claro da 1.6:1 y el dorado se ve oliva): textos con `--text` / `--text-2` / `--muted`, estados con `--acc-*`. Sobre el amarillo, texto marino (`--on-accent`), como los botones de la web.
 - Cada acción con su color (pedido del usuario del 2026-10-22), definido en `Botones.module.css`. En las solicitudes, el color es el de la insignia del estado al que lleva:
   - azul: consultar (ver, descargar, buscar, editar, asignar);
   - verde: aprobar, activar;
@@ -134,7 +155,7 @@ constants/          → números mágicos.
   - rojo: denegar, eliminar, quitar.
   
   Relleno para la acción que decide; contorno teñido (`.tono` con `--tono`) para las de una fila. Un naranja de contorno junto a uno rojo no se distingue en claro: por eso «Devolver» lleva relleno y «Desactivar» va en gris. El modal de confirmación toma el color con `tono`.
-- Botones: principal amarillo; secundario neutro con borde; aprobar con `--exito-fuerte`, denegar/eliminar con `--peligro-fuerte` (o contorno rojo); "Volver" sólido (`--card` con borde: sobre el fondo decorativo, transparente no se leía). Desactivado en gris (`--overlay-2` + `--muted`), no amarillo a media opacidad. En `useConfirmar`, `peligroso` (rojo) o `exito` (verde) según la acción.
+- Botones (en mayúsculas de Archivo desde el 2026-11-11): principal marino en claro y amarillo en oscuro (`--principal`); secundario con borde de tinta; aprobar con `--exito-fuerte`, denegar/eliminar con `--peligro-fuerte` (o contorno rojo); "Volver" sólido (`--card` con borde: sobre el fondo decorativo, transparente no se leía). Desactivado en gris (`--overlay-2` + `--muted`), no amarillo a media opacidad. En `useConfirmar`, `peligroso` (rojo) o `exito` (verde) según la acción.
   - Un botón principal no se desactiva porque falten datos: al pulsarlo dice qué falta (gris y sin explicación no se entendía, 2026-10-22). Se desactiva solo mientras guarda, o cuando al lado dice por qué (revisión de UCVMM).
 - Fondo «carta celeste» entre la cabecera y el pie, en todas las vistas y el login (`FondoPagina`, elegido por el usuario el 2026-10-22). Es decorativo y tenue a propósito, porque cruza títulos y botones. `.medio` lleva `overflow: clip`, no `hidden`: con hidden deja de funcionar el panel fijo de la revisión.
   - Solo en el login tiene movimiento (`animado`), con la variante «rutas vivas» que eligió el usuario el 2026-10-23: las rutas se trazan al entrar, las recorren luces doradas y las estrellas laten. En las pantallas de trabajo no se anima, para no distraer.
@@ -437,7 +458,7 @@ Pedido del usuario: dos sectores de UCVMM que no ven lo del otro, roles de super
 
 ### Dependencias: de dónde salen y fijadas (2026-11-10)
 Pedido del usuario: «¿las librerías son descargadas, nada se saca de internet?». Revisado a fondo:
-- **En ejecución no se descarga nada.** El frontend lleva sus librerías en el paquete compilado (sin CDN ni fuentes web: usa Segoe UI y las del sistema) y la CSP solo deja cargar lo del propio servidor. El backend habla solo con PostgreSQL, el AD (ldap3) y el SMTP (aiosmtplib). Los correos llevan el logo incrustado (`cid:`). Las URLs que aparecen en el paquete compilado son espacios de nombres XML de Office y enlaces en mensajes de error, no descargas.
+- **En ejecución no se descarga nada.** El frontend lleva sus librerías en el paquete compilado (sin CDN: sus letras, Archivo, Public Sans e IBM Plex Mono, van en el paquete desde el 2026-11-11) y la CSP solo deja cargar lo del propio servidor. El backend habla solo con PostgreSQL, el AD (ldap3) y el SMTP (aiosmtplib). Los correos llevan el logo incrustado (`cid:`). Las URLs que aparecen en el paquete compilado son espacios de nombres XML de Office y enlaces en mensajes de error, no descargas.
   - Única excepción, solo en desarrollo: `/api/docs` (Swagger de FastAPI) se carga desde un CDN. En producción está apagado.
   - requests y httpx están en el venv de desarrollo por pip-audit y las pruebas: no entran en producción.
 - **Al instalar sí se descarga, y siempre lo mismo:**

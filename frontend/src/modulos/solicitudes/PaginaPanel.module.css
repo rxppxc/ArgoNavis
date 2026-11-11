@@ -10,15 +10,18 @@
 .vista {
   padding: 10px 16px; margin-bottom: -1px;
   border-bottom: 3px solid transparent;
-  color: var(--text-2); font-weight: 700; font-size: .88rem;
+  color: var(--text-2);
+  font: 700 .72rem/1.2 var(--letra-titulo); font-stretch: var(--ancho-titulo);
+  letter-spacing: .1em; text-transform: uppercase;
 }
 .vista:hover { color: var(--text); }
 .vistaActiva, .vistaActiva:hover { color: var(--text); border-bottom-color: var(--y); }
 
-/* ─── Pestañas de estado (filtros) ─── */
+/* ─── Pestañas de estado (filtros): separadores de expediente sobre una línea de
+   tinta; la activa lleva la franja amarilla arriba (identidad «pase oficial»). ─── */
 .pestanas {
   display: flex; gap: 6px; flex-wrap: wrap;
-  margin-bottom: 14px;
+  margin-bottom: 16px; border-bottom: 1.5px solid var(--text);
 }
 /* En el celular van en una sola fila deslizable: en tres filas empujaban las
    solicitudes a media pantalla. */
@@ -32,17 +35,17 @@
 }
 .pestana {
   display: inline-flex; align-items: center; gap: 7px;
-  padding: 7px 12px; border-radius: 100px;
-  border: 1px solid var(--border); background: var(--card);
+  padding: 8px 13px 7px; border-radius: var(--r-md) var(--r-md) 0 0;
+  border: 1px solid var(--border-2); border-bottom: 0; background: var(--card);
   color: var(--text-2); font-size: .8rem; font-weight: 600;
 }
-.pestana:hover { border-color: var(--border-2); color: var(--text); }
-.pestanaActiva, .pestanaActiva:hover { border-color: var(--y); color: var(--text); background: var(--y-soft); }
-.pestanaConteo {
-  min-width: 20px; padding: 0 6px; border-radius: 100px;
-  background: var(--overlay-2); color: var(--text);
-  font-size: .72rem; font-weight: 800; text-align: center;
+.pestana:hover { border-color: var(--input-border); color: var(--text); }
+.pestanaActiva, .pestanaActiva:hover {
+  border-color: var(--text); color: var(--text); font-weight: 700;
+  box-shadow: inset 0 3px 0 var(--franja);
 }
+.pestanaConteo { font: 600 .74rem/1 var(--letra-mono); color: var(--muted); }
+.pestanaActiva .pestanaConteo { color: var(--text); }
 
 /* ─── Búsqueda + fechas ─── */
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 18px; }
@@ -78,7 +81,7 @@
 .error {
   display: flex; align-items: center; gap: 10px;
   background: var(--red-soft); border: 1px solid color-mix(in srgb, var(--acc-red) 35%, transparent);
-  border-radius: 8px; color: var(--acc-red);
+  border-radius: var(--r-sm); color: var(--acc-red);
   padding: 11px 14px; margin-bottom: 16px; font-size: .87rem;
 }
 

@@ -16,7 +16,7 @@
   gap: 6px;
   padding: 6px 9px;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   font-size: .78rem;
   font-weight: 600;
   color: var(--text-2);

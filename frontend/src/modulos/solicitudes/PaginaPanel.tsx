@@ -194,15 +194,16 @@ function Panel({ bandejaPedida, estadoPedido }: { bandejaPedida: Bandeja | null;
 
   return (
     <MarcoPagina ancho="amplio">
+      {/* El saludo y la agencia van en el rótulo; el título es el del documento. */}
       <EncabezadoPagina
-        titulo={<>Hola, {usuario?.full_name?.split(" ")[0] ?? usuario?.username}</>}
-        tituloDocumento="Solicitudes"
-        descripcion={<>
-          {vista === "revision" && esAdmin ? "Solicitudes de los dos sectores"
-            : vista === "supervision" && veLosDos ? "Solicitudes de los dos sectores, en solo lectura"
-            : VISTAS[vista].subtitulo}
-          {vista === "agencia" && usuario?.agencia && <> — {usuario.agencia.nombre}</>}
+        antetitulo={<>
+          Hola, {usuario?.full_name?.split(" ")[0] ?? usuario?.username}
+          {vista === "agencia" && usuario?.agencia && <> · {usuario.agencia.nombre}</>}
         </>}
+        titulo="Solicitudes"
+        descripcion={vista === "revision" && esAdmin ? "Solicitudes de los dos sectores"
+          : vista === "supervision" && veLosDos ? "Solicitudes de los dos sectores, en solo lectura"
+          : VISTAS[vista].subtitulo}
         acciones={puedeCrear && (
           <Link to="/new" className={styles.btnNuevo}>
             <IconoMas /> Nueva solicitud
