@@ -10,7 +10,7 @@
  * compartir la misma búsqueda.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import {
   apiSolicitudes, type EstadoSolicitud, type OpcionFiltro, type OpcionesHistorico, type PaginaSolicitudes,
 } from "../../api/solicitudes";
@@ -21,6 +21,7 @@ import { MarcoPagina } from "../../components/MarcoPagina";
 import { useNotificacion } from "../../components/Notificaciones";
 import { usePermisos } from "../../hooks/usePermisos";
 import { mensajeDeError } from "../../utils/errores";
+import { estadoParaVolver } from "../../utils/volver";
 import {
   FILTROS_VACIOS, anioDelRango, aniosDisponibles, consultaDeFiltros, filtrosDeUrl, hayFiltros, paginaDeUrl,
   rangoDeAnio, ultimaPagina, urlDeFiltros, type FiltrosHistorico,
@@ -68,6 +69,8 @@ export default function PaginaConsultaHistorica() {
   // En el celular los filtros menos usados van plegados: antes empujaban los resultados una pantalla abajo.
   const [masFiltros, setMasFiltros] = useState(false);
   const [parametros, setParametros] = useSearchParams();
+  // El expediente vuelve a esta búsqueda, con sus filtros y su página.
+  const { pathname, search } = useLocation();
   // Los filtros viven aquí y la URL los copia: así se pueden recargar o compartir.
   const [filtros, setFiltros] = useState<FiltrosHistorico>(() => filtrosDeUrl(parametros));
   const [pagina, setPagina] = useState(() => paginaDeUrl(parametros));
@@ -167,7 +170,7 @@ export default function PaginaConsultaHistorica() {
   }
 
   return (
-    <MarcoPagina ancho="amplio">
+    <MarcoPagina volverA="/dashboard" ancho="amplio">
       <EncabezadoPagina
         antetitulo="Personal del SNM"
         titulo="Consulta histórica"
@@ -313,7 +316,7 @@ export default function PaginaConsultaHistorica() {
                 {datos.items.map((s) => (
                   <tr key={s.id}>
                     <td data-etiqueta="N.º">
-                      <Link to={`/solicitudes/${s.id}`} className={styles.numero}>{s.numero ?? `#${s.id}`}</Link>
+                      <Link to={`/solicitudes/${s.id}`} state={estadoParaVolver(pathname, search)} className={styles.numero}>{s.numero ?? `#${s.id}`}</Link>
                     </td>
                     <td data-etiqueta="Estado">
                       <InsigniaEstado estado={s.estado} />

@@ -6,6 +6,7 @@ import { RUTA_CAMBIAR_CONTRASENA, vencimientoDelToken } from "./api/client";
 import { CapturadorErrores } from "./components/CapturadorErrores";
 import { CargandoRuta } from "./components/EstadoCarga";
 import { ModalExpiracionSesion } from "./components/ModalExpiracionSesion";
+import { VigilanteVersion } from "./components/VigilanteVersion";
 import { ProveedorNotificaciones } from "./components/Notificaciones";
 import { ProveedorConfirmacion } from "./components/ModalConfirmacion";
 import { ProveedorTema } from "./context/ContextoTema";
@@ -55,9 +56,11 @@ const PaginaBitacora        = lazy(() => import("./modulos/administracion/Pagina
 /** Con sesión. Una cuenta con cambio de contraseña pendiente solo puede ir a cambiarla.
  *  Sin sesión, al login recordando la página pedida (p. ej. el enlace de un correo). */
 function RutaPrivada({ children }: { children: React.ReactNode }) {
-  const { usuario } = useAutenticacion();
+  const { usuario, sesionCerrada } = useAutenticacion();
   const { pathname, search } = useLocation();
-  if (!usuario) return <Navigate to="/login" replace state={{ desde: pathname + search }} />;
+  // Recuerda la página solo si se llegó sin sesión (un enlace de un correo); si la sesión
+  // se acaba de cerrar aquí, al volver a entrar se va al inicio.
+  if (!usuario) return <Navigate to="/login" replace state={sesionCerrada ? undefined : { desde: pathname + search }} />;
   if (usuario.debe_cambiar_password && pathname !== RUTA_CAMBIAR_CONTRASENA) {
     return <Navigate to={RUTA_CAMBIAR_CONTRASENA} replace />;
   }
@@ -210,6 +213,8 @@ export default function App() {
     <CapturadorErrores>
       <ProveedorTema>
         <ProveedorNotificaciones>
+          {/* Una versión nueva desplegada con la página abierta: avisa y ofrece recargar. */}
+          <VigilanteVersion />
           <ProveedorConfirmacion>
             <ProveedorAutenticacion>
               <ProveedorPermisos>

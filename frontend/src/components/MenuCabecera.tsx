@@ -5,7 +5,7 @@ import { PERMISOS_PERSONAL_SNM, usePermisos } from "../hooks/usePermisos";
 import { RUTA_CAMBIAR_CONTRASENA } from "../api/client";
 import {
   IconoUsuarios, IconoEstadisticas, IconoEscudo, IconoArchivo, IconoAncla, IconoActividad,
-  IconoSalir, IconoChevronAbajo, IconoLlave, IconoMenu, IconoBuscar,
+  IconoSalir, IconoChevronAbajo, IconoLlave, IconoMenu, IconoBuscar, IconoBandeja,
 } from "./Iconos";
 import { SelectorTema } from "./SelectorTema";
 import styles from "./MenuCabecera.module.css";
@@ -90,6 +90,16 @@ export function MenuCabecera() {
                   <span className={styles.cuentaNombre}>{nombre}</span>
                   {detalle && <span className={styles.cuentaDetalle}>{detalle}</span>}
                 </div>
+                <div className={styles.sep} />
+              </>
+            )}
+            {/* El inicio: las bandejas. El escudo de la cabecera lleva al mismo lugar, pero no
+                se nota (2026-11-11). El del SysAdmin es Usuarios, que ya está abajo. */}
+            {!esSysAdmin && (
+              <>
+                <Link to="/dashboard" className={styles.item} onClick={() => setAbierto(false)}>
+                  <IconoBandeja />Inicio
+                </Link>
                 <div className={styles.sep} />
               </>
             )}

@@ -4,6 +4,10 @@ import type { Usuario } from "../types";
 export interface ValorAutenticacion {
   usuario: Usuario | null;
   estaAutenticado: boolean;
+  /** La sesión se cerró en esta página (Salir, inactividad u otra pestaña): el login
+   *  lleva al inicio, no a la última vista. Solo un enlace abierto sin sesión (el de un
+   *  correo) lleva a su página después de entrar. */
+  sesionCerrada: boolean;
   iniciarSesion: (nombreUsuario: string, contrasena: string) => Promise<Usuario>;
   cerrarSesion: (reportar?: boolean, expirada?: boolean) => Promise<void>;
   extenderSesion: () => Promise<void>;

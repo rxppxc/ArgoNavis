@@ -20,6 +20,7 @@
  *   mostrar("Escribe el motivo.", "aviso");
  *   mostrar(`Solicitud ${numero} enviada a revisión.`, "exito", { sello: "enviada" });
  *   mostrar("Procesando…", "info", 0);   // 0 = no se cierra solo
+ *   mostrar(texto, "info", { duracionMs: 0, accion: { texto: "Recargar", alHacer: recargar } });
  */
 import {
   Fragment, createContext, useCallback, useContext, useMemo, useRef, useState,
@@ -28,24 +29,32 @@ import type { ReactNode } from "react";
 import { IconoX } from "./Iconos";
 import {
   agregarAviso, duracionDe, esUrgente, partesDelTexto, textoDelSello,
-  type SelloSolicitud, type TipoNotificacion,
+  type SelloAviso, type TipoNotificacion,
 } from "./avisos";
 import styles from "./Notificaciones.module.css";
 
-export type { SelloSolicitud, TipoNotificacion } from "./avisos";
+export type { SelloAviso, SelloSolicitud, TipoNotificacion } from "./avisos";
+
+/** Un botón en el aviso, junto a «Cerrar» (p. ej. «Recargar» con una versión nueva). */
+interface AccionAviso {
+  texto: string;
+  alHacer: () => void;
+}
 
 interface OpcionesAviso {
   /** 0 = no se cierra solo. Por defecto, según el tipo y el sello (avisos.ts). */
   duracionMs?: number;
-  /** El estado al que pasó la solicitud: su sello, en lugar del del tipo. */
-  sello?: SelloSolicitud;
+  /** El estado al que pasó la solicitud (o «version»): su sello, en lugar del del tipo. */
+  sello?: SelloAviso;
+  accion?: AccionAviso;
 }
 
 interface Mensaje {
   id: number;
   texto: string;
   tipo: TipoNotificacion;
-  sello?: SelloSolicitud;
+  sello?: SelloAviso;
+  accion?: AccionAviso;
   duracionMs: number;
 }
 
@@ -55,10 +64,12 @@ interface ContextoNotificaciones {
 
 const Contexto = createContext<ContextoNotificaciones | null>(null);
 
-/** El color de cada sello de solicitud: el de la insignia del estado al que pasó. */
-const CLASE_SELLO: Record<SelloSolicitud, string> = {
+/** El color de cada sello de solicitud: el de la insignia del estado al que pasó. La versión
+ *  nueva, en azul, como un aviso informativo. */
+const CLASE_SELLO: Record<SelloAviso, string> = {
   enviada: styles.enRevision, reenviada: styles.enRevision, devuelta: styles.devuelta,
   aprobada: styles.aprobada, denegada: styles.denegada, finalizada: styles.finalizada,
+  version: styles.version,
 };
 
 /** Justo bajo la cabecera, que cambia de alto con el ancho de la pantalla; si ya se
@@ -86,8 +97,8 @@ export function ProveedorNotificaciones({ children }: { children: ReactNode }) {
 
   const mostrar = useCallback(
     (texto: string, tipo: TipoNotificacion = "info", opciones?: number | OpcionesAviso) => {
-      const { duracionMs, sello }: OpcionesAviso = typeof opciones === "number" ? { duracionMs: opciones } : opciones ?? {};
-      const nuevo: Mensaje = { id: idRef.current++, texto, tipo, sello, duracionMs: duracionMs ?? duracionDe(tipo, sello) };
+      const { duracionMs, sello, accion }: OpcionesAviso = typeof opciones === "number" ? { duracionMs: opciones } : opciones ?? {};
+      const nuevo: Mensaje = { id: idRef.current++, texto, tipo, sello, accion, duracionMs: duracionMs ?? duracionDe(tipo, sello) };
       setArriba(debajoDeLaCabecera());
       setItems((prev) => agregarAviso(prev, nuevo));
     },
@@ -127,6 +138,9 @@ function Aviso({ mensaje, onCerrar }: { mensaje: Mensaje; onCerrar: () => void }
           parte.numero ? <b key={i}>{parte.texto}</b> : <Fragment key={i}>{parte.texto}</Fragment>
         ))}
       </span>
+      {mensaje.accion && (
+        <button type="button" className={styles.accion} onClick={mensaje.accion.alHacer}>{mensaje.accion.texto}</button>
+      )}
       <button type="button" className={styles.cerrar} onClick={onCerrar} aria-label="Cerrar aviso">
         <span className={styles.cerrarTexto} aria-hidden="true">Cerrar</span>
         <IconoX tamano={15} />

@@ -13,8 +13,10 @@ import styles from "./PaginaLogin.module.css";
 
 const CORREO_SOPORTE = "mesadeayuda@migracion.gob.pa";
 
-/** Página a la que volver tras iniciar sesión: la que se pidió sin sesión
- *  (enlace de un correo, sesión vencida) o el panel. Solo rutas de esta app. */
+/** Página a la que volver tras iniciar sesión: la que se abrió sin sesión (el enlace de
+ *  un correo, o uno con la sesión ya vencida en el navegador: ?siguiente= del 401) o el
+ *  panel. Después de cerrar la sesión no hay página que recordar: se va al inicio.
+ *  Solo rutas de esta app. */
 function destinoTrasLogin(ubicacion: Location): string {
   const desde = (ubicacion.state as { desde?: unknown } | null)?.desde;
   const pedido = typeof desde === "string" ? desde : new URLSearchParams(ubicacion.search).get("siguiente");

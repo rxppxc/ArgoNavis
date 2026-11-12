@@ -6,7 +6,7 @@
  * las decide el backend (`acciones`) según el rol y el estado.
  */
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import {
   apiSolicitudes, type DocumentoSolicitud, type SolicitudDetalle, type TripulanteSolicitud,
 } from "../../api/solicitudes";
@@ -19,6 +19,7 @@ import { useAtraparFoco } from "../../hooks/useAtraparFoco";
 import { usePendientes } from "../../hooks/usePendientes";
 import { useTituloDocumento } from "../../hooks/useTituloDocumento";
 import { mensajeDeError } from "../../utils/errores";
+import { destinoDeVolver } from "../../utils/volver";
 import { DocumentosSolicitud } from "./DocumentosSolicitud";
 import { HistorialSolicitud } from "./HistorialSolicitud";
 import { InsigniaEstado } from "./InsigniaEstado";
@@ -242,6 +243,9 @@ function Dato({ etiqueta, valor }: { etiqueta: string; valor: string | null | un
 export default function PaginaDetalleSolicitud() {
   const { id = "" } = useParams<{ id: string }>();
   const solicitudId = Number(id);
+  // «Volver» regresa a donde se abrió el expediente (la consulta histórica con sus filtros,
+  // las estadísticas, la pestaña de la bandeja); sin origen, al inicio.
+  const volverA = destinoDeVolver(useLocation().state);
   const [solicitud, setSolicitud] = useState<SolicitudDetalle | null>(null);
   const [error, setError] = useState<string | null>(null);
   useTituloDocumento(solicitud ? `${solicitud.numero ?? `Solicitud ${solicitud.id}`} · ${solicitud.tipo_tramite_nombre}` : "Expediente");
@@ -262,19 +266,21 @@ export default function PaginaDetalleSolicitud() {
 
   if (error) {
     return (
-      <MarcoPagina volverA="/dashboard">
+      <MarcoPagina volverA={volverA}>
         <div className={styles.error} role="alert"><IconoAlerta /> {error}</div>
       </MarcoPagina>
     );
   }
   if (!solicitud) {
-    return <MarcoPagina volverA="/dashboard"><EstadoCarga texto="Cargando expediente…" pagina /></MarcoPagina>;
+    return <MarcoPagina volverA={volverA}><EstadoCarga texto="Cargando expediente…" pagina /></MarcoPagina>;
   }
   // key: al pasar a otro expediente se descarta lo que se estaba marcando o viendo en el anterior.
-  return <Expediente key={solicitud.id} s={solicitud} onActualizada={actualizar} />;
+  return <Expediente key={solicitud.id} s={solicitud} onActualizada={actualizar} volverA={volverA} />;
 }
 
-function Expediente({ s, onActualizada }: { s: SolicitudDetalle; onActualizada: (s: SolicitudDetalle) => void }) {
+function Expediente({ s, onActualizada, volverA }: {
+  s: SolicitudDetalle; onActualizada: (s: SolicitudDetalle) => void; volverA: string;
+}) {
   const { mostrar } = useNotificacion();
   // La verificación de impedimentos se marca en la tabla de tripulantes y la
   // resume el panel de decisión (UCVMM) o el del puesto: el estado vive aquí,
@@ -304,7 +310,7 @@ function Expediente({ s, onActualizada }: { s: SolicitudDetalle; onActualizada: 
     || s.documentos.some((d) => d.tripulante_id === null);
 
   return (
-    <MarcoPagina volverA="/dashboard" ancho="amplio">
+    <MarcoPagina volverA={volverA} ancho="amplio">
       {/* La cabeza del documento (identidad «pase oficial», 2026-11-11): la franja
           amarilla, el rótulo, el trámite, el número y el sello del estado. */}
       <header className={styles.encabezado}>

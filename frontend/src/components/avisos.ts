@@ -8,18 +8,23 @@ export type TipoNotificacion = "exito" | "error" | "info" | "aviso";
 /** El estado al que pasó la solicitud: el aviso lleva su sello, en el color de su insignia. */
 export type SelloSolicitud = "enviada" | "reenviada" | "devuelta" | "aprobada" | "denegada" | "finalizada";
 
+/** El sello de un aviso: el estado de la solicitud o, sin solicitud de por medio, una versión
+ *  nueva desplegada con la página abierta (VigilanteVersion). */
+export type SelloAviso = SelloSolicitud | "version";
+
 const SELLO_DEL_TIPO: Record<TipoNotificacion, string> = {
   exito: "Listo", aviso: "Revisa", error: "No se pudo", info: "Aviso",
 };
 
-const SELLO_DE_LA_SOLICITUD: Record<SelloSolicitud, string> = {
+const TEXTO_DEL_SELLO: Record<SelloAviso, string> = {
   enviada: "Enviada", reenviada: "Reenviada", devuelta: "Devuelta",
   aprobada: "Aprobada", denegada: "Denegada", finalizada: "Finalizada",
+  version: "Versión nueva",
 };
 
 /** El texto del sello: el estado al que pasó la solicitud o, si no, el tipo de aviso. */
-export function textoDelSello(tipo: TipoNotificacion, sello?: SelloSolicitud): string {
-  return sello ? SELLO_DE_LA_SOLICITUD[sello] : SELLO_DEL_TIPO[tipo];
+export function textoDelSello(tipo: TipoNotificacion, sello?: SelloAviso): string {
+  return sello ? TEXTO_DEL_SELLO[sello] : SELLO_DEL_TIPO[tipo];
 }
 
 /** Errores y validaciones: el lector de pantalla los anuncia enseguida (los éxitos, sin interrumpir). */
@@ -32,7 +37,7 @@ const DURACION_MS: Record<TipoNotificacion, number> = { exito: 4000, info: 4000,
 /** El resultado de una decisión trae más que leer (el número y, al devolver, el plazo). */
 const DURACION_CON_SELLO_MS = 6000;
 
-export function duracionDe(tipo: TipoNotificacion, sello?: SelloSolicitud): number {
+export function duracionDe(tipo: TipoNotificacion, sello?: SelloAviso): number {
   return sello ? DURACION_CON_SELLO_MS : DURACION_MS[tipo];
 }
 

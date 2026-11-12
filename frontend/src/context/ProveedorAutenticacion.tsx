@@ -12,13 +12,21 @@ function leerUsuarioGuardado(): Usuario | null {
  *  componente leía localStorage por su cuenta). */
 export function ProveedorAutenticacion({ children }: { children: ReactNode }) {
   const [usuario, setUsuario] = useState<Usuario | null>(leerUsuarioGuardado);
+  // La sesión se cerró en esta página (Salir, inactividad, otra pestaña): al volver a
+  // entrar se va al inicio, no a la última vista (2026-11-11). Sin esto, la guardia de
+  // las rutas mandaba al login recordando la página, y el recuerdo quedaba en el
+  // historial del navegador aunque se recargara.
+  const [sesionCerrada, setSesionCerrada] = useState(false);
 
   // Otra pestaña cerró la sesión o entró con otra cuenta: esta la sigue al
   // instante (antes seguía mostrando la sesión hasta su siguiente pedido al
   // servidor). key null = se vació el localStorage.
   useEffect(() => {
     function alCambiarEnOtraPestana(e: StorageEvent) {
-      if (e.key === "user" || e.key === null) setUsuario(leerUsuarioGuardado());
+      if (e.key !== "user" && e.key !== null) return;
+      const otro = leerUsuarioGuardado();
+      if (!otro) setSesionCerrada(true);
+      setUsuario(otro);
     }
     window.addEventListener("storage", alCambiarEnOtraPestana);
     return () => window.removeEventListener("storage", alCambiarEnOtraPestana);
@@ -35,6 +43,7 @@ export function ProveedorAutenticacion({ children }: { children: ReactNode }) {
     // "Cerrar sesión"), sus permisos cacheados no deben usarse ni un instante.
     localStorage.removeItem("permisos");
     localStorage.setItem("access_token", datos.access_token);
+    setSesionCerrada(false);
     guardarUsuario(datos.user);
     return datos.user;
   }, [guardarUsuario]);
@@ -50,6 +59,7 @@ export function ProveedorAutenticacion({ children }: { children: ReactNode }) {
     localStorage.removeItem("access_token");
     localStorage.removeItem("user");
     localStorage.removeItem("permisos");
+    setSesionCerrada(true);
     setUsuario(null);
     if (reportar && token) {
       // Si el token ya no es válido o falla la red, la sesión ya quedó cerrada aquí.
@@ -71,8 +81,8 @@ export function ProveedorAutenticacion({ children }: { children: ReactNode }) {
   }, [guardarUsuario]);
 
   const valor = useMemo<ValorAutenticacion>(() => ({
-    usuario, estaAutenticado: !!usuario, iniciarSesion, cerrarSesion, extenderSesion, cambiarContrasena,
-  }), [usuario, iniciarSesion, cerrarSesion, extenderSesion, cambiarContrasena]);
+    usuario, estaAutenticado: !!usuario, sesionCerrada, iniciarSesion, cerrarSesion, extenderSesion, cambiarContrasena,
+  }), [usuario, sesionCerrada, iniciarSesion, cerrarSesion, extenderSesion, cambiarContrasena]);
 
   return <ContextoAutenticacion.Provider value={valor}>{children}</ContextoAutenticacion.Provider>;
 }

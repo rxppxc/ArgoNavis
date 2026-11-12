@@ -11,6 +11,7 @@ describe("el sello de cada aviso", () => {
     expect(textoDelSello("aviso")).toBe("Revisa");
     expect(textoDelSello("error")).toBe("No se pudo");
     expect(textoDelSello("info")).toBe("Aviso");
+    expect(textoDelSello("info", "version")).toBe("Versión nueva");
   });
 
   it("errores y validaciones se anuncian enseguida y duran más; una decisión, 6 s", () => {

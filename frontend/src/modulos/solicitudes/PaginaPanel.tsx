@@ -287,7 +287,8 @@ function Panel({ bandejaPedida, estadoPedido }: { bandejaPedida: Bandeja | null;
         <>
           <div className={`${styles.lista} ${cargando ? styles.listaActualizando : ""}`} aria-busy={cargando}>
             {datos.items.map((s) => (
-              <TarjetaSolicitud key={s.id} s={s} vista={vista} conSector={veLosDos && vista !== "agencia"} />
+              <TarjetaSolicitud key={s.id} s={s} vista={vista} conSector={veLosDos && vista !== "agencia"}
+                volverA={`/dashboard?${new URLSearchParams({ bandeja: vista, estado: filtro })}`} />
             ))}
           </div>
           {totalPaginas > 1 && (

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { EstadisticasSolicitudes } from "../../../api/solicitudes";
 import { IconoChevronDerecha } from "../../../components/Iconos";
 import { formatearFechaHora } from "../../solicitudes/presentacion";
+import { estadoParaVolver } from "../../../utils/volver";
 import {
   DIAS_SEMANA, HORA_FIN_LABORAL, HORA_INICIO_LABORAL, NIVELES_CALOR, cifra, dosDigitos, horarioDeCasilla,
   nivelCalor, porcentaje, segun, textoHora,
@@ -196,7 +197,7 @@ export default function MapaHoras({ datos }: { datos: EstadisticasSolicitudes })
               <tbody>
                 {lista.map((o) => (
                   <tr key={o.id}>
-                    <td><Link to={`/solicitudes/${o.id}`} className={styles.enlace}>{o.numero ?? `#${o.id}`}</Link></td>
+                    <td><Link to={`/solicitudes/${o.id}`} state={estadoParaVolver("/admin/stats")} className={styles.enlace}>{o.numero ?? `#${o.id}`}</Link></td>
                     <td>{o.tipo_tramite}</td>
                     <td>{o.puesto}</td>
                     <td className={styles.numero}>

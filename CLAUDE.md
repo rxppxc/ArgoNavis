@@ -143,6 +143,7 @@ Pedido del usuario: «el diseño es genérico, típico de IAs; necesitamos ident
     - **Ubicación:** justo bajo la cabecera, que se mide (`data-cabecera`). Así no tapan la campana, el menú, el «Volver» ni el panel de decisión. Si la cabecera ya no se ve, van arriba.
     - **Lector de pantalla:** dos regiones siempre presentes, `alert` (errores y validaciones) y `status` (éxitos).
     - Un archivo que no cumple (formato o 2 MB) es una validación (REVISA), no un error.
+    - Un aviso puede llevar un botón junto a «Cerrar» (`accion`): lo usa el de la versión nueva («Recargar», ver «Navegación y versión nueva»).
 - **Reglas:**
   - El guilloche va solo en lo que identifica a un documento (cabecera, cabeza del expediente, tapa del pasaporte, hoja del login): sobre la carta del fondo, dos texturas juntas ensucian.
   - El amarillo sigue siendo relleno. La única excepción como texto es la tapa del pasaporte: dorado sobre marino, 10:1.
@@ -224,7 +225,7 @@ Pedido del usuario: «el diseño es genérico, típico de IAs; necesitamos ident
   - El frontend renueva el token mientras hay actividad (`VigilanteSesion` en `App.tsx`).
   - Cerrar sesión, cambiar o restablecer la contraseña y desactivar la cuenta invalidan los tokens (`users.sesiones_validas_desde`).
   - Tope de `SESION_MAXIMA_HORAS` (12) desde el login: el claim `ini` se conserva al renovar.
-  - Tras el login se vuelve a la página pedida (enlaces de los correos).
+  - Tras el login se vuelve a la página pedida (enlaces de los correos). Después de cerrar la sesión, no: se entra por el inicio (2026-11-11, ver «Navegación y versión nueva»).
 - Permisos de solo lectura: la API ya no los crea, edita ni borra (los siembran las migraciones).
 - LDAP: TLS opcional (`LDAP_USAR_SSL` / `LDAP_STARTTLS` / `LDAP_CA_CERT`, apagado por defecto), conexiones que siempre se cierran y el esquema del AD leído una vez por proceso.
 - Cabeceras de seguridad en nginx y en el backend cuando sirve el frontend; `.dockerignore` en backend y frontend.
@@ -272,7 +273,7 @@ Las agencias entran por la VPN, pero no son del SNM: se las trata como no confia
   - Sin tope, un valor más largo que la columna llegaba a la BD y respondía 500. Pasaba con el usuario del login (va a la bitácora, VARCHAR 100) y con el nombre de un rol.
   - Archivos por envío: hasta `MAX_ARCHIVOS_POR_ENVIO` (2000, en `schemas/solicitud.py`) y uno solo por casilla (`_resolver_asignaciones`).
 - **Errores de las descargas:** llegan como Blob; `leerErrorDeBlob` (`api/client.ts`) los lee para mostrar el motivo real del servidor.
-- **Después de un despliegue,** si falta un archivo de la versión anterior, `main.tsx` recarga la página (`vite:preloadError`, como mucho una vez por minuto).
+- **Después de un despliegue,** si falta un archivo de la versión anterior, `main.tsx` recarga la página (`vite:preloadError`, como mucho una vez por minuto). Desde el 2026-11-11 además se avisa la versión nueva (`VigilanteVersion`, ver «Navegación y versión nueva»).
 - **E2E `accesibilidad.spec.ts`:** prueba el enlace «Saltar al contenido», los nombres de los controles y esa recarga.
 - **Sesión con varias pestañas** (segundo lote del mismo día). Antes, una pestaña olvidada cerraba a los 15 min la sesión de la que se estaba usando: borraba el token, que es de todas.
   - La inactividad es la de todas las pestañas: la última actividad vive en localStorage (`ultima-actividad`, `utils/actividad.ts`).
@@ -539,6 +540,11 @@ Pedido del usuario: otros documentos para técnicos, supernumerarios y superinte
   - Excel (`core/informe_historico.py`): la identidad del informe de estadísticas, una fila por solicitud, el estado con el color de su insignia, filtros de Excel y encabezado fijo. Hasta `MAX_FILAS_EXPORTACION` (5000): si hay más, el archivo lo dice. Lleva el tope `LIMITE_EXPORTACIONES_POR_HORA` y va por `en_hilo_con_tope`.
   - Se entra por el menú y por un botón en las bandejas del SNM (`PERMISOS_PERSONAL_SNM`, `hooks/usePermisos.ts`, espejo de `es_personal_snm`).
   - Lo prueban `tests/test_historico.py`, `consultaHistorica.test.ts` y el E2E `flujo-completo.spec.ts`.
+- **Navegación y versión nueva** (pedido del usuario: «aunque cierre sesión y recargue, me mantiene en la última vista», «en consulta histórica no hay botón de volver al inicio» y el aviso de la versión nueva):
+  - **Después de cerrar la sesión se entra por el inicio.** Antes, la guardia de las rutas mandaba al login recordando la página (`state.desde`), y el navegador conserva ese estado aunque se recargue. Ahora `ProveedorAutenticacion` lleva `sesionCerrada` (Salir, el aviso de inactividad, el cierre por inactividad, otra pestaña) y `RutaPrivada` no recuerda la página. Un enlace abierto sin sesión (el de un correo) y el `?siguiente=` del 401 siguen llevando a su página. Lo prueba `e2e/sesion.spec.ts` («se vuelve a entrar por el inicio»), que falla con el código anterior.
+  - **«Volver» en la consulta histórica** (al inicio) e **«Inicio» arriba del menú** (salvo el SysAdmin, cuyo inicio es Usuarios). El escudo de la cabecera ya llevaba al inicio, pero no se notaba.
+  - **El «Volver» del expediente regresa a donde se abrió:** la consulta con sus filtros y su página, las estadísticas o la bandeja con su pestaña. Va en el estado de la navegación (`estadoParaVolver` / `destinoDeVolver`, `utils/volver.ts`, solo rutas propias); sin él (correo, campana), al inicio. **Un enlace nuevo al expediente lleva su `state`.**
+  - **Aviso de versión nueva** (`VigilanteVersion`, `utils/version.ts`): cada 5 min con la pestaña a la vista y al volver a ella (como mucho una vez por minuto) pide `/` sin caché y compara los archivos de `/assets/` de su index.html con los de la página cargada (llevan hash: no hay número de versión que subir). Si cambiaron, un aviso «Versión nueva» que no se cierra solo, con «Recargar»: la recarga la decide el usuario, que puede estar a mitad de un formulario. Una vez por versión. En desarrollo no revisa (Vite no empaqueta).
 - **En las celdas de una tabla, `overflow-wrap: break-word`, no `anywhere`:** con `anywhere` la columna se encoge al mínimo y parte palabras normales («KENSINGTO-N»). `anywhere` sigue siendo lo indicado en los bloques de texto libre.
 - **Vitest y la letra de unidad (Windows):** si todas las pruebas fallan con «Cannot read properties of undefined (reading 'config')», la carpeta de trabajo llegó como `c:\…` en minúscula y Vitest cargó dos copias de sí mismo. Se corre desde `C:\…`.
 

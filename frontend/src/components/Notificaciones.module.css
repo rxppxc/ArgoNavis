@@ -83,6 +83,22 @@
   cursor: pointer;
 }
 .cerrar:hover { color: var(--text); border-color: var(--input-border); background: var(--hover); }
+
+/* Un botón en el aviso («Recargar» con una versión nueva): el principal de la aplicación. */
+.accion {
+  flex: none;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--principal);
+  color: var(--sobre-principal);
+  font: 700 .66rem/1 var(--letra-titulo);
+  font-stretch: var(--ancho-etiqueta);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.accion:hover { background: var(--principal-hover); }
 .cerrar svg { display: none; }
 
 /* El tiempo que queda: se consume de derecha a izquierda y se detiene con el mouse encima o
@@ -110,13 +126,19 @@
 .aprobada   { --c: var(--acc-green); }
 .denegada   { --c: var(--acc-red); }
 .finalizada { --c: var(--acc-teal); }
+/* Versión nueva (VigilanteVersion): azul, como un aviso informativo. Su sello no cabe en la
+   columna en una línea: va en dos, como los sellos de goma («VERSIÓN / NUEVA»). */
+.version { --c: var(--acc-blue); }
+.version .sello { max-width: 104px; white-space: normal; text-align: center; justify-content: center; }
 
 /* En el celular no cabe a lo largo: el sello y la X arriba, el mensaje debajo, de borde a borde. */
 @media (max-width: 520px) {
   .contenedor { left: 12px; right: 12px; transform: none; width: auto; max-width: none; }
   .cinta { flex-wrap: wrap; gap: 6px 10px; padding: 10px 8px 13px 12px; }
   .columnaSello { flex: 1; width: auto; justify-content: flex-start; }
+  .version .sello { max-width: none; white-space: nowrap; }
   .texto { flex-basis: 100%; order: 3; }
+  .accion { order: 4; }
   .cerrar { width: 32px; height: 32px; padding: 0; border: 0; }
   .cerrarTexto { display: none; }
   .cerrar svg { display: block; }

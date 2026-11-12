@@ -9,7 +9,11 @@ import styles from "./TarjetaSolicitud.module.css";
  *  talón con el número y el sello del estado, y los datos del trámite. Lleva al
  *  expediente. `conSector`: para quien ve los dos sectores (Administrador,
  *  supervisor general), el del puesto. */
-export function TarjetaSolicitud({ s, vista, conSector = false }: { s: SolicitudResumen; vista: Bandeja; conSector?: boolean }) {
+export function TarjetaSolicitud({ s, vista, volverA, conSector = false }: {
+  s: SolicitudResumen; vista: Bandeja; conSector?: boolean;
+  /** La bandeja y la pestaña de donde se abre: el «Volver» del expediente regresa ahí. */
+  volverA?: string;
+}) {
   const deAgencia = vista === "agencia";
   // Quien finaliza es el puesto de control: a la agencia le basta saber hasta cuándo vale.
   const plazo =
@@ -22,7 +26,7 @@ export function TarjetaSolicitud({ s, vista, conSector = false }: { s: Solicitud
   return (
     // El enlace lleva el foco; el pase, dentro, lleva las muescas (una máscara
     // recortaría también el anillo de foco).
-    <Link to={`/solicitudes/${s.id}`} className={styles.enlace}>
+    <Link to={`/solicitudes/${s.id}`} state={volverA ? { volverA } : undefined} className={styles.enlace}>
       <div className={`${styles.pase} ${styles[s.estado] ?? ""}`}>
         <div className={styles.talon}>
           <span className={styles.numero}><small>N.º</small>{s.numero ?? `#${s.id}`}</span>

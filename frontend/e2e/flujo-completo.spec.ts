@@ -246,6 +246,26 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
       ucvmm.getByRole("button", { name: "Exportar a Excel" }).click(),
     ]);
     expect(descarga.suggestedFilename()).toMatch(/^Consulta-historica-\d{4}-\d{2}-\d{2}\.xlsx$/);
+    // Del expediente, «Volver» regresa a la búsqueda tal como estaba (antes iba al inicio).
+    const busqueda = ucvmm.url();
+    await fila.click();
+    // La URL primero: la tabla de la consulta también dice «Finalizada» y tiene su «Volver».
+    await expect(ucvmm).toHaveURL(new RegExp(`/solicitudes/${id}$`));
+    await expect(ucvmm.getByText("Autorización marítima · Formulario No. 3")).toBeVisible();
+    await ucvmm.getByRole("link", { name: "Volver" }).click();
+    await expect(ucvmm).toHaveURL(busqueda);
+    await expect(ucvmm.getByLabel("Pasajero")).toHaveValue("Pérez Gómez");
+    await expect(fila).toBeVisible();
+    // Y de la consulta se vuelve al inicio: con «Volver» o con «Inicio» del menú.
+    await ucvmm.getByRole("link", { name: "Volver" }).click();
+    await expect(ucvmm).toHaveURL(/\/dashboard$/);
+    await ucvmm.goBack();
+    await expect(ucvmm).toHaveURL(busqueda);
+    await ucvmm.getByRole("button", { name: "Menú" }).click();
+    await ucvmm.getByRole("link", { name: "Inicio", exact: true }).click();   // el escudo es «Ir al inicio»
+    await expect(ucvmm).toHaveURL(/\/dashboard$/);
+    await ucvmm.goBack();
+    await expect(ucvmm).toHaveURL(busqueda);
     // Un pasajero que no está: sin resultados.
     await ucvmm.getByLabel("Pasajero").fill("Nadie Inexistente");
     await expect(ucvmm.getByText("Ninguna solicitud coincide con los filtros.")).toBeVisible();

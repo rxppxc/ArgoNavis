@@ -6,7 +6,7 @@
  */
 import type { Page } from "@playwright/test";
 import { expect, test } from "./base";
-import { CUENTAS, iniciarSesion } from "./datos";
+import { CLAVE, CUENTAS, iniciarSesion } from "./datos";
 
 const MINUTO = 60_000;
 
@@ -65,6 +65,60 @@ test("la inactividad y el cierre de sesión valen para todas las pestañas", asy
     await expect(a).toHaveURL(/\/login$/);
     await a.waitForTimeout(1000);   // por si un pedido rezagado vuelve después
     expect(rechazados, "pedidos rechazados al cerrar sesión").toEqual([]);
+  });
+
+  await contexto.close();
+});
+
+/** Entra desde el formulario en el que quedó la página, sin ir antes a /login (eso
+ *  borraría lo que el login recuerda): como quien vuelve a entrar en la misma pestaña. */
+async function entrarAqui(pagina: Page, usuario: string) {
+  await expect(pagina).toHaveURL(/\/login/);
+  await pagina.getByLabel("Usuario").fill(usuario);
+  await pagina.getByLabel("Contraseña", { exact: true }).fill(CLAVE);
+  await pagina.getByRole("button", { name: "Iniciar sesión" }).click();
+}
+
+test("después de cerrar la sesión, se vuelve a entrar por el inicio", async ({ browser }) => {
+  const contexto = await browser.newContext();
+  await contexto.clock.install();
+  const pagina = await contexto.newPage();
+  await iniciarSesion(pagina, CUENTAS.ucvmm);
+
+  await test.step("con «Salir» del menú, y aunque se recargue el login", async () => {
+    await pagina.goto("/historico");
+    await expect(pagina.getByRole("heading", { name: "Consulta histórica" })).toBeVisible();
+    await pagina.getByRole("button", { name: "Menú" }).click();
+    await pagina.getByRole("button", { name: "Salir" }).click();
+    await expect(pagina).toHaveURL(/\/login$/);
+    await pagina.reload();
+    await entrarAqui(pagina, CUENTAS.ucvmm);
+    await expect(pagina).toHaveURL(/\/dashboard$/);
+  });
+
+  await test.step("con «Cerrar sesión» del aviso de inactividad", async () => {
+    await pagina.goto("/historico");
+    await expect(pagina.getByRole("heading", { name: "Consulta histórica" })).toBeVisible();
+    await contexto.clock.runFor(14 * MINUTO);
+    await pagina.getByRole("dialog", { name: "Sesión por expirar" }).getByRole("button", { name: "Cerrar sesión" }).click();
+    await entrarAqui(pagina, CUENTAS.ucvmm);
+    await expect(pagina).toHaveURL(/\/dashboard$/);
+  });
+
+  await test.step("con el cierre por inactividad (puede entrar otra persona en ese equipo)", async () => {
+    await pagina.goto("/historico");
+    await expect(pagina.getByRole("heading", { name: "Consulta histórica" })).toBeVisible();
+    await contexto.clock.runFor(15 * MINUTO + 1000);
+    await entrarAqui(pagina, CUENTAS.agencia);
+    await expect(pagina).toHaveURL(/\/dashboard$/);
+  });
+
+  await test.step("pero un enlace abierto sin sesión (el de un correo) sí lleva a su página", async () => {
+    await pagina.getByRole("button", { name: "Menú" }).click();
+    await pagina.getByRole("button", { name: "Salir" }).click();
+    await pagina.goto("/historico");
+    await entrarAqui(pagina, CUENTAS.ucvmm);
+    await expect(pagina).toHaveURL(/\/historico$/);
   });
 
   await contexto.close();
