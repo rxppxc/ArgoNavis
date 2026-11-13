@@ -207,7 +207,7 @@ class TopeDelCuerpo:
 aplicacion.add_middleware(TopeDelCuerpo)
 
 # Cada archivo de un envío pasa al disco temporal desde los 64 KB (Starlette deja en
-# memoria cada uno de hasta 1 MB): un envío de 141 archivos de casi 1 MB ocupaba ~140 MB
+# memoria cada uno de hasta 1 MB): un envío de 142 archivos de casi 1 MB ocupaba ~140 MB
 # del proceso mientras se procesaba; así, ~9 MB. Cuenta para el límite de memoria del
 # contenedor (docker-compose-prod.yml). Lo comprueba tests/test_recursos.py.
 MultiPartParser.spool_max_size = 64 * 1024

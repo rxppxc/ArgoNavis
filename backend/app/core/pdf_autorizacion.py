@@ -70,7 +70,7 @@ MORADO   = colors.HexColor("#7E22CE")
 LILA     = colors.HexColor("#F2E9FA")   # el morado al 10 % sobre blanco
 
 RANGOS = {
-    "marino": "Marino", "militar": "Militar", "tecnico": "Técnico",
+    "marino": "Marino", "pasajero": "Pasajero", "militar": "Militar", "tecnico": "Técnico",
     "supernumerario": "Supernumerario", "superintendente": "Superintendente",
 }
 
@@ -114,6 +114,8 @@ class DatosPdfAutorizacion:
     url_verificacion:    str
     codigo_verificacion: str
     copia_interna:       bool = False  # la descarga el personal del SNM
+    # Cambio de puerto (2026-11-13): el nuevo puesto, donde vale y se finaliza.
+    puesto_destino:      str | None = None
     # Aprobada fuera del horario laboral, con su costo migratorio (2026-11-11).
     fuera_de_horario:       bool = False
     costo_fuera_de_horario: Decimal | None = None
@@ -270,6 +272,7 @@ def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
     pares: list[tuple[str, str]] = [
         ("AGENCIA NAVIERA", _t(d.agencia_naviera)),
         ("PUESTO DE CONTROL MIGRATORIO", _t(d.puesto_control)),
+        *([("CAMBIO DE PUERTO A", _t(d.puesto_destino))] if d.puesto_destino else []),
         ("BUQUE", _t(d.nombre_buque)),
         ("IMO", _t(d.imo)),
         ("BANDERA", _t(d.bandera)),
@@ -291,7 +294,7 @@ def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
     ]
     if d.estado == "finalized":
         pares += [
-            ("FINALIZADA EN", _t(d.puesto_finalizacion or d.puesto_control)),
+            ("FINALIZADA EN", _t(d.puesto_finalizacion or d.puesto_destino or d.puesto_control)),
             ("FECHA DE FINALIZACIÓN", _f(d.finalizada_en, True)),
         ]
     if len(pares) % 2:
@@ -316,11 +319,13 @@ def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
     # Desde el 2026-10-30 no se finaliza en otro puesto: la operación en otro
     # puerto es una solicitud nueva.
     if d.estado != "finalized":
+        donde = (f"para el cambio de puerto a {escape(d.puesto_destino)}, donde se finaliza" if d.puesto_destino
+                 else "únicamente para el puesto de control indicado")
         historia += [
             Spacer(1, 2 * mm),
             Paragraph(
-                "Esta autorización vale únicamente para el puesto de control indicado. Si la operación se "
-                "realiza en otro puesto, la agencia naviera debe presentar una nueva solicitud.",
+                f"Esta autorización vale {donde}. Si la operación se realiza en otro puesto, la agencia naviera "
+                "debe presentar una nueva solicitud.",
                 e_nota,
             ),
         ]

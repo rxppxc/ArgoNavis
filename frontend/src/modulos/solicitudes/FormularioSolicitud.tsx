@@ -14,6 +14,7 @@ import { useConfirmar } from "../../components/ModalConfirmacion";
 import { ModalPreview } from "../../components/ModalPreview";
 import { useNotificacion } from "../../components/Notificaciones";
 import { TAMANO_MAX_MB } from "../../utils/archivos";
+import type { OpcionBuscable } from "../../utils/busqueda";
 import { mensajeDeError } from "../../utils/errores";
 import type { CasillaFormulario } from "./checklist";
 import { ChecklistSolicitud } from "./ChecklistSolicitud";
@@ -27,7 +28,7 @@ import type { DatosFormulario } from "./useCargaFormulario";
 import { useDocumentosFormulario } from "./useDocumentosFormulario";
 import { useTripulantesFormulario } from "./useTripulantesFormulario";
 import {
-  CABECERA_VACIA, MAX_TRIPULANTES, fechaReferencia, validarFormulario, type CabeceraFormulario,
+  CABECERA_VACIA, MAX_TRIPULANTES, MESES_VIGENCIA_PASAPORTE, fechaReferencia, validarFormulario, type CabeceraFormulario,
 } from "./validacionFormulario";
 import styles from "./PaginaSolicitud.module.css";
 
@@ -59,8 +60,9 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
 
   const tipo = useMemo(() => tipos.find((t) => t.codigo === codigoTramite) ?? null, [tipos, codigoTramite]);
   const paisesPorCodigo = useMemo(() => new Map(paises.map((p) => [p.codigo, p])), [paises]);
-  const opcionesPais = useMemo(
-    () => paises.map((p) => <option key={p.codigo} value={p.codigo}>{p.nombre}</option>),
+  // Para los selectores con buscador de bandera, país de nacimiento y nacionalidad.
+  const opcionesPais = useMemo<OpcionBuscable[]>(
+    () => paises.map((p) => ({ valor: p.codigo, texto: p.nombre })),
     [paises],
   );
   const fichas = useTripulantesFormulario(precarga?.tripulantes);
@@ -106,6 +108,10 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
       if (!ok) return false;
     }
     setCodigoTramite(codigo);
+    // Un trámite sin cambio de puerto no se queda con el «Sí» del anterior.
+    if (!tipos.find((t) => t.codigo === codigo)?.permite_cambio_puerto) {
+      setCabecera((prev) => ({ ...prev, cambio_puerto: "no", puesto_destino_id: "" }));
+    }
     documentos.descartarTodos();
     fichas.ajustarRangos(tipos.find((t) => t.codigo === codigo)?.rangos_permitidos ?? null);
     return true;
@@ -175,7 +181,8 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
             {tipo?.nota && <div className={styles.nota}>{tipo.nota}</div>}
             {tipo?.valida_vigencia && (
               <div className={styles.nota}>
-                Este trámite exige pasaporte y seamanbook <strong>vigentes</strong> a la fecha de la operación.
+                Este trámite exige pasaporte con <strong>al menos {MESES_VIGENCIA_PASAPORTE} meses de vigencia</strong> a
+                partir de la fecha de la operación. Si el seamanbook está vencido, se puede enviar igual: queda señalado.
               </div>
             )}
           </SelectorTramite>

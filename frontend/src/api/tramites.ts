@@ -35,7 +35,10 @@ export interface TipoTramite {
   requiere_puerto_desembarque: boolean;
   requiere_motivo: boolean;
   requiere_clinica: boolean;
-  /** Pasaporte y seamanbook deben estar vigentes a la fecha de la operación. */
+  /** El formulario ofrece el cambio de puerto (2026-11-13: Embarque y Desembarque). */
+  permite_cambio_puerto: boolean;
+  /** Pasaporte con al menos 3 meses de vigencia desde la operación (2026-11-13; el
+   *  seamanbook vencido solo se señala). */
   valida_vigencia: boolean;
   /** Rangos de tripulante que admite el trámite (null = cualquiera). */
   rangos_permitidos: RangoMarino[] | null;

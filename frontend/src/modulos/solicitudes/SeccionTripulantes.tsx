@@ -3,6 +3,7 @@ import BarraProgreso from "../../components/BarraProgreso";
 import { IconoArchivo, IconoCheck } from "../../components/Iconos";
 import { ETIQUETA_RANGO, ETIQUETA_SEXO, formatearFecha, formatearFechaHora } from "./presentacion";
 import type { VerificacionImpedimentos } from "./useVerificacionImpedimentos";
+import { MESES_VIGENCIA_PASAPORTE } from "./validacionFormulario";
 import styles from "./DetalleSolicitud.module.css";
 
 interface Props {
@@ -27,7 +28,10 @@ export function SeccionTripulantes({ solicitud: s, verificacion: v, onVerDocumen
         Pasajeros <span className={styles.contador}>{total}</span>
       </h2>
       {s.valida_vigencia && (
-        <p className={styles.ayuda}>Este trámite exige pasaporte y seamanbook vigentes a la fecha de la operación.</p>
+        <p className={styles.ayuda}>
+          Este trámite exige pasaporte con al menos {MESES_VIGENCIA_PASAPORTE} meses de vigencia a partir de la
+          operación. El seamanbook vencido no impide enviar: se señala aquí.
+        </p>
       )}
 
       {v && (
@@ -102,8 +106,10 @@ export function SeccionTripulantes({ solicitud: s, verificacion: v, onVerDocumen
                   </td>
                   <td data-etiqueta="Pasaporte">
                     <div className={styles.celdaPrincipal}>{m.pasaporte}</div>
-                    <div className={m.pasaporte_vencido ? styles.vencido : styles.celdaSecundaria}>
-                      Vence {formatearFecha(m.pasaporte_expira)}{m.pasaporte_vencido && " — vencido"}
+                    <div className={m.pasaporte_vencido || m.pasaporte_vigencia_corta ? styles.vencido : styles.celdaSecundaria}>
+                      Vence {formatearFecha(m.pasaporte_expira)}
+                      {m.pasaporte_vencido && " — vencido"}
+                      {m.pasaporte_vigencia_corta && ` — menos de ${MESES_VIGENCIA_PASAPORTE} meses de vigencia`}
                     </div>
                   </td>
                   <td data-etiqueta="Seamanbook">

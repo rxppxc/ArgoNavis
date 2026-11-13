@@ -1,19 +1,24 @@
-import { memo, type ReactNode } from "react";
+import { memo } from "react";
 import type { Pais } from "../../api/catalogos";
 import type { DocumentoSolicitud, RangoMarino, TripulanteEntrada } from "../../api/solicitudes";
 import { IconoAlerta, IconoBasura, IconoChevronAbajo } from "../../components/Iconos";
+import { SelectorBuscable } from "../../components/SelectorBuscable";
+import type { OpcionBuscable } from "../../utils/busqueda";
 import type { CasillaFormulario } from "./checklist";
 import { ChecklistDocumentos } from "./ChecklistDocumentos";
 import { FechaEnPalabras } from "./FechaEnPalabras";
 import { ETIQUETA_RANGO, ETIQUETA_SEXO, TODOS_LOS_RANGOS, formatearFecha, hoyISO } from "./presentacion";
-import { NACIMIENTO_MINIMO, nacimientoMaximo, portaLibreta, type FichaTripulante } from "./validacionFormulario";
+import {
+  MESES_VIGENCIA_PASAPORTE, NACIMIENTO_MINIMO, estadoPasaporte, nacimientoMaximo, portaLibreta, textoVigenciaCorta,
+  type FichaTripulante,
+} from "./validacionFormulario";
 import styles from "./PaginaSolicitud.module.css";
 
 interface Props {
   ficha:            FichaTripulante;
   indice:           number;
   puedeQuitar:      boolean;
-  opcionesPais:     ReactNode;
+  opcionesPais:     OpcionBuscable[];
   paises:           Map<string, Pais>;
   validaVigencia:   boolean;
   fechaReferencia:  string;
@@ -37,8 +42,9 @@ interface Props {
 }
 
 /** Ficha de un tripulante con sus propios documentos. Memoizada: con muchos
- *  tripulantes, escribir en uno no vuelve a pintar los demás (cada uno trae
- *  dos listas de países). Se puede contraer para no alargar la página. */
+ *  tripulantes, escribir en uno no vuelve a pintar los demás. Los países van en
+ *  selectores con buscador, que pintan su lista solo abiertos. Se puede contraer
+ *  para no alargar la página. */
 export const TarjetaTripulante = memo(function TarjetaTripulante({
   ficha, indice, puedeQuitar, opcionesPais, paises, validaVigencia, fechaReferencia, rangosPermitidos,
   exigeCustodia, avisoCustodia, casillas, nuevos, existentes, contraida,
@@ -48,8 +54,14 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
   const pais = paises.get(ficha.nacionalidad);
   // Solo se señala en los trámites cuyo proceso menciona la custodia.
   const restringida = (pais?.nacionalidad_restringida ?? false) && (exigeCustodia || avisoCustodia);
-  const pasaporteVencido = !!ficha.pasaporte_expira && ficha.pasaporte_expira < fechaReferencia;
+  // El pasaporte, con al menos 3 meses de vigencia desde la operación (2026-11-13).
+  const pasaporte = estadoPasaporte(ficha.pasaporte_expira, fechaReferencia);
+  const pasaporteVencido = pasaporte === "vencido";
+  const pasaporteCorto = pasaporte === "corto";
+  // El seamanbook vencido solo se avisa: se puede enviar igual.
   const libretaVencida = conLibreta && !!ficha.libreta_expira && ficha.libreta_expira < fechaReferencia;
+  const avisoResumen = pasaporteVencido || libretaVencida ? "documento vencido"
+    : pasaporteCorto ? `pasaporte con menos de ${MESES_VIGENCIA_PASAPORTE} meses de vigencia` : null;
   const rangos = rangosPermitidos ?? TODOS_LOS_RANGOS;
   const nombre = `${ficha.nombre} ${ficha.apellido}`.trim();
 
@@ -92,7 +104,7 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
         <div className={styles.marinoResumen}>
           {[pais?.nombre, ficha.pasaporte && `Pasaporte ${ficha.pasaporte}`, ETIQUETA_RANGO[ficha.rango]]
             .filter(Boolean).join(" · ") || "Sin datos todavía"}
-          {(pasaporteVencido || libretaVencida) && <span className={styles.resumenAlerta}> · documento vencido</span>}
+          {avisoResumen && <span className={styles.resumenAlerta}> · {avisoResumen}</span>}
         </div>
       ) : (
         <>
@@ -120,20 +132,10 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
               <FechaEnPalabras iso={ficha.fecha_nacimiento} />
             </label>
 
-            <label className={styles.campo}>
-              <span>País de nacimiento *</span>
-              <select {...campo("pais_nacimiento")}>
-                <option value="">Selecciona…</option>
-                {opcionesPais}
-              </select>
-            </label>
-            <label className={styles.campo}>
-              <span>Nacionalidad *</span>
-              <select {...campo("nacionalidad")}>
-                <option value="">Selecciona…</option>
-                {opcionesPais}
-              </select>
-            </label>
+            <SelectorBuscable className={styles.campo} etiqueta="País de nacimiento *" opciones={opcionesPais}
+              valor={ficha.pais_nacimiento} onCambiar={(valor) => onCambiar(ficha.clave, "pais_nacimiento", valor)} />
+            <SelectorBuscable className={styles.campo} etiqueta="Nacionalidad *" opciones={opcionesPais}
+              valor={ficha.nacionalidad} onCambiar={(valor) => onCambiar(ficha.clave, "nacionalidad", valor)} />
             <label className={styles.campo}>
               <span>Rango *</span>
               <select {...campo("rango")}>
@@ -175,7 +177,7 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
             )}
           </div>
 
-          {(restringida || pasaporteVencido || libretaVencida) && (
+          {(restringida || pasaporteVencido || pasaporteCorto || libretaVencida) && (
             <div className={styles.marinoAlertas}>
               {restringida && (
                 <div className={exigeCustodia ? styles.alertaInfo : styles.alertaAviso}>
@@ -189,14 +191,23 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
                 <div className={validaVigencia ? styles.alertaError : styles.alertaAviso}>
                   <IconoAlerta tamano={13} />
                   El pasaporte vence el {formatearFecha(ficha.pasaporte_expira)}, antes de la operación
-                  {validaVigencia ? " — este trámite exige pasaporte vigente." : "."}
+                  {validaVigencia
+                    ? ` — este trámite exige al menos ${MESES_VIGENCIA_PASAPORTE} meses de vigencia a partir de la operación.`
+                    : "."}
+                </div>
+              )}
+              {pasaporteCorto && (
+                <div className={validaVigencia ? styles.alertaError : styles.alertaAviso}>
+                  <IconoAlerta tamano={13} />
+                  El pasaporte {textoVigenciaCorta(ficha.pasaporte_expira, fechaReferencia)}
                 </div>
               )}
               {libretaVencida && (
-                <div className={validaVigencia ? styles.alertaError : styles.alertaAviso}>
+                // Solo un aviso (2026-11-13): el seamanbook vencido no impide enviar.
+                <div className={styles.alertaAviso}>
                   <IconoAlerta tamano={13} />
-                  El seamanbook vence el {formatearFecha(ficha.libreta_expira)}, antes de la operación
-                  {validaVigencia ? " — este trámite exige seamanbook vigente." : "."}
+                  El seamanbook vence el {formatearFecha(ficha.libreta_expira)}, antes de la operación. Puedes enviar
+                  la solicitud igual: quedará señalado en la revisión.
                 </div>
               )}
             </div>

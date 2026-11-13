@@ -28,7 +28,7 @@ import {
 } from "./consultaHistorica";
 import { FechaEnPalabras } from "./FechaEnPalabras";
 import { InsigniaEstado } from "./InsigniaEstado";
-import { formatearFecha, formatearFechaHora, TEXTO_HORARIO_LABORAL } from "./presentacion";
+import { formatearFecha, formatearFechaHora, TEXTO_HORARIO_LABORAL, textoPuestos } from "./presentacion";
 import panel from "./PaginaPanel.module.css";
 import styles from "./ConsultaHistorica.module.css";
 
@@ -330,7 +330,7 @@ export default function PaginaConsultaHistorica() {
                     <td data-etiqueta="Trámite">{s.tipo_tramite_nombre}</td>
                     <td data-etiqueta="Agencia naviera">{s.agencia_nombre}</td>
                     <td data-etiqueta="Puesto">
-                      {s.puesto_nombre}
+                      {textoPuestos(s)}
                       {veLosDos && s.sector_nombre && <small>{s.sector_nombre}</small>}
                     </td>
                     <td data-etiqueta="Buque">

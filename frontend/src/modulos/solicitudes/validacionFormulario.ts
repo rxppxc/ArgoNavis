@@ -1,12 +1,15 @@
 /** Validación del formulario de solicitud en el navegador. Espeja las reglas
  *  del backend (que igual vuelve a validar todo) para avisar antes de enviar. */
-import type { Pais } from "../../api/catalogos";
+import type { Pais, PuestoMini } from "../../api/catalogos";
 import type { TripulanteEntrada } from "../../api/solicitudes";
 import type { TipoTramite } from "../../api/tramites";
 import { ETIQUETA_RANGO, RANGOS_CON_LIBRETA, formatearFecha, normalizarImo } from "./presentacion";
 
 export interface CabeceraFormulario {
   puesto_control_id: string;
+  /** ¿Cambio de puerto? (2026-11-13) y, con «si», el nuevo puesto. */
+  cambio_puerto: "no" | "si";
+  puesto_destino_id: string;
   fecha_operacion: string;
   nombre_buque: string;
   imo: string;
@@ -23,7 +26,7 @@ export interface FichaTripulante extends TripulanteEntrada {
 }
 
 export const CABECERA_VACIA: CabeceraFormulario = {
-  puesto_control_id: "", fecha_operacion: "",
+  puesto_control_id: "", cambio_puerto: "no", puesto_destino_id: "", fecha_operacion: "",
   nombre_buque: "", imo: "", bandera: "",
   nombre_puerto: "", puerto_desembarque: "", motivo: "", clinica_hospital: "",
   observaciones: "",
@@ -35,15 +38,19 @@ export const EDAD_MINIMA = 18;
 export const NACIMIENTO_MINIMO = "1900-01-01";
 export const DIAS_MAXIMOS_ANTICIPACION = 365;
 export const MAX_TRIPULANTES = 30;
+/** El pasaporte tiene que vencer al menos estos meses después de la operación
+ *  (2026-11-13). Espejo de MESES_VIGENCIA_PASAPORTE (models/solicitud.py). */
+export const MESES_VIGENCIA_PASAPORTE = 3;
 
-/** Suma años o días a una fecha ISO (AAAA-MM-DD), sin pasar por la zona horaria.
- *  Si el día no existe en el año de destino (29 de febrero), queda el último del
- *  mes, como cuenta la edad el backend: el 29/02/2028 no tiene 18 años quien nació
- *  el 01/03/2010. */
-function desplazar(iso: string, { anios = 0, dias = 0 }: { anios?: number; dias?: number }): string {
+/** Suma años, meses o días a una fecha ISO (AAAA-MM-DD), sin pasar por la zona
+ *  horaria. Si el día no existe en el mes de destino (29 de febrero, 30 de
+ *  febrero), queda el último del mes, como el backend: el 29/02/2028 no tiene 18
+ *  años quien nació el 01/03/2010, y el 30/11 más 3 meses es el 28/02. */
+function desplazar(iso: string, { anios = 0, meses = 0, dias = 0 }: { anios?: number; meses?: number; dias?: number }): string {
   const [a, m, d] = iso.split("-").map(Number);
-  const ultimoDelMes = new Date(Date.UTC(a + anios, m, 0)).getUTCDate();
-  const fecha = new Date(Date.UTC(a + anios, m - 1, Math.min(d, ultimoDelMes) + dias));
+  const mes = m - 1 + meses;   // desde 0; Date.UTC pasa al año siguiente si se sale de 11
+  const ultimoDelMes = new Date(Date.UTC(a + anios, mes + 1, 0)).getUTCDate();
+  const fecha = new Date(Date.UTC(a + anios, mes, Math.min(d, ultimoDelMes) + dias));
   return fecha.toISOString().slice(0, 10);
 }
 
@@ -62,8 +69,38 @@ export function fechaReferencia(fechaOperacion: string, hoy: string): string {
   return fechaOperacion && fechaOperacion > hoy ? fechaOperacion : hoy;
 }
 
+/** Primer día en que puede vencer el pasaporte: la operación (`fechaReferencia`)
+ *  más 3 meses de calendario. Espejo de vigencia_minima_pasaporte. */
+export function vigenciaMinimaPasaporte(referencia: string): string {
+  return desplazar(referencia, { meses: MESES_VIGENCIA_PASAPORTE });
+}
+
+/** Cómo está el pasaporte para la operación: vencido, vigente pero con menos de 3
+ *  meses, o bien. Lo usan la validación y el aviso de la tarjeta del pasajero. */
+export function estadoPasaporte(vence: string, referencia: string): "vencido" | "corto" | "bien" {
+  if (!vence) return "bien";
+  if (vence < referencia) return "vencido";
+  return vence < vigenciaMinimaPasaporte(referencia) ? "corto" : "bien";
+}
+
+/** El aviso de un pasaporte con menos de 3 meses, después de «el pasaporte» (el mismo
+ *  texto que el backend). */
+export function textoVigenciaCorta(vence: string, referencia: string): string {
+  return `debe tener al menos ${MESES_VIGENCIA_PASAPORTE} meses de vigencia a partir de la operación `
+    + `(vencer el ${formatearFecha(vigenciaMinimaPasaporte(referencia))} o después); vence el ${formatearFecha(vence)}.`;
+}
+
 export function portaLibreta(ficha: Pick<TripulanteEntrada, "rango">): boolean {
   return RANGOS_CON_LIBRETA.includes(ficha.rango);
+}
+
+/** Los puestos a los que se puede cambiar desde el elegido (2026-11-13): los del
+ *  mismo sector, sin él. Si el nuevo puerto es del otro sector, va una solicitud
+ *  nueva. El backend lo vuelve a validar (`_validar_cambio_de_puerto`). */
+export function puestosParaCambio(puestos: PuestoMini[], puestoControlId: string): PuestoMini[] {
+  const elegido = puestos.find((p) => String(p.id) === puestoControlId);
+  if (!elegido) return [];
+  return puestos.filter((p) => p.sector_id === elegido.sector_id && p.id !== elegido.id);
 }
 
 export function validarFormulario(
@@ -76,6 +113,9 @@ export function validarFormulario(
   const errores: string[] = [];
 
   if (!c.puesto_control_id) errores.push("Elige el puesto de Control Migratorio.");
+  if (tipo.permite_cambio_puerto && c.cambio_puerto === "si" && !c.puesto_destino_id) {
+    errores.push("Elige el nuevo puesto de control del cambio de puerto.");
+  }
   if (!c.fecha_operacion) errores.push("Indica la fecha de la operación.");
   else if (c.fecha_operacion < hoy) errores.push("La fecha de la operación no puede ser anterior a hoy.");
   else if (c.fecha_operacion > operacionMaxima(hoy)) {
@@ -138,12 +178,14 @@ export function validarFormulario(
     }
 
     if (tipo.valida_vigencia) {
-      if (t.pasaporte_expira && t.pasaporte_expira < referencia) {
+      const pasaporte = estadoPasaporte(t.pasaporte_expira, referencia);
+      if (pasaporte === "vencido") {
         errores.push(`${quien}: el pasaporte vence el ${formatearFecha(t.pasaporte_expira)}, antes de la operación.`);
+      } else if (pasaporte === "corto") {
+        errores.push(`${quien}: el pasaporte ${textoVigenciaCorta(t.pasaporte_expira, referencia)}`);
       }
-      if (conLibreta && t.libreta_expira && t.libreta_expira < referencia) {
-        errores.push(`${quien}: el seamanbook vence el ${formatearFecha(t.libreta_expira)}, antes de la operación.`);
-      }
+      // El seamanbook vencido no impide enviar (2026-11-13): la tarjeta lo avisa y
+      // el expediente lo señala.
     }
 
     const clave = `${t.nacionalidad}|${t.pasaporte.trim().toUpperCase()}`;

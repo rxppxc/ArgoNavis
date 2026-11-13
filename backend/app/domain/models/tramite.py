@@ -52,9 +52,12 @@ class TipoTramite(Base):
     requiere_puerto_desembarque: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     requiere_motivo:             Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     requiere_clinica:            Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Si el formulario ofrece el cambio de puerto (2026-11-13): solo Embarque y Desembarque.
+    permite_cambio_puerto:       Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
-    # Si el trámite exige pasaporte y seamanbook vigentes a la fecha de la
-    # operación (Embarque, Visita médica y Shore Pass, según UCVMM).
+    # Si el trámite valida la vigencia (hoy, los 8): el pasaporte con al menos 3 meses
+    # a partir de la operación; el seamanbook vencido solo se señala (2026-11-13).
+    # UCVMM la pedía en Embarque, Visita médica y Shore Pass.
     valida_vigencia: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # Rangos de tripulante que admite el trámite (nulo = cualquiera). La
     # Autorización de Técnico, Superintendente o Supernumerario solo admite esos tres.

@@ -41,6 +41,8 @@ class SalidaTipoTramite(BaseModel):
     requiere_puerto_desembarque: bool
     requiere_motivo:             bool
     requiere_clinica:            bool = False
+    # El formulario ofrece el cambio de puerto (2026-11-13: Embarque y Desembarque).
+    permite_cambio_puerto:       bool = False
     valida_vigencia:             bool = False
     # Rangos de tripulante admitidos (nulo = cualquiera).
     rangos_permitidos: list[str] | None = None

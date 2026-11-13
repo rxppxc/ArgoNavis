@@ -132,6 +132,19 @@ def test_mayoria_de_edad(nacimiento, mayor):
     assert (not any("mayor de edad" in e for e in errores)) == mayor, errores
 
 
+@pytest.mark.parametrize("operacion, minimo", [
+    ("2026-11-13", "2027-02-13"),   # el ejemplo del pedido (2026-11-13)
+    ("2026-11-30", "2027-02-28"),   # no hay 30 de febrero: el último día del mes
+    ("2027-11-29", "2028-02-29"),   # año bisiesto
+    ("2026-10-31", "2027-01-31"),
+    ("2026-12-31", "2027-03-31"),   # cambia el año
+])
+def test_vigencia_minima_del_pasaporte(operacion, minimo):
+    from datetime import date
+    from app.domain.models.solicitud import vigencia_minima_pasaporte
+    assert vigencia_minima_pasaporte(date.fromisoformat(operacion)) == date.fromisoformat(minimo)
+
+
 def test_fechas_coherentes():
     from datetime import date
     assert any("no es válida" in e for e in _errores(_ficha(fecha_nacimiento=date(1899, 12, 31))))

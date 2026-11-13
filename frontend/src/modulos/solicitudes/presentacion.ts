@@ -13,6 +13,7 @@ export const ETIQUETA_ESTADO: Record<EstadoSolicitud, string> = {
 
 export const ETIQUETA_RANGO: Record<RangoMarino, string> = {
   marino:          "Marino",
+  pasajero:        "Pasajero",   // un Marino sin libreta (2026-11-13)
   militar:         "Militar",
   tecnico:         "Técnico",
   supernumerario:  "Supernumerario",
@@ -45,6 +46,22 @@ export const ETIQUETA_EVENTO: Record<EventoSolicitud["tipo"], string> = {
 
 /** Rangos que portan seamanbook (al resto no se le pide libreta). */
 export const RANGOS_CON_LIBRETA: RangoMarino[] = ["marino"];
+
+interface ConPuestos {
+  puesto_nombre: string | null;
+  puesto_destino_nombre: string | null;
+}
+
+/** Donde vale la autorización y se finaliza: con cambio de puerto (2026-11-13), el
+ *  nuevo puesto. Espejo de Solicitud.puesto_autorizado_nombre. */
+export function puestoAutorizado(s: ConPuestos): string {
+  return s.puesto_destino_nombre ?? s.puesto_nombre ?? "";
+}
+
+/** El puesto; con cambio de puerto, los dos: «Balboa → Rodman». */
+export function textoPuestos(s: ConPuestos): string {
+  return s.puesto_destino_nombre ? `${s.puesto_nombre ?? ""} → ${s.puesto_destino_nombre}` : s.puesto_nombre ?? "";
+}
 
 const dosCifras = (n: number) => String(n).padStart(2, "0");
 /** El horario laboral, como lo dicen el correo y el PDF (TEXTO_HORARIO, core/horario.py). */

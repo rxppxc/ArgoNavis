@@ -11,7 +11,7 @@ import { MarcoPagina } from "../../components/MarcoPagina";
 import { IconoAlerta, IconoExito, IconoXCirculo } from "../../components/Iconos";
 import { useTituloDocumento } from "../../hooks/useTituloDocumento";
 import { mensajeDeError } from "../../utils/errores";
-import { ETIQUETA_ESTADO, ETIQUETA_RANGO, formatearFecha, formatearFechaHora } from "./presentacion";
+import { ETIQUETA_ESTADO, ETIQUETA_RANGO, formatearFecha, formatearFechaHora, puestoAutorizado } from "./presentacion";
 import styles from "./PaginaVerificacion.module.css";
 
 export default function PaginaVerificacion() {
@@ -81,12 +81,15 @@ export default function PaginaVerificacion() {
                 <div><dt>Buque</dt><dd>{[datos.nombre_buque, datos.imo && `IMO ${datos.imo}`].filter(Boolean).join(" · ") || "—"}</dd></div>
                 <div><dt>Bandera</dt><dd>{datos.bandera ?? "—"}</dd></div>
                 <div><dt>Puesto de control</dt><dd>{datos.puesto_nombre ?? "—"}</dd></div>
+                {datos.puesto_destino_nombre && (
+                  <div><dt>Cambio de puerto a</dt><dd>{datos.puesto_destino_nombre}</dd></div>
+                )}
                 <div><dt>Fecha de la operación</dt><dd>{formatearFecha(datos.fecha_operacion)}</dd></div>
                 <div><dt>Aprobada</dt><dd>{formatearFechaHora(datos.aprobada_en)}</dd></div>
                 {datos.finalizada_en && (
                   <div>
                     <dt>Finalizada en</dt>
-                    <dd>{datos.puesto_finalizacion_nombre ?? datos.puesto_nombre ?? "—"} · {formatearFechaHora(datos.finalizada_en)}</dd>
+                    <dd>{datos.puesto_finalizacion_nombre ?? (puestoAutorizado(datos) || "—")} · {formatearFechaHora(datos.finalizada_en)}</dd>
                   </div>
                 )}
               </dl>

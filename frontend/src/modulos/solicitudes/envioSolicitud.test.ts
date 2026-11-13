@@ -134,3 +134,20 @@ describe("armarEnvio: lo que se manda al servidor", () => {
     expect(conservados).toEqual([1, 9]);
   });
 });
+
+describe("cambio de puerto (2026-11-13)", () => {
+  it("la precarga trae el nuevo puesto de una devuelta con cambio", () => {
+    const { cabecera } = desdeSolicitud(solicitudDePrueba({ puesto_control_id: 7, puesto_destino_id: 9 }));
+    expect(cabecera).toMatchObject({ puesto_control_id: "7", cambio_puerto: "si", puesto_destino_id: "9" });
+    expect(desdeSolicitud(solicitudDePrueba({ puesto_destino_id: null })).cabecera)
+      .toMatchObject({ cambio_puerto: "no", puesto_destino_id: "" });
+  });
+
+  it("el nuevo puesto viaja solo con «Sí»", () => {
+    const base = { ...CABECERA_VACIA, puesto_control_id: "7", puesto_destino_id: "9" };
+    expect(armarEnvio({ ...base, cambio_puerto: "si" }, [], SIN_DOCUMENTOS).datos.puesto_destino_id).toBe(9);
+    expect(armarEnvio({ ...base, cambio_puerto: "no" }, [], SIN_DOCUMENTOS).datos.puesto_destino_id).toBeNull();
+    expect(armarEnvio({ ...base, cambio_puerto: "si", puesto_destino_id: "" }, [], SIN_DOCUMENTOS).datos.puesto_destino_id)
+      .toBeNull();
+  });
+});

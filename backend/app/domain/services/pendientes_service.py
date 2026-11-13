@@ -61,7 +61,9 @@ class ServicioPendientes:
             fuentes.append(_Fuente("por_revisar", "Por revisar", "revision", EstadoSolicitud.EN_REVISION.value,
                                    filtros, EVENTOS_REVISION))
         if ctx.es_admin or ctx.es_puerto:
-            filtros = FiltrosBandeja(puestos_ids=None if ctx.es_admin else ctx.puestos_ids, solo_aprobadas_alguna_vez=True)
+            # Las que finalizan sus puestos (con cambio de puerto, el nuevo), como su bandeja.
+            filtros = FiltrosBandeja(puestos_autorizados=None if ctx.es_admin else ctx.puestos_ids,
+                                     solo_aprobadas_alguna_vez=True)
             fuentes.append(_Fuente("por_finalizar", "Por finalizar", "puerto", EstadoSolicitud.APROBADA.value,
                                    filtros, EVENTOS_PUERTO))
         if ctx.agencia_id is not None and (ctx.es_naviera or ctx.es_admin):

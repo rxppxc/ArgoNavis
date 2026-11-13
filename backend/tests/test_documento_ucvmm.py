@@ -14,9 +14,11 @@ propio; si el catálogo o las reglas se apartan de ella, estas pruebas fallan:
     aplique"); los procesos de Desembarque, Urgencias, Renovación y Shore Pass
     piden avisar al aprobar que se debe tramitar la custodia.
 
-Cuatro reglas van más allá de la lectura literal, por decisión del usuario:
+Cinco reglas van más allá de la lectura literal, por decisión del usuario:
   - Ningún documento vencido: la vigencia bloquea en los 8 trámites (la Nota
-    de la pág. 9 la pedía solo en Embarque, Visita médica y Shore Pass).
+    de la pág. 9 la pedía solo en Embarque, Visita médica y Shore Pass). Desde el
+    2026-11-13, el pasaporte con al menos 3 meses a partir de la operación, y el
+    seamanbook vencido ya no bloquea: se señala.
   - La Libreta de Marino en Embarque se pide a todo tripulante de rango
     Marino, sin importar la nacionalidad (el Form. 3 dice "Panameños").
   - A los rangos distintos de Marino (militar, técnico, supernumerario y
@@ -25,21 +27,30 @@ Cuatro reglas van más allá de la lectura literal, por decisión del usuario:
     los documentos por tripulante es solo del Marino, el boleto se agrega para
     los demás rangos y el trámite de Técnico ya no lleva la Carta Form. 7.
   - En Embarque y Desembarque, a los técnicos (técnico, supernumerario y
-    superintendente) se les piden la Carta de Responsabilidad, las Generales y
-    el Contrato de Trabajo; en Desembarque, además, el boleto como opcional, y en
-    Embarque el boleto queda solo para el militar (pedido del 2026-11-11).
+    superintendente) se les pedían la Carta de Responsabilidad, las Generales y
+    el Contrato de Trabajo (pedido del 2026-11-11). Desde el 2026-11-13 esos dos
+    trámites admiten solo Marino, Pasajero y Militar: las filas quedan sin uso.
+    El Pasajero presenta lo del Marino sin la Libreta, en todos los trámites salvo
+    el de Técnico, y el cambio de puerto va solo en Embarque y Desembarque.
+  - El Formulario No. 3 se adjunta en todos los trámites, uno por solicitud, con
+    todos los pasajeros y para cualquier rango; convive con la Lista de
+    Tripulantes. Y el Cambio de Puerto deja de ser un trámite: en cualquiera se
+    indica el cambio y el nuevo puesto, del mismo sector (pedido del 2026-11-13).
 """
 import secrets
+from datetime import date, timedelta
 
 import pytest
 
-from ayudas import HOY, cabecera, enviar, pdf, tripulante
+from app.domain.models.solicitud import vigencia_minima_pasaporte
+from ayudas import HOY, MANANA, cabecera, enviar, pdf, tripulante
 from conftest import Actor, crear_actor, id_sector
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 # (código, alcance, condición, rangos a los que se pide: None = a todos)
-MARINO = ("marino",)
+# Las filas del Marino incluyen al Pasajero (2026-11-13): un Marino sin libreta.
+MARINO = ("marino", "pasajero")
 NO_MARINOS = ("militar", "superintendente", "supernumerario", "tecnico")
 CUSTODIA = ("DOC-FORM6-CUSTODIA", "marino", "nacionalidad_restringida", MARINO)   # Form. 3: solo Desembarque
 GENERALES = ("DOC-GENERALES-PASAPORTE", "marino", "siempre", None)
@@ -50,6 +61,7 @@ CARTA = ("DOC-FORM7-RESPONSABILIDAD", "marino", "siempre", MARINO)    # "para ca
 REPORTE = ("DOC-REPORTE-MEDICO", "marino", "siempre", MARINO)         # "para cada tripulante"
 CITA = ("DOC-CITA-CONSULADO", "marino", "siempre", MARINO)
 BOLETO = ("DOC-BOLETO-AEREO", "marino", "siempre", NO_MARINOS)        # reunión del 2026-10-30
+FORM3 = ("DOC-FORMULARIO-3", "solicitud", "siempre", None)           # en todos (2026-11-13)
 # Pedido del usuario del 2026-11-11: en Embarque y Desembarque, los técnicos
 # (técnico, supernumerario, superintendente) presentan además la Carta y el
 # Contrato de Trabajo; en Embarque el boleto queda solo para el militar, y en
@@ -66,50 +78,47 @@ OPCIONAL = {("F3-DESEMBARQUE", "DOC-BOLETO-AEREO"): TECNICOS}
 # aviso_custodia: si el proceso pide avisar al aprobar que se tramite la custodia
 DOCUMENTO = {
     "F3-EMBARQUE": {
-        "campos": [], "vigencia": True, "aviso_custodia": False,
-        "documentos": {VISA, GENERALES, LIBRETA, BOLETO_MILITAR, CARTA_TECNICOS, CONTRATO},
+        "campos": [], "vigencia": True, "aviso_custodia": False, "cambio_puerto": True,
+        "rangos": {"marino", "pasajero", "militar"},   # 2026-11-13: los técnicos van por su trámite
+        "documentos": {FORM3, VISA, GENERALES, LIBRETA, BOLETO_MILITAR, CARTA_TECNICOS, CONTRATO},
     },
     "F3-DESEMBARQUE": {
-        "campos": [], "vigencia": True, "aviso_custodia": True,
+        "campos": [], "vigencia": True, "aviso_custodia": True, "cambio_puerto": True,
+        "rangos": {"marino", "pasajero", "militar"},
         # El boleto aéreo lo pide el Form. 3 a todos (también al Marino); a los técnicos, opcional.
-        "documentos": {("DOC-BOLETO-AEREO", "marino", "siempre", None), GENERALES, LIBRETA, LISTA, CUSTODIA,
+        "documentos": {FORM3, ("DOC-BOLETO-AEREO", "marino", "siempre", None), GENERALES, LIBRETA, LISTA, CUSTODIA,
                        CARTA_TECNICOS, CONTRATO},
     },
     "F3-URGENCIA-MEDICA": {
         "campos": ["puerto_desembarque", "clinica_hospital"], "vigencia": True, "aviso_custodia": True,
-        "documentos": {CARTA, REPORTE, GENERALES, LIBRETA, BOLETO},
+        "documentos": {FORM3, CARTA, REPORTE, GENERALES, LIBRETA, BOLETO},
     },
     "F3-RENOV-PASAPORTE": {
         "campos": ["puerto_desembarque"], "vigencia": True, "aviso_custodia": True,
-        "documentos": {GENERALES, CARTA, LISTA, LIBRETA, CITA, BOLETO},
+        "documentos": {FORM3, GENERALES, CARTA, LISTA, LIBRETA, CITA, BOLETO},
     },
     "F3-SHORE-PASS": {
         "campos": ["motivo"], "vigencia": True, "aviso_custodia": True,
-        "documentos": {GENERALES, LISTA, LIBRETA, BOLETO},
+        "documentos": {FORM3, GENERALES, LISTA, LIBRETA, BOLETO},
     },
     "F3-TECNICO": {
         "campos": [], "vigencia": True, "aviso_custodia": False,
         "rangos": {"tecnico", "superintendente", "supernumerario"},
         # El Form. 3 pide la Carta Form. 7; desde el 2026-10-30, estos rangos presentan Generales y boleto.
-        "documentos": {GENERALES, BOLETO},
+        "documentos": {FORM3, GENERALES, BOLETO},
     },
     "F3-CAMBIO-NAVE": {
         "campos": [], "vigencia": True, "aviso_custodia": False,
-        "documentos": {VISA, GENERALES, BOLETO},
+        "documentos": {FORM3, VISA, GENERALES, BOLETO},
     },
-    "F3-CAMBIO-PUERTO": {
-        "campos": ["nombre_puerto"], "vigencia": True, "aviso_custodia": False,
-        "documentos": {VISA, GENERALES, BOLETO},
-    },
+    # F3-CAMBIO-PUERTO: desde el 2026-11-13 no es un trámite (test_cambio_de_puerto_ya_no_es_un_tramite).
 }
 
 VALORES = {
-    "nombre_puerto": "Puerto de Balboa", "puerto_desembarque": "Puerto de Cristóbal",
-    "motivo": "Compras", "clinica_hospital": "Hospital Punta Pacífica",
+    "puerto_desembarque": "Puerto de Cristóbal", "motivo": "Compras", "clinica_hospital": "Hospital Punta Pacífica",
 }
 ETIQUETAS = {
-    "nombre_puerto": "Nombre del puerto", "puerto_desembarque": "Puerto de desembarque",
-    "motivo": "Motivo", "clinica_hospital": "Clínica u hospital",
+    "puerto_desembarque": "Puerto de desembarque", "motivo": "Motivo", "clinica_hospital": "Clínica u hospital",
 }
 LIBRETA_DOCS = {"DOC-LIBRETA-MARINO"}   # solo a quien porta seamanbook (rango Marino)
 
@@ -148,7 +157,9 @@ def _asignaciones(codigo_tramite: str, tripulantes: list[dict], *, sin: set[str]
 
 
 def _rango(codigo_tramite: str) -> str:
-    return "tecnico" if "rangos" in DOCUMENTO[codigo_tramite] else "marino"
+    """Un rango que el trámite admite: Marino, salvo en el de Técnico."""
+    rangos = DOCUMENTO[codigo_tramite].get("rangos")
+    return "marino" if not rangos or "marino" in rangos else "tecnico"
 
 
 def _datos(codigo_tramite: str, puesto_id: int, tripulantes: list[dict], **extra) -> tuple[dict, list]:
@@ -182,6 +193,9 @@ async def test_catalogo_igual_al_documento(cliente, agencia):
         documentos = {(d["codigo"], d["alcance"], d["condicion"], tuple(sorted(d["rangos"])) if d["rangos"] else None)
                       for d in tipo["documentos"]}
         assert documentos == esperado["documentos"], codigo
+        # El Formulario No. 3, primero entre los de la solicitud (2026-11-13).
+        de_la_solicitud = [d["codigo"] for d in tipo["documentos"] if d["alcance"] == "solicitud"]
+        assert de_la_solicitud[0] == "DOC-FORMULARIO-3", codigo
         opcionales = {(codigo, d["codigo"]): tuple(sorted(d["rangos_opcional"]))
                       for d in tipo["documentos"] if d["rangos_opcional"]}
         assert opcionales == {k: v for k, v in OPCIONAL.items() if k[0] == codigo}, codigo
@@ -193,6 +207,7 @@ async def test_catalogo_igual_al_documento(cliente, agencia):
         assert tipo["requiere_clinica"] == ("clinica_hospital" in esperado["campos"]), codigo
         assert set(tipo["rangos_permitidos"] or []) == esperado.get("rangos", set()), codigo
         assert tipo["aviso_custodia"] == esperado["aviso_custodia"], codigo
+        assert tipo["permite_cambio_puerto"] == esperado.get("cambio_puerto", False), codigo
 
 
 @pytest.mark.parametrize("codigo", sorted(DOCUMENTO))
@@ -227,6 +242,38 @@ async def test_vigencia_del_pasaporte(cliente, agencia, codigo):
         assert r.status_code == 201, (codigo, r.text)
         assert r.json()["tripulantes_con_alerta"] == 1
         assert r.json()["tripulantes"][0]["pasaporte_vencido"]
+
+
+@pytest.mark.parametrize("codigo", sorted(DOCUMENTO))
+async def test_pasaporte_con_tres_meses_de_vigencia(cliente, agencia, codigo):
+    """El pasaporte tiene que vencer al menos 3 meses después de la operación
+    (pedido del 2026-11-13), en todos los trámites y rangos: un día antes no se
+    envía; justo a los 3 meses, sí."""
+    naviera, puesto_id = agencia
+    minimo = vigencia_minima_pasaporte(date.fromisoformat(MANANA))   # la operación de cabecera()
+    tripulantes = [tripulante("Luis", "PHL", rango=_rango(codigo), pasaporte_expira=(minimo - timedelta(days=1)).isoformat())]
+    datos, archivos = _datos(codigo, puesto_id, tripulantes)
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 400 and "al menos 3 meses de vigencia" in r.json()["detail"], (codigo, r.text)
+
+    tripulantes = [tripulante("Luis", "PHL", rango=_rango(codigo), pasaporte_expira=minimo.isoformat())]
+    datos, archivos = _datos(codigo, puesto_id, tripulantes)
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 201, (codigo, r.text)
+    assert r.json()["tripulantes_con_alerta"] == 0
+
+
+@pytest.mark.parametrize("codigo", sorted(c for c in DOCUMENTO if _rango(c) == "marino"))
+async def test_seamanbook_vencido_no_impide_enviar(cliente, agencia, codigo):
+    """El seamanbook vencido a la fecha de la operación no bloquea el envío
+    (2026-11-13): el expediente lo señala, para la revisión."""
+    naviera, puesto_id = agencia
+    tripulantes = [tripulante("Luis", "PHL", libreta_expira=HOY.isoformat())]
+    datos, archivos = _datos(codigo, puesto_id, tripulantes)
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 201, (codigo, r.text)
+    assert r.json()["tripulantes"][0]["libreta_vencida"]
+    assert r.json()["tripulantes_con_alerta"] == 1
 
 
 @pytest.mark.parametrize("codigo", sorted(DOCUMENTO))
@@ -356,31 +403,23 @@ async def test_rangos_no_marinos_generales_y_boleto(cliente, agencia, codigo):
     assert del_tripulante == {"DOC-GENERALES-PASAPORTE", "DOC-BOLETO-AEREO"}, codigo
 
 
+@pytest.mark.parametrize("codigo", ["F3-EMBARQUE", "F3-DESEMBARQUE"])
 @pytest.mark.parametrize("rango", TECNICOS)
-async def test_tecnicos_en_desembarque_boleto_opcional(cliente, agencia, rango):
-    """2026-11-11: Carta, Generales y Contrato obligatorios; el boleto, opcional."""
+async def test_tecnicos_van_por_su_tramite(cliente, agencia, codigo, rango):
+    """2026-11-13: Embarque y Desembarque admiten solo Marino, Pasajero y Militar; los
+    técnicos, supernumerarios y superintendentes van por el trámite de Técnico."""
     naviera, puesto_id = agencia
-    tripulantes = [tripulante("Hans", "DEU", rango=rango)]
-    datos, archivos = _datos("F3-DESEMBARQUE", puesto_id, tripulantes, sin={"DOC-CONTRATO-TRABAJO"})
+    datos, archivos = _datos(codigo, puesto_id, [tripulante("Hans", "DEU", rango=rango)])
     r = await enviar(cliente, naviera, datos, archivos)
-    assert r.status_code == 400 and "Contrato de Trabajo" in r.json()["detail"], r.text
-
-    datos, archivos = _datos("F3-DESEMBARQUE", puesto_id, tripulantes, sin={"DOC-BOLETO-AEREO"})
-    r = await enviar(cliente, naviera, datos, archivos)
-    assert r.status_code == 201, r.text
-    casillas = {c["documento_codigo"]: c for c in r.json()["checklist"] if c["tripulante_id"] is not None}
-    assert set(casillas) == {"DOC-FORM7-RESPONSABILIDAD", "DOC-GENERALES-PASAPORTE", "DOC-CONTRATO-TRABAJO",
-                             "DOC-BOLETO-AEREO"}
-    boleto = casillas["DOC-BOLETO-AEREO"]
-    assert boleto["obligatoria"] is False and boleto["cubierta"] is False
-    assert all(c["obligatoria"] for k, c in casillas.items() if k != "DOC-BOLETO-AEREO")
+    assert r.status_code == 400 and "rango debe ser Marino, Pasajero, Militar" in r.json()["detail"], r.text
 
 
 async def test_embarque_segun_el_rango(cliente, agencia):
-    """2026-11-11: en Embarque los técnicos no llevan boleto (Carta, Generales y
-    Contrato); el militar sigue con Generales y boleto."""
+    """En Embarque, el Pasajero presenta lo del Marino sin la Libreta (2026-11-13) y el
+    militar sigue con Generales y boleto (reunión del 2026-10-30)."""
     naviera, puesto_id = agencia
-    esperado = {"tecnico": {"DOC-FORM7-RESPONSABILIDAD", "DOC-GENERALES-PASAPORTE", "DOC-CONTRATO-TRABAJO"},
+    esperado = {"marino": {"DOC-VISA-MARINO", "DOC-GENERALES-PASAPORTE", "DOC-LIBRETA-MARINO"},
+                "pasajero": {"DOC-VISA-MARINO", "DOC-GENERALES-PASAPORTE"},
                 "militar": {"DOC-GENERALES-PASAPORTE", "DOC-BOLETO-AEREO"}}
     for rango, documentos in esperado.items():
         datos, archivos = _datos("F3-EMBARQUE", puesto_id, [tripulante("Hans", "DEU", rango=rango)])
@@ -389,6 +428,30 @@ async def test_embarque_segun_el_rango(cliente, agencia):
         del_tripulante = {c["documento_codigo"] for c in r.json()["checklist"] if c["tripulante_id"] is not None}
         assert del_tripulante == documentos, rango
         assert all(c["obligatoria"] for c in r.json()["checklist"]), rango
+
+
+@pytest.mark.parametrize("codigo", sorted(set(DOCUMENTO) - {"F3-TECNICO"}))
+async def test_el_pasajero_presenta_lo_del_marino_sin_libreta(cliente, agencia, codigo):
+    """2026-11-13: en todos los trámites (salvo el de Técnico), al Pasajero se le
+    piden los documentos del Marino, sin la Libreta ni el seamanbook."""
+    naviera, puesto_id = agencia
+    marino, pasajero = tripulante("Ana", "PHL"), tripulante("Beto", "PHL", rango="pasajero")
+    datos, archivos = _datos(codigo, puesto_id, [marino, pasajero])
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 201, (codigo, r.text)
+    s = r.json()
+    por_tripulante = {t["id"]: {c["documento_codigo"] for c in s["checklist"] if c["tripulante_id"] == t["id"]}
+                      for t in s["tripulantes"]}
+    del_marino, del_pasajero = (por_tripulante[t["id"]] for t in s["tripulantes"])
+    assert del_pasajero == del_marino - {"DOC-LIBRETA-MARINO"}, codigo
+    assert s["tripulantes"][1]["rango"] == "pasajero" and s["tripulantes"][1]["libreta_marino"] is None
+
+
+async def test_el_pasajero_no_va_en_el_tramite_de_tecnico(cliente, agencia):
+    naviera, puesto_id = agencia
+    datos, archivos = _datos("F3-TECNICO", puesto_id, [tripulante("Beto", "PHL", rango="pasajero")])
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 400 and "rango debe ser Técnico" in r.json()["detail"], r.text
 
 
 async def test_cambio_de_catalogo_no_altera_solicitudes_enviadas(cliente, agencia):
@@ -499,3 +562,37 @@ async def test_pdf_sin_nombres_para_la_agencia(cliente, agencia):
             datos[clave] = await svc.preparar_pdf(ctx, await svc.obtener(ctx, sid))
     assert datos["agencia"].aprobada_por == "Servicio Nacional de Migración" and not datos["agencia"].copia_interna
     assert datos["snm"].aprobada_por == "Revisor Prueba (UCVMM)" and datos["snm"].copia_interna
+
+
+@pytest.mark.parametrize("codigo", sorted(DOCUMENTO))
+async def test_formulario_3_en_todos_los_tramites(cliente, agencia, codigo):
+    """2026-11-13: el Formulario No. 3, uno por solicitud con todos los pasajeros y
+    para cualquier rango, es obligatorio en todos los trámites."""
+    naviera, puesto_id = agencia
+    tripulantes = [tripulante("Ana", "PHL", rango=_rango(codigo)), tripulante("Beto", "PHL", rango=_rango(codigo))]
+    datos, archivos = _datos(codigo, puesto_id, tripulantes, sin={"DOC-FORMULARIO-3"})
+    r = await enviar(cliente, naviera, datos, archivos, formulario_3=False)
+    assert r.status_code == 400 and "Formulario No. 3" in r.json()["detail"], (codigo, r.text)
+
+    datos, archivos = _datos(codigo, puesto_id, tripulantes)
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 201, (codigo, r.text)
+    formulario = [c for c in r.json()["checklist"] if c["documento_codigo"] == "DOC-FORMULARIO-3"]
+    assert len(formulario) == 1 and formulario[0]["tripulante_id"] is None and formulario[0]["obligatoria"], codigo
+
+
+async def test_cambio_de_puerto_ya_no_es_un_tramite(cliente, agencia):
+    """2026-11-13: el Cambio de Puerto se indica dentro de cualquier trámite. El
+    trámite queda desactivado (no se ofrece ni se puede enviar), pero sigue en el
+    catálogo para las solicitudes que ya lo usan."""
+    naviera, puesto_id = agencia
+    r = await cliente.get("/tramites", headers=naviera.headers)
+    assert "F3-CAMBIO-PUERTO" not in {t["codigo"] for t in r.json()}
+    r = await cliente.get("/tramites/F3-CAMBIO-PUERTO", headers=naviera.headers)
+    assert r.status_code == 200 and r.json()["activo"] is False
+    assert {d["codigo"] for d in r.json()["documentos"]} >= {"DOC-FORMULARIO-3"}, "una devuelta lo pide al corregir"
+
+    datos = cabecera("F3-CAMBIO-PUERTO", puesto_id, nombre_puerto="Puerto de Balboa",
+                     tripulantes=[tripulante("Ana")], asignaciones=[])
+    r = await enviar(cliente, naviera, datos, [])
+    assert r.status_code == 404, r.text

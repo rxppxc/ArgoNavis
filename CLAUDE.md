@@ -491,7 +491,7 @@ Pedido del usuario: «¿las librerías son descargadas, nada se saca de internet
 
 ### Recursos y topes (2026-11-10)
 Pedido del usuario: «¿no hay riesgo de sobrecarga de recursos, procesos que afecten la operación?», y después: «¿por qué 200 MB si el máximo es 2 MB por archivo?», «los contenedores deben estar limitados» y «¿el respaldo nocturno ralentiza todo?». Lo prueba `tests/test_recursos.py`.
-- **Tope del cuerpo de cada petición** (`TopeDelCuerpo`, `main.py`): 1 MB en la API (`TOPE_CUERPO_MB`) y `TOPE_CUERPO_ENVIO_MB` (283) al crear y corregir una solicitud (`_RUTA_DE_ENVIO`). Es lo más que pesa un envío válido: 30 pasajeros × 4 documentos + 1 de la solicitud + 20 adicionales, de 2 MB, más 1 MB.
+- **Tope del cuerpo de cada petición** (`TopeDelCuerpo`, `main.py`): 1 MB en la API (`TOPE_CUERPO_MB`) y `TOPE_CUERPO_ENVIO_MB` (285 desde el 2026-11-13; antes 283) al crear y corregir una solicitud (`_RUTA_DE_ENVIO`). Es lo más que pesa un envío válido: 30 pasajeros × 4 documentos + 2 de la solicitud (el Formulario No. 3 y la Lista de Tripulantes) + 20 adicionales, de 2 MB, más 1 MB.
   - FastAPI lee el cuerpo **antes** de comprobar la sesión y el rate limit. Sin tope, cualquiera, sin cuenta, hacía leer al backend cientos de MB por petición, también en el login (un JSON va entero a la memoria). Con Content-Length se corta sin leer; sin él, se cuenta lo que llega.
   - nginx tiene los mismos: `client_max_body_size 1m` en `/api/` y un `location` anidado para los envíos, con el 413 en JSON. Antes eran 200 MB para todo `/api/`, que encima no alcanzaban para un envío máximo.
   - Si el catálogo pide más documentos, `test_el_tope_de_un_envio_alcanza_para_el_catalogo` falla: sube `MAX_DOCUMENTOS_*` (`solicitud_service.py`) y nginx. `test_nginx_tiene_los_mismos_topes_que_el_backend` compara los dos, y la CI corre `nginx -t` con la imagen de producción.
@@ -548,6 +548,41 @@ Pedido del usuario: otros documentos para técnicos, supernumerarios y superinte
 - **En las celdas de una tabla, `overflow-wrap: break-word`, no `anywhere`:** con `anywhere` la columna se encoge al mínimo y parte palabras normales («KENSINGTO-N»). `anywhere` sigue siendo lo indicado en los bloques de texto libre.
 - **Vitest y la letra de unidad (Windows):** si todas las pruebas fallan con «Cannot read properties of undefined (reading 'config')», la carpeta de trabajo llegó como `c:\…` en minúscula y Vitest cargó dos copias de sí mismo. Se corre desde `C:\…`.
 
+### Cambios del 2026-11-13 (revisiones `e5c2a8f1d376` y `f8b3d1e6a492`)
+Pedido del usuario: a la agencia no mostrarle su rol; el Cambio de Puerto dentro de «Nueva solicitud» y no como trámite aparte; y el Formulario No. 3 obligatorio en todos los trámites. Decisiones del usuario: con cambio de puerto finaliza el puesto nuevo y el primero solo consulta; el «Sí» no pide documentos extra; la pregunta va en todos los trámites; el Form. 3 se pide para cualquier rango y convive con la Lista de Tripulantes.
+- **Cabecera de la agencia:** su nombre y su agencia, sin el rol (`MenuCabecera`). El personal del SNM sigue viendo su rol.
+- **Cambio de puerto** (`solicitudes.puesto_destino_id` / `puesto_destino_nombre`, foto como `puesto_nombre`; nulo = sin cambio):
+  - En «Datos del trámite» de Embarque y Desembarque (`tipos_tramite.permite_cambio_puerto`, segundo lote): «¿Cambio de puerto?» (No por defecto) y, con «Sí», «Nuevo puesto de control» con los puestos activos **del mismo sector** que el elegido, sin él (`puestosParaCambio`, `validacionFormulario.ts`). `/catalogos/puestos` trae el `sector_id` de cada puesto, sin el nombre.
+  - Va al final de «Datos del trámite», en su recuadro, con el nuevo puesto al lado de la pregunta (pedido del usuario). En los demás trámites no se ofrece, y un nuevo puesto que llegue igual se descarta.
+  - El backend lo vuelve a validar (`_validar_cambio_de_puerto`): activo, distinto y del mismo sector. Si el nuevo puerto es del otro sector, va una solicitud nueva y esta vence sola. **El mensaje no nombra los sectores**: lo lee la agencia.
+  - El sector, y con él UCVMM, sale siempre de `puesto_control_id`.
+  - **El puesto que finaliza es el nuevo** (`Solicitud.puesto_autorizado_id` / `_nombre`, y `puesto_autorizado()` en SQL): su bandeja, su campana (`FiltrosBandeja.puestos_autorizados`), el correo de aprobación, `_es_del_puerto` y `finalizar`. El primero la ve (`_la_ve_como_puesto` en `puede_ver`, y la consulta histórica) pero no la finaliza: el 403 dice quién la finaliza.
+  - El filtro «Puesto» de la consulta histórica encuentra los dos; las estadísticas por puesto cuentan el autorizado.
+  - Se ve como «Balboa → Rodman» (`textoPuestos`, `presentacion.ts`) en las tarjetas, la consulta y su Excel, y como «Cambio de puerto a» en el expediente, el PDF, la verificación del QR y el correo.
+  - El trámite F3-CAMBIO-PUERTO queda **desactivado, no borrado**: las solicitudes que lo usan lo conservan, y una devuelta se corrige igual (`corregir` no exige trámite activo; `/tramites/{codigo}` trae los inactivos).
+  - Lo prueban `tests/test_cambio_de_puerto.py` y el E2E `formulario.spec.ts` (el desplegable), con dos puestos más sembrados en `servidor_e2e.py`.
+- **Formulario No. 3 en todos los trámites** (DOC-FORMULARIO-3): uno por solicitud, con todos los pasajeros y para cualquier rango, primero entre los documentos de la solicitud. Es la quinta excepción del catálogo (ver «Reglas»).
+  - Las solicitudes ya enviadas conservan su foto del checklist; una devuelta lo pide al corregirse.
+  - `MAX_DOCUMENTOS_DE_LA_SOLICITUD` pasa a 2 y el tope de un envío a 285 MB (`TOPE_CUERPO_ENVIO_MB` y nginx).
+  - En las pruebas, `enviar` (`tests/ayudas.py`) lo agrega solo al crear (`formulario_3=False` para probar que falta).
+- **Rango «Pasajero»** (`pasajero`, segundo lote): un Marino sin libreta. En cada trámite se le piden los documentos del Marino (las filas de `tramite_documentos` cuyo `rangos` incluye `marino` llevan también `pasajero`) salvo la Libreta (`requiere_libreta`, solo `RANGOS_CON_LIBRETA`). Se elige en todos los trámites salvo el de Técnico. La restricción `ck_solicitud_tripulantes_rango` lo admite.
+  - **Embarque y Desembarque admiten solo Marino, Pasajero y Militar** (`rangos_permitidos`): los técnicos, supernumerarios y superintendentes van por el trámite de Técnico, y el militar sigue con Generales y boleto (decisión del usuario, a sugerencia: un militar a bordo no es un pasajero).
+  - Las filas de los técnicos en esos dos trámites (Carta, Contrato y boleto opcional, del 2026-11-11) quedan sin uso, no se borran: las solicitudes que las tienen en su foto del checklist se siguen viendo igual. El boleto opcional ya no se alcanza desde la pantalla; la lógica de lo opcional sigue y la prueban el espejo y pytest.
+  - Lo prueban `test_documento_ucvmm.py` (el Pasajero en cada trámite, los técnicos rechazados en Embarque y Desembarque), su caso en `espejo/checklist.json` y el E2E `formulario.spec.ts`.
+- **Datos del trámite:** la fecha de la operación va antes que el puesto de control (pedido del usuario).
+- **Pasaporte con 3 meses de vigencia** (pedido del usuario): tiene que vencer al menos 3 meses después de la operación, en todos los trámites y rangos.
+  - Se cuenta desde la operación (o desde hoy, si fuera anterior), no desde el día de la solicitud: la operación puede ir hasta 365 días adelante.
+  - Meses de calendario, con el borde dentro (operación el 13/11 → vence el 13/02 o después). Si el día no existe, el último del mes (30/11 → 28/02).
+  - `MESES_VIGENCIA_PASAPORTE` y `vigencia_minima_pasaporte` (`models/solicitud.py`), espejados en `validacionFormulario.ts` (con `estadoPasaporte`).
+  - **El seamanbook vencido ya no bloquea** (decisión del usuario): la tarjeta del pasajero lo avisa («puedes enviar igual») y el expediente lo señala. El motivo sugerido al devolver (`ModalDecision`) ya no lo nombra.
+  - Lo ya enviado no cambia. Las alertas del expediente (`pasaporte_vigencia_corta`, nuevo en la salida del pasajero) y de las bandejas (`alertas_de`, con `make_interval` en SQL) cuentan también el pasaporte con menos de 3 meses. Si cambias una, cambia la otra: `test_la_bandeja_cuenta_las_alertas_como_el_expediente` y `test_postgresql_suma_los_meses_como_python`.
+  - Lo prueban los casos de `espejo/tripulantes.json`, `test_pasaporte_con_tres_meses_de_vigencia` y `test_seamanbook_vencido_no_impide_enviar` (`test_documento_ucvmm.py`), `test_reglas.py` y el E2E `formulario.spec.ts`.
+- **Países con buscador** (bandera, país de nacimiento y nacionalidad; pedido del usuario): `SelectorBuscable` (`components/`), propio y sin librería (CSP), con el patrón «combobox» de la WAI-ARIA.
+  - Busca sin distinguir mayúsculas ni tildes, también por el código («PAN»). Lo que empieza por lo escrito va primero (`filtrarOpciones`, `utils/busqueda.ts`, con sus pruebas).
+  - Flechas, Enter o Tab para elegir, Escape para cerrar sin cambiar. Al salir con el mouse sin elegir, vale lo escrito solo si no hay duda (`opcionEscrita`).
+  - La lista se pinta solo abierta: antes eran 2 × ~250 `<option>` por pasajero. Se abre hacia arriba si no cabe debajo.
+  - En el E2E se busca por rol (`getByRole("combobox", { name })`): `getByLabel` encuentra también la lista, que lleva el mismo rótulo. Para elegir, `elegirPais` (`e2e/datos.ts`).
+
 ### Lo que sigue pendiente (no urgente)
 1. **HTTPS y TLS con el AD** — la configuración está lista (README → "Producción"); falta el certificado del servidor y el del controlador de dominio (infraestructura).
 2. **JWT en cookie httpOnly** — actualmente en localStorage, con la CSP como barrera (regla 15). Plan en README → "Decisiones documentadas".
@@ -576,8 +611,9 @@ Pedido del usuario: otros documentos para técnicos, supernumerarios y superinte
     - los permisos se consultan en cada pedido (a veces dos veces);
     - el expediente vuelve a leer el catálogo (trámites, documentos y países) y carga `creada_por` con su rol y su agencia.
     Juntar la verificación del token con la carga del usuario y cachear el catálogo por proceso ahorraría entre 10 y 20 %. Correr `tests/carga.py` antes y después.
-17. **Documentación de la DTI, juego 0.7:** `docs/` no tiene todavía la identidad «pase oficial» ni los cambios del 2026-11-11 (documentos de los técnicos, nombre neutro para la agencia, costo fuera del horario y consulta histórica).
+17. **Documentación de la DTI, juego 0.7:** `docs/` no tiene todavía la identidad «pase oficial» ni los cambios del 2026-11-11 (documentos de los técnicos, nombre neutro para la agencia, costo fuera del horario y consulta histórica) y del 2026-11-13 (cambio de puerto, Formulario No. 3 en todos los trámites, cabecera de la agencia).
 18. **Validar con UCVMM, del 2026-11-11:** cómo y dónde paga la agencia el costo migratorio (el sistema solo lo avisa: no dice dónde se paga ni registra el pago), y si el Contrato de Trabajo debe cumplir alguna condición (hoy se pide sin ninguna).
+19. **Del 2026-11-13, para decidir o validar:** si el Formulario No. 3 va firmado y sellado (lo diría la descripción del documento); generarlo prellenado con los datos del formulario, para imprimir, firmar y subir; un «Desistir» para que la agencia cierre una solicitud que ya no usará (hoy queda aprobada hasta que vence); y, con UCVMM, que los 3 meses de vigencia del pasaporte apliquen también a la gente de mar.
 
 ### Flujo actual: Autorizaciones Marítimas (UCVMM)
 
@@ -595,7 +631,7 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
   - Aprueba, devuelve a corrección o deniega (el estado se muestra como "Denegada"; en la BD y la API sigue siendo `denied` / `/negar`).
 - **Puesto de Control** (`T-FINALIZAR-PUERTO` + asignación en `usuarios_puestos`) — ve las aprobadas de sus puestos, verifica los impedimentos en SIMPLUS (obligatoria desde el 2026-11-06, aparte de la de UCVMM) y las finaliza con comentario obligatorio.
   - El comentario sin finalizar (`POST /solicitudes/{id}/comentarios`) se retiró el 2026-10-20: no tenía pantalla. Los eventos `comentario` de antes se siguen mostrando, solo al SNM.
-  - Finaliza siempre en el puesto autorizado (reunión del 2026-10-30; antes podía indicar otro). Si la operación se hace en otro puesto, no se finaliza: vence sola y la agencia presenta una nueva solicitud. Las finalizadas en otro puesto antes del cambio se siguen mostrando así en el expediente, el PDF y la verificación pública.
+  - Finaliza siempre en el puesto autorizado (reunión del 2026-10-30; antes podía indicar otro). Con cambio de puerto (2026-11-13), el autorizado es el nuevo; el primero solo la consulta. Si la operación se hace en otro puesto, no se finaliza: vence sola y la agencia presenta una nueva solicitud. Las finalizadas en otro puesto antes del cambio se siguen mostrando así en el expediente, el PDF y la verificación pública.
   - El rol se siembra con `es_sistema = false` (el admin puede renombrarlo o borrarlo).
 - **Supervisor de sector** (`T-SUPERVISAR-SECTOR` + `usuarios_sectores`) y **Supervisor general** (`T-SUPERVISAR-TODO`; UCVMM en Tocumen) — solo lectura (2026-11-10): la bandeja «Supervisión» (`GET /solicitudes/supervision`), los expedientes con sus documentos (cada apertura queda en la bitácora), el PDF de la autorización (copia interna) y las estadísticas de su alcance, con exportación. Ningún botón de decisión (`acciones` todo en falso) y sin campana. El de sector ve las de sus sectores; el general, las de los dos, y el uso del sistema.
 - **Administrador** — acceso total (decisión del usuario del 2026-10-20): bandejas y expedientes (atajo a todos los `T-*`), catálogo de trámites, agencias/puestos/sectores/nacionalidades (`/admin/catalogos`), estadísticas, bitácora y también usuarios y roles (`/admin`, `/admin/roles`). Antes solo listaba usuarios y roles. No necesita sector: ve los dos.
@@ -615,7 +651,10 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
   - Antes de `7e3f1a9c2d64` se evaluaba en vivo, y el cambio de `b9e4d17a3c52` (Carta y Reporte "por tripulante") marcó como faltantes documentos que sí estaban.
 - `solicitud_documentos.documento_id` nulo = documento adicional (fuera del checklist; máx. 20 por solicitud).
 - Asignar un usuario a una agencia o a un puesto no le da acceso sin el permiso de su rol: la API exige las dos cosas (`ContextoAcceso`). Por eso la pantalla de catálogos ofrece «Mostrar todos los usuarios» a propósito.
-- `valida_vigencia` está activa en **todos** los trámites: un pasaporte o seamanbook que vence antes del día de la operación no deja enviar. Los rangos distintos de "marino" no portan seamanbook.
+- `valida_vigencia` está activa en **todos** los trámites. Desde el 2026-11-13:
+  - el pasaporte tiene que vencer al menos 3 meses después de la operación (`vigencia_minima_pasaporte`), si no, no deja enviar;
+  - el seamanbook vencido ya no bloquea: se avisa en el formulario y se señala en el expediente.
+  - Antes, los dos bastaba con que vencieran después del día de la operación. Los rangos distintos de "marino" no portan seamanbook.
 - Fechas (`ServicioTramite.validar_tripulantes` y `_validar_formulario`, espejadas en `validacionFormulario.ts`):
   - La operación va de hoy a `DIAS_MAXIMOS_ANTICIPACION` (365).
   - Tripulantes con 18 años cumplidos y nacidos desde 1900.
@@ -630,11 +669,12 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
   - Qué documentos: el recuadro del trámite en el **Formulario No. 3 oficial**. Por eso Desembarque lleva Generales de pasaporte, aunque el documento de proceso no la liste.
   - Por tripulante o por solicitud: cada proceso dice "para cada tripulante…". La única excepción escrita es la Lista de Tripulantes, que "debe subirse al trámite" (pág. 9). Por eso la Carta de responsabilidad y el Reporte médico van por tripulante.
   - Flujo y requisitos del sistema: págs. 9–10 del documento de proceso.
-  - **Cuatro excepciones decididas por el usuario** sobre la lectura literal:
-    - La vigencia se valida en los 8 trámites, no solo en los 3 que la mencionan (2026-10-14).
+  - **Cinco excepciones decididas por el usuario** sobre la lectura literal:
+    - La vigencia se valida en todos los trámites, no solo en los 3 que la mencionan (2026-10-14). Desde el 2026-11-13, el pasaporte con al menos 3 meses a partir de la operación, y el seamanbook vencido solo se señala.
     - La libreta de Embarque se pide a todo Marino (`siempre`), no solo a los panameños. La condición `solo_panamenos` queda en el enum sin uso (2026-10-14).
     - A los rangos distintos de Marino solo se les piden las Generales de pasaporte y el boleto aéreo, en todos los trámites (reunión del 2026-10-30, `tramite_documentos.rangos`), salvo lo de la cuarta.
     - A los técnicos, supernumerarios y superintendentes, en Desembarque: Carta de Responsabilidad, Generales de pasaporte, Contrato de Trabajo y, opcional, el boleto aéreo. En Embarque, lo mismo sin el boleto (2026-11-11, `tramite_documentos.rangos_opcional`). El militar sigue con Generales y boleto.
+    - El Formulario No. 3 en todos los trámites, uno por solicitud y para cualquier rango; el Cambio de Puerto deja de ser un trámite: se indica en Embarque y Desembarque, con el nuevo puesto del mismo sector; y el rango Pasajero presenta lo del Marino sin la Libreta, con Embarque y Desembarque solo para Marino, Pasajero y Militar (2026-11-13).
 - Nacionalidad restringida (`paises.nacionalidad_restringida`):
   - El Form. No. 6 se adjunta **solo en Desembarque** ("cuando aplique", como en el Form. 3).
   - `tipos_tramite.aviso_custodia` marca los trámites cuyo proceso dice que, al aprobar, se avisa a la agencia que debe realizar el trámite de solicitud de custodia: Desembarque, Urgencias, Renovación y Shore Pass.

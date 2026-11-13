@@ -5,6 +5,7 @@ import { useNotificacion, type SelloSolicitud } from "../../components/Notificac
 import { useAtraparFoco } from "../../hooks/useAtraparFoco";
 import { mensajeDeError } from "../../utils/errores";
 import { formatearFecha, formatearFechaHora } from "./presentacion";
+import { MESES_VIGENCIA_PASAPORTE } from "./validacionFormulario";
 import styles from "./DetalleSolicitud.module.css";
 
 export type Decision = "aprobar" | "devolver" | "negar";
@@ -48,16 +49,20 @@ function mensaje(decision: Decision, conImpedimento: string[]): string {
     : "La solicitud quedará denegada de forma definitiva y se avisará a la agencia.";
 }
 
-/** Motivo sugerido al devolver: qué tripulantes tienen documentación vencida
- *  a la fecha de la operación (el documento de UCVMM pide informarlo). */
+/** Motivo sugerido al devolver: qué pasajeros tienen el pasaporte vencido o con menos
+ *  de 3 meses de vigencia a la fecha de la operación (el documento de UCVMM pide
+ *  informarlo). El seamanbook vencido no va: desde el 2026-11-13 no impide enviar. */
 function motivoPorVencimientos(s: SolicitudDetalle): string {
   const lineas = s.tripulantes.flatMap((t) => [
     ...(t.pasaporte_vencido ? [`- ${t.nombre_completo}: el pasaporte vence el ${formatearFecha(t.pasaporte_expira)}.`] : []),
-    ...(t.libreta_vencida ? [`- ${t.nombre_completo}: el seamanbook vence el ${formatearFecha(t.libreta_expira)}.`] : []),
+    ...(t.pasaporte_vigencia_corta
+      ? [`- ${t.nombre_completo}: el pasaporte vence el ${formatearFecha(t.pasaporte_expira)}, `
+        + `con menos de ${MESES_VIGENCIA_PASAPORTE} meses de vigencia.`]
+      : []),
   ]);
   if (!lineas.length) return "";
   return [
-    "Documentación vencida a la fecha de la operación:",
+    `Pasaportes vencidos o con menos de ${MESES_VIGENCIA_PASAPORTE} meses de vigencia a partir de la operación:`,
     ...lineas,
     "Adjunta la documentación vigente o retira a esos pasajeros de la solicitud.",
   ].join("\n");

@@ -4,15 +4,15 @@ vencimientos, estadísticas y las novedades de las notificaciones internas."""
 from dataclasses import dataclass
 from datetime import date, datetime
 
-from sqlalchemy import Select, Time, and_, case, cast, extract, func, or_, select
+from sqlalchemy import Interval, Select, Time, and_, case, cast, extract, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.horario import FIN_LABORAL, INICIO_LABORAL, entre_fechas_panama
 from app.domain.models.catalogo import AgenciaNaviera, PuestoControl
 from app.domain.models.solicitud import (
-    RANGOS_CON_LIBRETA, CasillaSolicitud, DocumentoSolicitud, EstadoSolicitud, EventoSolicitud, Solicitud,
-    TipoEventoSolicitud, TripulanteSolicitud,
+    MESES_VIGENCIA_PASAPORTE, RANGOS_CON_LIBRETA, CasillaSolicitud, DocumentoSolicitud, EstadoSolicitud,
+    EventoSolicitud, Solicitud, TipoEventoSolicitud, TripulanteSolicitud,
 )
 from app.domain.models.tramite import TipoTramite
 
@@ -24,14 +24,25 @@ class AlcanceSnm:
     """Lo que ve el personal del SNM fuera de sus bandejas (la consulta histórica,
     2026-11-11): lo mismo que ServicioSolicitud.puede_ver, sin la vía de la agencia."""
     puestos:           frozenset[int] = frozenset()   # todas sus solicitudes (UCVMM, supervisión de sector)
-    puestos_aprobadas: frozenset[int] = frozenset()   # desde que se aprueban (puesto de control)
+    # Desde que se aprueban (puesto de control), como primer puesto o como el nuevo de
+    # un cambio de puerto.
+    puestos_aprobadas: frozenset[int] = frozenset()
+
+
+def puesto_autorizado():
+    """Solicitud.puesto_autorizado_id en SQL: el puesto que la finaliza (con cambio
+    de puerto, el nuevo)."""
+    return func.coalesce(Solicitud.puesto_destino_id, Solicitud.puesto_control_id)
 
 
 @dataclass
 class FiltrosBandeja:
     """Alcance (quién ve qué) + filtros de la bandeja."""
     agencia_id:  int | None = None        # bandeja de la agencia (y filtro de la consulta histórica)
-    puestos_ids: set[int] | None = None   # bandeja del puesto (None = todos)
+    # Por el puesto elegido, que decide el sector (UCVMM y supervisión; None = todos).
+    puestos_ids: set[int] | None = None
+    # Por el puesto que la finaliza (la bandeja y la campana del puesto; None = todos).
+    puestos_autorizados: set[int] | None = None
     solo_aprobadas_alguna_vez: bool = False
     estado:      str | None = None
     texto:       str | None = None
@@ -113,17 +124,22 @@ class RepositorioSolicitud:
         if filtros.puestos_ids is not None:
             # Sin puestos asignados no ve nada (IN de una lista vacía no es válido en SQL).
             condiciones.append(Solicitud.puesto_control_id.in_(sorted(filtros.puestos_ids) or [-1]))
+        if filtros.puestos_autorizados is not None:
+            condiciones.append(puesto_autorizado().in_(sorted(filtros.puestos_autorizados) or [-1]))
         if filtros.solo_aprobadas_alguna_vez:
             condiciones.append(Solicitud.aprobada_en.isnot(None))
         if filtros.alcance_snm is not None:
             alcance = filtros.alcance_snm
+            aprobadas = sorted(alcance.puestos_aprobadas) or [-1]
             condiciones.append(or_(
                 Solicitud.puesto_control_id.in_(sorted(alcance.puestos) or [-1]),
-                and_(Solicitud.puesto_control_id.in_(sorted(alcance.puestos_aprobadas) or [-1]),
+                and_(or_(Solicitud.puesto_control_id.in_(aprobadas), Solicitud.puesto_destino_id.in_(aprobadas)),
                      Solicitud.aprobada_en.isnot(None)),
             ))
         if filtros.puesto_id is not None:
-            condiciones.append(Solicitud.puesto_control_id == filtros.puesto_id)
+            # El elegido o el nuevo de un cambio de puerto.
+            condiciones.append(or_(Solicitud.puesto_control_id == filtros.puesto_id,
+                                   Solicitud.puesto_destino_id == filtros.puesto_id))
         if filtros.tipo_tramite_id is not None:
             condiciones.append(Solicitud.tipo_tramite_id == filtros.tipo_tramite_id)
         if filtros.pasajero:
@@ -143,7 +159,7 @@ class RepositorioSolicitud:
             condiciones.append(or_(*(
                 columna.icontains(texto, autoescape=True)
                 for columna in (Solicitud.numero, Solicitud.titulo, Solicitud.nombre_buque, Solicitud.imo,
-                                Solicitud.agencia_nombre, Solicitud.puesto_nombre)
+                                Solicitud.agencia_nombre, Solicitud.puesto_nombre, Solicitud.puesto_destino_nombre)
             )))
         if filtros.fecha_por == "operacion":   # la fecha de la operación ya es un día de Panamá
             if filtros.desde:
@@ -222,16 +238,19 @@ class RepositorioSolicitud:
         return total, list((await self.sesion.execute(consulta)).scalars().all())
 
     async def alertas_de(self, ids: list[int]) -> dict[int, tuple[int, bool]]:
-        """Por solicitud: cuántos tripulantes tienen el pasaporte o el seamanbook
-        vencido a la fecha de la operación y si alguno es de nacionalidad
-        restringida. Lo calcula la BD en una consulta: antes cada página de una
-        bandeja traía a todos sus tripulantes (hasta 100 × 30) solo para contarlos.
-        La regla es la de ServicioSolicitud._vencimientos_tripulante."""
+        """Por solicitud: cuántos tripulantes tienen el seamanbook vencido a la fecha
+        de la operación o el pasaporte con menos de 3 meses de vigencia desde ese
+        día (o vencido), y si alguno es de nacionalidad restringida. Lo calcula la
+        BD en una consulta: antes cada página de una bandeja traía a todos sus
+        tripulantes (hasta 100 × 30) solo para contarlos. La regla es la de
+        ServicioSolicitud._vencimientos_tripulante; la fecha + 3 meses de
+        PostgreSQL da lo mismo que vigencia_minima_pasaporte (30/11 → 28/02)."""
         if not ids:
             return {}
         t = TripulanteSolicitud
+        minimo_pasaporte = Solicitud.fecha_operacion + func.make_interval(0, MESES_VIGENCIA_PASAPORTE, type_=Interval)
         vencido = or_(
-            t.pasaporte_expira < Solicitud.fecha_operacion,
+            t.pasaporte_expira < minimo_pasaporte,
             and_(t.rango.in_(sorted(RANGOS_CON_LIBRETA)), t.libreta_expira.isnot(None),
                  t.libreta_expira < Solicitud.fecha_operacion),
         )
@@ -410,6 +429,8 @@ class RepositorioSolicitud:
     async def contar_por_puesto(
         self, desde: date | None, hasta: date | None, puestos_ids: set[int] | None = None,
     ) -> list:
+        """Por el puesto donde vale la autorización (con cambio de puerto, el nuevo,
+        que es el que la finaliza o la deja vencer)."""
         consulta = (
             select(
                 PuestoControl.nombre,
@@ -417,7 +438,7 @@ class RepositorioSolicitud:
                 func.count(Solicitud.finalizada_en).label("finalizadas"),
                 func.count(case((Solicitud.aprobada_en.isnot(None), Solicitud.expirada_en))).label("expiradas"),
             )
-            .join(PuestoControl, PuestoControl.id == Solicitud.puesto_control_id)
+            .join(PuestoControl, PuestoControl.id == puesto_autorizado())
             .where(*self._filtro_fechas(desde, hasta, puestos_ids))
             .group_by(PuestoControl.nombre)
             .order_by(func.count(Solicitud.aprobada_en).desc(), PuestoControl.nombre)
@@ -488,7 +509,8 @@ class RepositorioSolicitud:
         consulta = (
             select(
                 Solicitud.id, Solicitud.numero, TipoTramite.nombre.label("tipo_tramite"),
-                Solicitud.puesto_nombre.label("puesto"), Solicitud.aprobada_en,
+                func.coalesce(Solicitud.puesto_destino_nombre, Solicitud.puesto_nombre).label("puesto"),
+                Solicitud.aprobada_en,
                 aprobada_por.label("aprobada_por"),
             )
             .join(TipoTramite, TipoTramite.id == Solicitud.tipo_tramite_id)

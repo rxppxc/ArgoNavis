@@ -84,7 +84,7 @@ REGLAS = {
     "pasaporte_antes_de_nacer": "vencimiento del pasaporte debe ser posterior",
     "seamanbook_antes_de_nacer": "vencimiento del seamanbook debe ser posterior",
     "pasaporte_vencido": "el pasaporte vence el",
-    "seamanbook_vencido": "el seamanbook vence el",
+    "pasaporte_vigencia_corta": "meses de vigencia",   # 2026-11-13; el seamanbook vencido ya no bloquea
     "rango_no_permitido": "el rango debe ser",
     "marino_sin_seamanbook": "requiere el número de seamanbook",
     "pasaporte_repetido": "ya está en el pasajero",
@@ -124,7 +124,7 @@ def _constante_ts(archivo: str, nombre: str):
 def test_constantes_iguales_en_el_frontend():
     from app.core import horario
     from app.core.config import Configuracion
-    from app.domain.models.solicitud import RANGOS_CON_LIBRETA
+    from app.domain.models.solicitud import MESES_VIGENCIA_PASAPORTE, RANGOS_CON_LIBRETA
     from app.domain.schemas import user
     from app.domain.services import solicitud_service, tramite_service
     from app.infrastructure import almacenamiento
@@ -144,6 +144,8 @@ def test_constantes_iguales_en_el_frontend():
     assert _constante_ts("modulos/solicitudes/validacionFormulario.ts", "MAX_TRIPULANTES") \
         == solicitud_service.MAX_TRIPULANTES
     assert set(_constante_ts("modulos/solicitudes/presentacion.ts", "RANGOS_CON_LIBRETA")) == RANGOS_CON_LIBRETA
+    assert _constante_ts("modulos/solicitudes/validacionFormulario.ts", "MESES_VIGENCIA_PASAPORTE") \
+        == MESES_VIGENCIA_PASAPORTE
     # El mapa de horas de las estadísticas marca el horario laboral por horas enteras.
     assert horario.INICIO_LABORAL.minute == horario.FIN_LABORAL.minute == 0
     assert _constante_ts("modulos/administracion/estadisticas/calculos.ts", "HORA_INICIO_LABORAL") \

@@ -4,7 +4,8 @@ import type { RangoMarino, TripulanteEntrada } from "../../api/solicitudes";
 import { tramiteDePrueba } from "../../pruebas/datos";
 import { leerEspejo, type Caso } from "../../pruebas/espejo";
 import {
-  CABECERA_VACIA, MAX_TRIPULANTES, fechaReferencia, nacimientoMaximo, operacionMaxima, validarFormulario,
+  CABECERA_VACIA, MAX_TRIPULANTES, estadoPasaporte, fechaReferencia, nacimientoMaximo, operacionMaxima,
+  puestosParaCambio, validarFormulario, vigenciaMinimaPasaporte,
   type CabeceraFormulario, type FichaTripulante,
 } from "./validacionFormulario";
 
@@ -31,7 +32,7 @@ const REGLAS: Record<string, string> = {
   pasaporte_antes_de_nacer: "vencimiento del pasaporte debe ser posterior",
   seamanbook_antes_de_nacer: "vencimiento del seamanbook debe ser posterior",
   pasaporte_vencido: "el pasaporte vence el",
-  seamanbook_vencido: "el seamanbook vence el",
+  pasaporte_vigencia_corta: "meses de vigencia",   // 2026-11-13; el seamanbook vencido ya no bloquea
   rango_no_permitido: "el rango debe ser",
   marino_sin_seamanbook: "falta N° de seamanbook",
   pasaporte_repetido: "ya está registrado en el pasajero",
@@ -110,5 +111,51 @@ describe("fechas límite", () => {
     expect(fechaReferencia("2026-11-01", "2026-10-14")).toBe("2026-11-01");
     expect(fechaReferencia("2026-10-01", "2026-10-14")).toBe("2026-10-14");
     expect(fechaReferencia("", "2026-10-14")).toBe("2026-10-14");
+  });
+
+  // Los mismos bordes que test_vigencia_minima_del_pasaporte (test_reglas.py).
+  it("el pasaporte vence al menos 3 meses después de la operación, con el último día del mes", () => {
+    expect(vigenciaMinimaPasaporte("2026-11-13")).toBe("2027-02-13");
+    expect(vigenciaMinimaPasaporte("2026-11-30")).toBe("2027-02-28");
+    expect(vigenciaMinimaPasaporte("2027-11-29")).toBe("2028-02-29");
+    expect(vigenciaMinimaPasaporte("2026-10-31")).toBe("2027-01-31");
+    expect(vigenciaMinimaPasaporte("2026-12-31")).toBe("2027-03-31");
+  });
+
+  it("vencido, con menos de 3 meses o bien", () => {
+    expect(estadoPasaporte("2026-11-12", "2026-11-13")).toBe("vencido");
+    expect(estadoPasaporte("2027-01-13", "2026-11-13")).toBe("corto");
+    expect(estadoPasaporte("2027-02-12", "2026-11-13")).toBe("corto");
+    expect(estadoPasaporte("2027-02-13", "2026-11-13")).toBe("bien");
+    expect(estadoPasaporte("", "2026-11-13")).toBe("bien");   // sin fecha: lo dice «falta»
+  });
+});
+
+describe("cambio de puerto (2026-11-13)", () => {
+  const puestos = [
+    { id: 1, nombre: "Balboa", sector_id: 10 },
+    { id: 2, nombre: "Rodman", sector_id: 10 },
+    { id: 3, nombre: "Cristóbal", sector_id: 20 },
+    { id: 4, nombre: "Vacamonte", sector_id: 10 },
+  ];
+
+  it("solo los puestos del mismo sector, sin el elegido", () => {
+    expect(puestosParaCambio(puestos, "1").map((p) => p.nombre)).toEqual(["Rodman", "Vacamonte"]);
+    expect(puestosParaCambio(puestos, "3")).toEqual([]);
+    expect(puestosParaCambio(puestos, "")).toEqual([]);
+  });
+
+  it("con «Sí» hay que elegir el nuevo puesto", () => {
+    const hoy = "2026-10-14";
+    const cabecera: CabeceraFormulario = {
+      ...CABECERA_VACIA, puesto_control_id: "1", fecha_operacion: "2026-10-20", cambio_puerto: "si",
+    };
+    const conCambio = tramiteDePrueba({ permite_cambio_puerto: true });
+    expect(validarFormulario(conCambio, cabecera, [ficha()], paises, hoy))
+      .toEqual(["Elige el nuevo puesto de control del cambio de puerto."]);
+    expect(validarFormulario(conCambio, { ...cabecera, puesto_destino_id: "2" }, [ficha()], paises, hoy))
+      .toEqual([]);
+    // Un trámite sin cambio de puerto no lo pide aunque haya quedado «Sí» de otro trámite.
+    expect(validarFormulario(tramiteDePrueba(), cabecera, [ficha()], paises, hoy)).toEqual([]);
   });
 });

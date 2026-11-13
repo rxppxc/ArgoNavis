@@ -1,7 +1,8 @@
 import { clienteApi, guardarComoArchivo } from "./client";
 
 export type EstadoSolicitud = "review" | "returned" | "approved" | "denied" | "finalized" | "expired";
-export type RangoMarino = "marino" | "militar" | "tecnico" | "supernumerario" | "superintendente";
+/** «pasajero» (2026-11-13): un Marino sin libreta. */
+export type RangoMarino = "marino" | "pasajero" | "militar" | "tecnico" | "supernumerario" | "superintendente";
 export type Sexo = "M" | "F" | "X";
 /** «supervision»: solo lectura, las de sus sectores o las de los dos (2026-11-10). */
 export type Bandeja = "agencia" | "revision" | "puerto" | "supervision";
@@ -32,6 +33,8 @@ export interface AsignacionArchivo {
 
 export interface DatosFormularioSolicitud {
   puesto_control_id: number | null;
+  /** Cambio de puerto (2026-11-13): el nuevo puesto, del mismo sector. null = sin cambio. */
+  puesto_destino_id: number | null;
   fecha_operacion: string | null;
   nombre_buque: string | null;
   imo: string | null;
@@ -63,6 +66,8 @@ export interface SolicitudResumen {
   agencia_id: number;
   agencia_nombre: string;
   puesto_nombre: string;
+  /** Cambio de puerto (2026-11-13): el nuevo puesto, donde vale y se finaliza. */
+  puesto_destino_nombre: string | null;
   /** El sector de UCVMM del puesto (2026-11-10). Solo para el SNM: a la agencia le llega null. */
   sector_nombre: string | null;
   nombre_buque: string | null;
@@ -161,6 +166,9 @@ export interface TripulanteSolicitud {
   porta_libreta: boolean;
   orden: number;
   pasaporte_vencido: boolean;
+  /** Vigente el día de la operación, pero vence antes de 3 meses (2026-11-13). */
+  pasaporte_vigencia_corta: boolean;
+  /** El seamanbook vencido no impide enviar (2026-11-13): solo se señala. */
   libreta_vencida: boolean;
 }
 
@@ -221,6 +229,7 @@ export interface SolicitudDetalle extends SolicitudResumen {
   requiere_clinica: boolean;
   valida_vigencia: boolean;
   puesto_control_id: number;
+  puesto_destino_id: number | null;
   bandera: string | null;
   bandera_nombre: string | null;
   nombre_puerto: string | null;
@@ -268,6 +277,7 @@ export interface VerificacionAutorizacion {
   imo: string | null;
   bandera: string | null;
   puesto_nombre: string | null;
+  puesto_destino_nombre: string | null;
   fecha_operacion: string | null;
   aprobada_en: string | null;
   vigente_hasta: string | null;

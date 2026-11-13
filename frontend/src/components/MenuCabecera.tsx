@@ -22,9 +22,13 @@ export function MenuCabecera() {
     && (tiene("T-PROCESAR-PACIFICO") || tiene("T-SUPERVISAR-SECTOR") || tiene("T-SUPERVISAR-TODO"));
   // La consulta histórica (2026-11-11): el personal del SNM; el admin la tiene en su bloque.
   const veHistorico = !esAdmin && tieneAlguno(...PERMISOS_PERSONAL_SNM);
-  // Quién está en la sesión y con qué rol: se ve junto al menú (escritorio) y arriba del panel.
+  // Quién está en la sesión: se ve junto al menú (escritorio) y arriba del panel. Al
+  // personal del SNM, con su rol; a la agencia, solo su nombre y su agencia (2026-11-13).
   const nombre = usuario?.full_name?.trim() || usuario?.username || "";
-  const detalle = [usuario?.rol_personalizado?.nombre, usuario?.agencia?.nombre].filter(Boolean).join(" · ");
+  const esDeAgencia = !!usuario?.agencia && !esAdmin && !esSysAdmin && !tieneAlguno(...PERMISOS_PERSONAL_SNM);
+  const detalle = esDeAgencia
+    ? usuario?.agencia?.nombre ?? ""
+    : [usuario?.rol_personalizado?.nombre, usuario?.agencia?.nombre].filter(Boolean).join(" · ");
 
   useEffect(() => {
     if (!abierto) return;

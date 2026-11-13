@@ -66,7 +66,21 @@ def cabecera(codigo: str | None, puesto_id: int, **extra) -> dict:
     return datos
 
 
-async def enviar(cliente, actor: Actor, datos: dict, archivos: list, metodo: str = "POST", ruta: str = "/solicitudes"):
+FORMULARIO_3 = "DOC-FORMULARIO-3"
+
+
+async def enviar(cliente, actor: Actor, datos: dict, archivos: list, metodo: str = "POST", ruta: str = "/solicitudes",
+                 *, formulario_3: bool = True):
+    """Crea (POST) o corrige (PUT) una solicitud. Al crear, si las asignaciones no
+    traen el Formulario No. 3, que todos los trámites piden desde el 2026-11-13, se
+    agrega con su archivo: así cada prueba no tiene que repetirlo. `formulario_3=False`
+    lo deja afuera (para probar que falta). Al corregir no se agrega: el de la
+    solicitud se conserva con `documentos_conservados`."""
+    asignaciones = datos.get("asignaciones")
+    if (formulario_3 and metodo == "POST" and isinstance(asignaciones, list)
+            and not any(isinstance(a, dict) and a.get("documento_codigo") == FORMULARIO_3 for a in asignaciones)):
+        datos = {**datos, "asignaciones": [*asignaciones, {"documento_codigo": FORMULARIO_3}]}
+        archivos = [*archivos, pdf("formulario-3")]
     return await cliente.request(
         metodo, ruta, data={"solicitud": json.dumps(datos)},
         files=[("files", a) for a in archivos] or None, headers=actor.headers,

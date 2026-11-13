@@ -54,6 +54,7 @@ export default function PaginaTramites() {
                 t.requiere_puerto_desembarque && "Puerto de desembarque",
                 t.requiere_clinica && "Clínica u hospital",
                 t.requiere_motivo && "Motivo",
+                t.permite_cambio_puerto && "Cambio de puerto (opcional)",
               ].filter(Boolean) as string[];
 
               return (
@@ -120,7 +121,10 @@ export default function PaginaTramites() {
                       {t.valida_vigencia && (
                         <div className={styles.nota}>
                           <IconoCandado tamano={13} />
-                          <span>Exige pasaporte y seamanbook vigentes a la fecha de la operación.</span>
+                          <span>
+                            Exige pasaporte con al menos 3 meses de vigencia a partir de la operación; el seamanbook
+                            vencido solo se señala.
+                          </span>
                         </div>
                       )}
 

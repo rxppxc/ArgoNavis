@@ -145,9 +145,10 @@ def _solicitud(puesto_id: int) -> tuple[dict, list]:
         "asignaciones": [
             {"documento_codigo": "DOC-VISA-MARINO", "indice_tripulante": 0},
             {"documento_codigo": "DOC-GENERALES-PASAPORTE", "indice_tripulante": 0},
+            {"documento_codigo": "DOC-FORMULARIO-3"},   # en todos los trámites desde el 2026-11-13
         ],
     }
-    return datos, [_pdf("visa"), _pdf("pasaporte")]
+    return datos, [_pdf("visa"), _pdf("pasaporte"), _pdf("formulario-3")]
 
 
 class Medidas:

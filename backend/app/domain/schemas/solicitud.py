@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-RangoMarino = Literal["marino", "militar", "tecnico", "supernumerario", "superintendente"]
+RangoMarino = Literal["marino", "pasajero", "militar", "tecnico", "supernumerario", "superintendente"]
 Sexo        = Literal["M", "F", "X"]
 Estado      = Literal["review", "returned", "approved", "denied", "finalized", "expired"]
 
@@ -75,6 +75,8 @@ class _DatosFormularioSolicitud(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     puesto_control_id: int | None  = None
+    # Cambio de puerto (2026-11-13): el nuevo puesto, del mismo sector. Nulo = sin cambio.
+    puesto_destino_id: int | None  = None
     fecha_operacion:   date | None = None
 
     nombre_buque: str | None = Field(default=None, max_length=255)
@@ -255,6 +257,9 @@ class SalidaTripulante(BaseModel):
 
     # Alertas para la revisión, calculadas a la fecha de la operación
     pasaporte_vencido: bool = False
+    # Vigente ese día, pero vence antes de 3 meses (2026-11-13: no deja enviar).
+    pasaporte_vigencia_corta: bool = False
+    # El seamanbook vencido no impide enviar desde el 2026-11-13: solo se señala.
     libreta_vencida:   bool = False
 
 
@@ -319,6 +324,8 @@ class SalidaSolicitudResumen(BaseModel):
     agencia_id:           int
     agencia_nombre:       str
     puesto_nombre:        str
+    # Cambio de puerto (2026-11-13): el nuevo puesto, que es el que la finaliza.
+    puesto_destino_nombre: str | None = None
     # El sector de UCVMM del puesto (2026-11-10). Solo para el SNM: a la agencia le llega None.
     sector_nombre:        str | None = None
     nombre_buque:         str | None = None
@@ -368,6 +375,7 @@ class SalidaSolicitud(SalidaSolicitudResumen):
     valida_vigencia:             bool = False
 
     puesto_control_id:  int
+    puesto_destino_id:  int | None = None
     bandera:            str | None = None
     bandera_nombre:     str | None = None
     nombre_puerto:      str | None = None
@@ -421,6 +429,7 @@ class SalidaVerificacion(BaseModel):
     imo:             str | None = None
     bandera:         str | None = None
     puesto_nombre:   str | None = None
+    puesto_destino_nombre: str | None = None   # cambio de puerto: donde vale y se finaliza
     fecha_operacion: date | None = None
     aprobada_en:     datetime | None = None
     vigente_hasta:   datetime | None = None

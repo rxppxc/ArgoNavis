@@ -4,7 +4,7 @@ import { IconoExito } from "../../components/Iconos";
 import { useConfirmar } from "../../components/ModalConfirmacion";
 import { useNotificacion } from "../../components/Notificaciones";
 import { mensajeDeError } from "../../utils/errores";
-import { formatearFechaHora, tiempoRestante } from "./presentacion";
+import { formatearFechaHora, puestoAutorizado, tiempoRestante } from "./presentacion";
 import type { VerificacionImpedimentos } from "./useVerificacionImpedimentos";
 import styles from "./DetalleSolicitud.module.css";
 
@@ -40,7 +40,7 @@ export function PanelPuerto({ solicitud, verificacion: v, onActualizada }: Props
     }
     const ok = await confirmar({
       titulo: "Finalizar solicitud",
-      mensaje: `Se registrará la operación con tu comentario como finalizada en ${solicitud.puesto_nombre} `
+      mensaje: `Se registrará la operación con tu comentario como finalizada en ${puestoAutorizado(solicitud)} `
         + "y la autorización quedará cerrada."
         + (v.conImpedimento.length
           ? ` Con impedimento en SIMPLUS: ${v.conImpedimento.join(", ")}. Indica en el comentario qué pasó con ${
@@ -107,8 +107,9 @@ export function PanelPuerto({ solicitud, verificacion: v, onActualizada }: Props
           <div className={styles.pasoCuerpo}>
             <strong className={styles.pasoTitulo}>Finaliza</strong>
             <span className={styles.pasoTexto}>
-              Solo si la operación se hizo en <strong>{solicitud.puesto_nombre}</strong>. Si fue en otro puesto, no la
-              finalices: vence sola y la agencia presenta una nueva solicitud.
+              Solo si la operación se hizo en <strong>{puestoAutorizado(solicitud)}</strong>
+              {solicitud.puesto_destino_nombre && <> (cambio de puerto desde {solicitud.puesto_nombre})</>}. Si fue en
+              otro puesto, no la finalices: vence sola y la agencia presenta una nueva solicitud.
             </span>
           </div>
         </li>

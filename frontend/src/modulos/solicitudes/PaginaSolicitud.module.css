@@ -57,13 +57,14 @@
 
 .campo { display: flex; flex-direction: column; gap: 6px; margin-bottom: 13px; min-width: 0; }
 /* El rótulo de cada campo, en mayúsculas espaciadas como en un formulario impreso.
-   El nombre accesible del campo sigue siendo el texto de siempre (las mayúsculas son de CSS). */
-.campo > span {
+   El nombre accesible del campo sigue siendo el texto de siempre (las mayúsculas son de CSS).
+   En los selectores con buscador (SelectorBuscable) el rótulo es un <label> aparte. */
+.campo > span, .campo > label {
   color: var(--text-2);
   font: 600 .66rem/1.35 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
   letter-spacing: .12em; text-transform: uppercase;
 }
-.campo > span em { color: var(--muted); font-style: normal; font-weight: 500; text-transform: none; letter-spacing: 0; font-family: var(--letra-texto); font-stretch: 100%; }
+.campo > span em, .campo > label em { color: var(--muted); font-style: normal; font-weight: 500; text-transform: none; letter-spacing: 0; font-family: var(--letra-texto); font-stretch: 100%; }
 /* La fecha elegida, en palabras (FechaEnPalabras). */
 .fechaEnPalabras { color: var(--text-2); font-size: .74rem; margin-top: -2px; }
 
@@ -102,6 +103,24 @@
   border-left: 3px solid var(--acc-blue);
   color: var(--text);
   font-size: .82rem; line-height: 1.5;
+}
+
+/* Cambio de puerto (2026-11-13): la pregunta y el nuevo puesto en una fila propia,
+   juntos y recuadrados, con su aviso debajo. En el celular, uno bajo el otro. */
+.cambioPuerto {
+  grid-column: 1 / -1;
+  display: grid; grid-template-columns: minmax(160px, 220px) minmax(0, 1fr); gap: 0 13px;
+  align-items: start;
+  margin-bottom: 13px; padding: 12px 13px 0;
+  border-radius: var(--r-sm);
+  background: var(--overlay);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--acc-blue);
+}
+.cambioPuertoAviso {
+  grid-column: 1 / -1;
+  margin: -2px 0 12px;
+  color: var(--text-2); font-size: .82rem; line-height: 1.5;
 }
 
 /* ─── Tripulantes ─── */
@@ -250,6 +269,7 @@
 @media (max-width: 560px) {
   .marinoGrid { grid-template-columns: 1fr; }
   .sinLibreta { grid-column: auto; }
+  .cambioPuerto { grid-template-columns: 1fr; }
   .casilla { flex-direction: column; align-items: stretch; }
   .casillaAccion { justify-content: space-between; flex-wrap: wrap; }
   .acciones { flex-direction: column; align-items: stretch; }

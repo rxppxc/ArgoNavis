@@ -16,7 +16,9 @@
     creó o que es de su propia agencia (separación de funciones).
   - El puesto de control (T-FINALIZAR-PUERTO + asignación en
     `usuarios_puestos`) ve las aprobadas de sus puestos, verifica los
-    impedimentos (obligatoria para finalizar) y las finaliza.
+    impedimentos (obligatoria para finalizar) y las finaliza. Con cambio de
+    puerto (2026-11-13), las finaliza el puesto nuevo (`puesto_autorizado_id`);
+    el primero solo las consulta.
   - Cada transición bloquea la fila (SELECT ... FOR UPDATE): dos usuarios no
     pueden, por ejemplo, aprobar y negar la misma solicitud a la vez.
   - Cada paso queda en `solicitud_eventos` (historial con usuario y hora).
@@ -43,7 +45,7 @@ from app.core.permisos import (
 from app.domain.models.catalogo import PuestoControl
 from app.domain.models.solicitud import (
     RANGOS_CON_LIBRETA, CasillaSolicitud, DocumentoSolicitud, EstadoSolicitud, EventoSolicitud, Solicitud,
-    TipoEventoSolicitud, TripulanteSolicitud,
+    TipoEventoSolicitud, TripulanteSolicitud, vigencia_minima_pasaporte,
 )
 from app.domain.models.tramite import AlcanceDocumento, TipoTramite, TramiteDocumento
 from app.domain.models.user import Usuario
@@ -79,11 +81,12 @@ MAX_TRIPULANTES            = 30   # por solicitud (reunión del 2026-10-30); esp
 # de la solicitud: es el tope del cuerpo de esas dos rutas (TopeDelCuerpo en main.py y
 # client_max_body_size en frontend/nginx.conf, revisión de recursos del 2026-11-10). Con
 # el catálogo de hoy, a un pasajero se le piden como mucho 4 documentos (Desembarque,
-# Urgencia médica y Renovación) y a la solicitud, 1 (la Lista de Tripulantes):
-# 30 × 4 + 1 + 20 adicionales = 141 archivos de 2 MB, más 1 MB para los datos y los
-# separadores. tests/test_recursos.py falla si el catálogo pide más, o si nginx no coincide.
+# Urgencia médica y Renovación) y a la solicitud, 2 (el Formulario No. 3, desde el
+# 2026-11-13, y la Lista de Tripulantes): 30 × 4 + 2 + 20 adicionales = 142 archivos
+# de 2 MB, más 1 MB para los datos y los separadores. tests/test_recursos.py falla si
+# el catálogo pide más, o si nginx no coincide.
 MAX_DOCUMENTOS_POR_TRIPULANTE  = 4
-MAX_DOCUMENTOS_DE_LA_SOLICITUD = 1
+MAX_DOCUMENTOS_DE_LA_SOLICITUD = 2
 MAX_ARCHIVOS_EN_UN_ENVIO = (MAX_TRIPULANTES * MAX_DOCUMENTOS_POR_TRIPULANTE + MAX_DOCUMENTOS_DE_LA_SOLICITUD
                             + MAX_DOCUMENTOS_ADICIONALES)
 TOPE_CUERPO_ENVIO_MB = MAX_ARCHIVOS_EN_UN_ENVIO * almacenamiento.TAMANO_MAXIMO_MB + 1
@@ -339,7 +342,16 @@ class ServicioSolicitud:
 
     @staticmethod
     def _es_del_puerto(ctx: ContextoAcceso, s: Solicitud) -> bool:
-        return ctx.es_admin or (ctx.es_puerto and s.puesto_control_id in ctx.puestos_ids)
+        """Es del puesto que la finaliza: con cambio de puerto, el nuevo."""
+        return ctx.es_admin or (ctx.es_puerto and s.puesto_autorizado_id in ctx.puestos_ids)
+
+    @staticmethod
+    def _la_ve_como_puesto(ctx: ContextoAcceso, s: Solicitud) -> bool:
+        """El puesto que la finaliza y, con cambio de puerto, también el primero,
+        que solo la consulta (2026-11-13)."""
+        return ctx.es_admin or (ctx.es_puerto and (
+            s.puesto_control_id in ctx.puestos_ids or s.puesto_destino_id in ctx.puestos_ids
+        ))
 
     @staticmethod
     def _tiene_conflicto(ctx: ContextoAcceso, s: Solicitud) -> bool:
@@ -351,12 +363,14 @@ class ServicioSolicitud:
     def puede_ver(self, ctx: ContextoAcceso, s: Solicitud) -> bool:
         """La ven su agencia, el admin y el supervisor general; UCVMM y el
         supervisor de sector, si es de un puesto de sus sectores; el puesto de
-        control, solo las de sus puestos y desde que se aprueban."""
+        control, solo las de sus puestos (con cambio de puerto, los dos) y desde
+        que se aprueban. La consulta histórica aplica lo mismo en SQL
+        (`_alcance_historico`): si cambias uno, cambia el otro."""
         if ctx.ve_todos_los_sectores or ctx.es_de_su_agencia(s):
             return True
         if (ctx.es_revisor or ctx.es_supervisor_sector) and ctx.en_sus_sectores(s):
             return True
-        return s.aprobada_en is not None and self._es_del_puerto(ctx, s)
+        return s.aprobada_en is not None and self._la_ve_como_puesto(ctx, s)
 
     def acciones(self, ctx: ContextoAcceso, s: Solicitud) -> AccionesSolicitud:
         ahora      = ahora_utc()
@@ -466,12 +480,13 @@ class ServicioSolicitud:
         return await self._pagina(ctx, filtros, consulta, "recientes")
 
     async def bandeja_puerto(self, ctx: ContextoAcceso, consulta: ConsultaBandeja) -> PaginaSolicitudes:
-        """Autorizaciones aprobadas de los puestos del usuario (el admin ve
-        todos). Las pendientes de finalizar salen por fecha de operación."""
+        """Autorizaciones aprobadas que finalizan los puestos del usuario (el
+        admin ve todos): con cambio de puerto, en la bandeja del nuevo. Las
+        pendientes de finalizar salen por fecha de operación."""
         if not (ctx.es_admin or ctx.es_puerto):
             raise _error(status.HTTP_403_FORBIDDEN, f"No tienes el permiso requerido: {PERMISO_PUERTO}.")
         filtros = self._filtros(
-            consulta, puestos_ids=None if ctx.es_admin else ctx.puestos_ids, solo_aprobadas_alguna_vez=True,
+            consulta, puestos_autorizados=None if ctx.es_admin else ctx.puestos_ids, solo_aprobadas_alguna_vez=True,
         )
         orden = "operacion" if consulta.estado == Estado.APROBADA.value else "recientes"
         return await self._pagina(ctx, filtros, consulta, orden)
@@ -553,7 +568,9 @@ class ServicioSolicitud:
             filas=[
                 FilaHistorico(
                     numero=s.numero, estado=s.estado, tramite=s.tipo_tramite.nombre, agencia=s.agencia_nombre,
-                    puesto=s.puesto_nombre, sector=s.puesto.sector.nombre if s.puesto and s.puesto.sector else None,
+                    puesto=(f"{s.puesto_nombre} → {s.puesto_destino_nombre}" if s.puesto_destino_nombre
+                            else s.puesto_nombre),
+                    sector=s.puesto.sector.nombre if s.puesto and s.puesto.sector else None,
                     buque=s.nombre_buque, imo=s.imo, fecha_operacion=s.fecha_operacion,
                     pasajeros=s.cantidad_tripulantes, enviada_en=s.enviada_en, aprobada_en=s.aprobada_en,
                     finalizada_en=s.finalizada_en,
@@ -578,11 +595,35 @@ class ServicioSolicitud:
 
     # ── Validación del formulario ────────────────────────────────────────────
 
+    async def _validar_cambio_de_puerto(
+        self, puesto: PuestoControl, puesto_destino_id: int | None,
+    ) -> PuestoControl | None:
+        """El nuevo puesto de un cambio de puerto (2026-11-13): activo, distinto del
+        primero y del mismo sector (el sector decide quién revisa). Si el nuevo
+        puerto es del otro sector, va una solicitud nueva y esta vence sola. El
+        mensaje no nombra los sectores: lo lee la agencia."""
+        if puesto_destino_id is None:
+            return None
+        destino = await self.repo_catalogos.buscar_puesto(puesto_destino_id)
+        if not destino or not destino.activo:
+            raise _error(status.HTTP_400_BAD_REQUEST,
+                         "El puesto de control del cambio de puerto no existe o no está activo.")
+        if destino.id == puesto.id:
+            raise _error(status.HTTP_400_BAD_REQUEST,
+                         "El cambio de puerto tiene que ser a otro puesto de control.")
+        if destino.sector_id != puesto.sector_id:
+            raise _error(
+                status.HTTP_400_BAD_REQUEST,
+                f"No se puede cambiar de {puesto.nombre} a {destino.nombre} en la misma solicitud: presenta una "
+                "nueva solicitud para ese puerto.",
+            )
+        return destino
+
     async def _validar_formulario(
         self, tipo: TipoTramite, datos: _DatosFormularioSolicitud,
-    ) -> tuple[PuestoControl, list[_TripulanteResuelto], str | None]:
-        """Valida cabecera y tripulantes. Devuelve el puesto, los tripulantes
-        resueltos y el IMO normalizado."""
+    ) -> tuple[PuestoControl, PuestoControl | None, list[_TripulanteResuelto], str | None]:
+        """Valida cabecera y tripulantes. Devuelve el puesto, el del cambio de
+        puerto (o None), los tripulantes resueltos y el IMO normalizado."""
         faltan = self.tramites.validar_campos_cabecera(tipo, datos.model_dump())
         if faltan:
             raise _error(status.HTTP_400_BAD_REQUEST, f"Faltan datos obligatorios del formulario: {', '.join(faltan)}.")
@@ -600,6 +641,12 @@ class ServicioSolicitud:
         puesto = await self.repo_catalogos.buscar_puesto(datos.puesto_control_id)
         if not puesto or not puesto.activo:
             raise _error(status.HTTP_400_BAD_REQUEST, "El puesto de control seleccionado no existe o no está activo.")
+        # Solo los trámites que lo admiten (Embarque y Desembarque): en los demás, un
+        # nuevo puesto que llegue (resto de otro trámite elegido antes) se descarta,
+        # como los campos que el trámite no usa.
+        destino = await self._validar_cambio_de_puerto(
+            puesto, datos.puesto_destino_id if tipo.permite_cambio_puerto else None,
+        )
 
         imo = None
         if datos.imo:
@@ -640,7 +687,7 @@ class ServicioSolicitud:
             _TripulanteResuelto(entrada=t, restringido=paises[t.nacionalidad].nacionalidad_restringida)
             for t in datos.tripulantes
         ]
-        return puesto, resueltos, imo
+        return puesto, destino, resueltos, imo
 
     @staticmethod
     def _resolver_asignaciones(
@@ -729,13 +776,15 @@ class ServicioSolicitud:
 
     def _aplicar_cabecera(
         self, s: Solicitud, tipo: TipoTramite, datos: _DatosFormularioSolicitud,
-        puesto: PuestoControl, imo: str | None, cantidad_tripulantes: int,
+        puesto: PuestoControl, destino: PuestoControl | None, imo: str | None, cantidad_tripulantes: int,
     ) -> None:
         """Copia la cabecera del formulario. Los campos que el trámite no usa
         se guardan vacíos aunque lleguen con valor (restos de otro trámite
         que la agencia eligió antes en el formulario)."""
         s.puesto_control_id    = puesto.id
         s.puesto_nombre        = puesto.nombre
+        s.puesto_destino_id     = destino.id if destino else None
+        s.puesto_destino_nombre = destino.nombre if destino else None
         s.fecha_operacion      = datos.fecha_operacion
         s.cantidad_tripulantes = cantidad_tripulantes
         s.nombre_buque         = datos.nombre_buque if tipo.requiere_buque else None
@@ -819,7 +868,7 @@ class ServicioSolicitud:
         if not tipo or not tipo.activo:
             raise _error(status.HTTP_404_NOT_FOUND, f"Tipo de trámite no encontrado o inactivo: {datos.codigo_tramite}.")
 
-        puesto, tripulantes, imo = await self._validar_formulario(tipo, datos)
+        puesto, destino, tripulantes, imo = await self._validar_formulario(tipo, datos)
 
         if len(datos.asignaciones) != len(archivos):
             raise _error(status.HTTP_400_BAD_REQUEST, "Cada archivo debe indicar a qué documento corresponde.")
@@ -843,7 +892,7 @@ class ServicioSolicitud:
                 estado=Estado.EN_REVISION.value,
                 enviada_en=ahora_utc(),
             )
-            self._aplicar_cabecera(s, tipo, datos, puesto, imo, len(tripulantes))
+            self._aplicar_cabecera(s, tipo, datos, puesto, destino, imo, len(tripulantes))
             tripulantes_orm: list[TripulanteSolicitud] = []
             for orden, t in enumerate(tripulantes):
                 orm = TripulanteSolicitud()
@@ -884,7 +933,7 @@ class ServicioSolicitud:
 
         tipo = await self.repo_tramites.buscar_tipo_por_id(s.tipo_tramite_id)
         assert tipo is not None
-        puesto, tripulantes, imo = await self._validar_formulario(tipo, datos)
+        puesto, destino, tripulantes, imo = await self._validar_formulario(tipo, datos)
 
         # ── Tripulantes que se conservan / quitan ──
         existentes = {t.id: t for t in s.tripulantes}
@@ -947,7 +996,7 @@ class ServicioSolicitud:
             self._registrar_casillas(s, requeridas, tripulantes_orm)
 
             anterior = s.estado
-            self._aplicar_cabecera(s, tipo, datos, puesto, imo, len(tripulantes))
+            self._aplicar_cabecera(s, tipo, datos, puesto, destino, imo, len(tripulantes))
             s.estado           = Estado.EN_REVISION.value
             s.enviada_en       = ahora_utc()
             s.plazo_correccion = None
@@ -1116,6 +1165,10 @@ class ServicioSolicitud:
     async def _para_puerto(self, ctx: ContextoAcceso, solicitud_id: int) -> Solicitud:
         s = await self.obtener(ctx, solicitud_id, bloquear=True)
         if not self._es_del_puerto(ctx, s):
+            if s.puesto_destino_id is not None:
+                # El primer puesto de un cambio de puerto la ve, pero no la finaliza.
+                raise _error(status.HTTP_403_FORBIDDEN,
+                             f"La autorización tiene cambio de puerto: la finaliza {s.puesto_destino_nombre}.")
             raise _error(status.HTTP_403_FORBIDDEN, "La solicitud no corresponde a tus puestos de control.")
         if s.estado != Estado.APROBADA.value:
             raise _error(status.HTTP_409_CONFLICT, "La autorización no está aprobada pendiente de finalizar.")
@@ -1138,19 +1191,19 @@ class ServicioSolicitud:
     async def finalizar(
         self, ctx: ContextoAcceso, solicitud_id: int, comentario: str, puesto_finalizacion_id: int | None = None,
     ) -> Solicitud:
-        """Cierra la autorización en el puesto autorizado, con la verificación
-        de impedimentos del puesto ya registrada (desde el 2026-11-06). Desde el
-        2026-10-30 no se finaliza en otro puesto: si la operación se hace en
-        otro, la agencia presenta una nueva solicitud y esta vence sola.
-        `puesto_finalizacion_id` solo llega de una página abierta antes del
-        cambio: si es otro puesto, se rechaza con el motivo en vez de cerrarla
-        donde no fue."""
+        """Cierra la autorización en el puesto autorizado (con cambio de puerto,
+        el nuevo), con la verificación de impedimentos del puesto ya registrada
+        (desde el 2026-11-06). Desde el 2026-10-30 no se finaliza en otro puesto:
+        si la operación se hace en otro, la agencia presenta una nueva solicitud y
+        esta vence sola. `puesto_finalizacion_id` solo llega de una página abierta
+        antes del cambio: si es otro puesto, se rechaza con el motivo en vez de
+        cerrarla donde no fue."""
         s = await self._para_puerto(ctx, solicitud_id)
-        if puesto_finalizacion_id is not None and puesto_finalizacion_id != s.puesto_control_id:
+        if puesto_finalizacion_id is not None and puesto_finalizacion_id != s.puesto_autorizado_id:
             raise _error(
                 status.HTTP_400_BAD_REQUEST,
-                f"La autorización es solo para {s.puesto_nombre}: no se finaliza en otro puesto. Si la operación "
-                "se realizó en otro, la agencia debe presentar una nueva solicitud.",
+                f"La autorización es solo para {s.puesto_autorizado_nombre}: no se finaliza en otro puesto. Si la "
+                "operación se realizó en otro, la agencia debe presentar una nueva solicitud.",
             )
         if not s.impedimentos_puesto_verificados or any(t.con_impedimento_puesto is None for t in s.tripulantes):
             raise _error(
@@ -1163,10 +1216,10 @@ class ServicioSolicitud:
         s.finalizada_por_id          = ctx.usuario.id
         s.comentario_finalizacion    = comentario
         # Se sigue registrando (es el autorizado) para las estadísticas por puesto y las finalizadas de antes.
-        s.puesto_finalizacion_id     = s.puesto_control_id
-        s.puesto_finalizacion_nombre = s.puesto_nombre
+        s.puesto_finalizacion_id     = s.puesto_autorizado_id
+        s.puesto_finalizacion_nombre = s.puesto_autorizado_nombre
         self._registrar_evento(s, ctx.usuario, TipoEventoSolicitud.FINALIZADA, anterior, s.estado,
-                               f"Finalizada en {s.puesto_nombre}. {comentario}")
+                               f"Finalizada en {s.puesto_autorizado_nombre}. {comentario}")
         await self.repo.guardar()
         return await self._recargar(s.id)
 
@@ -1197,11 +1250,14 @@ class ServicioSolicitud:
     # ── Salidas ──────────────────────────────────────────────────────────────
 
     @staticmethod
-    def _vencimientos_tripulante(t: TripulanteSolicitud, referencia: date) -> tuple[bool, bool]:
-        """(pasaporte vencido, seamanbook vencido) a la fecha de la operación."""
+    def _vencimientos_tripulante(t: TripulanteSolicitud, referencia: date) -> tuple[bool, bool, bool]:
+        """(pasaporte vencido, pasaporte con menos de 3 meses de vigencia, seamanbook
+        vencido) a la fecha de la operación. Lo mismo cuenta la bandeja en SQL
+        (RepositorioSolicitud.alertas_de): si cambias uno, cambia el otro."""
         pasaporte = t.pasaporte_expira < referencia
+        corta     = not pasaporte and t.pasaporte_expira < vigencia_minima_pasaporte(referencia)
         libreta   = bool(t.porta_libreta and t.libreta_expira and t.libreta_expira < referencia)
-        return pasaporte, libreta
+        return pasaporte, corta, libreta
 
     def construir_resumen(
         self, s: Solicitud, *, interno: bool, alertas: tuple[int, bool] | None = None,
@@ -1210,7 +1266,8 @@ class ServicioSolicitud:
 
     def _campos_resumen(self, s: Solicitud, *, interno: bool, alertas: tuple[int, bool] | None = None) -> dict:
         """`interno`: quien consulta es del SNM. Lo interno no le llega a la agencia.
-        `alertas` = (tripulantes con documento vencido, ¿alguno restringido?), ya
+        `alertas` = (tripulantes con documento vencido o pasaporte con menos de 3 meses
+        de vigencia, ¿alguno restringido?), ya
         contados por la BD (bandejas, RepositorioSolicitud.alertas_de); sin ellas
         se cuentan aquí, con los tripulantes cargados (el expediente)."""
         if alertas is None:
@@ -1223,6 +1280,7 @@ class ServicioSolicitud:
             id=s.id, numero=s.numero, titulo=s.titulo, estado=s.estado,
             tipo_tramite_codigo=s.tipo_tramite.codigo, tipo_tramite_nombre=s.tipo_tramite.nombre,
             agencia_id=s.agencia_id, agencia_nombre=s.agencia_nombre, puesto_nombre=s.puesto_nombre,
+            puesto_destino_nombre=s.puesto_destino_nombre,
             # El sector del puesto, para el SNM (la agencia no trabaja con sectores).
             sector_nombre=s.puesto.sector.nombre if interno and s.puesto else None,
             nombre_buque=s.nombre_buque, imo=s.imo, fecha_operacion=s.fecha_operacion,
@@ -1278,7 +1336,7 @@ class ServicioSolicitud:
 
         tripulantes = []
         for t in s.tripulantes:
-            pasaporte_vencido, libreta_vencida = self._vencimientos_tripulante(t, s.fecha_operacion)
+            pasaporte_vencido, pasaporte_corta, libreta_vencida = self._vencimientos_tripulante(t, s.fecha_operacion)
             tripulantes.append(SalidaTripulante(
                 id=t.id, nombre=t.nombre, apellido=t.apellido, nombre_completo=t.nombre_completo,
                 fecha_nacimiento=t.fecha_nacimiento,
@@ -1293,7 +1351,8 @@ class ServicioSolicitud:
                 con_impedimento=t.con_impedimento if ctx.es_personal_snm else None,
                 con_impedimento_puesto=t.con_impedimento_puesto if ctx.es_personal_snm else None,
                 porta_libreta=t.porta_libreta, orden=t.orden,
-                pasaporte_vencido=pasaporte_vencido, libreta_vencida=libreta_vencida,
+                pasaporte_vencido=pasaporte_vencido, pasaporte_vigencia_corta=pasaporte_corta,
+                libreta_vencida=libreta_vencida,
             ))
 
         documentos = [
@@ -1334,7 +1393,7 @@ class ServicioSolicitud:
             requiere_puerto_desembarque=tipo.requiere_puerto_desembarque,
             requiere_motivo=tipo.requiere_motivo, requiere_clinica=tipo.requiere_clinica,
             valida_vigencia=tipo.valida_vigencia,
-            puesto_control_id=s.puesto_control_id,
+            puesto_control_id=s.puesto_control_id, puesto_destino_id=s.puesto_destino_id,
             bandera=s.bandera, bandera_nombre=await self._nombre_pais(s.bandera),
             nombre_puerto=s.nombre_puerto, puerto_desembarque=s.puerto_desembarque,
             motivo=s.motivo, clinica_hospital=s.clinica_hospital, observaciones=s.observaciones,
@@ -1386,7 +1445,8 @@ class ServicioSolicitud:
             aviso_custodia=s.tipo_tramite.aviso_custodia,
             agencia_naviera=s.agencia_nombre,
             nombre_buque=s.nombre_buque, imo=s.imo, bandera=await self._nombre_pais(s.bandera),
-            puesto_control=s.puesto_nombre, fecha_operacion=s.fecha_operacion,
+            puesto_control=s.puesto_nombre, puesto_destino=s.puesto_destino_nombre,
+            fecha_operacion=s.fecha_operacion,
             nombre_puerto=s.nombre_puerto, puerto_desembarque=s.puerto_desembarque,
             clinica_hospital=s.clinica_hospital, motivo=s.motivo,
             fecha_solicitud=s.enviada_en.astimezone(TZ_PANAMA),
@@ -1429,7 +1489,8 @@ class ServicioSolicitud:
             tipo_tramite=s.tipo_tramite.nombre,
             agencia_nombre=s.agencia_nombre,
             nombre_buque=s.nombre_buque, imo=s.imo, bandera=await self._nombre_pais(s.bandera),
-            puesto_nombre=s.puesto_nombre, fecha_operacion=s.fecha_operacion,
+            puesto_nombre=s.puesto_nombre, puesto_destino_nombre=s.puesto_destino_nombre,
+            fecha_operacion=s.fecha_operacion,
             aprobada_en=s.aprobada_en, vigente_hasta=s.vigente_hasta, finalizada_en=s.finalizada_en,
             puesto_finalizacion_nombre=s.puesto_finalizacion_nombre,
             tripulantes=[

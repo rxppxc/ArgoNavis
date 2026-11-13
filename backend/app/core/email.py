@@ -42,7 +42,7 @@ _CID_LOGO = "logo-argo-navis@argonavis.snm"
 # recuadro destacado (el resto, lo que escribió el usuario, va tal cual, escapado).
 _ETIQUETAS = (
     "Motivo:", "Plazo para corregir:", "Nacionalidad restringida:",
-    "Aprobada fuera del horario laboral", "Costo migratorio:",
+    "Aprobada fuera del horario laboral", "Costo migratorio:", "Cambio de puerto:",
 )
 
 # Tono de cada aviso = color del estado en la interfaz (InsigniaEstado): recibida

@@ -27,6 +27,13 @@ class SalidaCatalogoMini(BaseModel):
     nombre: str
 
 
+class SalidaPuestoFormulario(SalidaCatalogoMini):
+    """Un puesto para el formulario de solicitud. Con el número de su sector, sin
+    el nombre: el cambio de puerto solo admite puestos del mismo sector (2026-11-13),
+    y a la agencia no se le nombran los sectores."""
+    sector_id: int
+
+
 class UsuarioAsignado(BaseModel):
     id:        int
     username:  str

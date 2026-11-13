@@ -12,11 +12,13 @@ from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import pytest
-from sqlalchemy import func, select, text, update
+from sqlalchemy import Date, Interval, cast, func, literal, select, text, update
 
 from app.api.v1 import solicitudes as api_solicitudes
 from app.core.pdf_autorizacion import generar_pdf_autorizacion
-from app.domain.models.solicitud import Solicitud, TripulanteSolicitud
+from app.domain.models.solicitud import (
+    MESES_VIGENCIA_PASAPORTE, Solicitud, TripulanteSolicitud, vigencia_minima_pasaporte,
+)
 from app.domain.repositories.solicitud_repository import RepositorioSolicitud
 from app.domain.services.notificacion_service import ServicioNotificacion
 from app.domain.services.solicitud_service import MAX_TRIPULANTES, ServicioSolicitud
@@ -154,6 +156,12 @@ async def test_validaciones_de_creacion(cliente, escenario: Escenario):
     r = await enviar(cliente, e.nav_a1, datos, [])
     assert r.status_code == 400 and "pasaporte vence" in r.json()["detail"]
 
+    # Vigente el día de la operación, pero con menos de 3 meses (2026-11-13).
+    pocos_meses = (HOY + timedelta(days=60)).isoformat()
+    datos = cabecera("F3-EMBARQUE", pid, tripulantes=[tripulante("Juan", pasaporte_expira=pocos_meses)], asignaciones=[])
+    r = await enviar(cliente, e.nav_a1, datos, [])
+    assert r.status_code == 400 and "al menos 3 meses de vigencia" in r.json()["detail"]
+
     datos = cabecera("F3-EMBARQUE", pid, tripulantes=[tripulante("Juan", libreta_marino=None, libreta_expira=None)], asignaciones=[])
     r = await enviar(cliente, e.nav_a1, datos, [])
     assert r.status_code == 400 and "seamanbook" in r.json()["detail"]
@@ -232,13 +240,14 @@ async def test_ciclo_completo(cliente, escenario: Escenario, monkeypatch):
     sid = s["id"]
     assert s["estado"] == "review" and s["numero"] == f"AM-{HOY.year}-{sid:06d}"
     assert s["agencia_id"] == e.agencia_a["id"] and s["agencia_nombre"] == e.agencia_a["nombre"]
-    assert len(s["checklist"]) == 8 and all(c["cubierta"] for c in s["checklist"])
-    assert len(s["documentos"]) == 9
+    # 3 por pasajero × 2, la Lista de Tripulantes, la custodia de Raúl y el Formulario No. 3 (2026-11-13).
+    assert len(s["checklist"]) == 9 and all(c["cubierta"] for c in s["checklist"])
+    assert len(s["documentos"]) == 10
     assert [d["nombre_original"] for d in s["documentos"] if d["documento_id"] is None] == ["carta-del-capitan.pdf"]
     assert s["tiene_nacionalidad_restringida"] and s["tripulantes"][1]["nacionalidad_restringida"]
     assert s["bandera_nombre"] == "Panamá" and s["imo"] == "9074729"
     carpeta = STORAGE / f"solicitud-{sid}"
-    assert carpeta.is_dir() and len(list(carpeta.iterdir())) == 9
+    assert carpeta.is_dir() and len(list(carpeta.iterdir())) == 10
     assert not list(STORAGE.glob("tmp-*"))
 
     # ── Acceso por agencia y por rol ──
@@ -299,11 +308,11 @@ async def test_ciclo_completo(cliente, escenario: Escenario, monkeypatch):
     corregida = r.json()
     assert corregida["estado"] == "review" and corregida["cantidad_tripulantes"] == 1
     assert not corregida["impedimentos_verificados"]
-    assert len(corregida["documentos"]) == 6 and all(c["cubierta"] for c in corregida["checklist"])
+    assert len(corregida["documentos"]) == 7 and all(c["cubierta"] for c in corregida["checklist"])   # con el Form. 3
     assert [ev["tipo"] for ev in corregida["eventos"]] == ["creada", "devuelta", "corregida"]
     r = await cliente.get(f"/solicitudes/{sid}", headers=e.revisor.headers)
     assert [ev["tipo"] for ev in r.json()["eventos"]] == ["creada", "impedimentos", "devuelta", "corregida"]
-    assert len(list(carpeta.iterdir())) == 6, "en disco quedan solo los documentos vigentes"
+    assert len(list(carpeta.iterdir())) == 7, "en disco quedan solo los documentos vigentes"
 
     # ── Aprobación, PDF y QR ──
     await verificar_impedimentos(cliente, e.revisor, sid)
@@ -703,7 +712,7 @@ async def test_la_bandeja_cuenta_las_alertas_como_el_expediente(cliente, escenar
     """La bandeja cuenta en SQL (RepositorioSolicitud.alertas_de) lo que el
     expediente cuenta con los tripulantes cargados (_vencimientos_tripulante):
     tienen que coincidir. Los vencimientos se fuerzan en la BD, porque al enviar
-    no se acepta un documento vencido."""
+    no se acepta un pasaporte vencido ni con menos de 3 meses de vigencia."""
     e = escenario
     creada = await solicitud_simple(cliente, e.nav_a1, e.puesto_a["id"])
     operacion = date.fromisoformat(creada["fecha_operacion"])
@@ -725,6 +734,18 @@ async def test_la_bandeja_cuenta_las_alertas_como_el_expediente(cliente, escenar
     assert await alertas() == (1, 1), "marino con el seamanbook vencido"
     await cambiar(libreta_expira=operacion)
     assert await alertas() == (0, 0), "vence el mismo día de la operación: todavía vale"
+
+    # El pasaporte, con al menos 3 meses de vigencia desde la operación (2026-11-13).
+    minimo = vigencia_minima_pasaporte(operacion)
+    await cambiar(pasaporte_expira=minimo)
+    assert await alertas() == (0, 0), "vence justo a los 3 meses"
+    await cambiar(pasaporte_expira=minimo - timedelta(days=1))
+    assert await alertas() == (1, 1), "pasaporte con menos de 3 meses de vigencia"
+    r = await cliente.get(f"/solicitudes/{creada['id']}", headers=e.nav_a1.headers)
+    pasajero = r.json()["tripulantes"][0]
+    assert pasajero["pasaporte_vigencia_corta"] and not pasajero["pasaporte_vencido"]
+    await cambiar(pasaporte_expira=operacion + timedelta(days=400))
+
     await cambiar(rango="tecnico", libreta_expira=operacion - timedelta(days=1))
     assert await alertas() == (0, 0), "los demás rangos no portan seamanbook"
     await cambiar(pasaporte_expira=operacion - timedelta(days=1))
@@ -734,6 +755,17 @@ async def test_la_bandeja_cuenta_las_alertas_como_el_expediente(cliente, escenar
     async with SesionLocal() as s:
         assert await RepositorioSolicitud(s).alertas_de([creada["id"]]) == {creada["id"]: (1, True)}
         assert await RepositorioSolicitud(s).alertas_de([]) == {}
+
+
+@pytest.mark.parametrize("operacion", ["2026-11-13", "2026-11-30", "2027-11-29", "2026-10-31", "2026-12-31", "2027-03-31"])
+async def test_postgresql_suma_los_meses_como_python(operacion):
+    """La bandeja suma los 3 meses en SQL (fecha + make_interval) y el expediente y la
+    validación, en Python (vigencia_minima_pasaporte): al final del mes, los dos dan el
+    último día del mes (30/11 → 28/02; en bisiesto, 29/02)."""
+    dia = date.fromisoformat(operacion)
+    minimo = cast(literal(dia) + func.make_interval(0, MESES_VIGENCIA_PASAPORTE, type_=Interval), Date)
+    async with SesionLocal() as s:
+        assert (await s.execute(select(minimo))).scalar_one() == vigencia_minima_pasaporte(dia)
 
 
 # ── Estadísticas, bitácora y protecciones del admin ──────────────────────────

@@ -99,5 +99,27 @@
       ["CONTRATO", 1]
     ],
     "opcionales": [["BOLETO", 1]]
+  },
+  {
+    "caso": "el Pasajero presenta lo del Marino, salvo la Libreta (2026-11-13)",
+    "documentos": [
+      {"codigo": "VISA", "alcance": "marino", "condicion": "siempre", "requiere_libreta": false, "orden": 1, "rangos": ["marino", "pasajero"]},
+      {"codigo": "GENERALES", "alcance": "marino", "condicion": "siempre", "requiere_libreta": false, "orden": 2},
+      {"codigo": "LIBRETA", "alcance": "marino", "condicion": "siempre", "requiere_libreta": true, "orden": 3},
+      {"codigo": "CUSTODIA", "alcance": "marino", "condicion": "nacionalidad_restringida", "requiere_libreta": false, "orden": 4, "rangos": ["marino", "pasajero"]},
+      {"codigo": "BOLETO", "alcance": "marino", "condicion": "siempre", "requiere_libreta": false, "orden": 5, "rangos": ["militar"]}
+    ],
+    "tripulantes": [
+      {"nombre": "Marino", "es_panameno": false, "rango": "marino", "restringida": false},
+      {"nombre": "Pasajero cubano", "es_panameno": false, "rango": "pasajero", "restringida": true},
+      {"nombre": "Militar", "es_panameno": false, "rango": "militar", "restringida": false}
+    ],
+    "esperado": [
+      ["VISA", 0], ["VISA", 1],
+      ["GENERALES", 0], ["GENERALES", 1], ["GENERALES", 2],
+      ["LIBRETA", 0],
+      ["CUSTODIA", 1],
+      ["BOLETO", 2]
+    ]
   }
 ]

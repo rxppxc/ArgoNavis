@@ -12,7 +12,8 @@ Destinatarios:
   - UCVMM: el buzón CORREO_UCVMM (solicitud nueva o corregida).
   - Agencia: su buzón + sus usuarios activos (aprobada, devuelta, denegada, expirada).
     Sin unidades internas (UCVMM, sectores): la institución (2026-11-11).
-  - Puesto de control: su buzón + sus funcionarios asignados (aprobada).
+  - Puesto de control: su buzón + sus funcionarios asignados (aprobada). Con
+    cambio de puerto (2026-11-13), los del puesto nuevo, que es el que la finaliza.
 """
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -46,13 +47,18 @@ def _operacion(s: Solicitud) -> str:
     return f"operación el {s.fecha_operacion.strftime('%d/%m/%Y')}"
 
 
+def _puestos(s: Solicitud) -> str:
+    """El puesto; con cambio de puerto (2026-11-13), los dos: «Balboa → Rodman»."""
+    return f"{s.puesto_nombre} → {s.puesto_destino_nombre}" if s.puesto_destino_nombre else s.puesto_nombre
+
+
 def _campos(s: Solicitud) -> list[tuple[str, str]]:
     """Datos del pase del correo (los vacíos no se muestran)."""
     return [
         ("Buque",           s.nombre_buque or ""),
         ("IMO",             s.imo or ""),
         ("Trámite",         s.tipo_tramite.nombre if s.tipo_tramite else ""),
-        ("Puesto",          s.puesto_nombre),
+        ("Puesto",          _puestos(s)),
         ("Operación",       s.fecha_operacion.strftime("%d/%m/%Y")),
         ("Pasajeros",       str(s.cantidad_tripulantes)),
         ("Agencia naviera", s.agencia_nombre),
@@ -77,8 +83,10 @@ class ServicioNotificacion:
         return list(dict.fromkeys(correos))
 
     async def _correos_puesto(self, s: Solicitud) -> list[str]:
-        correos = [s.puesto.correo] if s.puesto and s.puesto.correo else []
-        correos += await self.repo_catalogos.correos_de_puesto(s.puesto_control_id)
+        """Los del puesto que la finaliza: con cambio de puerto, el nuevo."""
+        puesto = s.puesto_autorizado
+        correos = [puesto.correo] if puesto and puesto.correo else []
+        correos += await self.repo_catalogos.correos_de_puesto(s.puesto_autorizado_id)
         return list(dict.fromkeys(correos))
 
     async def _correos_ucvmm(self, s: Solicitud) -> list[str]:
@@ -120,18 +128,21 @@ class ServicioNotificacion:
             [t.nombre_completo for t in s.tripulantes if t.nacionalidad_restringida]
             if s.tipo_tramite and s.tipo_tramite.aviso_custodia else []
         )
+        cambio = (f"Cambio de puerto: de {s.puesto_nombre} a {s.puesto_destino_nombre}."
+                  if s.puesto_destino_nombre else None)
         # La observación de aprobación es interna de UCVMM: no va a la agencia.
         nota_agencia = "\n".join(filter(None, [
             vigencia,
             horario,
-            f"Vale solo para {s.puesto_nombre}: si la operación se realiza en otro puesto, "
+            cambio,
+            f"Vale solo para {s.puesto_autorizado_nombre}: si la operación se realiza en otro puesto, "
             "la agencia debe presentar una nueva solicitud.",
             ("Nacionalidad restringida: la agencia debe realizar el trámite de solicitud de custodia para "
              + ", ".join(restringidos) + ".")
             if restringidos else None,
         ]))
         previa = _vista_previa(
-            s.puesto_nombre, _operacion(s), f"vigente hasta el {_fecha_hora_corta(s.vigente_hasta)}",
+            s.puesto_autorizado_nombre, _operacion(s), f"vigente hasta el {_fecha_hora_corta(s.vigente_hasta)}",
             (f"costo migratorio de {texto_costo(s.costo_fuera_de_horario)} (fuera del horario)"
              if s.costo_fuera_de_horario else "fuera del horario laboral") if fuera else None,
         )
@@ -150,7 +161,8 @@ class ServicioNotificacion:
                     "UCVMM aprobó una autorización marítima que se realizará en tu puesto de control. "
                     "Ingresa al sistema para registrar la operación y finalizarla."
                 ),
-                vista_previa=previa, campos=_campos(s), destacado="\n".join(filter(None, [vigencia, horario])),
+                vista_previa=previa, campos=_campos(s),
+                destacado="\n".join(filter(None, [vigencia, horario, cambio])),
                 tono="verde", boton_texto="Abrir autorización", boton_url=url_solicitud(s),
             ),
         ])

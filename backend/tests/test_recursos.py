@@ -65,7 +65,7 @@ async def test_el_tope_de_un_envio_alcanza_para_el_catalogo():
     assert tipos and por_pasajero and de_la_solicitud
     assert por_pasajero <= MAX_DOCUMENTOS_POR_TRIPULANTE, f"un trámite pide {por_pasajero} documentos por pasajero"
     assert de_la_solicitud <= MAX_DOCUMENTOS_DE_LA_SOLICITUD, f"un trámite pide {de_la_solicitud} por solicitud"
-    assert TOPE_CUERPO_ENVIO_MB == 283   # 30 × 4 + 1 + 20 = 141 archivos de 2 MB, más 1 MB
+    assert TOPE_CUERPO_ENVIO_MB == 285   # 30 × 4 + 2 + 20 = 142 archivos de 2 MB, más 1 MB
 
 
 def test_nginx_tiene_los_mismos_topes_que_el_backend():

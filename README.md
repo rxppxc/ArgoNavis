@@ -237,9 +237,13 @@ Administrador y SysAdmin se reconocen por el nombre del rol (`rol_personalizado.
 - En ningún trámite se puede enviar la solicitud si el pasaporte o el seamanbook vence antes del día de la operación. Solo el rango Marino porta seamanbook; en Embarque se le pide la libreta sin importar la nacionalidad.
 - El catálogo sigue tal cual los documentos:
   - Los documentos de cada trámite son los del Formulario No. 3 oficial.
-  - Todos se suben por pasajero, salvo la Lista de Tripulantes (su nombre oficial en el Form. 3), que va a la solicitud.
+  - Todos se suben por pasajero, salvo la Lista de Tripulantes (su nombre oficial en el Form. 3) y el Formulario No. 3, que van a la solicitud.
   - Excepción (30/10/2026): a los rangos distintos de Marino solo se les piden las Generales de pasaporte y el boleto aéreo (`tramite_documentos.rangos`).
   - Excepción (11/11/2026): a los técnicos, supernumerarios y superintendentes se les piden, en Desembarque, la Carta de Responsabilidad, las Generales de pasaporte, el Contrato de Trabajo y, opcional, el boleto aéreo; en Embarque, lo mismo sin el boleto (`tramite_documentos.rangos_opcional`). Un documento opcional se puede dejar sin adjuntar.
+  - Excepción (13/11/2026): el Formulario No. 3 se adjunta en todos los trámites, uno por solicitud y para cualquier rango.
+  - Rango Pasajero (13/11/2026): se le piden los documentos del Marino, salvo la Libreta. Embarque y Desembarque admiten solo Marino, Pasajero y Militar; los técnicos, supernumerarios y superintendentes van por el trámite de Técnico.
+  - Vigencia (13/11/2026): el pasaporte tiene que vencer al menos 3 meses después de la operación (13/11 → 13/02 o después). El seamanbook vencido no impide enviar: se avisa y queda señalado en el expediente.
+- Cambio de puerto (13/11/2026): no es un trámite aparte. En Embarque y Desembarque la agencia indica si hay cambio de puerto y elige el nuevo puesto de control, que tiene que ser del mismo sector que el primero; si el nuevo puerto es del otro sector, presenta una nueva solicitud y la original vence sola. La finaliza el puesto nuevo; el primero la puede consultar.
 - Una solicitud admite hasta 30 pasajeros.
 - Nacionalidad restringida:
   - En Desembarque se exige el Formulario No. 6 de custodia por pasajero.
@@ -304,7 +308,7 @@ Las agencias entran por la VPN, pero no son del SNM: ARGO NAVIS las trata como u
 - **Archivos:** PDF, Word y Excel de hasta 2 MB cada uno, comprobados por su contenido; los de Office con macros se rechazan. La vista previa del Word va en un marco aislado (sin scripts, sin enlaces, sin acceso a la sesión).
 - **Navegador:** Content-Security-Policy (solo código propio de ARGO NAVIS), `X-Frame-Options: DENY` y `nosniff`, en nginx y en el backend cuando sirve el frontend.
 - **Topes:** login por IP (10 por minuto), por cuenta y por hora los envíos (`LIMITE_ENVIOS_POR_HORA`, 30), las exportaciones de las estadísticas (`LIMITE_EXPORTACIONES_POR_HORA`, 30) y las descargas del PDF (`LIMITE_PDF_POR_HORA`, 120), y 2 MB por archivo, en cualquier formato. Se cuentan en memoria, por proceso: con varios workers, cada uno lleva su cuenta.
-- **Tamaño de cada petición:** 1 MB en la API y, al crear o corregir una solicitud (todos los archivos van juntos), 283 MB: lo más que pesa un envío válido (30 pasajeros × 4 documentos + 1 de la solicitud + 20 adicionales, de 2 MB). nginx y el backend cortan lo que pase de ahí sin leerlo; antes nginx aceptaba 200 MB en cualquier ruta, también en el login, y el backend los leía enteros antes de comprobar la sesión.
+- **Tamaño de cada petición:** 1 MB en la API y, al crear o corregir una solicitud (todos los archivos van juntos), 285 MB: lo más que pesa un envío válido (30 pasajeros × 4 documentos + 2 de la solicitud + 20 adicionales, de 2 MB). nginx y el backend cortan lo que pase de ahí sin leerlo; antes nginx aceptaba 200 MB en cualquier ruta, también en el login, y el backend los leía enteros antes de comprobar la sesión.
 - **Rutas sin sesión:** solo el login, la verificación del QR y el health check; una prueba falla si aparece otra.
 - **Producción:** no arranca con una `SECRET_KEY` corta o de ejemplo.
 
@@ -369,7 +373,7 @@ Frontend (opcionales):
 ## Pendiente (decisiones del equipo)
 - HTTPS en el servidor, y TLS con el Active Directory y con el correo (la configuración ya está; ver *Producción*).
 - Edición del catálogo de trámites desde la interfaz.
-- Envío por partes para tripulaciones muy grandes: un envío lleva todos sus archivos juntos (hasta 283 MB), y por una VPN lenta uno así puede pasar los 5 minutos que espera el navegador.
+- Envío por partes para tripulaciones muy grandes: un envío lleva todos sus archivos juntos (hasta 285 MB), y por una VPN lenta uno así puede pasar los 5 minutos que espera el navegador.
 - Política de retención de datos personales (Ley 81 de 2019) y copia de los respaldos fuera del servidor.
 - Solicitud de Custodia y Solicitud de Transbordos (el documento de UCVMM dice que faltan por levantar).
 - Segundo factor (código TOTP) para las cuentas de las agencias: decidido para más adelante.

@@ -10,7 +10,8 @@ varias condiciones dependen de los datos de esa solicitud:
                                (Formulario No. 6 de custodia, hoy solo en
                                Desembarque, como en el Form. 3).
   - Documentos con `requiere_libreta` → solo a quien porta seamanbook (rango
-    Marino); militares, técnicos, supernumerarios y superintendentes no.
+    Marino); pasajeros, militares, técnicos, supernumerarios y superintendentes no.
+    El Pasajero (2026-11-13) va en las filas del Marino: lo mismo, sin la Libreta.
   - `rangos` de la fila → solo a esos rangos (nulo = a todos). Desde la
     reunión del 2026-10-30, a los rangos distintos de Marino solo se les piden
     las Generales de pasaporte y el boleto aéreo. Un documento de la solicitud
@@ -20,13 +21,16 @@ varias condiciones dependen de los datos de esa solicitud:
 (`modulos/solicitudes/checklist.ts`): si cambias uno, cambia el otro.
 
 También valida la cabecera del formulario y la ficha de cada tripulante
-(vigencia de pasaporte y seamanbook: hoy la exigen los 8 trámites).
+(vigencia: hoy la exigen los 8 trámites. El pasaporte, con al menos 3 meses a
+partir de la operación; el seamanbook vencido solo se señala, desde el 2026-11-13).
 """
 import re
 from dataclasses import dataclass, field
 from datetime import date
 
-from app.domain.models.solicitud import RANGOS_CON_LIBRETA, RangoMarino
+from app.domain.models.solicitud import (
+    MESES_VIGENCIA_PASAPORTE, RANGOS_CON_LIBRETA, RangoMarino, vigencia_minima_pasaporte,
+)
 from app.domain.models.tramite import AlcanceDocumento, CondicionDocumento, TipoTramite, TramiteDocumento
 from app.domain.schemas.solicitud import DatosTripulanteEntrada
 
@@ -42,6 +46,7 @@ def edad_cumplida(nacimiento: date, hoy: date) -> int:
 
 ETIQUETA_RANGO = {
     RangoMarino.MARINO.value:          "Marino",
+    RangoMarino.PASAJERO.value:        "Pasajero",
     RangoMarino.MILITAR.value:         "Militar",
     RangoMarino.TECNICO.value:         "Técnico",
     RangoMarino.SUPERNUMERARIO.value:  "Supernumerario",
@@ -229,8 +234,8 @@ class ServicioTramite:
         """Errores de la ficha de los tripulantes (lista vacía si todo bien).
 
         La vigencia se compara contra `fecha_referencia` (el día de la
-        operación, o hoy si fuera anterior): el documento tiene que estar
-        vigente el día del trámite en puerto.
+        operación, o hoy si fuera anterior): el pasaporte tiene que vencer al
+        menos 3 meses después (2026-11-13). El seamanbook vencido ya no bloquea.
         """
         errores: list[str] = []
         pasaportes_vistos: dict[tuple[str, str], int] = {}
@@ -269,15 +274,19 @@ class ServicioTramite:
                 errores.append(f"{quien}: el rango Marino requiere el número de seamanbook y su fecha de expiración.")
 
             if tipo.valida_vigencia:
+                minimo = vigencia_minima_pasaporte(fecha_referencia)
                 if t.pasaporte_expira < fecha_referencia:
                     errores.append(
                         f"{quien}: el pasaporte vence el {_fecha(t.pasaporte_expira)}, "
                         f"antes de la operación ({_fecha(fecha_referencia)})."
                     )
-                if porta_libreta and t.libreta_expira and t.libreta_expira < fecha_referencia:
+                elif t.pasaporte_expira < minimo:
                     errores.append(
-                        f"{quien}: el seamanbook vence el {_fecha(t.libreta_expira)}, "
-                        f"antes de la operación ({_fecha(fecha_referencia)})."
+                        f"{quien}: el pasaporte debe tener al menos {MESES_VIGENCIA_PASAPORTE} meses de vigencia "
+                        f"a partir de la operación (vencer el {_fecha(minimo)} o después); "
+                        f"vence el {_fecha(t.pasaporte_expira)}."
                     )
+                # El seamanbook vencido no impide enviar (2026-11-13): el formulario lo
+                # avisa y el expediente lo señala (libreta_vencida), para la revisión.
 
         return errores

@@ -44,17 +44,39 @@
      "tramite": {"valida_vigencia": true, "rangos_permitidos": null},
      "tripulantes": [{"pasaporte_expira": "2026-10-20"}], "esperado": ["pasaporte_vencido"]},
 
-    {"caso": "pasaporte que vence justo el día de la operación", "hoy": "2026-10-14", "fecha_operacion": "2026-11-01",
+    {"caso": "pasaporte que vence el día de la operación: vigente, pero sin los 3 meses", "hoy": "2026-10-14", "fecha_operacion": "2026-11-01",
      "tramite": {"valida_vigencia": true, "rangos_permitidos": null},
-     "tripulantes": [{"pasaporte_expira": "2026-11-01"}], "esperado": []},
+     "tripulantes": [{"pasaporte_expira": "2026-11-01"}], "esperado": ["pasaporte_vigencia_corta"]},
 
-    {"caso": "seamanbook vencido el día de la operación", "hoy": "2026-10-14", "fecha_operacion": "2026-11-01",
+    {"caso": "pasaporte con menos de 3 meses desde la operación (el ejemplo del pedido del 2026-11-13)", "hoy": "2026-11-13", "fecha_operacion": "2026-11-13",
      "tramite": {"valida_vigencia": true, "rangos_permitidos": null},
-     "tripulantes": [{"libreta_expira": "2026-10-20"}], "esperado": ["seamanbook_vencido"]},
+     "tripulantes": [{"pasaporte_expira": "2027-01-13"}], "esperado": ["pasaporte_vigencia_corta"]},
+
+    {"caso": "pasaporte que vence justo a los 3 meses de la operación", "hoy": "2026-11-13", "fecha_operacion": "2026-11-13",
+     "tramite": {"valida_vigencia": true, "rangos_permitidos": null},
+     "tripulantes": [{"pasaporte_expira": "2027-02-13"}], "esperado": []},
+
+    {"caso": "pasaporte que vence un día antes de los 3 meses", "hoy": "2026-11-13", "fecha_operacion": "2026-11-13",
+     "tramite": {"valida_vigencia": true, "rangos_permitidos": null},
+     "tripulantes": [{"pasaporte_expira": "2027-02-12"}], "esperado": ["pasaporte_vigencia_corta"]},
+
+    {"caso": "fin de mes: el 30 de noviembre más 3 meses es el 28 de febrero", "hoy": "2026-11-13", "fecha_operacion": "2026-11-30",
+     "tramite": {"valida_vigencia": true, "rangos_permitidos": null},
+     "tripulantes": [{"pasaporte_expira": "2027-02-28"}, {"nombre": "Luis", "pasaporte": "P999", "pasaporte_expira": "2027-02-27"}],
+     "esperado": ["pasaporte_vigencia_corta"]},
+
+    {"caso": "los 3 meses se cuentan desde la operación, no desde hoy", "hoy": "2026-10-14", "fecha_operacion": "2027-03-01",
+     "tramite": {"valida_vigencia": true, "rangos_permitidos": null},
+     "tripulantes": [{"pasaporte_expira": "2027-04-01"}], "esperado": ["pasaporte_vigencia_corta"]},
+
+    {"caso": "seamanbook vencido el día de la operación: no impide enviar (2026-11-13)", "hoy": "2026-10-14", "fecha_operacion": "2026-11-01",
+     "tramite": {"valida_vigencia": true, "rangos_permitidos": null},
+     "tripulantes": [{"libreta_expira": "2026-10-20"}], "esperado": []},
 
     {"caso": "si el trámite no valida vigencia, el vencimiento no importa", "hoy": "2026-10-14", "fecha_operacion": "2026-11-01",
      "tramite": {"valida_vigencia": false, "rangos_permitidos": null},
-     "tripulantes": [{"pasaporte_expira": "2026-10-20"}], "esperado": []},
+     "tripulantes": [{"pasaporte_expira": "2026-10-20"}, {"nombre": "Luis", "pasaporte": "P999", "pasaporte_expira": "2026-12-01"}],
+     "esperado": []},
 
     {"caso": "un marino sin seamanbook", "hoy": "2026-10-14", "fecha_operacion": "2026-10-20",
      "tramite": {"valida_vigencia": true, "rangos_permitidos": null},

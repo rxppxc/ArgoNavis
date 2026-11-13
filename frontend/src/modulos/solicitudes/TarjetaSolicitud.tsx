@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import type { Bandeja, SolicitudResumen } from "../../api/solicitudes";
 import { IconoAlerta, IconoReloj } from "../../components/Iconos";
 import { InsigniaEstado } from "./InsigniaEstado";
-import { formatearFecha, formatearFechaHora, TEXTO_HORARIO_LABORAL, tiempoRestante } from "./presentacion";
+import { formatearFecha, formatearFechaHora, TEXTO_HORARIO_LABORAL, textoPuestos, tiempoRestante } from "./presentacion";
 import styles from "./TarjetaSolicitud.module.css";
 
 /** Fila de las bandejas, como un pase (identidad «pase oficial», 2026-11-11): el
@@ -40,7 +40,7 @@ export function TarjetaSolicitud({ s, vista, volverA, conSector = false }: {
             {s.imo && <div><dt>IMO</dt><dd className={styles.mono}>{s.imo}</dd></div>}
             {/* La agencia solo ve las suyas: su nombre en cada pase sobraba. */}
             {!deAgencia && <div><dt>Agencia</dt><dd>{s.agencia_nombre}</dd></div>}
-            <div><dt>Puesto</dt><dd>{s.puesto_nombre}{conSector && s.sector_nombre && <> · {s.sector_nombre}</>}</dd></div>
+            <div><dt>Puesto</dt><dd>{textoPuestos(s)}{conSector && s.sector_nombre && <> · {s.sector_nombre}</>}</dd></div>
             <div><dt>Operación</dt><dd className={styles.mono}>{formatearFecha(s.fecha_operacion)}</dd></div>
             <div><dt>Pasajeros</dt><dd className={styles.mono}>{s.cantidad_tripulantes}</dd></div>
             <div><dt>Enviada</dt><dd>{formatearFechaHora(s.enviada_en)}{!deAgencia && s.creada_por && <> por {s.creada_por}</>}</dd></div>
@@ -50,7 +50,7 @@ export function TarjetaSolicitud({ s, vista, volverA, conSector = false }: {
             <div className={styles.marcas}>
               {s.tripulantes_con_alerta > 0 && (
                 <span className={styles.chipAlerta}>
-                  <IconoAlerta tamano={11} /> {s.tripulantes_con_alerta} con documento vencido
+                  <IconoAlerta tamano={11} /> {s.tripulantes_con_alerta} con documento vencido o por vencer
                 </span>
               )}
               {s.tiene_nacionalidad_restringida && <span className={styles.chipRestringida}>Nacionalidad restringida</span>}

@@ -1,7 +1,8 @@
 """Catálogos del flujo de Autorizaciones Marítimas.
 
-  - Lectura (cualquier usuario autenticado): puestos de control activos y
-    países, para llenar el formulario de solicitud.
+  - Lectura (cualquier usuario autenticado): puestos de control activos (con el
+    número de su sector, para el cambio de puerto) y países, para llenar el
+    formulario de solicitud.
   - Administración (solo admin):
       · sectores de UCVMM (Pacífico y Atlántico): su buzón y sus funcionarios
         (UCVMM y supervisores de sector), 2026-11-10;
@@ -24,7 +25,7 @@ from app.domain.repositories.user_repository import RepositorioUsuario
 from app.domain.schemas.catalogo import (
     DatosActualizarAgencia, DatosActualizarPais, DatosActualizarPuesto, DatosActualizarSector, DatosAsignarUsuarios,
     DatosCrearAgencia, DatosCrearPuesto, SalidaAgencia, SalidaCatalogoConUsuarios, SalidaCatalogoMini,
-    SalidaPais, SalidaPuesto, SalidaSector, UsuarioAsignado,
+    SalidaPais, SalidaPuesto, SalidaPuestoFormulario, SalidaSector, UsuarioAsignado,
 )
 from app.infrastructure.database import obtener_sesion_bd
 
@@ -89,7 +90,7 @@ async def _validar_usuarios(sesion: AsyncSession, usuario_ids: list[int]) -> lis
 
 # ── Lectura para el formulario ───────────────────────────────────────────────
 
-@enrutador.get("/catalogos/puestos", response_model=list[SalidaCatalogoMini])
+@enrutador.get("/catalogos/puestos", response_model=list[SalidaPuestoFormulario])
 async def listar_puestos_activos(
     _user_id: int = Depends(obtener_id_usuario_actual),
     sesion:   AsyncSession = Depends(obtener_sesion_bd, scope="function"),

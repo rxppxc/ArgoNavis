@@ -5,6 +5,7 @@ transferencia suelta con enlace público, sino el expediente de una solicitud
 de una agencia — organizado por casilla del checklist y por tripulante,
 visible por rol y conservado como registro del trámite.
 """
+import calendar
 import enum
 from datetime import date, datetime
 from decimal import Decimal
@@ -29,8 +30,10 @@ class EstadoSolicitud(str, enum.Enum):
 
 class RangoMarino(str, enum.Enum):
     """Rango del tripulante. Solo el rango Marino porta seamanbook: al resto
-    no se le pide libreta ni se le valida su vencimiento."""
+    no se le pide libreta ni se le valida su vencimiento. El Pasajero
+    (2026-11-13) es un Marino sin libreta: se le piden los demás documentos del Marino."""
     MARINO          = "marino"
+    PASAJERO        = "pasajero"
     MILITAR         = "militar"
     TECNICO         = "tecnico"
     SUPERNUMERARIO  = "supernumerario"
@@ -38,6 +41,20 @@ class RangoMarino(str, enum.Enum):
 
 
 RANGOS_CON_LIBRETA = {RangoMarino.MARINO.value}
+
+# El pasaporte tiene que vencer al menos 3 meses después de la operación (pedido del
+# usuario del 2026-11-13; antes bastaba con que siguiera vigente ese día). Espejo:
+# MESES_VIGENCIA_PASAPORTE y vigenciaMinimaPasaporte (validacionFormulario.ts).
+MESES_VIGENCIA_PASAPORTE = 3
+
+
+def vigencia_minima_pasaporte(operacion: date) -> date:
+    """Primer día en que puede vencer el pasaporte: la operación más 3 meses de
+    calendario (13/11 → 13/02). Si ese día no existe, el último del mes (30/11 →
+    28/02), como suma los meses PostgreSQL (RepositorioSolicitud.alertas_de)."""
+    indice = operacion.month - 1 + MESES_VIGENCIA_PASAPORTE
+    anio, mes = operacion.year + indice // 12, indice % 12 + 1
+    return date(anio, mes, min(operacion.day, calendar.monthrange(anio, mes)[1]))
 
 
 class TipoEventoSolicitud(str, enum.Enum):
@@ -78,6 +95,13 @@ class Solicitud(Base):
     tipo_tramite_id:   Mapped[int] = mapped_column(ForeignKey("tipos_tramite.id", ondelete="RESTRICT"), index=True)
     puesto_control_id: Mapped[int] = mapped_column(ForeignKey("puestos_control.id", ondelete="RESTRICT"), index=True)
     puesto_nombre:     Mapped[str] = mapped_column(String(200))
+    # Cambio de puerto (2026-11-13): el nuevo puesto, del mismo sector que el primero
+    # (el sector, y con él UCVMM, sale siempre de `puesto_control_id`). Nulo = sin
+    # cambio. Con cambio, lo ve y lo finaliza el nuevo; el primero puede consultarla.
+    puesto_destino_id:     Mapped[int | None] = mapped_column(
+        ForeignKey("puestos_control.id", ondelete="RESTRICT", name="fk_solicitudes_puesto_destino"), index=True,
+    )
+    puesto_destino_nombre: Mapped[str | None] = mapped_column(String(200))
 
     titulo:               Mapped[str]  = mapped_column(String(255))
     fecha_operacion:      Mapped[date] = mapped_column(Date)
@@ -148,6 +172,9 @@ class Solicitud(Base):
     puesto:       Mapped["PuestoControl"]  = relationship(  # noqa: F821
         "PuestoControl", foreign_keys=[puesto_control_id], lazy="selectin",
     )
+    puesto_destino: Mapped["PuestoControl | None"] = relationship(  # noqa: F821
+        "PuestoControl", foreign_keys=[puesto_destino_id], lazy="selectin",
+    )
     agencia:      Mapped["AgenciaNaviera"] = relationship("AgenciaNaviera", lazy="selectin")  # noqa: F821
 
     # `passive_deletes`: las FK hijas son ON DELETE CASCADE en la BD, así que al
@@ -172,6 +199,20 @@ class Solicitud(Base):
         back_populates="solicitud", cascade="all, delete-orphan", passive_deletes=True,
         order_by="CasillaSolicitud.orden",
     )
+
+    # El puesto donde vale la autorización: el que la ve en su bandeja, recibe el
+    # aviso y la finaliza. Con cambio de puerto, el nuevo; si no, el elegido.
+    @property
+    def puesto_autorizado_id(self) -> int:
+        return self.puesto_destino_id or self.puesto_control_id
+
+    @property
+    def puesto_autorizado_nombre(self) -> str:
+        return self.puesto_destino_nombre or self.puesto_nombre
+
+    @property
+    def puesto_autorizado(self) -> "PuestoControl | None":  # noqa: F821
+        return self.puesto_destino if self.puesto_destino_id else self.puesto
 
 
 class TripulanteSolicitud(Base):

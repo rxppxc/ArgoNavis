@@ -83,14 +83,20 @@ class RepositorioCatalogo:
         return (await self.sesion.execute(consulta)).scalar_one_or_none()
 
     async def contar_solicitudes_por_puesto(self) -> dict[int, int]:
-        consulta = select(Solicitud.puesto_control_id, func.count()).group_by(Solicitud.puesto_control_id)
-        return {pid: total for pid, total in (await self.sesion.execute(consulta)).all()}
+        """Solicitudes de cada puesto: como el elegido o como el nuevo de un cambio de puerto."""
+        totales: dict[int, int] = {}
+        for columna in (Solicitud.puesto_control_id, Solicitud.puesto_destino_id):
+            consulta = select(columna, func.count()).where(columna.isnot(None)).group_by(columna)
+            for pid, total in (await self.sesion.execute(consulta)).all():
+                totales[pid] = totales.get(pid, 0) + total
+        return totales
 
     async def puesto_en_uso(self, puesto_id: int) -> bool:
-        """Si alguna solicitud lo tiene como puesto autorizado o como puesto
-        donde se finalizó (las dos llaves impiden borrarlo)."""
+        """Si alguna solicitud lo tiene como puesto autorizado, como el nuevo de un
+        cambio de puerto o como puesto donde se finalizó (las llaves impiden borrarlo)."""
         consulta = select(exists().where(or_(
             Solicitud.puesto_control_id == puesto_id,
+            Solicitud.puesto_destino_id == puesto_id,
             Solicitud.puesto_finalizacion_id == puesto_id,
         )))
         return bool((await self.sesion.execute(consulta)).scalar())

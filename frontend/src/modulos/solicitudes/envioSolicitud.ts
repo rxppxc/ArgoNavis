@@ -42,6 +42,8 @@ export interface Precarga {
 export function desdeSolicitud(s: SolicitudDetalle): Precarga {
   const cabecera: CabeceraFormulario = {
     puesto_control_id: String(s.puesto_control_id),
+    cambio_puerto: s.puesto_destino_id ? "si" : "no",
+    puesto_destino_id: s.puesto_destino_id ? String(s.puesto_destino_id) : "",
     fecha_operacion: s.fecha_operacion,
     nombre_buque: s.nombre_buque ?? "",
     imo: s.imo ?? "",
@@ -112,6 +114,9 @@ export function armarEnvio(
 
   const datos: DatosFormularioSolicitud = {
     puesto_control_id: cabecera.puesto_control_id ? Number(cabecera.puesto_control_id) : null,
+    // Con «No» no viaja aunque haya quedado un puesto elegido.
+    puesto_destino_id: cabecera.cambio_puerto === "si" && cabecera.puesto_destino_id
+      ? Number(cabecera.puesto_destino_id) : null,
     fecha_operacion: cabecera.fecha_operacion || null,
     nombre_buque: texto(cabecera.nombre_buque),
     imo,

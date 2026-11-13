@@ -8,7 +8,7 @@
 import { readFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
 import { expect, test } from "./base";
-import { CUENTAS, NOMBRE_REVISOR, PUESTO, entrar, fechaPanama, pdf } from "./datos";
+import { CUENTAS, NOMBRE_REVISOR, PUESTO, elegirPais, entrar, fechaPanama, pdf } from "./datos";
 
 const TRIPULANTE = "Juan Carlos Pérez Gómez";
 /** Una «palabra» más larga que cualquier caja, como el «pruebasssss…» que se
@@ -68,14 +68,14 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     await agencia.getByLabel("Fecha de la operación en puerto *").fill(fechaPanama(2));
     await agencia.getByLabel("Nombre del buque *").fill("ESTRELLA DEL ISTMO");
     await agencia.getByLabel(/^IMO \*/).fill("IMO 9074729");
-    await agencia.getByLabel("Bandera *").selectOption("PAN");
+    await elegirPais(agencia.getByRole("combobox", { name: "Bandera *" }), "Panamá");
 
     await agencia.getByLabel("Nombre(s) *", { exact: true }).fill("Juan Carlos");
     await agencia.getByLabel("Apellido(s) *", { exact: true }).fill("Pérez Gómez");
     await agencia.getByLabel("Sexo *").selectOption("M");
     await agencia.getByLabel("Fecha de nacimiento *").fill("1988-03-14");
-    await agencia.getByLabel("País de nacimiento *").selectOption("PAN");
-    await agencia.getByLabel("Nacionalidad *").selectOption("PAN");
+    await elegirPais(agencia.getByRole("combobox", { name: "País de nacimiento *" }), "Panamá");
+    await elegirPais(agencia.getByRole("combobox", { name: "Nacionalidad *" }), "Panamá");
     await agencia.getByLabel("Ocupación *").fill("Primer oficial");
     await agencia.getByLabel("N° de pasaporte *").fill("PA1234567");
     await agencia.getByLabel("Vence el pasaporte *").fill("2030-05-01");
@@ -85,6 +85,8 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     for (const documento of ["Visa Especial de Marino", "Generales de Pasaporte", "Libreta de Marino"]) {
       await agencia.getByLabel(`Adjuntar ${documento} de ${TRIPULANTE}`).setInputFiles(pdf(`${documento}.pdf`));
     }
+    // En todos los trámites, uno por solicitud (2026-11-13).
+    await agencia.getByLabel("Adjuntar Formulario No. 3").setInputFiles(pdf("Formulario No. 3.pdf"));
     await agencia.getByRole("textbox", { name: "Observaciones", exact: true })
       .fill(`Se sube la documentación, ${SIN_ESPACIOS}`);
     await sinUnidadesInternas(agencia);   // el formulario, con su checklist

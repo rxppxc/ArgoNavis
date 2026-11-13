@@ -37,6 +37,9 @@ PUESTO = "Puesto E2E"
 # El puesto de las pruebas es del Sector Pacífico (2026-11-10): el revisor del
 # Atlántico no ve sus solicitudes, y el supervisor general las ve sin decidir.
 SECTOR_DEL_PUESTO = "Sector Pacífico"
+# Para el cambio de puerto (2026-11-13): otro puesto del mismo sector y uno del otro.
+PUESTO_MISMO_SECTOR = "Puesto E2E Rodman"
+PUESTO_OTRO_SECTOR = "Puesto E2E Atlántico"
 CUENTAS = [  # usuario, nombre, apellido, rol, ¿de la agencia?, ¿del puesto?, sector
     ("e2e.agencia", "Laura", "Agencia", "Naviera", True, False, None),
     ("e2e.ucvmm", "Ricardo", "Revisor", "UCVMM", False, False, "Sector Pacífico"),
@@ -113,7 +116,9 @@ async def sembrar() -> None:
         sectores = {x.nombre: x.id for x in (await s.execute(select(Sector))).scalars()}
         agencia = AgenciaNaviera(nombre=AGENCIA)
         puesto = PuestoControl(nombre=PUESTO, sector_id=sectores[SECTOR_DEL_PUESTO])
-        s.add_all([agencia, puesto])
+        s.add_all([agencia, puesto,
+                   PuestoControl(nombre=PUESTO_MISMO_SECTOR, sector_id=sectores[SECTOR_DEL_PUESTO]),
+                   PuestoControl(nombre=PUESTO_OTRO_SECTOR, sector_id=sectores["Sector Atlántico"])])
         await s.flush()
         clave = hashear_password(CLAVE)
         for usuario, nombre, apellido, rol, de_agencia, de_puesto, sector in CUENTAS:

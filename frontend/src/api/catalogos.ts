@@ -1,7 +1,12 @@
 import { clienteApi } from "./client";
 import type { CatalogoMini } from "../types";
 
-export type PuestoMini = CatalogoMini;
+/** Un puesto para el formulario de solicitud, con el número de su sector (sin el
+ *  nombre: a la agencia no se le nombran los sectores). El cambio de puerto solo
+ *  admite puestos del mismo sector (2026-11-13). */
+export interface PuestoMini extends CatalogoMini {
+  sector_id: number;
+}
 
 export interface Pais {
   codigo: string;

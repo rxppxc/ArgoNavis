@@ -25,7 +25,9 @@ import { HistorialSolicitud } from "./HistorialSolicitud";
 import { InsigniaEstado } from "./InsigniaEstado";
 import { PanelPuerto } from "./PanelPuerto";
 import { PanelRevision } from "./PanelRevision";
-import { formatearFecha, formatearFechaHora, TEXTO_HORARIO_LABORAL, tiempoRestante } from "./presentacion";
+import {
+  formatearFecha, formatearFechaHora, puestoAutorizado, TEXTO_HORARIO_LABORAL, textoPuestos, tiempoRestante,
+} from "./presentacion";
 import { SeccionTripulantes } from "./SeccionTripulantes";
 import { useVerificacionImpedimentos } from "./useVerificacionImpedimentos";
 import styles from "./DetalleSolicitud.module.css";
@@ -85,7 +87,8 @@ function BannerEstado({ s }: { s: SolicitudDetalle }) {
           {/* Al puesto que la finaliza se lo dice su panel. */}
           {!s.acciones.finalizar && (
             <div className={styles.bannerPie}>
-              Vale solo para {s.puesto_nombre}: si la operación se realiza en otro puesto, la agencia debe presentar
+              {s.puesto_destino_nombre && <>Con cambio de puerto: de {s.puesto_nombre} a {s.puesto_destino_nombre}. </>}
+              Vale solo para {puestoAutorizado(s)}: si la operación se realiza en otro puesto, la agencia debe presentar
               una nueva solicitud.
             </div>
           )}
@@ -101,13 +104,17 @@ function BannerEstado({ s }: { s: SolicitudDetalle }) {
     case "finalized":
       return (
         <div className={`${styles.banner} ${styles.bannerFinalizada}`}>
-          <div className={styles.bannerTitulo}>Finalizada en {s.puesto_finalizacion_nombre ?? s.puesto_nombre}</div>
+          <div className={styles.bannerTitulo}>Finalizada en {s.puesto_finalizacion_nombre ?? puestoAutorizado(s)}</div>
           <div className={styles.bannerTexto}>
             {formatearFechaHora(s.finalizada_en)}
             {s.comentario_finalizacion && <> — {s.finalizada_por ?? "Puesto de control"}: {s.comentario_finalizacion}</>}
           </div>
-          {s.puesto_finalizacion_nombre && s.puesto_finalizacion_nombre !== s.puesto_nombre && (
-            <div className={styles.bannerPie}>La autorización era para {s.puesto_nombre}.</div>
+          {s.puesto_destino_nombre && (
+            <div className={styles.bannerPie}>Con cambio de puerto: de {s.puesto_nombre} a {s.puesto_destino_nombre}.</div>
+          )}
+          {/* Las finalizadas en otro puesto antes del 30/10/2026. */}
+          {s.puesto_finalizacion_nombre && s.puesto_finalizacion_nombre !== puestoAutorizado(s) && (
+            <div className={styles.bannerPie}>La autorización era para {puestoAutorizado(s)}.</div>
           )}
           <AvisoFueraDeHorario s={s} />
         </div>
@@ -319,7 +326,7 @@ function Expediente({ s, onActualizada, volverA }: {
           <h1>{s.tipo_tramite_nombre}</h1>
           <p className={styles.numero}><small>N.º</small>{s.numero ?? `Solicitud ${s.id}`}</p>
           <div className={styles.subtitulo}>
-            {[buque, s.puesto_nombre, `Operación: ${formatearFecha(s.fecha_operacion)}`]
+            {[buque, textoPuestos(s), `Operación: ${formatearFecha(s.fecha_operacion)}`]
               .filter(Boolean).join(" — ")}
           </div>
           {s.fuera_de_horario && (
@@ -359,6 +366,8 @@ function Expediente({ s, onActualizada, volverA }: {
               <Dato etiqueta="Creada por" valor={s.creada_por} />
               <Dato etiqueta="Fecha de solicitud" valor={formatearFechaHora(s.created_at)} />
               <Dato etiqueta="Puesto de Control Migratorio" valor={s.puesto_nombre} />
+              {/* Cambio de puerto (2026-11-13): el nuevo puesto, que la finaliza. */}
+              <Dato etiqueta="Cambio de puerto a" valor={s.puesto_destino_nombre} />
               {/* El sector de UCVMM (2026-11-10): solo le llega al SNM. */}
               {s.sector_nombre && <Dato etiqueta="Sector" valor={s.sector_nombre} />}
               <Dato etiqueta="Fecha de la operación" valor={formatearFecha(s.fecha_operacion)} />
