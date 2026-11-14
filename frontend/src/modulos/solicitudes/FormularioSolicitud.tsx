@@ -71,8 +71,6 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
   const { faltantes } = documentos;
 
   const hoy = hoyISO();
-  // El Form. No. 6 a los restringidos (hoy solo Desembarque, como en el Form. 3).
-  const exigeCustodia = !!tipo?.documentos.some((d) => d.condicion === "nacionalidad_restringida");
   const errores = useMemo(
     () => (tipo ? validarFormulario(tipo, cabecera, tripulantes, paisesPorCodigo, hoy) : []),
     [tipo, cabecera, tripulantes, paisesPorCodigo, hoy],
@@ -224,7 +222,6 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
                   validaVigencia={tipo.valida_vigencia}
                   fechaReferencia={referenciaVigencia}
                   rangosPermitidos={tipo.rangos_permitidos}
-                  exigeCustodia={exigeCustodia}
                   avisoCustodia={tipo.aviso_custodia}
                   casillas={documentos.casillasPorTripulante.get(t.clave) ?? SIN_CASILLAS}
                   nuevos={documentos.nuevos}

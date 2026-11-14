@@ -3,7 +3,8 @@ import type { RangoMarino } from "./solicitudes";
 
 export type Formulario = "formulario_3";
 export type AlcanceDocumento = "solicitud" | "marino";
-export type CondicionDocumento = "siempre" | "solo_panamenos" | "nacionalidad_restringida";
+/** `solo_extranjeros` (2026-11-14): a todos menos a los panameños. */
+export type CondicionDocumento = "siempre" | "solo_panamenos" | "nacionalidad_restringida" | "solo_extranjeros";
 
 /** Una fila del checklist de un trámite. */
 export interface TramiteDocumento {
@@ -77,4 +78,5 @@ export const ETIQUETA_CONDICION: Record<CondicionDocumento, string> = {
   siempre: "Siempre",
   solo_panamenos: "Solo panameños",
   nacionalidad_restringida: "Nacionalidad restringida",
+  solo_extranjeros: "No a panameños",
 };

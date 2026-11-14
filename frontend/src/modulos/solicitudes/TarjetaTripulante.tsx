@@ -24,8 +24,6 @@ interface Props {
   fechaReferencia:  string;
   /** Rangos que admite el trámite (null = cualquiera). */
   rangosPermitidos: RangoMarino[] | null;
-  /** El trámite exige el Form. No. 6 a los restringidos (Desembarque, como en el Form. 3). */
-  exigeCustodia:    boolean;
   /** Al aprobar se avisa que se debe tramitar la custodia (lo dice el proceso del trámite). */
   avisoCustodia:    boolean;
   /** Casillas del checklist que corresponden a este tripulante. */
@@ -41,19 +39,39 @@ interface Props {
   onVer:       (documento: DocumentoSolicitud) => void;
 }
 
+/** «Visa» · «Visa» y «Formulario No. 6» · «A», «B» y «C». */
+function enumerar(nombres: string[]): string {
+  const citados = nombres.map((n) => `«${n}»`);
+  return citados.length < 2 ? citados.join("") : `${citados.slice(0, -1).join(", ")} y ${citados[citados.length - 1]}`;
+}
+
+/** El aviso de un pasajero de nacionalidad restringida: lo que debe adjuntar (la Visa,
+ *  desde el 2026-11-14, y el Form. No. 6 en Desembarque) y, en los trámites que lo
+ *  dicen, que al aprobarse se tramita la custodia. */
+function textoRestringida(documentos: string[], avisoCustodia: boolean): string {
+  const partes = ["Nacionalidad restringida:"];
+  if (documentos.length) partes.push(`debe adjuntar ${enumerar(documentos)}.`);
+  if (avisoCustodia) {
+    partes.push(`${documentos.length ? "Al" : "al"} aprobarse, la agencia deberá realizar el trámite de solicitud de custodia.`);
+  }
+  return partes.join(" ");
+}
+
 /** Ficha de un tripulante con sus propios documentos. Memoizada: con muchos
  *  tripulantes, escribir en uno no vuelve a pintar los demás. Los países van en
  *  selectores con buscador, que pintan su lista solo abiertos. Se puede contraer
  *  para no alargar la página. */
 export const TarjetaTripulante = memo(function TarjetaTripulante({
   ficha, indice, puedeQuitar, opcionesPais, paises, validaVigencia, fechaReferencia, rangosPermitidos,
-  exigeCustodia, avisoCustodia, casillas, nuevos, existentes, contraida,
+  avisoCustodia, casillas, nuevos, existentes, contraida,
   onCambiar, onQuitar, onAlternar, onElegir, onDescartar, onVer,
 }: Props) {
   const conLibreta = portaLibreta(ficha);
   const pais = paises.get(ficha.nacionalidad);
-  // Solo se señala en los trámites cuyo proceso menciona la custodia.
-  const restringida = (pais?.nacionalidad_restringida ?? false) && (exigeCustodia || avisoCustodia);
+  // Desde el 2026-11-14 se señala en todos los trámites: se le pide la Visa.
+  const restringida = pais?.nacionalidad_restringida ?? false;
+  // Lo que se le pide por su nacionalidad (la Visa y, en Desembarque, el Form. No. 6).
+  const porRestringida = casillas.filter((c) => c.condicion === "nacionalidad_restringida").map((c) => c.documento_nombre);
   // El pasaporte, con al menos 3 meses de vigencia desde la operación (2026-11-13).
   const pasaporte = estadoPasaporte(ficha.pasaporte_expira, fechaReferencia);
   const pasaporteVencido = pasaporte === "vencido";
@@ -63,6 +81,9 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
   const avisoResumen = pasaporteVencido || libretaVencida ? "documento vencido"
     : pasaporteCorto ? `pasaporte con menos de ${MESES_VIGENCIA_PASAPORTE} meses de vigencia` : null;
   const rangos = rangosPermitidos ?? TODOS_LOS_RANGOS;
+  // Un solo rango posible (Sellado de Shore Pass: solo Marino, 2026-11-14): ya elegido, y se dice.
+  const rangoUnico = rangos.length === 1 ? rangos[0] : null;
+  const idNotaRango = `tripulante-${ficha.clave}-nota-rango`;
   const nombre = `${ficha.nombre} ${ficha.apellido}`.trim();
 
   // Las opcionales no cuentan: completo es tener todas las obligatorias.
@@ -138,11 +159,17 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
               valor={ficha.nacionalidad} onCambiar={(valor) => onCambiar(ficha.clave, "nacionalidad", valor)} />
             <label className={styles.campo}>
               <span>Rango *</span>
-              <select {...campo("rango")}>
+              <select {...campo("rango")} aria-describedby={rangoUnico ? idNotaRango : undefined}>
                 {rangos.map((r) => (
                   <option key={r} value={r}>{ETIQUETA_RANGO[r]}</option>
                 ))}
               </select>
+              {/* aria-hidden: no se suma al nombre del campo; el lector la lee como su descripción. */}
+              {rangoUnico && (
+                <small id={idNotaRango} className={styles.notaCampo} aria-hidden="true">
+                  Único rango de este trámite.
+                </small>
+              )}
             </label>
             <label className={styles.campo}>
               <span>Ocupación *</span>
@@ -180,11 +207,9 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
           {(restringida || pasaporteVencido || pasaporteCorto || libretaVencida) && (
             <div className={styles.marinoAlertas}>
               {restringida && (
-                <div className={exigeCustodia ? styles.alertaInfo : styles.alertaAviso}>
+                <div className={porRestringida.length ? styles.alertaInfo : styles.alertaAviso}>
                   <IconoAlerta tamano={13} />
-                  {exigeCustodia
-                    ? "Nacionalidad restringida: debe adjuntar el Formulario No. 6 de custodia aprobada."
-                    : "Nacionalidad restringida: al aprobarse, la agencia deberá realizar el trámite de solicitud de custodia."}
+                  {textoRestringida(porRestringida, avisoCustodia)}
                 </div>
               )}
               {pasaporteVencido && (

@@ -7,8 +7,9 @@ autorización existe y si sigue vigente — sin exponer el expediente.
 
 Hay dos versiones: la de la agencia ("Aprobada por: Servicio Nacional de
 Migración", sin unidades internas desde el 2026-11-11) y la copia interna del
-personal del SNM, con el nombre de quien aprobó y una leyenda que la distingue
-si alguien la reenvía (reunión del 2026-10-30).
+personal del SNM, con el nombre de quien aprobó, el de quien finalizó (desde el
+2026-11-14) y una leyenda que la distingue si alguien la reenvía (reunión del
+2026-10-30). Quien escanea el QR ve la de la agencia (2026-11-14).
 """
 import logging
 from dataclasses import dataclass, field
@@ -114,6 +115,8 @@ class DatosPdfAutorizacion:
     url_verificacion:    str
     codigo_verificacion: str
     copia_interna:       bool = False  # la descarga el personal del SNM
+    # Quien finalizó, solo en la copia interna (2026-11-14): la agencia no ve nombres.
+    finalizada_por:      str | None = None
     # Cambio de puerto (2026-11-13): el nuevo puesto, donde vale y se finaliza.
     puesto_destino:      str | None = None
     # Aprobada fuera del horario laboral, con su costo migratorio (2026-11-11).
@@ -297,6 +300,8 @@ def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
             ("FINALIZADA EN", _t(d.puesto_finalizacion or d.puesto_destino or d.puesto_control)),
             ("FECHA DE FINALIZACIÓN", _f(d.finalizada_en, True)),
         ]
+        if d.finalizada_por:
+            pares.append(("FINALIZADA POR", _t(d.finalizada_por)))
     if len(pares) % 2:
         pares.append(("", ""))
     filas = []

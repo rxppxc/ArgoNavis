@@ -75,8 +75,9 @@ constants/          → números mágicos.
 6. **Nunca** versionar `.env`. Está en `.gitignore`. Si el usuario lo va a versionar, avisar.
 7. **Nunca** usar `--no-verify`, `--no-gpg-sign`, ni saltarse hooks de git sin permiso explícito.
 8. JWT se verifica contra BD en cada request — esto es **a propósito** para revocación inmediata: el estado de la cuenta y `users.sesiones_validas_desde` contra el `iat` del token (cerrar sesión, cambiar o restablecer la contraseña y desactivar la cuenta invalidan los tokens ya emitidos). No lo conviertas en caché sin pensar el trade-off.
-9. Rate limit en `/auth/login`, `/auth/cambiar-contrasena` y `/verificacion/{codigo}` (el único endpoint público) — si agregas otro endpoint público, agrégalo, y súmalo a la lista de `test_solo_estas_rutas_responden_sin_sesion` (`tests/test_seguridad.py`), que falla con cualquier ruta sin token que no esté ahí.
+9. Rate limit en `/auth/login`, `/auth/cambiar-contrasena`, `/verificacion/{codigo}` y su `/autorizacion.pdf` (los únicos endpoints públicos, con el login) — si agregas otro endpoint público, agrégalo, y súmalo a la lista de `test_solo_estas_rutas_responden_sin_sesion` (`tests/test_seguridad.py`), que falla con cualquier ruta sin token que no esté ahí.
 10. Los documentos del expediente solo se sirven con sesión, validando acceso a la solicitud (`ServicioSolicitud.obtener_documento`) y dejando DOCUMENTO_VISTO/DESCARGADO en la bitácora. **Nunca** vuelvas a exponer archivos por token o enlace público.
+    - La única excepción es el **PDF de la autorización**, que no es un documento del expediente: lo arma el sistema. Desde el 2026-11-14 quien escanea el QR lo ve sin sesión (`GET /verificacion/{codigo}/autorizacion.pdf`, decisión del usuario). Es la copia de la agencia, sin nombres de funcionarios ni nada interno. Se ve mientras la autorización valga y hasta `DIAS_PDF_PUBLICO` días después de la operación, con tope por IP y en la bitácora (ver «Cambios del 2026-11-14»). No le agregues lo interno, y no abras así ningún otro archivo.
 11. Separación de funciones: nadie revisa (impedimentos, aprobar, devolver, negar) una solicitud que creó o que es de su agencia. No la quites "para probar": usa dos cuentas.
     - Y cada sector de UCVMM ve y revisa solo las solicitudes de los puestos de su sector (2026-11-10). No lo abras "para probar": asigna el usuario a los dos sectores.
 12. El login responde lo mismo si el usuario no existe y si la contraseña está mal (`ErrorAcceso` en `auth_service.py`); el motivo real va solo a la bitácora. No vuelvas a distinguirlos: revela qué cuentas existen en el AD.
@@ -491,7 +492,7 @@ Pedido del usuario: «¿las librerías son descargadas, nada se saca de internet
 
 ### Recursos y topes (2026-11-10)
 Pedido del usuario: «¿no hay riesgo de sobrecarga de recursos, procesos que afecten la operación?», y después: «¿por qué 200 MB si el máximo es 2 MB por archivo?», «los contenedores deben estar limitados» y «¿el respaldo nocturno ralentiza todo?». Lo prueba `tests/test_recursos.py`.
-- **Tope del cuerpo de cada petición** (`TopeDelCuerpo`, `main.py`): 1 MB en la API (`TOPE_CUERPO_MB`) y `TOPE_CUERPO_ENVIO_MB` (285 desde el 2026-11-13; antes 283) al crear y corregir una solicitud (`_RUTA_DE_ENVIO`). Es lo más que pesa un envío válido: 30 pasajeros × 4 documentos + 2 de la solicitud (el Formulario No. 3 y la Lista de Tripulantes) + 20 adicionales, de 2 MB, más 1 MB.
+- **Tope del cuerpo de cada petición** (`TopeDelCuerpo`, `main.py`): 1 MB en la API (`TOPE_CUERPO_MB`) y `TOPE_CUERPO_ENVIO_MB` (345 desde el 2026-11-14; antes 285 y 283) al crear y corregir una solicitud (`_RUTA_DE_ENVIO`). Es lo más que pesa un envío válido: 30 pasajeros × 5 documentos (uno restringido, con la Visa) + 2 de la solicitud (el Formulario No. 3 y la Lista de Tripulantes) + 20 adicionales, de 2 MB, más 1 MB.
   - FastAPI lee el cuerpo **antes** de comprobar la sesión y el rate limit. Sin tope, cualquiera, sin cuenta, hacía leer al backend cientos de MB por petición, también en el login (un JSON va entero a la memoria). Con Content-Length se corta sin leer; sin él, se cuenta lo que llega.
   - nginx tiene los mismos: `client_max_body_size 1m` en `/api/` y un `location` anidado para los envíos, con el 413 en JSON. Antes eran 200 MB para todo `/api/`, que encima no alcanzaban para un envío máximo.
   - Si el catálogo pide más documentos, `test_el_tope_de_un_envio_alcanza_para_el_catalogo` falla: sube `MAX_DOCUMENTOS_*` (`solicitud_service.py`) y nginx. `test_nginx_tiene_los_mismos_topes_que_el_backend` compara los dos, y la CI corre `nginx -t` con la imagen de producción.
@@ -583,6 +584,24 @@ Pedido del usuario: a la agencia no mostrarle su rol; el Cambio de Puerto dentro
   - La lista se pinta solo abierta: antes eran 2 × ~250 `<option>` por pasajero. Se abre hacia arriba si no cabe debajo.
   - En el E2E se busca por rol (`getByRole("combobox", { name })`): `getByLabel` encuentra también la lista, que lleva el mismo rótulo. Para elegir, `elegirPais` (`e2e/datos.ts`).
 
+### Cambios del 2026-11-14 (revisión `c3e8a1f5d927`)
+Pedido del usuario: Shore Pass solo para marinos, la visa obligatoria a los de nacionalidad restringida, los panameños sin visa, el nombre de quien finalizó en el PDF y que se pueda ver el PDF escaneando el QR sin VPN ni cuenta. Decisiones del usuario: la Visa es un documento nuevo, y quien además deba la Visa Especial de Marino sube las dos; la regla de los panameños va para todo rango y también en Cambio de nave; el nombre de quien finalizó, solo en la copia interna; y en el QR, ver el PDF «sin afectar la seguridad interna, sin vulnerabilidades y sin puntos muertos».
+- **Sellado de Shore Pass solo para el Marino** (`rangos_permitidos`). El rango viene elegido y, con un solo rango posible, el campo lo dice («Único rango de este trámite», con `aria-describedby`) y la tarjeta del trámite suma «solo rango Marino».
+- **La Visa a los restringidos** (DOC-VISA, «Visa»): una por pasajero de nacionalidad restringida, en todos los trámites (también el desactivado) y para cualquier rango, al final del checklist. Quien además deba la Visa Especial de Marino (Embarque y Cambio de nave) sube las dos.
+  - El aviso de la tarjeta sale de las casillas: nombra lo que se le pide por su nacionalidad (`CasillaFormulario.condicion`, `textoRestringida` en `TarjetaTripulante`). Antes salía solo en los trámites con custodia.
+  - `tiene_nacionalidad_restringida` (bandeja) y el chip «Restringida» del expediente, en todos los trámites.
+  - `MAX_DOCUMENTOS_POR_TRIPULANTE` pasa a 5 (un restringido en Urgencia, Renovación o Desembarque) y el tope de un envío, a 345 MB (`TOPE_CUERPO_ENVIO_MB` y nginx).
+- **Panameños sin visa ni boleto** (condición nueva `solo_extranjeros`, «No a panameños» en el catálogo; espejo en `checklist.ts`): la Visa Especial de Marino y el boleto aéreo de Embarque, el boleto de Desembarque y la Visa Especial de Cambio de nave. El marino panameño presenta Generales y Libreta; el pasajero y el militar, solo Generales; el militar de Cambio de nave sigue con su boleto. Un documento de la solicitud con esa condición no se pide si todos son panameños.
+- **«Finalizada por» en la copia interna del PDF** («Nombre (Puesto de control)», del historial, como quien aprobó). La de la agencia no lleva nombres.
+- **El PDF por el QR, sin VPN ni cuenta** (`GET /verificacion/{codigo}/autorizacion.pdf`, `api/v1/verificacion.py`):
+  - La página de verificación suma «Ver autorización (PDF)», un enlace normal: el celular lo abre en su visor (Android lo descarga y lo abre). Se probó que Chrome lo muestra con la CSP del sistema, así que no hizo falta tocarla.
+  - Es la copia de la agencia (`pdf_publico` → `_datos_pdf(interno=False)`), mientras valga (`_vigente`) y hasta `DIAS_PDF_PUBLICO` (30) días después de la operación (`pdf_publico_disponible`, y `pdf_disponible` en `SalidaVerificacion`).
+  - Si no se puede, o el código no existe, responde 303 a `/verificar/{codigo}`, que explica por qué: **sin pantallas sin salida** («La agencia naviera lo descarga con su cuenta», «no está vigente», «no encontrada»).
+  - Tope por IP (`LIMITE_PDF_PUBLICO_POR_MINUTO`, 10), `en_hilo_con_tope`, código validado por formato (422) y metido en la redirección con `quote`, `no-store` y `noindex`, y cada vista en la bitácora (AUTORIZACION_DESCARGADA con `publica` e IP, sin usuario).
+  - **Sin VPN funciona solo cuando la DTI publique la verificación en internet**: con un nombre propio, HTTPS y solo estas rutas (plantilla `frontend/nginx-verificacion-publica.conf`, que no usa Docker). En el nginx interno va `set_real_ip_from` para la IP real, y en el `.env`, `URL_VERIFICACION_PUBLICA`: el QR apunta ahí (`url_base_verificacion`). `verificar-despliegue.sh` avisa mientras falte. README → «Verificación pública del QR».
+  - Lo prueban `test_ciclo_completo` y `test_pdf_publico_solo_mientras_vale` (`test_flujo.py`), la lista de rutas públicas de `test_seguridad.py` y el E2E `flujo-completo.spec.ts` (el enlace y el PDF).
+- Lo prueban también `test_visa_a_los_restringidos_*`, `test_panamenos_sin_visa_ni_boleto` y `test_shore_pass_solo_marino` (`test_documento_ucvmm.py`), los casos nuevos de `espejo/checklist.json` y el E2E `formulario.spec.ts`. La BD del E2E siembra Cuba como restringida (`servidor_e2e.py`).
+
 ### Lo que sigue pendiente (no urgente)
 1. **HTTPS y TLS con el AD** — la configuración está lista (README → "Producción"); falta el certificado del servidor y el del controlador de dominio (infraestructura).
 2. **JWT en cookie httpOnly** — actualmente en localStorage, con la CSP como barrera (regla 15). Plan en README → "Decisiones documentadas".
@@ -611,9 +630,13 @@ Pedido del usuario: a la agencia no mostrarle su rol; el Cambio de Puerto dentro
     - los permisos se consultan en cada pedido (a veces dos veces);
     - el expediente vuelve a leer el catálogo (trámites, documentos y países) y carga `creada_por` con su rol y su agencia.
     Juntar la verificación del token con la carga del usuario y cachear el catálogo por proceso ahorraría entre 10 y 20 %. Correr `tests/carga.py` antes y después.
-17. **Documentación de la DTI, juego 0.7:** `docs/` no tiene todavía la identidad «pase oficial» ni los cambios del 2026-11-11 (documentos de los técnicos, nombre neutro para la agencia, costo fuera del horario y consulta histórica) y del 2026-11-13 (cambio de puerto, Formulario No. 3 en todos los trámites, cabecera de la agencia).
+17. **Documentación de la DTI, juego 0.7:** `docs/` no tiene todavía la identidad «pase oficial» ni los cambios del 2026-11-11 (documentos de los técnicos, nombre neutro para la agencia, costo fuera del horario y consulta histórica), del 2026-11-13 (cambio de puerto, Formulario No. 3 en todos los trámites, cabecera de la agencia, rango Pasajero, pasaporte con 3 meses) y del 2026-11-14 (la Visa de los restringidos, los panameños, Shore Pass, quien finalizó y el PDF por el QR).
 18. **Validar con UCVMM, del 2026-11-11:** cómo y dónde paga la agencia el costo migratorio (el sistema solo lo avisa: no dice dónde se paga ni registra el pago), y si el Contrato de Trabajo debe cumplir alguna condición (hoy se pide sin ninguna).
 19. **Del 2026-11-13, para decidir o validar:** si el Formulario No. 3 va firmado y sellado (lo diría la descripción del documento); generarlo prellenado con los datos del formulario, para imprimir, firmar y subir; un «Desistir» para que la agencia cierre una solicitud que ya no usará (hoy queda aprobada hasta que vence); y, con UCVMM, que los 3 meses de vigencia del pasaporte apliquen también a la gente de mar.
+20. **Del 2026-11-14:**
+    - Con la DTI: publicar la verificación del QR en internet (plantilla `frontend/nginx-verificacion-publica.conf`, HTTPS, `set_real_ip_from` y `URL_VERIFICACION_PUBLICA`). Mientras tanto, el QR solo funciona dentro de la red del SNM.
+    - Con UCVMM: el nombre y la descripción de la Visa de los restringidos (hoy «Visa», «Para el pasajero de nacionalidad restringida.»; se cambian con una migración).
+    - Si las agencias van a entrar al sistema desde internet sin VPN (el usuario lo mencionó), es otra decisión con la DTI: hoy todo está pensado para la VPN. Publicar todo pediría al menos HTTPS, el segundo factor de las agencias (punto 8) y un WAF.
 
 ### Flujo actual: Autorizaciones Marítimas (UCVMM)
 
@@ -669,18 +692,20 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
   - Qué documentos: el recuadro del trámite en el **Formulario No. 3 oficial**. Por eso Desembarque lleva Generales de pasaporte, aunque el documento de proceso no la liste.
   - Por tripulante o por solicitud: cada proceso dice "para cada tripulante…". La única excepción escrita es la Lista de Tripulantes, que "debe subirse al trámite" (pág. 9). Por eso la Carta de responsabilidad y el Reporte médico van por tripulante.
   - Flujo y requisitos del sistema: págs. 9–10 del documento de proceso.
-  - **Cinco excepciones decididas por el usuario** sobre la lectura literal:
+  - **Seis excepciones decididas por el usuario** sobre la lectura literal:
     - La vigencia se valida en todos los trámites, no solo en los 3 que la mencionan (2026-10-14). Desde el 2026-11-13, el pasaporte con al menos 3 meses a partir de la operación, y el seamanbook vencido solo se señala.
     - La libreta de Embarque se pide a todo Marino (`siempre`), no solo a los panameños. La condición `solo_panamenos` queda en el enum sin uso (2026-10-14).
     - A los rangos distintos de Marino solo se les piden las Generales de pasaporte y el boleto aéreo, en todos los trámites (reunión del 2026-10-30, `tramite_documentos.rangos`), salvo lo de la cuarta.
     - A los técnicos, supernumerarios y superintendentes, en Desembarque: Carta de Responsabilidad, Generales de pasaporte, Contrato de Trabajo y, opcional, el boleto aéreo. En Embarque, lo mismo sin el boleto (2026-11-11, `tramite_documentos.rangos_opcional`). El militar sigue con Generales y boleto.
     - El Formulario No. 3 en todos los trámites, uno por solicitud y para cualquier rango; el Cambio de Puerto deja de ser un trámite: se indica en Embarque y Desembarque, con el nuevo puesto del mismo sector; y el rango Pasajero presenta lo del Marino sin la Libreta, con Embarque y Desembarque solo para Marino, Pasajero y Militar (2026-11-13).
+    - La Visa (DOC-VISA) a todo pasajero de nacionalidad restringida, en todos los trámites y rangos; a los panameños, sin visa ni boleto aéreo en Embarque y Desembarque ni la Visa Especial de Marino en Cambio de nave (condición `solo_extranjeros`); y el Sellado de Shore Pass solo para el Marino (2026-11-14).
 - Nacionalidad restringida (`paises.nacionalidad_restringida`):
+  - Desde el 2026-11-14 se le pide la **Visa** (DOC-VISA) en todos los trámites y rangos, y se señala en todos: el chip de la tarjeta, la bandeja y el expediente, y el aviso del formulario, que nombra lo que debe adjuntar.
   - El Form. No. 6 se adjunta **solo en Desembarque** ("cuando aplique", como en el Form. 3).
   - `tipos_tramite.aviso_custodia` marca los trámites cuyo proceso dice que, al aprobar, se avisa a la agencia que debe realizar el trámite de solicitud de custodia: Desembarque, Urgencias, Renovación y Shore Pass.
-  - En los demás trámites no se menciona: ni en el formulario, ni en el expediente, ni en el correo, ni en el PDF.
+  - En los demás trámites no se menciona la custodia: ni en el formulario, ni en el expediente, ni en el correo, ni en el PDF.
   - **Ninguna nacionalidad viene sembrada**: la lista oficial la marca el admin.
-- `tipos_tramite.rangos_permitidos` limita los rangos del trámite (nulo = cualquiera); hoy solo F3-TECNICO, por el nombre del trámite en el Form. 3. Lo valida `ServicioTramite.validar_tripulantes` y lo espeja `validacionFormulario.ts`.
+- `tipos_tramite.rangos_permitidos` limita los rangos del trámite (nulo = cualquiera): F3-TECNICO (sus tres rangos, por el nombre del trámite en el Form. 3), Embarque y Desembarque (Marino, Pasajero y Militar, 2026-11-13) y Shore Pass (solo Marino, 2026-11-14). Lo valida `ServicioTramite.validar_tripulantes` y lo espeja `validacionFormulario.ts`. Con un solo rango, el formulario lo trae elegido y lo dice bajo el campo y en la tarjeta del trámite.
 - Las aclaraciones del instructivo del Form. 3 para el buque y el puerto ("nueva nave a embarcar", etc.) viven en `AYUDA_CAMPOS_TRAMITE` (`modulos/solicitudes/presentacion.ts`).
 - `tipos_tramite.descripcion` (revisión `a3d9c6e1f584`) es una línea con cuándo se usa el trámite, para las tarjetas del paso 1.
   - Primera versión del 2026-10-19, apoyada en los documentos que pide cada trámite (el boleto aéreo del Desembarque, la cita del consulado de la Renovación): **falta validarla con UCVMM**.

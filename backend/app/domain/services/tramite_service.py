@@ -6,9 +6,13 @@ varias condiciones dependen de los datos de esa solicitud:
 
   - SOLO_PANAMENOS           → solo a tripulantes panameños (hoy sin uso: la
                                Libreta de Embarque se pide a todo Marino).
-  - NACIONALIDAD_RESTRINGIDA → solo a tripulantes de nacionalidad restringida
-                               (Formulario No. 6 de custodia, hoy solo en
-                               Desembarque, como en el Form. 3).
+  - SOLO_EXTRANJEROS         → a todos menos a los panameños (2026-11-14): la
+                               visa y el boleto aéreo de Embarque y Desembarque,
+                               y la Visa Especial de Marino de Cambio de nave.
+  - NACIONALIDAD_RESTRINGIDA → solo a tripulantes de nacionalidad restringida:
+                               la Visa, en todos los trámites y rangos
+                               (2026-11-14), y el Formulario No. 6 de custodia,
+                               solo en Desembarque, como en el Form. 3.
   - Documentos con `requiere_libreta` → solo a quien porta seamanbook (rango
     Marino); pasajeros, militares, técnicos, supernumerarios y superintendentes no.
     El Pasajero (2026-11-13) va en las filas del Marino: lo mismo, sin la Libreta.
@@ -145,6 +149,9 @@ class ServicioTramite:
                 if (td.condicion == CondicionDocumento.NACIONALIDAD_RESTRINGIDA.value
                         and not any(t.nacionalidad_restringida for t in tripulantes)):
                     continue
+                if (td.condicion == CondicionDocumento.SOLO_EXTRANJEROS.value
+                        and all(t.es_panameno for t in tripulantes)):
+                    continue
                 if td.rangos and not any(t.rango in td.rangos for t in tripulantes):
                     continue
                 casillas.append(CasillaChecklist(
@@ -158,6 +165,8 @@ class ServicioTramite:
             # Alcance "marino": una casilla por cada tripulante al que aplique.
             for indice, tripulante in enumerate(tripulantes):
                 if td.condicion == CondicionDocumento.SOLO_PANAMENOS.value and not tripulante.es_panameno:
+                    continue
+                if td.condicion == CondicionDocumento.SOLO_EXTRANJEROS.value and tripulante.es_panameno:
                     continue
                 if (td.condicion == CondicionDocumento.NACIONALIDAD_RESTRINGIDA.value
                         and not tripulante.nacionalidad_restringida):

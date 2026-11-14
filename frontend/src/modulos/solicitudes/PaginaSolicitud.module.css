@@ -67,6 +67,8 @@
 .campo > span em, .campo > label em { color: var(--muted); font-style: normal; font-weight: 500; text-transform: none; letter-spacing: 0; font-family: var(--letra-texto); font-stretch: 100%; }
 /* La fecha elegida, en palabras (FechaEnPalabras). */
 .fechaEnPalabras { color: var(--text-2); font-size: .74rem; margin-top: -2px; }
+/* Una aclaración bajo el campo (el rango único de Shore Pass, 2026-11-14). */
+.notaCampo { color: var(--text-2); font-size: .74rem; line-height: 1.4; margin-top: -2px; }
 
 /* Todos los campos iguales en todos los pasos (antes unos eran grises y otros
    blancos) y con borde de 3:1, para que se vea dónde se escribe. */

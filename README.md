@@ -159,6 +159,12 @@ Después de cada despliegue, `sudo bash verificar-despliegue.sh` revisa sin camb
 > - **Navegador:** un certificado para el servidor; en nginx, un `server` en el 443 (`ssl_certificate` / `ssl_certificate_key`) y el 80 redirigiendo al 443. Ya con HTTPS, agregar `Strict-Transport-Security`. En Windows, lo mismo en el proxy que esté delante de uvicorn.
 > - **Correo:** si el SMTP pide usuario y contraseña (`MAIL_USERNAME` / `MAIL_PASSWORD`), activar `MAIL_STARTTLS=true` (587 o 25) o `MAIL_USAR_SSL=true` (465); si no, viajan en claro, y el backend lo advierte al arrancar. Como con el AD: `MAIL_HOST` con el nombre del certificado y `MAIL_CA_CERT` con el PEM de la CA interna. Sin TLS (lo de siempre), ni siquiera se intenta STARTTLS.
 
+> **Verificación pública del QR** (14/11/2026, para la DTI). Quien escanea el QR del PDF ve si la autorización es auténtica y si sigue vigente, y con «Ver autorización (PDF)» abre el PDF en su celular, sin cuenta: la copia de la agencia (sin nombres de funcionarios), mientras valga y hasta `DIAS_PDF_PUBLICO` (30) días después de la operación. Si ya no se puede ver así, la página dice por qué; los documentos del expediente nunca salen por ahí.
+> - **Hoy el QR solo funciona dentro de la red del SNM.** Desde un celular sin VPN solo se llega a lo que está en internet. Para eso, la DTI publica **solo la verificación** con un nombre propio y HTTPS (sin HTTPS no: el PDF lleva los datos de los pasajeros). La plantilla del proxy está en `frontend/nginx-verificacion-publica.conf`: deja pasar la página `/verificar/{código}`, lo que esa página carga y dos rutas de solo lectura de la API (`GET /api/v1/verificacion/{código}` y su `/autorizacion.pdf`). Todo lo demás (el login, las bandejas, los documentos, el resto de la API) responde 404 desde internet.
+> - En el nginx interno, confiar en ese proxy para la IP real del cliente (`set_real_ip_from <IP del proxy>; real_ip_header X-Real-IP;`, ver el comentario en `frontend/nginx.conf`): sin eso, la bitácora y el tope por IP verían a todos como el proxy.
+> - En el `.env`: `URL_VERIFICACION_PUBLICA=https://<el nombre publicado>` y reiniciar el backend. Los PDF que se descarguen desde entonces llevan el QR a esa dirección; los ya impresos siguen con la interna (se vuelven a descargar). `verificar-despliegue.sh` avisa mientras falte.
+> - Ya en la aplicación: el código del QR es aleatorio (192 bits), el PDF tiene tope por IP (`LIMITE_PDF_PUBLICO_POR_MINUTO`, 10), cada vista queda en la bitácora (con la IP) y la respuesta no se guarda en caché ni se indexa.
+
 > **Al migrar un servidor que venía del storage** (revisión `d4f1a8c27e90`): las transferencias sueltas que existan se **eliminan**, en la base y en disco. Si alguna hace falta, descárgala antes de actualizar.
 
 > **Primer SysAdmin** (desde la revisión `c7a2e94b1f30`): usuarios, roles y permisos los gestionan el SysAdmin y el Administrador, y la migración no le asigna esos roles a nadie. Después de migrar, nómbralo desde la consola del servidor (queda en la bitácora). En una instalación nueva no hay usuarios: agrega `--crear-ad` para darlo de alta desde el Active Directory, o `--crear-local` para una cuenta local con contraseña temporal (se muestra una vez):
@@ -234,7 +240,7 @@ Administrador y SysAdmin se reconocen por el nombre del rol (`rol_personalizado.
   - La operación va de hoy hasta `DIAS_MAXIMOS_ANTICIPACION` (365) días.
   - Cada pasajero debe tener 18 años cumplidos y haber nacido desde 1900.
   - El pasaporte y el seamanbook tienen que vencer después del nacimiento.
-- En ningún trámite se puede enviar la solicitud si el pasaporte o el seamanbook vence antes del día de la operación. Solo el rango Marino porta seamanbook; en Embarque se le pide la libreta sin importar la nacionalidad.
+- En ningún trámite se puede enviar la solicitud si el pasaporte vence antes de 3 meses después de la operación; el seamanbook vencido solo se avisa (13/11/2026). Solo el rango Marino porta seamanbook; en Embarque se le pide la libreta sin importar la nacionalidad.
 - El catálogo sigue tal cual los documentos:
   - Los documentos de cada trámite son los del Formulario No. 3 oficial.
   - Todos se suben por pasajero, salvo la Lista de Tripulantes (su nombre oficial en el Form. 3) y el Formulario No. 3, que van a la solicitud.
@@ -243,13 +249,16 @@ Administrador y SysAdmin se reconocen por el nombre del rol (`rol_personalizado.
   - Excepción (13/11/2026): el Formulario No. 3 se adjunta en todos los trámites, uno por solicitud y para cualquier rango.
   - Rango Pasajero (13/11/2026): se le piden los documentos del Marino, salvo la Libreta. Embarque y Desembarque admiten solo Marino, Pasajero y Militar; los técnicos, supernumerarios y superintendentes van por el trámite de Técnico.
   - Vigencia (13/11/2026): el pasaporte tiene que vencer al menos 3 meses después de la operación (13/11 → 13/02 o después). El seamanbook vencido no impide enviar: se avisa y queda señalado en el expediente.
+  - Panameños (14/11/2026): no se les pide visa ni boleto aéreo en Embarque y Desembarque, ni la Visa Especial de Marino en Cambio de nave (condición `solo_extranjeros`). El marino panameño presenta Generales de pasaporte y Libreta; el pasajero y el militar, solo Generales.
+  - Sellado de Shore Pass (14/11/2026): solo el rango Marino.
 - Cambio de puerto (13/11/2026): no es un trámite aparte. En Embarque y Desembarque la agencia indica si hay cambio de puerto y elige el nuevo puesto de control, que tiene que ser del mismo sector que el primero; si el nuevo puerto es del otro sector, presenta una nueva solicitud y la original vence sola. La finaliza el puesto nuevo; el primero la puede consultar.
 - Una solicitud admite hasta 30 pasajeros.
 - Nacionalidad restringida:
+  - En todos los trámites y rangos se le pide la Visa (14/11/2026), además de lo que pida el trámite: en Embarque y Cambio de nave, al marino y al pasajero, también la Visa Especial de Marino. El formulario y el expediente lo señalan.
   - En Desembarque se exige el Formulario No. 6 de custodia por pasajero.
   - En Desembarque, Urgencias, Renovación y Shore Pass, al aprobar se avisa a la agencia que debe realizar el trámite de solicitud de custodia (`tipos_tramite.aviso_custodia`).
   - La lista de nacionalidades restringidas la marca el admin; no viene ninguna sembrada.
-- El trámite de Técnico, Superintendente o Supernumerario solo admite pasajeros con esos rangos (`tipos_tramite.rangos_permitidos`).
+- El trámite de Técnico, Superintendente o Supernumerario solo admite pasajeros con esos rangos, y el Sellado de Shore Pass solo al Marino (`tipos_tramite.rangos_permitidos`).
 - `backend/tests/test_documento_ucvmm.py` tiene la lectura del Formulario No. 3 y del documento de UCVMM trámite por trámite (campos, documentos, vigencias, custodia): si el catálogo se aparta de él, la prueba falla.
 - Además del checklist, se pueden adjuntar hasta 20 documentos adicionales por solicitud.
 - Lo interno no le llega a la agencia, porque el backend lo filtra, no solo la vista:
@@ -259,7 +268,7 @@ Administrador y SysAdmin se reconocen por el nombre del rol (`rol_personalizado.
   - Los nombres de los funcionarios: en su historial ve «Servicio Nacional de Migración» o "Puesto de control".
   - Sí ve los motivos de devolución y de negación.
 - **Nombre neutro para la agencia (11/11/2026):** en lo que ve la agencia (pantallas, correos y PDF) no se nombran las unidades internas (UCVMM, los sectores): dice «Servicio Nacional de Migración». Las pantallas y los informes del SNM no cambian.
-- El PDF de la autorización no lleva observaciones. El de la agencia dice "Aprobada por: Servicio Nacional de Migración"; el personal del SNM descarga una copia interna con el nombre de quien aprobó.
+- El PDF de la autorización no lleva observaciones. El de la agencia dice "Aprobada por: Servicio Nacional de Migración"; el personal del SNM descarga una copia interna con el nombre de quien aprobó y, ya finalizada, el de quien finalizó (14/11/2026). Quien escanea el QR ve la de la agencia.
 - Las autorizaciones que UCVMM aprueba antes de las 07:00, desde las 15:01 o en fin de semana (hora de Panamá) cuentan como fuera del horario laboral. Lo muestran las estadísticas y una insignia en las bandejas y en el expediente.
   - Desde el 11/11/2026 lo ve también la agencia, con el costo migratorio (`COSTO_FUERA_DE_HORARIO`, B/.20.00): en su bandeja, en el expediente, en el correo de aprobación y en el PDF.
   - El costo se guarda en la solicitud al aprobar: cambiar el monto no toca lo ya aprobado.
@@ -308,8 +317,8 @@ Las agencias entran por la VPN, pero no son del SNM: ARGO NAVIS las trata como u
 - **Archivos:** PDF, Word y Excel de hasta 2 MB cada uno, comprobados por su contenido; los de Office con macros se rechazan. La vista previa del Word va en un marco aislado (sin scripts, sin enlaces, sin acceso a la sesión).
 - **Navegador:** Content-Security-Policy (solo código propio de ARGO NAVIS), `X-Frame-Options: DENY` y `nosniff`, en nginx y en el backend cuando sirve el frontend.
 - **Topes:** login por IP (10 por minuto), por cuenta y por hora los envíos (`LIMITE_ENVIOS_POR_HORA`, 30), las exportaciones de las estadísticas (`LIMITE_EXPORTACIONES_POR_HORA`, 30) y las descargas del PDF (`LIMITE_PDF_POR_HORA`, 120), y 2 MB por archivo, en cualquier formato. Se cuentan en memoria, por proceso: con varios workers, cada uno lleva su cuenta.
-- **Tamaño de cada petición:** 1 MB en la API y, al crear o corregir una solicitud (todos los archivos van juntos), 285 MB: lo más que pesa un envío válido (30 pasajeros × 4 documentos + 2 de la solicitud + 20 adicionales, de 2 MB). nginx y el backend cortan lo que pase de ahí sin leerlo; antes nginx aceptaba 200 MB en cualquier ruta, también en el login, y el backend los leía enteros antes de comprobar la sesión.
-- **Rutas sin sesión:** solo el login, la verificación del QR y el health check; una prueba falla si aparece otra.
+- **Tamaño de cada petición:** 1 MB en la API y, al crear o corregir una solicitud (todos los archivos van juntos), 345 MB: lo más que pesa un envío válido (30 pasajeros × 5 documentos + 2 de la solicitud + 20 adicionales, de 2 MB). nginx y el backend cortan lo que pase de ahí sin leerlo; antes nginx aceptaba 200 MB en cualquier ruta, también en el login, y el backend los leía enteros antes de comprobar la sesión.
+- **Rutas sin sesión:** solo el login, la verificación del QR (con el PDF de la agencia desde el 14/11/2026) y el health check; una prueba falla si aparece otra.
 - **Producción:** no arranca con una `SECRET_KEY` corta o de ejemplo.
 
 ### Tareas de fondo
@@ -373,7 +382,7 @@ Frontend (opcionales):
 ## Pendiente (decisiones del equipo)
 - HTTPS en el servidor, y TLS con el Active Directory y con el correo (la configuración ya está; ver *Producción*).
 - Edición del catálogo de trámites desde la interfaz.
-- Envío por partes para tripulaciones muy grandes: un envío lleva todos sus archivos juntos (hasta 285 MB), y por una VPN lenta uno así puede pasar los 5 minutos que espera el navegador.
+- Envío por partes para tripulaciones muy grandes: un envío lleva todos sus archivos juntos (hasta 345 MB), y por una VPN lenta uno así puede pasar los 5 minutos que espera el navegador.
 - Política de retención de datos personales (Ley 81 de 2019) y copia de los respaldos fuera del servidor.
 - Solicitud de Custodia y Solicitud de Transbordos (el documento de UCVMM dice que faltan por levantar).
 - Segundo factor (código TOTP) para las cuentas de las agencias: decidido para más adelante.

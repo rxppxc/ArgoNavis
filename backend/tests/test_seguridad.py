@@ -357,6 +357,9 @@ def test_solo_estas_rutas_responden_sin_sesion():
     publicas = {f"{metodo} {camino}" for camino, ruta in rutas(aplicacion.routes)
                 if not exige_token(ruta.dependant) for metodo in ruta.methods}
     permitidas = {"POST /api/v1/auth/login", "GET /api/v1/verificacion/{codigo}", "GET /api/health",
+                  # El PDF de la autorización para quien escanea el QR (2026-11-14): la copia de la
+                  # agencia, mientras valga, con rate limit por IP (api/v1/verificacion.py).
+                  "GET /api/v1/verificacion/{codigo}/autorizacion.pdf",
                   "GET /{ruta_completa:path}"}   # la última solo existe si hay frontend compilado
     assert publicas - permitidas == set(), publicas - permitidas
     assert {"POST /api/v1/auth/login", "GET /api/v1/verificacion/{codigo}"} <= publicas

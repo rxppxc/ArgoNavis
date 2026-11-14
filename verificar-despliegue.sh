@@ -115,7 +115,14 @@ c=$(codigo http://localhost/api/v1/solicitudes/revision)
 case "$c" in 401|403) bien "La API sin sesión no responde nada ($c)";; *) mal "La API sin sesión responde $c (se esperaba 401)";; esac
 c=$(codigo http://localhost/api/v1/verificacion/codigo-que-no-existe)
 if [ "$c" = 404 ]; then bien "La verificación del QR con un código falso responde 404"; else mal "La verificación del QR con un código falso responde $c"; fi
-info "APP_URL (enlaces de los correos y del QR): $(env_de APP_URL)"
+c=$(codigo http://localhost/api/v1/verificacion/codigo-que-no-existe/autorizacion.pdf)
+if [ "$c" = 303 ]; then bien "El PDF por el QR con un código falso lleva a la verificación (303)"; else mal "El PDF por el QR con un código falso responde $c (se esperaba 303)"; fi
+info "APP_URL (enlaces de los correos): $(env_de APP_URL)"
+if [ -n "$(env_de URL_VERIFICACION_PUBLICA)" ]; then
+  info "URL_VERIFICACION_PUBLICA (el QR del PDF): $(env_de URL_VERIFICACION_PUBLICA)"
+else
+  aviso "Sin URL_VERIFICACION_PUBLICA: el QR del PDF solo se escanea dentro de la red del SNM (README → «Verificación pública del QR»)"
+fi
 info "PERMITIR_LOGIN_LOCAL (cuentas de las agencias): $(env_de PERMITIR_LOGIN_LOCAL)"
 info "CORREO_UCVMM (aviso de cada solicitud nueva): $(env_de CORREO_UCVMM)"
 

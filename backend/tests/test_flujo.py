@@ -15,7 +15,9 @@ import pytest
 from sqlalchemy import Date, Interval, cast, func, literal, select, text, update
 
 from app.api.v1 import solicitudes as api_solicitudes
+from app.api.v1 import verificacion as api_verificacion
 from app.core.pdf_autorizacion import generar_pdf_autorizacion
+from app.domain.models.audit_log import AccionAuditoria, RegistroAuditoria
 from app.domain.models.solicitud import (
     MESES_VIGENCIA_PASAPORTE, Solicitud, TripulanteSolicitud, vigencia_minima_pasaporte,
 )
@@ -235,19 +237,23 @@ async def test_ciclo_completo(cliente, escenario: Escenario, monkeypatch):
     asignaciones.append({"documento_codigo": "DOC-FORM6-CUSTODIA", "indice_tripulante": 1})
     archivos.append(pdf("custodia"))
     r = await enviar(cliente, e.nav_a1, cabecera("F3-DESEMBARQUE", pid, tripulantes=tripulantes, asignaciones=asignaciones), archivos)
+    assert r.status_code == 400 and "Visa de Raúl" in r.json()["detail"], "al restringido se le pide la Visa (2026-11-14)"
+    asignaciones.append({"documento_codigo": "DOC-VISA", "indice_tripulante": 1})
+    archivos.append(pdf("visa-raul"))
+    r = await enviar(cliente, e.nav_a1, cabecera("F3-DESEMBARQUE", pid, tripulantes=tripulantes, asignaciones=asignaciones), archivos)
     assert r.status_code == 201, r.text
     s = r.json()
     sid = s["id"]
     assert s["estado"] == "review" and s["numero"] == f"AM-{HOY.year}-{sid:06d}"
     assert s["agencia_id"] == e.agencia_a["id"] and s["agencia_nombre"] == e.agencia_a["nombre"]
-    # 3 por pasajero × 2, la Lista de Tripulantes, la custodia de Raúl y el Formulario No. 3 (2026-11-13).
-    assert len(s["checklist"]) == 9 and all(c["cubierta"] for c in s["checklist"])
-    assert len(s["documentos"]) == 10
+    # 3 por pasajero × 2, la Lista de Tripulantes, la custodia y la Visa de Raúl y el Formulario No. 3.
+    assert len(s["checklist"]) == 10 and all(c["cubierta"] for c in s["checklist"])
+    assert len(s["documentos"]) == 11
     assert [d["nombre_original"] for d in s["documentos"] if d["documento_id"] is None] == ["carta-del-capitan.pdf"]
     assert s["tiene_nacionalidad_restringida"] and s["tripulantes"][1]["nacionalidad_restringida"]
     assert s["bandera_nombre"] == "Panamá" and s["imo"] == "9074729"
     carpeta = STORAGE / f"solicitud-{sid}"
-    assert carpeta.is_dir() and len(list(carpeta.iterdir())) == 10
+    assert carpeta.is_dir() and len(list(carpeta.iterdir())) == 11
     assert not list(STORAGE.glob("tmp-*"))
 
     # ── Acceso por agencia y por rol ──
@@ -308,11 +314,11 @@ async def test_ciclo_completo(cliente, escenario: Escenario, monkeypatch):
     corregida = r.json()
     assert corregida["estado"] == "review" and corregida["cantidad_tripulantes"] == 1
     assert not corregida["impedimentos_verificados"]
-    assert len(corregida["documentos"]) == 7 and all(c["cubierta"] for c in corregida["checklist"])   # con el Form. 3
+    assert len(corregida["documentos"]) == 8 and all(c["cubierta"] for c in corregida["checklist"])   # con el Form. 3 y la Visa
     assert [ev["tipo"] for ev in corregida["eventos"]] == ["creada", "devuelta", "corregida"]
     r = await cliente.get(f"/solicitudes/{sid}", headers=e.revisor.headers)
     assert [ev["tipo"] for ev in r.json()["eventos"]] == ["creada", "impedimentos", "devuelta", "corregida"]
-    assert len(list(carpeta.iterdir())) == 7, "en disco quedan solo los documentos vigentes"
+    assert len(list(carpeta.iterdir())) == 8, "en disco quedan solo los documentos vigentes"
 
     # ── Aprobación, PDF y QR ──
     await verificar_impedimentos(cliente, e.revisor, sid)
@@ -331,6 +337,7 @@ async def test_ciclo_completo(cliente, escenario: Escenario, monkeypatch):
         return generar_pdf_autorizacion(datos)
 
     monkeypatch.setattr(api_solicitudes, "generar_pdf_autorizacion", capturar)
+    monkeypatch.setattr(api_verificacion, "generar_pdf_autorizacion", capturar)
     r = await cliente.get(f"/solicitudes/{sid}/autorizacion.pdf", headers=e.nav_a2.headers)
     assert r.status_code == 200 and r.content[:5] == b"%PDF-" and r.headers["content-type"] == "application/pdf"
     assert r.headers["content-disposition"] == f'attachment; filename="Autorizacion-{s["numero"]}.pdf"'
@@ -349,8 +356,14 @@ async def test_ciclo_completo(cliente, escenario: Escenario, monkeypatch):
     r = await cliente.get(f"/verificacion/{codigo}")
     assert r.status_code == 200 and r.json()["valida"] and r.json()["numero"] == s["numero"]
     assert r.json()["tripulantes"][0]["pasaporte"].startswith("•")
+    assert r.json()["pdf_disponible"], "quien escanea puede ver el PDF (2026-11-14)"
     r = await cliente.get("/verificacion/codigo-que-no-existe")
     assert r.status_code == 404
+    # El PDF por el QR, sin sesión: la copia de la agencia, sin nombres de funcionarios.
+    r = await cliente.get(f"/verificacion/{codigo}/autorizacion.pdf")
+    assert r.status_code == 200 and r.content[:5] == b"%PDF-" and r.headers["content-type"] == "application/pdf"
+    assert r.headers["content-disposition"] == f'inline; filename="Autorizacion-{s["numero"]}.pdf"'
+    assert armados[-1].aprobada_por == "Servicio Nacional de Migración" and not armados[-1].copia_interna
 
     # ── Puesto de control ──
     r = await cliente.get("/solicitudes/puerto", headers=e.puerto_a.headers)
@@ -387,6 +400,11 @@ async def test_ciclo_completo(cliente, escenario: Escenario, monkeypatch):
     assert r.json()["puesto_finalizacion_nombre"] == e.puesto_a["nombre"]
     r = await cliente.get(f"/solicitudes/{sid}/autorizacion.pdf", headers=e.nav_a1.headers)
     assert r.status_code == 200 and r.content[:5] == b"%PDF-"
+    assert armados[-1].finalizada_por is None, "la agencia no ve quién finalizó"
+    r = await cliente.get(f"/solicitudes/{sid}/autorizacion.pdf", headers=e.revisor.headers)
+    assert armados[-1].finalizada_por == "Puerto Prueba (Puesto de control)", "la copia interna, sí (2026-11-14)"
+    r = await cliente.get(f"/verificacion/{codigo}/autorizacion.pdf")
+    assert r.status_code == 200 and armados[-1].finalizada_por is None and not armados[-1].copia_interna
 
     # ── Lo que ve la agencia: estados y motivos, nada interno del SNM ──
     vista = (await cliente.get(f"/solicitudes/{sid}", headers=e.nav_a1.headers)).json()
@@ -843,3 +861,69 @@ async def test_protecciones_del_admin(cliente, escenario: Escenario, admin, sysa
     assert r.status_code == 204, "una agencia sin solicitudes sí se elimina"
     r = await cliente.get("/auth/me", headers=naviera.headers)
     assert r.json()["agencia_id"] is None, "sus usuarios quedan sin agencia"
+
+
+async def test_pdf_publico_solo_mientras_vale(cliente, escenario: Escenario, monkeypatch):
+    """El PDF por el QR (2026-11-14), sin sesión: mientras la autorización valga y hasta
+    DIAS_PDF_PUBLICO días después de la operación, con tope por IP y en la bitácora. Si
+    no, lleva a la página de verificación, que explica por qué (sin pantallas sin salida)."""
+    from app.core import rate_limit
+
+    e = escenario
+    creada = await solicitud_simple(cliente, e.nav_a1, e.puesto_a["id"])
+    sid = creada["id"]
+    await verificar_impedimentos(cliente, e.revisor, sid)
+    aprobada = await cliente.post(f"/solicitudes/{sid}/aprobar", json={}, headers=e.revisor.headers)
+    assert aprobada.status_code == 200, aprobada.text
+    numero = aprobada.json()["numero"]
+    async with SesionLocal() as sesion:
+        codigo = (await sesion.execute(select(Solicitud.codigo_verificacion).where(Solicitud.id == sid))).scalar_one()
+    ruta = f"/verificacion/{codigo}/autorizacion.pdf"
+
+    r = await cliente.get(ruta)
+    assert r.status_code == 200 and r.content[:5] == b"%PDF-"
+    assert r.headers["cache-control"] == "no-store" and "noindex" in r.headers["x-robots-tag"]
+    async with SesionLocal() as sesion:
+        registro = (await sesion.execute(
+            select(RegistroAuditoria).where(RegistroAuditoria.accion == AccionAuditoria.AUTORIZACION_DESCARGADA)
+            .order_by(RegistroAuditoria.id.desc()).limit(1)
+        )).scalar_one()
+    assert registro.detalle == {"numero": numero, "estado": "approved", "publica": True} and registro.user_id is None
+
+    # Tope por IP: cada PDF ocupa la CPU.
+    monkeypatch.setattr(rate_limit._config, "LIMITE_PDF_PUBLICO_POR_MINUTO", 2)
+    monkeypatch.setattr(rate_limit.limiter, "enabled", True)
+    rate_limit.limiter.reset()
+    try:
+        for _ in range(2):
+            assert (await cliente.get(ruta)).status_code == 200
+        r = await cliente.get(ruta)
+        assert r.status_code == 429 and "Espera" in r.json()["detail"]
+    finally:
+        rate_limit.limiter.reset()
+        monkeypatch.setattr(rate_limit.limiter, "enabled", False)
+
+    async def cambiar(**valores) -> None:
+        async with SesionLocal() as sesion:
+            await sesion.execute(update(Solicitud).where(Solicitud.id == sid).values(**valores))
+            await sesion.commit()
+
+    async def publico() -> tuple[bool, bool, int]:
+        v = (await cliente.get(f"/verificacion/{codigo}")).json()
+        return v["valida"], v["pdf_disponible"], (await cliente.get(ruta)).status_code
+
+    # Finalizada, se ve hasta 30 días después de la operación; después, la agencia la descarga con su cuenta.
+    await cambiar(estado="finalized", finalizada_en=func.now(), fecha_operacion=HOY - timedelta(days=30))
+    assert await publico() == (True, True, 200)
+    await cambiar(fecha_operacion=HOY - timedelta(days=31))
+    assert await publico() == (True, False, 303)
+    r = await cliente.get(ruta)
+    assert r.headers["location"] == f"/verificar/{codigo}", "a la verificación, que explica por qué"
+    # Vencida: ya no vale.
+    await cambiar(estado="expired", finalizada_en=None, fecha_operacion=HOY)
+    assert await publico() == (False, False, 303)
+
+    r = await cliente.get("/verificacion/no-existe/autorizacion.pdf")
+    assert r.status_code == 303 and r.headers["location"] == "/verificar/no-existe"
+    r = await cliente.get("/verificacion/a.b/autorizacion.pdf")
+    assert r.status_code == 422, "solo el formato del código"

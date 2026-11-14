@@ -7,14 +7,16 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./base";
 import {
-  CUENTAS, PUESTO, PUESTO_MISMO_SECTOR, PUESTO_OTRO_SECTOR, elegirPais, entrar, fechaPanama, opcionesDe, pdf,
+  CUENTAS, NACIONALIDAD_RESTRINGIDA, PUESTO, PUESTO_MISMO_SECTOR, PUESTO_OTRO_SECTOR, elegirPais, entrar, fechaPanama,
+  opcionesDe, pdf,
 } from "./datos";
 
 const tarjeta = (pagina: Page, indice: number) => pagina.locator('[id^="tripulante-"]').nth(indice);
 
-async function marinoPanameno(pagina: Page, indice: number, nombre: string) {
+/** Un marino filipino: a un panameño no se le piden visa ni boleto (2026-11-14). */
+async function marinoFilipino(pagina: Page, indice: number, nombre: string) {
   await tarjeta(pagina, indice).getByLabel("Nombre(s) *", { exact: true }).fill(nombre);
-  await elegirPais(tarjeta(pagina, indice).getByRole("combobox", { name: "Nacionalidad *" }), "Panamá");
+  await elegirPais(tarjeta(pagina, indice).getByRole("combobox", { name: "Nacionalidad *" }), "Filipinas");
 }
 
 test("el formulario cuida los documentos al quitar un pasajero o cambiar de trámite", async ({ browser }) => {
@@ -22,11 +24,11 @@ test("el formulario cuida los documentos al quitar un pasajero o cambiar de trá
   await agencia.goto("/new");
   await agencia.getByRole("button", { name: /^Embarque/ }).click();
 
-  // Dos marinos panameños: Embarque pide tres documentos a cada uno, en su tarjeta,
+  // Dos marinos filipinos: Embarque pide tres documentos a cada uno, en su tarjeta,
   // y el Formulario No. 3 a la solicitud (2026-11-13).
-  await marinoPanameno(agencia, 0, "Ana");
+  await marinoFilipino(agencia, 0, "Ana");
   await agencia.getByRole("button", { name: "Agregar pasajero" }).click();
-  await marinoPanameno(agencia, 1, "Beto");
+  await marinoFilipino(agencia, 1, "Beto");
   await expect(agencia.getByText("Faltan 7 documentos por adjuntar")).toBeVisible();
 
   await agencia.getByLabel("Adjuntar Visa Especial de Marino de Ana").setInputFiles(pdf("visa-ana.pdf"));
@@ -243,5 +245,40 @@ test("bandera, país de nacimiento y nacionalidad se eligen con buscador", async
     await agencia.keyboard.type("filip");
     await agencia.keyboard.press("Enter");
     await expect(nacionalidad).toHaveValue("Filipinas");
+  });
+});
+
+test("panameños sin visa, la Visa de los restringidos y Shore Pass solo para marinos", async ({ browser }) => {
+  const agencia = await entrar(browser, CUENTAS.agencia);
+  await agencia.goto("/new");
+  await agencia.getByRole("button", { name: /^Embarque/ }).click();
+  const ficha = tarjeta(agencia, 0);
+  await ficha.getByLabel("Nombre(s) *", { exact: true }).fill("Ana");
+  const nacionalidad = ficha.getByRole("combobox", { name: "Nacionalidad *" });
+
+  await test.step("al marino panameño no se le pide la visa: solo Generales y Libreta", async () => {
+    await elegirPais(nacionalidad, "Panamá");
+    await expect(agencia.getByLabel("Adjuntar Visa Especial de Marino de Ana")).toHaveCount(0);
+    await expect(agencia.getByLabel("Adjuntar Generales de Pasaporte de Ana")).toBeAttached();
+    await expect(agencia.getByLabel("Adjuntar Libreta de Marino de Ana")).toBeAttached();
+    await expect(ficha.getByText("0/2 documentos")).toBeVisible();
+  });
+
+  await test.step("al restringido se le pide la Visa, y se dice", async () => {
+    await elegirPais(nacionalidad, NACIONALIDAD_RESTRINGIDA);
+    await expect(ficha.getByText("Nacionalidad restringida", { exact: true })).toBeVisible();
+    await expect(ficha.getByText(/^Nacionalidad restringida: debe adjuntar «Visa»\./)).toBeVisible();
+    await expect(agencia.getByLabel("Adjuntar Visa de Ana", { exact: true })).toBeAttached();
+    await expect(agencia.getByLabel("Adjuntar Visa Especial de Marino de Ana")).toBeAttached();
+    await expect(ficha.getByText("0/4 documentos")).toBeVisible();
+  });
+
+  await test.step("en Shore Pass, solo el rango Marino, ya elegido y dicho", async () => {
+    await agencia.getByRole("button", { name: "Cambiar" }).click();
+    await agencia.getByRole("button", { name: /^Sellado de Shore Pass/ }).click();
+    const rango = tarjeta(agencia, 0).getByLabel("Rango *");
+    await expect(rango.locator("option")).toHaveText(["Marino"]);
+    await expect(rango).toHaveValue("marino");
+    await expect(rango).toHaveAccessibleDescription("Único rango de este trámite.");
   });
 });

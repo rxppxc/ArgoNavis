@@ -40,6 +40,8 @@ SECTOR_DEL_PUESTO = "Sector Pacífico"
 # Para el cambio de puerto (2026-11-13): otro puesto del mismo sector y uno del otro.
 PUESTO_MISMO_SECTOR = "Puesto E2E Rodman"
 PUESTO_OTRO_SECTOR = "Puesto E2E Atlántico"
+# A los pasajeros de esta nacionalidad se les pide la Visa (2026-11-14).
+NACIONALIDAD_RESTRINGIDA = "CUB"
 CUENTAS = [  # usuario, nombre, apellido, rol, ¿de la agencia?, ¿del puesto?, sector
     ("e2e.agencia", "Laura", "Agencia", "Naviera", True, False, None),
     ("e2e.ucvmm", "Ricardo", "Revisor", "UCVMM", False, False, "Sector Pacífico"),
@@ -104,10 +106,12 @@ def preparar_bd() -> None:
 
 
 async def sembrar() -> None:
-    from sqlalchemy import insert, select
+    from sqlalchemy import insert, select, update
 
     from app.core.security import hashear_password
-    from app.domain.models.catalogo import AgenciaNaviera, PuestoControl, Sector, usuarios_puestos, usuarios_sectores
+    from app.domain.models.catalogo import (
+        AgenciaNaviera, Pais, PuestoControl, Sector, usuarios_puestos, usuarios_sectores,
+    )
     from app.domain.models.rol import Rol
     from app.domain.models.user import TipoUsuario, Usuario
     from app.infrastructure.database import SesionLocal, motor_bd
@@ -131,6 +135,7 @@ async def sembrar() -> None:
                 await s.execute(insert(usuarios_puestos).values(usuario_id=u.id, puesto_id=puesto.id))
             if sector:
                 await s.execute(insert(usuarios_sectores).values(usuario_id=u.id, sector_id=sectores[sector]))
+        await s.execute(update(Pais).where(Pais.codigo == NACIONALIDAD_RESTRINGIDA).values(nacionalidad_restringida=True))
         await s.commit()
     await motor_bd.dispose()
 

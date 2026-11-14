@@ -7,6 +7,8 @@ export const PUESTO = "Puesto E2E";
 /** Para el cambio de puerto (2026-11-13): otro puesto del mismo sector y uno del otro. */
 export const PUESTO_MISMO_SECTOR = "Puesto E2E Rodman";
 export const PUESTO_OTRO_SECTOR = "Puesto E2E Atlántico";
+/** Nacionalidad restringida en la BD de las pruebas: se le pide la Visa (2026-11-14). */
+export const NACIONALIDAD_RESTRINGIDA = "Cuba";
 export const CUENTAS = {
   agencia:    "e2e.agencia",
   ucvmm:      "e2e.ucvmm",        // Sector Pacífico, el del puesto de las pruebas

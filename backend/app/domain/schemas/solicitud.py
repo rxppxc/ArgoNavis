@@ -343,7 +343,8 @@ class SalidaSolicitudResumen(BaseModel):
     expirada_en:          datetime | None = None
     veces_devuelta:       int = 0
     tripulantes_con_alerta:         int = 0
-    # Solo en los trámites con aviso de custodia (los demás procesos no la mencionan).
+    # Algún pasajero de nacionalidad restringida: desde el 2026-11-14, en todos los
+    # trámites (se le pide la Visa); antes, solo en los que avisan la custodia.
     tiene_nacionalidad_restringida: bool = False
     # Aprobada fuera del horario laboral (None: sin aprobar). Desde el 2026-11-11
     # lo ve también la agencia, con el costo migratorio guardado al aprobar
@@ -435,6 +436,9 @@ class SalidaVerificacion(BaseModel):
     vigente_hasta:   datetime | None = None
     finalizada_en:   datetime | None = None
     puesto_finalizacion_nombre: str | None = None
+    # Si quien escanea puede ver el PDF (la copia de la agencia, 2026-11-14): mientras
+    # valga y hasta DIAS_PDF_PUBLICO días después de la operación.
+    pdf_disponible:  bool = False
     tripulantes:     list[SalidaTripulanteVerificacion] = Field(default_factory=list)
 
 

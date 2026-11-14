@@ -100,7 +100,8 @@ export function SeccionTripulantes({ solicitud: s, verificacion: v, onVerDocumen
                   </td>
                   <td data-etiqueta="Nacionalidad">
                     {m.nacionalidad_nombre ?? m.nacionalidad}
-                    {m.nacionalidad_restringida && s.tipo_tramite_aviso_custodia && (
+                    {/* En todos los trámites desde el 2026-11-14: se le pide la Visa. */}
+                    {m.nacionalidad_restringida && (
                       <div className={styles.chipRestringida}>Restringida</div>
                     )}
                   </td>

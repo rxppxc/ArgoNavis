@@ -56,6 +56,12 @@ def limite_pdf() -> str:
     return f"{n}/hour" if n > 0 else "100000/hour"
 
 
+def limite_pdf_publico() -> str:
+    """El PDF de la autorización por el QR, sin sesión: por IP y por minuto (2026-11-14)."""
+    n = _config.LIMITE_PDF_PUBLICO_POR_MINUTO
+    return f"{n}/minute" if n > 0 else "100000/minute"
+
+
 def limite_verificacion() -> str:
     """Devuelve la cadena de límite (p. ej. "30/minute") según configuración.
     Si `LIMITE_VERIFICACIONES_POR_MINUTO` es 0, retorna un límite muy alto

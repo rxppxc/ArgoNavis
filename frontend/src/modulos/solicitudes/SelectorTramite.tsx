@@ -5,7 +5,7 @@ import {
   IconoHerramienta, IconoIntercambio, IconoPasaporte,
 } from "../../components/Iconos";
 import { aplicaAlRango } from "./checklist";
-import { AYUDA_CAMPOS_TRAMITE, TODOS_LOS_RANGOS } from "./presentacion";
+import { AYUDA_CAMPOS_TRAMITE, ETIQUETA_RANGO, TODOS_LOS_RANGOS } from "./presentacion";
 import styles from "./SelectorTramite.module.css";
 
 /** Ícono y color de cada trámite del Form. 3, para distinguir las tarjetas de
@@ -37,8 +37,11 @@ function resumenRequisitos(t: TipoTramite): string {
   });
   const n = Math.max(0, ...porRango.map((r) => r.todos));
   const fijos = Math.min(n, ...porRango.map((r) => r.fijos));
+  const unico = t.rangos_permitidos?.length === 1 ? t.rangos_permitidos[0] : null;
   const partes = [
     n > 0 && `${fijos < n ? "Hasta " : ""}${n} documento${n === 1 ? "" : "s"} por pasajero`,
+    // Un solo rango (Sellado de Shore Pass: solo Marino, 2026-11-14).
+    unico && `solo rango ${ETIQUETA_RANGO[unico]}`,
     ...t.documentos.filter((d) => d.alcance === "solicitud" && d.condicion === "siempre").map((d) => d.nombre),
     t.requiere_puerto && (AYUDA_CAMPOS_TRAMITE[t.codigo]?.puerto?.toLowerCase() ?? "puerto"),
     t.requiere_puerto_desembarque && "puerto de desembarque",

@@ -1,14 +1,18 @@
 /**
  * Verificación pública de una Autorización Marítima (destino del QR del PDF).
  * No requiere sesión: muestra lo mínimo para comprobar que la autorización
- * existe y si sigue vigente, con los pasaportes enmascarados.
+ * existe y si sigue vigente, con los pasaportes enmascarados. Desde el
+ * 2026-11-14, además, «Ver autorización (PDF)»: la copia de la agencia, mientras
+ * valga y hasta 30 días después de la operación. Se abre con un enlace normal,
+ * para que el celular la muestre en su visor (en Android se descarga y se abre).
+ * Cuando ya no se puede ver así, la página dice por qué y qué hacer.
  */
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { apiSolicitudes, type VerificacionAutorizacion } from "../../api/solicitudes";
 import { EstadoCarga } from "../../components/EstadoCarga";
 import { MarcoPagina } from "../../components/MarcoPagina";
-import { IconoAlerta, IconoExito, IconoXCirculo } from "../../components/Iconos";
+import { IconoAlerta, IconoArchivo, IconoExito, IconoXCirculo } from "../../components/Iconos";
 import { useTituloDocumento } from "../../hooks/useTituloDocumento";
 import { mensajeDeError } from "../../utils/errores";
 import { ETIQUETA_ESTADO, ETIQUETA_RANGO, formatearFecha, formatearFechaHora, puestoAutorizado } from "./presentacion";
@@ -72,6 +76,20 @@ export default function PaginaVerificacion() {
                 </div>
               </div>
             </div>
+
+            {datos.pdf_disponible ? (
+              <div className={styles.accionPdf}>
+                <a className={styles.botonPdf} href={apiSolicitudes.urlPdfPublico(codigo)} target="_blank" rel="noopener">
+                  <IconoArchivo tamano={18} /> Ver autorización (PDF)
+                </a>
+              </div>
+            ) : (
+              <p className={styles.notaPdf}>
+                {datos.valida
+                  ? "El PDF ya no se puede ver con el código QR: la agencia naviera lo descarga con su cuenta."
+                  : "El PDF no está disponible porque la autorización no está vigente."}
+              </p>
+            )}
 
             <div className={styles.tarjeta}>
               <dl className={styles.datos}>

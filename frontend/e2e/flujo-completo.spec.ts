@@ -74,8 +74,9 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     await agencia.getByLabel("Apellido(s) *", { exact: true }).fill("Pérez Gómez");
     await agencia.getByLabel("Sexo *").selectOption("M");
     await agencia.getByLabel("Fecha de nacimiento *").fill("1988-03-14");
-    await elegirPais(agencia.getByRole("combobox", { name: "País de nacimiento *" }), "Panamá");
-    await elegirPais(agencia.getByRole("combobox", { name: "Nacionalidad *" }), "Panamá");
+    // Colombiano: a un panameño no se le pide la Visa Especial de Marino (2026-11-14).
+    await elegirPais(agencia.getByRole("combobox", { name: "País de nacimiento *" }), "Colombia");
+    await elegirPais(agencia.getByRole("combobox", { name: "Nacionalidad *" }), "Colombia");
     await agencia.getByLabel("Ocupación *").fill("Primer oficial");
     await agencia.getByLabel("N° de pasaporte *").fill("PA1234567");
     await agencia.getByLabel("Vence el pasaporte *").fill("2030-05-01");
@@ -190,11 +191,19 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     expect(codigo).not.toBe("");
   });
 
-  await test.step("un tercero verifica el QR sin sesión", async () => {
+  await test.step("un tercero verifica el QR sin sesión y ve el PDF", async () => {
     const tercero = await (await browser.newContext()).newPage();
     await tercero.goto(`/verificar/${codigo}`);
     await expect(tercero.getByText("Autorización auténtica y vigente")).toBeVisible();
     await expect(tercero.getByText(/PA1234567/)).toHaveCount(0);   // pasaporte enmascarado
+    // El PDF, sin sesión (2026-11-14): la copia de la agencia, en el visor del navegador.
+    const enlace = tercero.getByRole("link", { name: "Ver autorización (PDF)" });
+    await expect(enlace).toBeVisible();
+    const respuesta = await tercero.request.get((await enlace.getAttribute("href")) ?? "");
+    expect(respuesta.status()).toBe(200);
+    expect(respuesta.headers()["content-type"]).toBe("application/pdf");
+    expect(respuesta.headers()["content-disposition"]).toMatch(/^inline;/);
+    expect((await respuesta.body()).subarray(0, 5).toString()).toBe("%PDF-");
     await tercero.goto("/verificar/codigo-que-no-existe");
     await expect(tercero.getByText("Autorización no encontrada")).toBeVisible();
   });

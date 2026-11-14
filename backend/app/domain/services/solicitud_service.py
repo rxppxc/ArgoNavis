@@ -80,12 +80,13 @@ MAX_TRIPULANTES            = 30   # por solicitud (reunión del 2026-10-30); esp
 # Lo más que pesa un envío válido (crear o corregir), que lleva juntos todos los archivos
 # de la solicitud: es el tope del cuerpo de esas dos rutas (TopeDelCuerpo en main.py y
 # client_max_body_size en frontend/nginx.conf, revisión de recursos del 2026-11-10). Con
-# el catálogo de hoy, a un pasajero se le piden como mucho 4 documentos (Desembarque,
-# Urgencia médica y Renovación) y a la solicitud, 2 (el Formulario No. 3, desde el
-# 2026-11-13, y la Lista de Tripulantes): 30 × 4 + 2 + 20 adicionales = 142 archivos
-# de 2 MB, más 1 MB para los datos y los separadores. tests/test_recursos.py falla si
-# el catálogo pide más, o si nginx no coincide.
-MAX_DOCUMENTOS_POR_TRIPULANTE  = 4
+# el catálogo de hoy, a un pasajero se le piden como mucho 5 documentos (uno de
+# nacionalidad restringida en Desembarque, Urgencia médica o Renovación, con la Visa
+# desde el 2026-11-14) y a la solicitud, 2 (el Formulario No. 3, desde el 2026-11-13, y
+# la Lista de Tripulantes): 30 × 5 + 2 + 20 adicionales = 172 archivos de 2 MB, más
+# 1 MB para los datos y los separadores. tests/test_recursos.py falla si el catálogo
+# pide más, o si nginx no coincide.
+MAX_DOCUMENTOS_POR_TRIPULANTE  = 5
 MAX_DOCUMENTOS_DE_LA_SOLICITUD = 2
 MAX_ARCHIVOS_EN_UN_ENVIO = (MAX_TRIPULANTES * MAX_DOCUMENTOS_POR_TRIPULANTE + MAX_DOCUMENTOS_DE_LA_SOLICITUD
                             + MAX_DOCUMENTOS_ADICIONALES)
@@ -1292,7 +1293,7 @@ class ServicioSolicitud:
             finalizada_en=s.finalizada_en, expirada_en=s.expirada_en,
             veces_devuelta=s.veces_devuelta or 0,
             tripulantes_con_alerta=con_alerta,
-            tiene_nacionalidad_restringida=s.tipo_tramite.aviso_custodia and alguno_restringido,
+            tiene_nacionalidad_restringida=alguno_restringido,
             # Aprobada fuera del horario laboral (2026-11-06; antes, por la finalización).
             # Desde el 2026-11-11 lo ve también la agencia, con el costo migratorio.
             fuera_de_horario=fuera_de_horario(s.aprobada_en) if s.aprobada_en else None,
@@ -1426,17 +1427,47 @@ class ServicioSolicitud:
 
     @staticmethod
     def url_verificacion(codigo: str) -> str:
-        return f"{configuracion.app_base_url}/verificar/{codigo}"
+        """Adonde apunta el QR: la dirección pública de la verificación, si la DTI la
+        publicó (URL_VERIFICACION_PUBLICA); si no, la del sistema."""
+        return f"{configuracion.url_base_verificacion}/verificar/{codigo}"
 
     async def preparar_pdf(self, ctx: ContextoAcceso, s: Solicitud) -> DatosPdfAutorizacion:
         if not self.acciones(ctx, s).descargar_autorizacion or not s.codigo_verificacion:
             raise _error(status.HTTP_409_CONFLICT, "La autorización solo se descarga cuando la solicitud está aprobada o finalizada.")
-        assert s.aprobada_en is not None
-        # La agencia recibe "UCVMM", como en su vista del expediente (decisión del
-        # usuario, 2026-10-15). El personal del SNM, una copia interna con el
-        # nombre de quien aprobó (reunión del 2026-10-30), tomado del historial.
-        interno   = ctx.es_personal_snm
-        aprobador = self._autor_ultimo(s, TipoEventoSolicitud.APROBADA) if interno else None
+        return await self._datos_pdf(s, interno=ctx.es_personal_snm)
+
+    @staticmethod
+    def _vigente(s: Solicitud, ahora: datetime) -> bool:
+        """Si la autorización vale: finalizada, o aprobada y dentro de su plazo."""
+        return s.estado == Estado.FINALIZADA.value or (
+            s.estado == Estado.APROBADA.value and (s.vigente_hasta is None or s.vigente_hasta >= ahora)
+        )
+
+    def pdf_publico_disponible(self, s: Solicitud) -> bool:
+        """Si el PDF se puede ver por el QR, sin sesión (2026-11-14): mientras la
+        autorización valga y hasta DIAS_PDF_PUBLICO días después de la operación.
+        Después, la agencia lo descarga con su cuenta."""
+        if s.aprobada_en is None or not s.codigo_verificacion or not self._vigente(s, ahora_utc()):
+            return False
+        return hoy_panama() <= s.fecha_operacion + timedelta(days=configuracion.DIAS_PDF_PUBLICO)
+
+    async def pdf_publico(self, codigo: str) -> DatosPdfAutorizacion | None:
+        """La copia de la agencia, para quien escanea el QR. None si el código no
+        existe o si ya no se puede ver así (la ruta lleva a la verificación, que
+        explica por qué)."""
+        s = await self.repo.buscar_por_codigo_verificacion(codigo)
+        if not s or not self.pdf_publico_disponible(s):
+            return None
+        return await self._datos_pdf(s, interno=False)
+
+    async def _datos_pdf(self, s: Solicitud, *, interno: bool) -> DatosPdfAutorizacion:
+        assert s.aprobada_en is not None and s.codigo_verificacion
+        # La agencia recibe la institución, sin nombres de funcionarios, como en su
+        # vista del expediente (decisión del usuario, 2026-10-15). El personal del SNM,
+        # una copia interna con el nombre de quien aprobó (reunión del 2026-10-30) y,
+        # ya finalizada, el de quien finalizó (2026-11-14), tomados del historial.
+        aprobador   = self._autor_ultimo(s, TipoEventoSolicitud.APROBADA) if interno else None
+        finalizador = self._autor_ultimo(s, TipoEventoSolicitud.FINALIZADA) if interno else None
         return DatosPdfAutorizacion(
             numero=s.numero or str(s.id),
             estado=s.estado,
@@ -1458,6 +1489,7 @@ class ServicioSolicitud:
             vigente_hasta=s.vigente_hasta.astimezone(TZ_PANAMA) if s.vigente_hasta else None,
             finalizada_en=s.finalizada_en.astimezone(TZ_PANAMA) if s.finalizada_en else None,
             puesto_finalizacion=s.puesto_finalizacion_nombre,
+            finalizada_por=f"{finalizador} (Puesto de control)" if finalizador else None,
             url_verificacion=self.url_verificacion(s.codigo_verificacion),
             codigo_verificacion=s.codigo_verificacion,
             tripulantes=[
@@ -1476,16 +1508,14 @@ class ServicioSolicitud:
         s = await self.repo.buscar_por_codigo_verificacion(codigo)
         if not s:
             raise _error(status.HTTP_404_NOT_FOUND, "El código no corresponde a ninguna autorización emitida.")
-        ahora = ahora_utc()
-        vigente = s.estado == Estado.FINALIZADA.value or (
-            s.estado == Estado.APROBADA.value and (s.vigente_hasta is None or s.vigente_hasta >= ahora)
-        )
+        vigente = self._vigente(s, ahora_utc())
 
         def enmascarar(pasaporte: str) -> str:
             return "•" * max(len(pasaporte) - 4, 0) + pasaporte[-4:]
 
         return SalidaVerificacion(
             valida=vigente, estado=s.estado, numero=s.numero,
+            pdf_disponible=self.pdf_publico_disponible(s),
             tipo_tramite=s.tipo_tramite.nombre,
             agencia_nombre=s.agencia_nombre,
             nombre_buque=s.nombre_buque, imo=s.imo, bandera=await self._nombre_pais(s.bandera),

@@ -283,6 +283,9 @@ export interface VerificacionAutorizacion {
   vigente_hasta: string | null;
   finalizada_en: string | null;
   puesto_finalizacion_nombre: string | null;
+  /** Quien escanea puede ver el PDF (la copia de la agencia, 2026-11-14): mientras
+   *  valga y hasta 30 días después de la operación. */
+  pdf_disponible: boolean;
   tripulantes: { nombre_completo: string; nacionalidad: string | null; pasaporte: string | null; rango: RangoMarino | null }[];
 }
 
@@ -483,6 +486,10 @@ export const apiSolicitudes = {
   /** Verificación pública del QR (no requiere sesión). */
   verificar: (codigo: string) =>
     clienteApi.get<VerificacionAutorizacion>(`/verificacion/${encodeURIComponent(codigo)}`).then((r) => r.data),
+  /** El PDF de la autorización para quien escanea el QR, sin sesión (2026-11-14): se
+   *  abre con un enlace normal, para que el celular lo muestre en su visor. */
+  urlPdfPublico: (codigo: string) =>
+    `${clienteApi.defaults.baseURL ?? ""}/verificacion/${encodeURIComponent(codigo)}/autorizacion.pdf`,
 };
 
 /** Si una acción chocó con un cambio de estado (409: otra persona ya la decidió o

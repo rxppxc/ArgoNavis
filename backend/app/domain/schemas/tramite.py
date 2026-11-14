@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Literal
 
-CondicionDocumento = Literal["siempre", "solo_panamenos", "nacionalidad_restringida"]
+CondicionDocumento = Literal["siempre", "solo_panamenos", "nacionalidad_restringida", "solo_extranjeros"]
 Formulario         = Literal["formulario_3"]
 
 

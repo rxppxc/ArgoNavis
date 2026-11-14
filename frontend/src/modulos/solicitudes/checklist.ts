@@ -1,5 +1,5 @@
 import type { RangoMarino } from "../../api/solicitudes";
-import type { TipoTramite, TramiteDocumento } from "../../api/tramites";
+import type { CondicionDocumento, TipoTramite, TramiteDocumento } from "../../api/tramites";
 import { RANGOS_CON_LIBRETA } from "./presentacion";
 
 /** Lo que el checklist necesita saber de cada tripulante. `clave` es estable
@@ -22,6 +22,9 @@ export interface CasillaFormulario {
   nombre_tripulante: string | null;
   /** Opcional: se puede enviar sin ella y no cuenta como faltante (2026-11-11). */
   obligatoria: boolean;
+  /** La condición de su fila: la tarjeta del pasajero nombra los documentos que
+   *  se le piden por su nacionalidad restringida (2026-11-14). */
+  condicion?: CondicionDocumento;
 }
 
 export function claveCasilla(documentoCodigo: string, claveTripulante: string | null): string {
@@ -50,6 +53,7 @@ export function construirCasillas(tipo: TipoTramite, tripulantes: TripulanteChec
   for (const d of [...tipo.documentos].sort((a, b) => a.orden - b.orden)) {
     if (d.alcance === "solicitud") {
       if (d.condicion === "nacionalidad_restringida" && !tripulantes.some((t) => t.restringida)) continue;
+      if (d.condicion === "solo_extranjeros" && tripulantes.every((t) => t.es_panameno)) continue;
       // Un documento de la solicitud con rangos: si algún tripulante es de esos rangos.
       const rangos = d.rangos;
       if (rangos && !tripulantes.some((t) => rangos.includes(t.rango))) continue;
@@ -61,12 +65,15 @@ export function construirCasillas(tipo: TipoTramite, tripulantes: TripulanteChec
         clave_tripulante: null,
         nombre_tripulante: null,
         obligatoria: true,
+        condicion: d.condicion,
       });
       continue;
     }
 
     for (const t of tripulantes) {
       if (d.condicion === "solo_panamenos" && !t.es_panameno) continue;
+      // A los panameños no se les pide visa ni boleto aéreo en Embarque y Desembarque (2026-11-14).
+      if (d.condicion === "solo_extranjeros" && t.es_panameno) continue;
       if (d.condicion === "nacionalidad_restringida" && !t.restringida) continue;
       if (!aplicaAlRango(d, t.rango)) continue;
       resultado.push({
@@ -77,6 +84,7 @@ export function construirCasillas(tipo: TipoTramite, tripulantes: TripulanteChec
         clave_tripulante: t.clave,
         nombre_tripulante: t.nombre,
         obligatoria: !opcionalPara(d, t.rango),
+        condicion: d.condicion,
       });
     }
   }

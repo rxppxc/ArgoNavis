@@ -121,5 +121,51 @@
       ["CUSTODIA", 1],
       ["BOLETO", 2]
     ]
+  },
+  {
+    "caso": "a los panameños no se les pide lo que es solo para extranjeros, y la Visa va a los restringidos de cualquier rango (2026-11-14)",
+    "documentos": [
+      {"codigo": "VISA-MARINO", "alcance": "marino", "condicion": "solo_extranjeros", "requiere_libreta": false, "orden": 1, "rangos": ["marino", "pasajero"]},
+      {"codigo": "GENERALES", "alcance": "marino", "condicion": "siempre", "requiere_libreta": false, "orden": 2},
+      {"codigo": "LIBRETA", "alcance": "marino", "condicion": "siempre", "requiere_libreta": true, "orden": 3},
+      {"codigo": "BOLETO", "alcance": "marino", "condicion": "solo_extranjeros", "requiere_libreta": false, "orden": 4},
+      {"codigo": "VISA", "alcance": "marino", "condicion": "nacionalidad_restringida", "requiere_libreta": false, "orden": 5}
+    ],
+    "tripulantes": [
+      {"nombre": "Marino panameño", "es_panameno": true, "rango": "marino", "restringida": false},
+      {"nombre": "Pasajero panameño", "es_panameno": true, "rango": "pasajero", "restringida": false},
+      {"nombre": "Marino filipino", "es_panameno": false, "rango": "marino", "restringida": false},
+      {"nombre": "Militar panameño", "es_panameno": true, "rango": "militar", "restringida": false},
+      {"nombre": "Militar cubano", "es_panameno": false, "rango": "militar", "restringida": true}
+    ],
+    "esperado": [
+      ["VISA-MARINO", 2],
+      ["GENERALES", 0], ["GENERALES", 1], ["GENERALES", 2], ["GENERALES", 3], ["GENERALES", 4],
+      ["LIBRETA", 0], ["LIBRETA", 2],
+      ["BOLETO", 2], ["BOLETO", 4],
+      ["VISA", 4]
+    ]
+  },
+  {
+    "caso": "un documento de la solicitud solo para extranjeros no se pide si todos son panameños",
+    "documentos": [
+      {"codigo": "EXTRANJEROS", "alcance": "solicitud", "condicion": "solo_extranjeros", "requiere_libreta": false, "orden": 1}
+    ],
+    "tripulantes": [
+      {"nombre": "Ana", "es_panameno": true, "rango": "marino", "restringida": false},
+      {"nombre": "Luis", "es_panameno": true, "rango": "militar", "restringida": false}
+    ],
+    "esperado": []
+  },
+  {
+    "caso": "un documento de la solicitud solo para extranjeros se pide si hay alguno",
+    "documentos": [
+      {"codigo": "EXTRANJEROS", "alcance": "solicitud", "condicion": "solo_extranjeros", "requiere_libreta": false, "orden": 1}
+    ],
+    "tripulantes": [
+      {"nombre": "Ana", "es_panameno": true, "rango": "marino", "restringida": false},
+      {"nombre": "Liu", "es_panameno": false, "rango": "marino", "restringida": false}
+    ],
+    "esperado": [["EXTRANJEROS", null]]
   }
 ]

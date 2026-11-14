@@ -73,6 +73,11 @@ class Configuracion(BaseSettings):
     FRONTEND_URL: str = "http://localhost:5173"
     # URL pública de la app (usada en enlaces de correo). Defínela con la IP/dominio real.
     APP_URL: str = ""
+    # Dirección pública de la verificación del QR (2026-11-14), sin la ruta: la que la
+    # DTI publique en internet para que se pueda escanear desde cualquier celular,
+    # sin VPN (p. ej. https://verificar.migracion.gob.pa). Vacía = APP_URL, que solo
+    # se alcanza dentro de la red del SNM. README → «Verificación pública del QR».
+    URL_VERIFICACION_PUBLICA: str = ""
 
     MAIL_HOST:      str = ""
     MAIL_PORT:      int = 25
@@ -117,6 +122,11 @@ class Configuracion(BaseSettings):
     LIMITE_VERIFICACIONES_POR_MINUTO: int = Field(
         30, validation_alias=AliasChoices("LIMITE_VERIFICACIONES_POR_MINUTO", "RATE_LIMIT_DOWNLOADS_PER_MINUTE"),
     )
+    # El PDF de la autorización por el QR (2026-11-14), sin sesión: por IP y por
+    # minuto (cada uno ocupa la CPU ~0,2 s), y hasta cuántos días después de la
+    # operación se puede ver así. Después, la agencia lo descarga con su cuenta.
+    LIMITE_PDF_PUBLICO_POR_MINUTO: int = 10
+    DIAS_PDF_PUBLICO: int = 30
     # Envíos (crear o corregir una solicitud, que suben archivos) por usuario y
     # por hora: frena que una cuenta (p. ej. de una agencia comprometida) llene
     # el disco o sature la validación de archivos. 0 = sin límite.
@@ -158,6 +168,11 @@ class Configuracion(BaseSettings):
     @property
     def app_base_url(self) -> str:
         return self.APP_URL or self.FRONTEND_URL
+
+    @property
+    def url_base_verificacion(self) -> str:
+        """Adonde apunta el QR del PDF: la dirección pública, si la DTI la publicó."""
+        return (self.URL_VERIFICACION_PUBLICA or self.app_base_url).rstrip("/")
 
     @property
     def es_produccion(self) -> bool:

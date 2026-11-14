@@ -101,6 +101,8 @@ services:
       - MAIL_FROM_NAME=ARGO NAVIS - SNM
       - FRONTEND_URL=${APP_URL}
       - APP_URL=${APP_URL}
+      # Dirección pública de la verificación del QR, cuando la DTI la publique (README).
+      - URL_VERIFICACION_PUBLICA=${URL_VERIFICACION_PUBLICA:-}
       - LIMITE_VERIFICACIONES_POR_MINUTO=30
       - LIMITE_ENVIOS_POR_HORA=30
       # Autorizaciones Marítimas

@@ -32,8 +32,11 @@ class CondicionDocumento(str, enum.Enum):
     solicitud (ver ServicioTramite.construir_casillas).
     """
     SIEMPRE                  = "siempre"
-    SOLO_PANAMENOS           = "solo_panamenos"            # Libreta de Marino en Embarque
-    NACIONALIDAD_RESTRINGIDA = "nacionalidad_restringida"  # Form. No. 6 de custodia
+    SOLO_PANAMENOS           = "solo_panamenos"            # hoy sin uso (antes, la Libreta de Embarque)
+    NACIONALIDAD_RESTRINGIDA = "nacionalidad_restringida"  # Form. No. 6 de custodia y la Visa
+    # A los panameños no se les pide (2026-11-14): la visa y el boleto aéreo de
+    # Embarque y Desembarque, y la Visa Especial de Marino de Cambio de nave.
+    SOLO_EXTRANJEROS         = "solo_extranjeros"
 
 
 class TipoTramite(Base):
