@@ -14,7 +14,7 @@ const FORMATOS: { id: FormatoExportacion; etiqueta: string; descripcion: string 
 ];
 
 /** Exportar las estadísticas del periodo elegido (y el uso del sistema) con la
- *  identidad del SNM: los archivos los arma el servidor (core/informe_*.py). La
+ *  identidad del SNM: los archivos los arma el servidor (app/informes/estadisticas*.py). La
  *  serie va en la unidad que se ve en pantalla. Azul de contorno: descargar es
  *  consultar (Botones.module.css). */
 export default function BotonesExportar({ rango, unidad, sectorId }: { rango: RangoFechas; unidad: Unidad; sectorId: number | null }) {

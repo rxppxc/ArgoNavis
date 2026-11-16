@@ -24,7 +24,7 @@ _FORMATO = "%(asctime)s %(levelname)s [%(name)s] [%(pedido)s] %(message)s"
 _PREFIJO = "argonavis-"
 _NOMBRE_DIARIO = re.compile(rf"^{_PREFIJO}(\d{{4}}-\d{{2}}-\d{{2}})\.log$")
 
-# Código del pedido HTTP en curso: lo pone el middleware de main.py y vale "-" fuera
+# Código del pedido HTTP en curso: lo pone el middleware CodigoDePedido (api/middleware.py) y vale "-" fuera
 # de un pedido (las tareas de fondo). Va en cada línea del log (%(pedido)s): quien
 # reporta un error dice el código que le mostró la pantalla y aquí está su traza.
 id_pedido: ContextVar[str] = ContextVar("id_pedido", default="-")

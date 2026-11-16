@@ -244,7 +244,7 @@ async def _verificar_sin_macros(ruta: Path, ext: str, nombre_original: str) -> N
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail=f"No se pudo validar '{nombre_original}' de forma segura: el archivo podría estar dañado.",
-        )
+        ) from exc
     if tiene_macros:
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,

@@ -19,13 +19,12 @@ from fastapi import APIRouter, Depends, Path, Request
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.http_utils import obtener_agente, obtener_ip
-from app.core.pdf_autorizacion import generar_pdf_autorizacion
+from app.api.v1.dependencias import auditar
 from app.core.rate_limit import limite_pdf_publico, limite_verificacion, limiter
 from app.domain.models.audit_log import AccionAuditoria
-from app.domain.repositories.audit_repository import RepositorioAuditoria
 from app.domain.schemas.solicitud import SalidaVerificacion
 from app.domain.services.solicitud_service import ServicioSolicitud
+from app.informes.autorizacion_pdf import generar_pdf_autorizacion
 from app.infrastructure.database import obtener_sesion_bd
 from app.infrastructure.trabajo_pesado import en_hilo_con_tope
 
@@ -43,11 +42,8 @@ async def verificar_autorizacion(
     sesion:  AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     resultado = await ServicioSolicitud(sesion).verificar(codigo)
-    await RepositorioAuditoria(sesion).registrar(
-        AccionAuditoria.AUTORIZACION_VERIFICADA,
-        detalle={"numero": resultado.numero, "estado": resultado.estado, "valida": resultado.valida},
-        ip=obtener_ip(request), agente=obtener_agente(request),
-    )
+    await auditar(sesion, request, AccionAuditoria.AUTORIZACION_VERIFICADA,
+                  detalle={"numero": resultado.numero, "estado": resultado.estado, "valida": resultado.valida})
     return resultado
 
 
@@ -66,11 +62,8 @@ async def ver_autorizacion_publica(
     # La conexión vuelve al pool mientras se arma el PDF (con turno, trabajo_pesado.py).
     await sesion.commit()
     contenido = await en_hilo_con_tope(generar_pdf_autorizacion, datos)
-    await RepositorioAuditoria(sesion).registrar(
-        AccionAuditoria.AUTORIZACION_DESCARGADA,
-        detalle={"numero": datos.numero, "estado": datos.estado, "publica": True},
-        ip=obtener_ip(request), agente=obtener_agente(request),
-    )
+    await auditar(sesion, request, AccionAuditoria.AUTORIZACION_DESCARGADA,
+                  detalle={"numero": datos.numero, "estado": datos.estado, "publica": True})
     return Response(
         content=contenido,
         media_type="application/pdf",

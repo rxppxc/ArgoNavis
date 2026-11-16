@@ -67,7 +67,6 @@
 }
 .consultar       { composes: tono; --tono: var(--acc-blue); }
 .activar         { composes: tono; --tono: var(--acc-green); }
-.finalizarContorno { composes: tono; --tono: var(--acc-teal); }
 /* Texto en --naranja-boton; borde y fondo en el tinte vivo (globals.css). */
 .advertir        { composes: tono; --tono: var(--naranja-boton); --tinte: var(--tinte-naranja); }
 .apagar          { composes: tono; --tono: var(--acc-gray); }

@@ -11,6 +11,8 @@ interface Props {
   children: ReactNode;
   /** Ruta del botón "Volver" (sin botón si no se indica). */
   volverA?: string;
+  /** Lo que el «Volver» le devuelve a la página de origen (utils/volver.ts). */
+  estadoVolver?: unknown;
   /** Página pública (sin sesión): no muestra el menú. */
   publica?: boolean;
   /** angosto: una sola tarjeta (cambiar contraseña); el "Volver" queda alineado con ella. */
@@ -20,7 +22,7 @@ interface Props {
 /** Estructura común de página: la misma franja institucional y el mismo pie
  *  del login, con la campana de notificaciones y el menú del usuario a la
  *  derecha; "Volver" va arriba del contenido. */
-export function MarcoPagina({ children, volverA, publica = false, ancho = "normal" }: Props) {
+export function MarcoPagina({ children, volverA, estadoVolver, publica = false, ancho = "normal" }: Props) {
   const claseAncho = ancho === "amplio" ? styles.amplio : ancho === "angosto" ? styles.angosto : "";
   return (
     <div className={styles.pagina}>
@@ -32,7 +34,7 @@ export function MarcoPagina({ children, volverA, publica = false, ancho = "norma
       <div className={styles.medio}>
         <FondoPagina />
         <main id="contenido" tabIndex={-1} className={`${styles.contenido} ${claseAncho}`}>
-          {volverA && <div className={styles.volver}><BotonVolver to={volverA} /></div>}
+          {volverA && <div className={styles.volver}><BotonVolver to={volverA} estado={estadoVolver} /></div>}
           {children}
         </main>
       </div>

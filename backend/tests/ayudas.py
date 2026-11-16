@@ -4,13 +4,41 @@ import json
 import secrets
 import zipfile
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
-
+from app.core.horario import ZONA_PANAMA
 from conftest import Actor
 
-HOY     = datetime.now(ZoneInfo("America/Panama")).date()
+HOY     = datetime.now(ZONA_PANAMA).date()
 MANANA  = (HOY + timedelta(days=1)).isoformat()
 VIGENTE = (HOY + timedelta(days=400)).isoformat()
+
+
+def panama(*partes: int) -> datetime:
+    """Un momento en hora de Panamá: panama(2026, 10, 30, 15, 1)."""
+    return datetime(*partes, tzinfo=ZONA_PANAMA)
+
+
+async def login(cliente, usuario: str, clave: str):
+    return await cliente.post("/auth/login", json={"username": usuario, "password": clave})
+
+
+def cuerpo_impedimentos(detalle: dict, con_impedimento: set[str] = frozenset(),
+                        comentario: str | None = "Sin impedimentos en SIMPLUS") -> dict:
+    """La verificación por pasajero: todos "sin impedimento" salvo los nombrados."""
+    return {
+        "tripulantes": [{"tripulante_id": t["id"], "con_impedimento": t["nombre"] in con_impedimento}
+                        for t in detalle["tripulantes"]],
+        "comentario": comentario,
+    }
+
+
+async def verificar_impedimentos(cliente, actor: Actor, solicitud_id: int, *,
+                                 con_impedimento: set[str] = frozenset(), ruta: str = "impedimentos") -> dict:
+    """La de UCVMM (`impedimentos`) o la del puesto de control (`impedimentos-puesto`)."""
+    detalle = (await cliente.get(f"/solicitudes/{solicitud_id}", headers=actor.headers)).json()
+    r = await cliente.post(f"/solicitudes/{solicitud_id}/{ruta}",
+                           json=cuerpo_impedimentos(detalle, con_impedimento), headers=actor.headers)
+    assert r.status_code == 200, r.text
+    return r.json()
 
 
 def pdf(nombre: str) -> tuple[str, bytes, str]:

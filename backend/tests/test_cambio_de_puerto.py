@@ -10,23 +10,15 @@ import secrets
 
 import pytest
 
-from app.core.pdf_autorizacion import generar_pdf_autorizacion
+from app.informes.autorizacion_pdf import generar_pdf_autorizacion
 from app.domain.repositories.user_repository import RepositorioUsuario
 from app.domain.services.notificacion_service import ServicioNotificacion
 from app.domain.services.solicitud_service import ServicioSolicitud
 from app.infrastructure.database import SesionLocal
-from ayudas import cabecera, enviar, pdf, tripulante
-from conftest import ATLANTICO, PACIFICO, Actor, crear_actor, id_sector
+from ayudas import cabecera, enviar, pdf, tripulante, verificar_impedimentos
+from conftest import ATLANTICO, PACIFICO, crear_actor, id_sector
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
-
-
-async def verificar_impedimentos(cliente, actor: Actor, solicitud_id: int, ruta: str = "impedimentos") -> None:
-    """Todos sin impedimento: la de UCVMM (`impedimentos`) o la del puesto (`impedimentos-puesto`)."""
-    detalle = (await cliente.get(f"/solicitudes/{solicitud_id}", headers=actor.headers)).json()
-    cuerpo = {"tripulantes": [{"tripulante_id": t["id"], "con_impedimento": False} for t in detalle["tripulantes"]]}
-    r = await cliente.post(f"/solicitudes/{solicitud_id}/{ruta}", json=cuerpo, headers=actor.headers)
-    assert r.status_code == 200, r.text
 
 
 @pytest.fixture(scope="module")
@@ -139,7 +131,7 @@ async def test_la_finaliza_el_puesto_nuevo(cliente, e, admin):
                                                  for t in r.json()["tripulantes"]]},
                            headers=e["del_origen"].headers)
     assert r.status_code == 403 and e["destino"]["nombre"] in r.json()["detail"], r.text
-    r = await cliente.get("/solicitudes/historico", params={"texto": s["numero"]}, headers=e["del_origen"].headers)
+    r = await cliente.post("/solicitudes/historico", json={"texto": s["numero"]}, headers=e["del_origen"].headers)
     assert [x["id"] for x in r.json()["items"]] == [sid], "y la encuentra en la consulta histórica"
 
     # El PDF y la verificación del QR dicen el cambio.
@@ -164,7 +156,7 @@ async def test_la_finaliza_el_puesto_nuevo(cliente, e, admin):
 
     # La consulta histórica la encuentra por cualquiera de los dos puestos.
     for puesto in (e["origen"], e["destino"]):
-        r = await cliente.get("/solicitudes/historico", params={"puesto_id": puesto["id"]}, headers=admin.headers)
+        r = await cliente.post("/solicitudes/historico", json={"puesto_id": puesto["id"]}, headers=admin.headers)
         assert sid in {x["id"] for x in r.json()["items"]}, puesto["nombre"]
 
 

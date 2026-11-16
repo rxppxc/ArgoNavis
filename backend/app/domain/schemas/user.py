@@ -1,6 +1,5 @@
-import unicodedata
-
 from pydantic import BaseModel, Field, ValidationInfo, field_validator
+from app.core.texto import sin_tildes
 from app.domain.models.user import TipoUsuario, EstadoUsuario
 from app.domain.schemas.catalogo import SalidaCatalogoMini, validar_correo
 from app.domain.schemas.rol import RolMini
@@ -10,11 +9,6 @@ LARGO_MAXIMO_CONTRASENA = 64
 # Lo primero que prueba cualquiera: con estas palabras la contraseña no vale
 # aunque cumpla lo demás (se comparan sin tildes ni mayúsculas).
 _PALABRAS_PROHIBIDAS = ("password", "contrasena", "qwerty", "123456", "navis", "migracion", "panama")
-
-
-def _normalizar(texto: str) -> str:
-    sin_tildes = unicodedata.normalize("NFD", texto)
-    return "".join(c for c in sin_tildes if not unicodedata.combining(c)).lower()
 
 
 def problema_de_contrasena(clave: str, usuario: str | None = None) -> str | None:
@@ -32,8 +26,8 @@ def problema_de_contrasena(clave: str, usuario: str | None = None) -> str | None
         return "La contraseña debe tener al menos un número."
     if not any(not c.isalnum() and not c.isspace() for c in clave):
         return "La contraseña debe tener al menos un carácter especial (por ejemplo ! # % - . @)."
-    normal = _normalizar(clave)
-    if usuario and len(usuario.strip()) >= 3 and _normalizar(usuario.strip()) in normal:
+    normal = sin_tildes(clave).lower()
+    if usuario and len(usuario.strip()) >= 3 and sin_tildes(usuario.strip()).lower() in normal:
         return "La contraseña no puede contener el nombre de usuario."
     if any(palabra in normal for palabra in _PALABRAS_PROHIBIDAS):
         return "La contraseña no puede contener palabras fáciles de adivinar (password, navis, 123456…)."

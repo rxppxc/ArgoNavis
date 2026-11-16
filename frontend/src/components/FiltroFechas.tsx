@@ -1,3 +1,4 @@
+import { fechaISOLocal } from "../utils/fechas";
 import { IconoReloj } from "./Iconos";
 import styles from "./FiltroFechas.module.css";
 
@@ -16,18 +17,10 @@ const PRESETS: { id: Preset; etiqueta: string }[] = [
   { id: "7d",    etiqueta: "Últimos 7 días" },
 ];
 
-/** Fecha local (no UTC) en formato YYYY-MM-DD — evita el desfase de zona horaria de toISOString. */
-function fechaLocalISO(d: Date): string {
-  const y  = d.getFullYear();
-  const m  = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${dd}`;
-}
-
 function haceDias(n: number): string {
   const d = new Date();
   d.setDate(d.getDate() - n);
-  return fechaLocalISO(d);
+  return fechaISOLocal(d);
 }
 
 interface Props {
@@ -36,7 +29,7 @@ interface Props {
 }
 
 export default function FiltroFechas({ valor, onCambio }: Props) {
-  const hoy = fechaLocalISO(new Date());
+  const hoy = fechaISOLocal(new Date());
 
   // El preset activo se deriva directamente del valor — sin estado propio,
   // así el filtro nunca puede desincronizarse de lo que ve el padre.

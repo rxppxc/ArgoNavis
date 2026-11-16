@@ -17,7 +17,7 @@ interface Cargados {
 /** Notificaciones internas (la campana de la cabecera). Consulta /pendientes
  *  al entrar, al cambiar de página, cada minuto con la pestaña a la vista y al
  *  volver a ella. La consulta no cuenta como actividad (la anotan el mouse y
- *  el teclado, App.tsx): no impide el cierre de la sesión por inactividad.
+ *  el teclado, components/VigilanteSesion.tsx): no impide el cierre de la sesión por inactividad.
  *  Con pendientes, la pestaña del navegador dice "(N) …". */
 export function ProveedorPendientes({ children }: { children: ReactNode }) {
   const { usuario } = useAutenticacion();

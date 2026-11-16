@@ -1,14 +1,15 @@
 import { useState } from "react";
 import type { RangoFechas } from "../../../components/FiltroFechas";
 import { IconoReloj } from "../../../components/Iconos";
-import { PRESETS, fechaISO, presetDeRango, rangoDePreset } from "./calculos";
+import { fechaISOLocal } from "../../../utils/fechas";
+import { PRESETS, presetDeRango, rangoDePreset } from "./calculos";
 import styles from "./Estadisticas.module.css";
 
 /** El periodo de las estadísticas: atajos (el mes pasado sirve para el informe
  *  mensual) y, con «Otras fechas», desde y hasta. Acota todo lo que hay debajo. */
 export default function SelectorPeriodo({ valor, onCambio }: { valor: RangoFechas; onCambio: (r: RangoFechas) => void }) {
   const hoy = new Date();
-  const hoyISO = fechaISO(hoy);
+  const hoyISO = fechaISOLocal(hoy);
   const preset = presetDeRango(valor, hoy);
   const [otrasFechas, setOtrasFechas] = useState(preset === null);
 

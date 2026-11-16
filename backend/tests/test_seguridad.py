@@ -15,6 +15,7 @@ from app.core.ldap import servicio_ldap
 from app.domain.models.user import EstadoUsuario, Usuario
 from app.infrastructure import almacenamiento
 from app.infrastructure.database import SesionLocal, al_confirmar
+from ayudas import login
 from conftest import crear_actor
 
 asincrona = pytest.mark.asyncio(loop_scope="session")
@@ -47,10 +48,6 @@ def _ad_falso(monkeypatch, *, clave_correcta: str = "Correcta2026", espera: floa
     return consultas
 
 
-async def _entrar(cliente, usuario: str, clave: str):
-    return await cliente.post("/auth/login", json={"username": usuario, "password": clave})
-
-
 @asincrona
 async def test_login_no_revela_si_el_usuario_existe(cliente, admin, monkeypatch):
     """Nombre que no es de ARGO NAVIS, cuenta del AD con la contraseña equivocada,
@@ -61,19 +58,19 @@ async def test_login_no_revela_si_el_usuario_existe(cliente, admin, monkeypatch)
     # Cuenta del dominio no registrada en ARGO NAVIS, con su contraseña correcta:
     # antes respondía "no tienes acceso" (un oráculo de contraseñas del AD
     # para cualquiera en la VPN). Ahora ni se le pregunta al AD.
-    r = await _entrar(cliente, "no.registrado", "Correcta2026")
+    r = await login(cliente, "no.registrado", "Correcta2026")
     assert r.status_code == 401 and r.json()["detail"] == GENERICO
     assert consultas == []
     assert await _motivo_en_bitacora(cliente, admin, "no.registrado") == \
         "Usuario no registrado en ARGO NAVIS: no se consultó el AD."
 
     ad = await crear_actor(None, ad=True, prefijo="ad")
-    r = await _entrar(cliente, ad.username, "mala")
+    r = await login(cliente, ad.username, "mala")
     assert r.status_code == 401 and r.json()["detail"] == GENERICO
     assert await _motivo_en_bitacora(cliente, admin, ad.username) == "Contraseña incorrecta (Active Directory)."
 
     borrada = await crear_actor(None, ad=True, prefijo="borrado")
-    r = await _entrar(cliente, borrada.username, "Correcta2026")
+    r = await login(cliente, borrada.username, "Correcta2026")
     assert r.status_code == 401 and r.json()["detail"] == GENERICO
     assert await _motivo_en_bitacora(cliente, admin, borrada.username) == "Usuario no encontrado en Active Directory."
 
@@ -82,14 +79,14 @@ async def test_login_no_revela_si_el_usuario_existe(cliente, admin, monkeypatch)
         (await s.get(Usuario, ad.id)).status = EstadoUsuario.INACTIVO
         await s.commit()
     consultas.clear()
-    r = await _entrar(cliente, ad.username, "Correcta2026")
+    r = await login(cliente, ad.username, "Correcta2026")
     assert r.status_code == 401 and r.json()["detail"] == GENERICO and consultas == []
     assert await _motivo_en_bitacora(cliente, admin, ad.username) == "Cuenta desactivada: no se consultó el AD."
 
     # Sin distinguir mayúsculas, como el AD; al AD se le pregunta por el nombre registrado.
     activa = await crear_actor(None, ad=True, prefijo="ad")
     consultas.clear()
-    r = await _entrar(cliente, f"  {activa.username.upper()} ", "Correcta2026")
+    r = await login(cliente, f"  {activa.username.upper()} ", "Correcta2026")
     assert r.status_code == 200 and consultas == [activa.username]
 
 
@@ -230,8 +227,8 @@ async def test_freno_del_login_contra_el_ad(cliente, admin, monkeypatch):
     ad = await crear_actor(None, ad=True, prefijo="ad")
 
     for _ in range(maximo - 1):
-        assert (await _entrar(cliente, ad.username, "mala")).status_code == 401
-    r = await _entrar(cliente, ad.username, "mala")
+        assert (await login(cliente, ad.username, "mala")).status_code == 401
+    r = await login(cliente, ad.username, "mala")
     assert r.status_code == 429 and "espera" in r.json()["detail"]
     assert len(consultas) == maximo
     r = await cliente.get("/admin/bitacora", params={"accion": "CUENTA_BLOQUEADA", "usuario": ad.username},
@@ -239,15 +236,15 @@ async def test_freno_del_login_contra_el_ad(cliente, admin, monkeypatch):
     assert r.json()["items"][0]["detalle"]["origen"] == "ad"
 
     # Frenada: ni con la contraseña correcta se le pregunta al AD.
-    r = await _entrar(cliente, ad.username, "Correcta2026")
+    r = await login(cliente, ad.username, "Correcta2026")
     assert r.status_code == 429 and len(consultas) == maximo
 
     # Pasada la espera entra, y el contador vuelve a cero.
     async with SesionLocal() as s:
         (await s.get(Usuario, ad.id)).bloqueado_hasta = datetime.now(timezone.utc) - timedelta(seconds=1)
         await s.commit()
-    assert (await _entrar(cliente, ad.username, "Correcta2026")).status_code == 200
-    assert (await _entrar(cliente, ad.username, "mala")).status_code == 401
+    assert (await login(cliente, ad.username, "Correcta2026")).status_code == 200
+    assert (await login(cliente, ad.username, "mala")).status_code == 401
 
 
 @asincrona
@@ -259,7 +256,7 @@ async def test_freno_del_ad_con_intentos_en_paralelo(cliente, monkeypatch):
     consultas = _ad_falso(monkeypatch, espera=0.05)   # que se pisen si no fueran de a uno
     ad = await crear_actor(None, ad=True, prefijo="ad")
 
-    respuestas = await asyncio.gather(*(_entrar(cliente, ad.username, "mala") for _ in range(maximo + 3)))
+    respuestas = await asyncio.gather(*(login(cliente, ad.username, "mala") for _ in range(maximo + 3)))
     assert sorted(r.status_code for r in respuestas) == [401] * (maximo - 1) + [429] * 4
     assert len(consultas) == maximo
 
@@ -370,9 +367,9 @@ async def test_login_con_usuario_muy_largo(cliente, admin):
     """El usuario va a la bitácora (VARCHAR 100). Uno más largo se rechaza al
     validar (422); antes hacía fallar el guardado del intento (500) y el
     intento no quedaba registrado."""
-    r = await _entrar(cliente, "x" * 101, "cualquiera")
+    r = await login(cliente, "x" * 101, "cualquiera")
     assert r.status_code == 422
     usuario = "x" * 100
-    r = await _entrar(cliente, usuario, "cualquiera")
+    r = await login(cliente, usuario, "cualquiera")
     assert r.status_code == 401 and r.json()["detail"] == GENERICO
     assert await _motivo_en_bitacora(cliente, admin, usuario), "el intento queda en la bitácora"

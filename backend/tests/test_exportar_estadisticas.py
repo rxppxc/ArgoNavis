@@ -14,7 +14,7 @@ from datetime import date, datetime
 import pytest
 
 from app.core.horario import ZONA_PANAMA
-from app.core.informe_estadisticas import (
+from app.informes.estadisticas import (
     DatosInforme, duracion, generar_informe, nombre_archivo, porcentaje, rotulo_periodo, texto_periodo,
 )
 from app.domain.schemas.solicitud import (

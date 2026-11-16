@@ -210,7 +210,7 @@ class ServicioAutenticacion:
             raise _error(
                 status.HTTP_503_SERVICE_UNAVAILABLE,
                 "No se pudo conectar al servidor de Active Directory. Verifica tu conexión de red.",
-            )
+            ) from e
 
         if not ldap_usuario:
             raise ErrorAcceso("Usuario no encontrado en Active Directory.")
@@ -220,7 +220,7 @@ class ServicioAutenticacion:
             autenticado = await asyncio.to_thread(servicio_ldap.autenticar, ldap_usuario["dn"], contrasena)
         except Exception as e:
             logger.error(f"Error inesperado al verificar credenciales LDAP: {e}", exc_info=True)
-            raise _error(status.HTTP_503_SERVICE_UNAVAILABLE, "Error al verificar credenciales. Inténtalo de nuevo.")
+            raise _error(status.HTTP_503_SERVICE_UNAVAILABLE, "Error al verificar credenciales. Inténtalo de nuevo.") from e
         if not autenticado:
             raise ErrorAcceso("Contraseña incorrecta (Active Directory).")
         return ldap_usuario

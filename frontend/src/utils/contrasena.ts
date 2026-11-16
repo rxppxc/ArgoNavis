@@ -3,13 +3,15 @@
  * dominio). Espejo de `problema_de_contrasena` en
  * backend/app/domain/schemas/user.py: si cambias una, cambia la otra.
  */
+import { sinTildes } from "./texto";
+
 export const LARGO_MINIMO_CONTRASENA = 12;
 export const LARGO_MAXIMO_CONTRASENA = 64;
 
 /** Lo primero que prueba cualquiera (se compara sin tildes ni mayúsculas). */
 const PALABRAS_PROHIBIDAS = ["password", "contrasena", "qwerty", "123456", "navis", "migracion", "panama"];
 
-const normalizar = (texto: string) => texto.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+const normalizar = (texto: string) => sinTildes(texto).toLowerCase();
 
 const tieneMayuscula = (c: string) => /\p{Lu}/u.test(c);
 const tieneMinuscula = (c: string) => /\p{Ll}/u.test(c);

@@ -8,7 +8,7 @@ services:
     # menor en cada pull. Dentro de la 15 los datos sirven igual; para actualizar,
     # cambia la etiqueta (y la del flujo de CI, .github/workflows/ci.yml).
     image: postgres:15.19-alpine3.24
-    container_name: snm_postgres
+    container_name: argonavis_postgres
     restart: always
     # Límites de cada contenedor (revisión de recursos del 2026-11-10). Sin ellos, uno
     # que se desboca se lleva a los demás: sin memoria, el kernel mata al proceso más
@@ -47,7 +47,7 @@ services:
     # Con nombre fijo: así se puede guardar y llevar a un servidor sin internet
     # (empaquetar-sin-internet.sh y docker compose up --no-build).
     image: argonavis-backend:latest
-    container_name: snm_backend
+    container_name: argonavis_backend
     restart: always
     # Memoria medida el 2026-11-10 con 100 usuarios (tests/carga.py): ~150 MB por proceso
     # de uvicorn y ~110 MB el maestro, ~410 MB en total; 1 GB deja margen para envíos y
@@ -138,7 +138,7 @@ services:
   frontend:
     build: ./frontend
     image: argonavis-frontend:latest
-    container_name: snm_frontend
+    container_name: argonavis_frontend
     restart: always
     mem_limit: ${FRONTEND_MEMORIA:-256m}
     pids_limit: 200

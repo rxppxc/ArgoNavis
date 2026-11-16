@@ -14,29 +14,26 @@ from app.domain.models.catalogo import AgenciaNaviera, PuestoControl
 from app.domain.models.solicitud import EventoSolicitud, Solicitud
 from app.domain.models.tramite import TipoTramite
 from app.domain.repositories.solicitud_repository import _fuera_de_horario
-from app.domain.services.solicitud_service import _meses_antes, _periodos_mes, _serie
+from app.domain.services.series import meses_antes, periodos_mes, serie
 from app.infrastructure.database import SesionLocal
+from ayudas import panama
 from conftest import crear_actor, id_sector
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 
-def _panama(*partes: int) -> datetime:
-    return datetime(*partes, tzinfo=ZONA_PANAMA)
-
-
 # Viernes 30/10/2026, sábado 31, domingo 1/11 y lunes 2/11, en hora de Panamá.
 BORDES = [
-    (_panama(2026, 10, 30, 6, 59, 59), True),
-    (_panama(2026, 10, 30, 7, 0), False),
-    (_panama(2026, 10, 30, 14, 59, 59), False),
-    (_panama(2026, 10, 30, 15, 0), False),         # las 15:00 en punto todavía son laborales
-    (_panama(2026, 10, 30, 15, 0, 59), False),
-    (_panama(2026, 10, 30, 15, 1), True),          # desde las 15:01, fuera
-    (_panama(2026, 10, 30, 22, 30), True),         # en UTC ya es sábado
-    (_panama(2026, 10, 31, 10, 0), True),          # sábado
-    (_panama(2026, 11, 1, 10, 0), True),           # domingo
-    (_panama(2026, 11, 2, 7, 30), False),          # lunes
+    (panama(2026, 10, 30, 6, 59, 59), True),
+    (panama(2026, 10, 30, 7, 0), False),
+    (panama(2026, 10, 30, 14, 59, 59), False),
+    (panama(2026, 10, 30, 15, 0), False),         # las 15:00 en punto todavía son laborales
+    (panama(2026, 10, 30, 15, 0, 59), False),
+    (panama(2026, 10, 30, 15, 1), True),          # desde las 15:01, fuera
+    (panama(2026, 10, 30, 22, 30), True),         # en UTC ya es sábado
+    (panama(2026, 10, 31, 10, 0), True),          # sábado
+    (panama(2026, 11, 1, 10, 0), True),           # domingo
+    (panama(2026, 11, 2, 7, 30), False),          # lunes
 ]
 
 
@@ -49,15 +46,15 @@ async def test_la_regla_en_python_y_en_sql_coinciden(momento, fuera):
 
 
 async def test_la_serie_se_agrupa_por_dia_mes_y_anio():
-    assert _meses_antes(date(2026, 1, 15), 1) == date(2025, 12, 1)
-    assert _meses_antes(date(2026, 1, 15), -1) == date(2026, 2, 1)
-    assert _periodos_mes(date(2025, 11, 20), date(2026, 2, 3)) == [
+    assert meses_antes(date(2026, 1, 15), 1) == date(2025, 12, 1)
+    assert meses_antes(date(2026, 1, 15), -1) == date(2026, 2, 1)
+    assert periodos_mes(date(2025, 11, 20), date(2026, 2, 3)) == [
         date(2025, 11, 1), date(2025, 12, 1), date(2026, 1, 1), date(2026, 2, 1),
     ]
     diaria = {date(2026, 10, 30): {"recibidas": 2}, date(2026, 11, 2): {"recibidas": 1, "aprobadas": 1}}
-    meses = _serie(diaria, [date(2026, 10, 1), date(2026, 11, 1)], lambda d: f"{d.year:04d}-{d.month:02d}")
+    meses = serie(diaria, [date(2026, 10, 1), date(2026, 11, 1)], lambda d: f"{d.year:04d}-{d.month:02d}")
     assert [(m.periodo, m.recibidas, m.aprobadas) for m in meses] == [("2026-10", 2, 0), ("2026-11", 1, 1)]
-    anios = _serie(diaria, [date(2026, 1, 1)], lambda d: f"{d.year:04d}")
+    anios = serie(diaria, [date(2026, 1, 1)], lambda d: f"{d.year:04d}")
     assert (anios[0].periodo, anios[0].recibidas, anios[0].finalizadas) == ("2026", 3, 0)
 
 
@@ -163,7 +160,7 @@ async def test_aprobada_fuera_del_horario_lleva_el_costo(cliente, monkeypatch):
     momento y la agencia lo ve en la bandeja, el expediente, el correo de
     aprobación y el PDF (2026-11-11). Cambiar el costo no toca lo ya aprobado."""
     from app.api.v1 import solicitudes as api_solicitudes
-    from app.core.pdf_autorizacion import generar_pdf_autorizacion
+    from app.informes.autorizacion_pdf import generar_pdf_autorizacion
     from app.domain.services import solicitud_service
 
     sufijo = secrets.token_hex(3)

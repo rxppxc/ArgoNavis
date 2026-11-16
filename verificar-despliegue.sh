@@ -33,9 +33,9 @@ seccion() { echo; echo "== $* =="; }
 env_de()  { grep -E "^$1=" .env | tail -1 | cut -d= -f2-; }
 codigo()  { curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$@"; }
 # Consulta a la base, con las credenciales que ya tiene el contenedor.
-psql_bd() { docker exec snm_postgres sh -c "psql -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" -tA -F' ' -c \"$1\"" 2>/dev/null; }
+psql_bd() { docker exec argonavis_postgres sh -c "psql -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" -tA -F' ' -c \"$1\"" 2>/dev/null; }
 # Python dentro del backend (lee el programa de la entrada estándar).
-py_backend() { docker exec -i snm_backend python -; }
+py_backend() { docker exec -i argonavis_backend python -; }
 
 # ── Contenedores ─────────────────────────────────────────────────────────────
 # Recién desplegado, el backend tarda unos segundos en arrancar (aplica las
@@ -44,7 +44,7 @@ py_backend() { docker exec -i snm_backend python -; }
 # 502 en todo lo que pasa por el backend.
 for intento in $(seq 1 24); do
   arrancando=""
-  for c in snm_postgres snm_backend snm_frontend; do
+  for c in argonavis_postgres argonavis_backend argonavis_frontend; do
     if [ "$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$c" 2>/dev/null)" = starting ]; then
       arrancando="$arrancando $c"
     fi
@@ -54,7 +54,7 @@ for intento in $(seq 1 24); do
   sleep 5
 done
 seccion "Contenedores"
-for c in snm_postgres snm_backend snm_frontend; do
+for c in argonavis_postgres argonavis_backend argonavis_frontend; do
   estado=$(docker inspect -f '{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}sin chequeo{{end}}|{{.RestartCount}}|{{.HostConfig.RestartPolicy.Name}}' "$c" 2>/dev/null)
   if [ -z "$estado" ]; then mal "$c no existe"; continue; fi
   IFS='|' read -r st salud reinicios politica <<<"$estado"
@@ -65,7 +65,7 @@ done
 # Límites de memoria (2026-11-10): sin ellos, un contenedor desbocado se lleva a los
 # demás. Cerca del límite, Docker corta procesos de ese contenedor: hay que subirlo.
 suma_mb=0
-for c in snm_postgres snm_backend snm_frontend; do
+for c in argonavis_postgres argonavis_backend argonavis_frontend; do
   limite=$(docker inspect -f '{{.HostConfig.Memory}}' "$c" 2>/dev/null) || continue
   if [ "${limite:-0}" -eq 0 ]; then aviso "$c sin límite de memoria (mem_limit en docker-compose-prod.yml)"; continue; fi
   suma_mb=$((suma_mb + limite / 1048576))
@@ -90,9 +90,9 @@ if [ "$suma_mb" -gt "$total_mb" ]; then
 elif [ "$suma_mb" -gt 0 ]; then
   info "Límites de memoria: $suma_mb MB en total; la VM tiene $total_mb MB y $(nproc) núcleo(s)"
 fi
-murieron=$(docker logs --since 24h snm_backend 2>&1 | grep -c 'Child process .* died')
+murieron=$(docker logs --since 24h argonavis_backend 2>&1 | grep -c 'Child process .* died')
 if [ "$murieron" -gt 0 ]; then
-  aviso "En 24 h se cayeron $murieron proceso(s) de uvicorn, y uvicorn los levantó (¿límite de memoria?): docker logs --since 24h snm_backend 2>&1 | grep -B5 died"
+  aviso "En 24 h se cayeron $murieron proceso(s) de uvicorn, y uvicorn los levantó (¿límite de memoria?): docker logs --since 24h argonavis_backend 2>&1 | grep -B5 died"
 fi
 if [ "$(systemctl is-enabled docker 2>/dev/null)" = enabled ]; then
   bien "Docker arranca solo al encender la máquina"
@@ -154,9 +154,9 @@ if ss -tlnH | awk '{print $4}' | grep -E ':5432$' | grep -vqE '^(127\.0\.0\.1|\[
 else
   bien "PostgreSQL solo escucha en este equipo (127.0.0.1)"
 fi
-uid=$(docker exec snm_backend id -u 2>/dev/null)
+uid=$(docker exec argonavis_backend id -u 2>/dev/null)
 if [ "$uid" = 10001 ]; then bien "El backend corre sin privilegios (uid 10001)"; else mal "El backend corre con uid ${uid:-?} (se esperaba 10001)"; fi
-if [ "$(docker exec snm_backend printenv APP_ENV 2>/dev/null)" = production ]; then bien "APP_ENV=production"; else mal "APP_ENV no es production"; fi
+if [ "$(docker exec argonavis_backend printenv APP_ENV 2>/dev/null)" = production ]; then bien "APP_ENV=production"; else mal "APP_ENV no es production"; fi
 c=$(codigo http://localhost/api/docs)
 if [ "$c" = 404 ]; then bien "La documentación de la API está oculta"; else aviso "/api/docs responde $c"; fi
 sk=$(env_de SECRET_KEY)
@@ -179,7 +179,7 @@ fi
 
 # ── Base de datos ────────────────────────────────────────────────────────────
 seccion "Base de datos"
-rev=$(docker exec snm_backend alembic current 2>/dev/null | tail -1)
+rev=$(docker exec argonavis_backend alembic current 2>/dev/null | tail -1)
 if echo "$rev" | grep -q '(head)'; then bien "Esquema al día: $rev"; else mal "Esquema sin migrar: ${rev:-sin respuesta}"; fi
 topes=$(py_backend <<'PY' 2>/dev/null
 import asyncio
@@ -228,9 +228,9 @@ else
   aviso "Cuenta de la aplicación: ${cuenta:-sin respuesta} (se esperaba sin superusuario y la bitácora solo para agregar)"
 fi
 max=$(psql_bd "show max_connections")
-workers=$(docker exec snm_backend printenv UVICORN_WORKERS 2>/dev/null); workers=${workers:-1}
-bd_pool=$(docker exec snm_backend printenv BD_POOL 2>/dev/null)
-bd_extra=$(docker exec snm_backend printenv BD_POOL_EXTRA 2>/dev/null)
+workers=$(docker exec argonavis_backend printenv UVICORN_WORKERS 2>/dev/null); workers=${workers:-1}
+bd_pool=$(docker exec argonavis_backend printenv BD_POOL 2>/dev/null)
+bd_extra=$(docker exec argonavis_backend printenv BD_POOL_EXTRA 2>/dev/null)
 por_proceso=$(( ${bd_pool:-5} + ${bd_extra:-10} ))
 necesarias=$(( workers * por_proceso ))
 if [ -n "$max" ] && [ "$necesarias" -lt "$max" ]; then
@@ -239,10 +239,10 @@ else
   mal "Se pueden pedir $necesarias conexiones y PostgreSQL admite ${max:-?}"
 fi
 if [ "$workers" -gt 1 ]; then
-  corriendo=$(docker top snm_backend 2>/dev/null | grep -c 'spawn_main')
+  corriendo=$(docker top argonavis_backend 2>/dev/null | grep -c 'spawn_main')
   if [ "$corriendo" -eq "$workers" ]; then bien "$workers procesos del backend en marcha"; else aviso "Se pidieron $workers procesos del backend y hay $corriendo"; fi
 fi
-if docker exec snm_backend sh -c 'f=/app/storage/documentos/.verificacion; touch "$f" && rm -f "$f"' 2>/dev/null; then
+if docker exec argonavis_backend sh -c 'f=/app/storage/documentos/.verificacion; touch "$f" && rm -f "$f"' 2>/dev/null; then
   bien "El backend puede escribir en el volumen de documentos"
 else
   mal "El backend no puede escribir en /app/storage/documentos (¿volumen creado como root? README → Producción)"
@@ -350,11 +350,11 @@ if [ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" = yes ]; then
 else
   aviso "El reloj no está sincronizado (timedatectl): los plazos y el horario laboral dependen de la hora"
 fi
-errores=$(docker logs --since 24h snm_backend 2>&1 | grep -cE ' (ERROR|CRITICAL) |Traceback')
+errores=$(docker logs --since 24h argonavis_backend 2>&1 | grep -cE ' (ERROR|CRITICAL) |Traceback')
 if [ "$errores" -eq 0 ]; then
   bien "Sin errores en el log del backend (últimas 24 h)"
 else
-  aviso "$errores línea(s) de error en el log del backend (últimas 24 h): docker logs --since 24h snm_backend 2>&1 | grep -B2 -A10 -E ' (ERROR|CRITICAL) |Traceback'"
+  aviso "$errores línea(s) de error en el log del backend (últimas 24 h): docker logs --since 24h argonavis_backend 2>&1 | grep -B2 -A10 -E ' (ERROR|CRITICAL) |Traceback'"
 fi
 
 echo

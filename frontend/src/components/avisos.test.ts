@@ -61,3 +61,14 @@ describe("agregarAviso", () => {
     expect(agregarAviso([aviso("Hecho", "info")], aviso("Hecho", "exito"))).toHaveLength(2);
   });
 });
+
+describe("el tope de avisos no descarta los que esperan al usuario", () => {
+  it("con «Versión nueva» abierta, salen los que se cierran solos", () => {
+    type Aviso = { texto: string; tipo: TipoNotificacion; duracionMs: number };
+    let lista: Aviso[] = agregarAviso<Aviso>([], { texto: "Hay una versión nueva", tipo: "info", duracionMs: 0 });
+    for (const texto of ["uno", "dos", "tres", "cuatro"]) {
+      lista = agregarAviso<Aviso>(lista, { texto, tipo: "exito", duracionMs: 4000 });
+    }
+    expect(lista.map((m) => m.texto)).toEqual(["cuatro", "tres", "Hay una versión nueva"]);
+  });
+});

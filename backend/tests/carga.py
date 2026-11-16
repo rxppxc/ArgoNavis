@@ -34,40 +34,30 @@ from zoneinfo import ZoneInfo
 
 import httpx
 import psycopg
-from dotenv import dotenv_values
 
-BACKEND = Path(__file__).resolve().parent.parent
+from entorno_pruebas import BACKEND, alembic, servidor_bd, sql_admin, url_admin, variables
+
 PUERTO = 8002
 BASE = f"http://127.0.0.1:{PUERTO}"
 NOMBRE_BD = f"argonavis_carga_{secrets.token_hex(3)}"
 STORAGE = Path(tempfile.mkdtemp(prefix="argonavis_carga_"))
 CLAVE = "Carga-Prueba-2026!"
 
-_url = os.environ.get("TEST_DATABASE_URL") or dotenv_values(BACKEND / ".env").get("DATABASE_URL")
-if not _url:
-    raise SystemExit("Define TEST_DATABASE_URL o DATABASE_URL en backend/.env.")
-_base = _url.rpartition("/")[0]
-URL_ADMIN = f"{_base}/postgres".replace("postgresql+asyncpg://", "postgresql://")
+_base = servidor_bd()
+URL_ADMIN = url_admin(_base)
 URL_BD = f"{_base}/{NOMBRE_BD}"
 
-ENTORNO = {
-    **os.environ,
-    "DATABASE_URL": URL_BD, "MIGRACIONES_DATABASE_URL": "",
-    "STORAGE_PATH": str(STORAGE), "APP_ENV": "test", "SECRET_KEY": secrets.token_urlsafe(32),
-    "LDAP_HOST": "ldap.invalido", "LDAP_BASE_DN": "DC=prueba", "LDAP_BIND_USER": "x", "LDAP_BIND_PASSWORD": "x",
-    "MAIL_HOST": "", "CORREO_UCVMM": "", "LOG_CARPETA": "", "LOG_NIVEL": "WARNING",
-    "PERMITIR_LOGIN_LOCAL": "true", "LIMITE_VERIFICACIONES_POR_MINUTO": "0", "LIMITE_ENVIOS_POR_HORA": "0",
-}
+ENTORNO = {**os.environ, **variables(URL_BD, STORAGE, LOG_NIVEL="WARNING", LIMITE_ENVIOS_POR_HORA="0")}
 os.environ.update(ENTORNO)
 sys.path.insert(0, str(BACKEND))
 
-MANANA = (datetime.now(ZoneInfo("America/Panama")).date() + timedelta(days=1)).isoformat()
-VIGENTE = (datetime.now(ZoneInfo("America/Panama")).date() + timedelta(days=400)).isoformat()
+_HOY = datetime.now(ZoneInfo("America/Panama")).date()
+MANANA = (_HOY + timedelta(days=1)).isoformat()
+VIGENTE = (_HOY + timedelta(days=400)).isoformat()
 
 
 def _sql_admin(sentencia: str) -> None:
-    with psycopg.connect(URL_ADMIN, autocommit=True) as cx:
-        cx.execute(sentencia)
+    sql_admin(URL_ADMIN, sentencia)
 
 
 def _conexiones_abiertas() -> int:
@@ -77,8 +67,7 @@ def _conexiones_abiertas() -> int:
 
 def preparar_bd() -> None:
     _sql_admin(f'CREATE DATABASE "{NOMBRE_BD}"')
-    r = subprocess.run([sys.executable, "-I", "-m", "alembic", "upgrade", "head"], cwd=BACKEND, env=ENTORNO,
-                       capture_output=True, text=True)
+    r = alembic("upgrade", "head", entorno=ENTORNO)
     if r.returncode:
         raise SystemExit(r.stderr[-3000:])
 

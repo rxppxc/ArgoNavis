@@ -23,7 +23,7 @@
  *   mostrar(texto, "info", { duracionMs: 0, accion: { texto: "Recargar", alHacer: recargar } });
  */
 import {
-  Fragment, createContext, useCallback, useContext, useMemo, useRef, useState,
+  Fragment, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
 } from "react";
 import type { ReactNode } from "react";
 import { IconoX } from "./Iconos";
@@ -104,6 +104,25 @@ export function ProveedorNotificaciones({ children }: { children: ReactNode }) {
     },
     [],
   );
+
+  // Mientras hay avisos, siguen a la cabecera si la página se desplaza o cambia de tamaño
+  // (antes se medía solo al mostrarlos y quedaban corridos). Una vez por cuadro.
+  const hayAvisos = items.length > 0;
+  useEffect(() => {
+    if (!hayAvisos) return;
+    let cuadro = 0;
+    const recolocar = () => {
+      if (cuadro) return;
+      cuadro = requestAnimationFrame(() => { cuadro = 0; setArriba(debajoDeLaCabecera()); });
+    };
+    window.addEventListener("scroll", recolocar, { passive: true });
+    window.addEventListener("resize", recolocar);
+    return () => {
+      cancelAnimationFrame(cuadro);
+      window.removeEventListener("scroll", recolocar);
+      window.removeEventListener("resize", recolocar);
+    };
+  }, [hayAvisos]);
 
   const valor = useMemo(() => ({ mostrar }), [mostrar]);
 

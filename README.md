@@ -59,9 +59,10 @@ Los dos escuchan solo en este equipo. Para probar desde otro (p. ej. el celular)
 ### Pruebas
 ```bat
 cd backend
+venv\Scripts\python -m ruff check .
 venv\Scripts\python -m pytest
 ```
-Crean una base de datos temporal en el servidor de `DATABASE_URL` (o `TEST_DATABASE_URL`), le aplican las migraciones, recorren el flujo completo por la API y la borran al terminar. No envían correos ni tocan la base de desarrollo.
+`ruff` revisa el código del backend (`backend/ruff.toml`); la CI lo corre antes de las pruebas. Las pruebas crean una base de datos temporal en el servidor de `DATABASE_URL` (o `TEST_DATABASE_URL`), le aplican las migraciones, recorren el flujo completo por la API y la borran al terminar. No envían correos ni tocan la base de desarrollo.
 
 ```bat
 cd frontend
@@ -115,8 +116,8 @@ Después de cada despliegue, `sudo bash verificar-despliegue.sh` revisa sin camb
 > ```bash
 > docker compose -f docker-compose-prod.yml stop backend
 > # La base: se borra y se vuelve a crear vacía antes de cargar el respaldo.
-> docker exec snm_postgres sh -c 'dropdb -U "$POSTGRES_USER" "$POSTGRES_DB" && createdb -U "$POSTGRES_USER" "$POSTGRES_DB"'
-> gunzip -c ~/backups/argonavis_bd_<FECHA>.sql.gz | docker exec -i snm_postgres sh -c 'psql -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+> docker exec argonavis_postgres sh -c 'dropdb -U "$POSTGRES_USER" "$POSTGRES_DB" && createdb -U "$POSTGRES_USER" "$POSTGRES_DB"'
+> gunzip -c ~/backups/argonavis_bd_<FECHA>.sql.gz | docker exec -i argonavis_postgres sh -c 'psql -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
 > # Los documentos (a un volumen vacío queda igual a la copia; sobre uno con datos, agrega lo que falte).
 > sudo cp -a ~/backups/documentos/<FECHA>/. "$(docker volume inspect argonavis_documentos --format '{{ .Mountpoint }}')/"
 > docker compose -f docker-compose-prod.yml start backend   # al arrancar, vuelve a dar los permisos de la cuenta de la app
@@ -148,7 +149,7 @@ Después de cada despliegue, `sudo bash verificar-despliegue.sh` revisa sin camb
 >   Pon `POSTGRES_DB=argonavis` en el `.env`, renombra la base y levanta todo (al arrancar, el backend aplica la migración de las rutas):
 >   ```bash
 >   docker compose -f docker-compose-prod.yml up -d postgres_db
->   docker exec snm_postgres sh -c 'psql -U "$POSTGRES_USER" -d postgres -c "ALTER DATABASE filetransfer RENAME TO argonavis"'
+>   docker exec argonavis_postgres sh -c 'psql -U "$POSTGRES_USER" -d postgres -c "ALTER DATABASE filetransfer RENAME TO argonavis"'
 >   docker compose -f docker-compose-prod.yml up -d --build
 >   ```
 >   Actualiza la ruta de `backup.sh` en el cron. Cuando todo funcione, borra los volúmenes viejos y los respaldos `filetransfer_*.gz` (la retención ya solo limpia los `argonavis_*`).
@@ -182,21 +183,26 @@ Después de cada despliegue, `sudo bash verificar-despliegue.sh` revisa sin camb
 ArgoNavis/
 ├─ backend/
 │  ├─ app/
-│  │  ├─ main.py               # FastAPI, CORS, rutas, tarea de vencimientos
-│  │  ├─ api/v1/               # endpoints: solo orquestan (auth, solicitudes, catálogos, admin, bitácora...)
-│  │  ├─ core/                 # config, JWT, LDAP, permisos, correos, PDF, rate limit
+│  │  ├─ main.py               # arma la aplicación: ciclo de vida, middlewares, rutas, salud, frontend compilado
+│  │  ├─ api/
+│  │  │  ├─ v1/                # endpoints: solo orquestan (auth, solicitudes, catálogos, admin, bitácora...)
+│  │  │  ├─ manejadores.py     # respuestas a los errores que no son HTTPException (BD caída, 429, 409)
+│  │  │  └─ middleware.py      # tope del cuerpo de cada petición y código de pedido
+│  │  ├─ core/                 # transversal: config, contraseñas y JWT, LDAP, correos, rate limit, horario, identidad
 │  │  ├─ domain/
 │  │  │  ├─ models/            # ORM: solicitud, tramite, catalogo, user, rol, audit_log
 │  │  │  ├─ schemas/           # contratos Pydantic de la API
 │  │  │  ├─ repositories/      # acceso a BD, uno por agregado
-│  │  │  └─ services/          # reglas: solicitud, tramite (checklist), notificacion (correos), pendientes (la campana), auth
+│  │  │  └─ services/          # reglas: solicitud, tramite (checklist), usuarios, roles, catálogos, notificacion (correos), pendientes (la campana), auth
+│  │  ├─ informes/             # PDF de la autorización; estadísticas en Excel, PDF y CSV; consulta histórica en Excel
 │  │  └─ infrastructure/
 │  │     ├─ database.py        # motor async y sesión por request
 │  │     ├─ almacenamiento.py  # validación y guardado de documentos (carpeta por solicitud)
 │  │     ├─ tareas.py          # vencimientos, con un solo ejecutor entre workers
 │  │     └─ asignar_rol.py     # nombra el primer SysAdmin desde la consola
 │  ├─ alembic/versions/        # el esquema completo vive aquí
-│  ├─ tests/                   # pytest sobre BD temporal; espejo/: casos compartidos con el frontend
+│  ├─ tests/                   # pytest sobre BD temporal; espejo/: casos compartidos con el frontend;
+│  │                           #   entorno_pruebas.py: lo común a las pruebas, al backend del E2E y a la prueba de carga
 │  └─ storage/documentos/      # documentos de los expedientes (NO versionar)
 │
 ├─ docs/                       # línea base funcional y técnica: Word, BPMN y diagramas (ver docs/README.md)
@@ -204,7 +210,7 @@ ArgoNavis/
 ├─ frontend/e2e/               # recorrido completo en el navegador (Playwright)
 │
 └─ frontend/src/
-   ├─ App.tsx                  # rutas y proveedores (tema, sesión, permisos, avisos)
+   ├─ App.tsx                  # rutas y proveedores (tema, sesión, permisos, avisos); guardias en components/RutasProtegidas
    ├─ api/                     # cliente axios + un módulo por dominio
    ├─ components/              # UI reutilizable (MarcoPagina, ModalPreview, Iconos...)
    ├─ context/                 # proveedores: tema, autenticación, permisos, notificaciones (pendientes)
@@ -212,7 +218,7 @@ ArgoNavis/
    ├─ pruebas/                 # ayudas de las pruebas unitarias (cada *.test.ts va junto a su módulo)
    └─ modulos/
       ├─ autenticacion/        # login y cambio de contraseña
-      ├─ solicitudes/          # bandejas, formulario, expediente, verificación del QR
+      ├─ solicitudes/          # formulario/, expediente/, bandejas/, historico/, verificacion/ y lo compartido
       └─ administracion/       # usuarios, roles, catálogos, trámites, estadísticas, bitácora
 ```
 
@@ -276,7 +282,7 @@ Administrador y SysAdmin se reconocen por el nombre del rol (`rol_personalizado.
 - **Consulta histórica (11/11/2026):** el personal del SNM busca solicitudes de cualquier año en «Consulta histórica» (menú, o el botón de las bandejas).
   - Filtros: texto, pasajero (nombre o pasaporte), agencia, puesto, trámite, estado, fecha de envío o de la operación (con un atajo por año) y «solo aprobadas fuera del horario».
   - Cada uno ve lo mismo que en los expedientes: UCVMM y el supervisor de sector, su sector; el puesto de control, sus puestos desde que se aprueban.
-  - Exporta a Excel lo que cumple los filtros, hasta 5000 filas (`GET /api/v1/solicitudes/historico` y `/historico/exportar`).
+  - Exporta a Excel lo que cumple los filtros, hasta 5000 filas (`POST /api/v1/solicitudes/historico` y `/historico/exportar`: los filtros van en el cuerpo, para que el pasajero no quede en la URL ni en los logs).
 - **Notificaciones internas:** la campana de la cabecera muestra lo que le toca hacer a cada rol (por revisar, por corregir, por finalizar) y las novedades de sus solicitudes. Consulta `GET /api/v1/pendientes` cada minuto con la pestaña a la vista.
 - **Separación de funciones:** nadie revisa una solicitud que creó o que es de su propia agencia.
 - **Sectores:** cada puesto de control es del Sector Pacífico o del Atlántico (Catálogos → Sectores). UCVMM y el supervisor de sector ven solo las solicitudes de los puestos de su sector; el aviso de cada solicitud nueva va al correo de su sector.

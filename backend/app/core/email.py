@@ -18,24 +18,20 @@ import html
 from dataclasses import dataclass, field
 from email.message import EmailMessage
 from email.utils import formataddr
-from pathlib import Path
 
 import aiosmtplib
 
 from app.core.config import obtener_configuracion
+from app.core.identidad import AMARILLO, INSTITUCION, LOGO_ARGO_NAVIS_CORREO, MARINO
 
 configuracion = obtener_configuracion()
 
-# Paleta del SNM (la de frontend/src/styles/globals.css): marino y amarillo de marca.
-NAVY, ORO = "#10233F", "#F2C94C"
 _FUENTE   = "'Segoe UI',Arial,sans-serif"
 _MONO     = "Consolas,'Courier New',monospace"
 _SOPORTE  = "mesadeayuda@migracion.gob.pa"
 
-# Logo de ARGO NAVIS (PNG de 141 px que se muestra a 70): Outlook de escritorio no
-# muestra WebP, por eso no se usa el del frontend.
-_LOGO     = Path(__file__).parent.parent / "recursos" / "logo-argo-navis-correo.png"
-_LOGO_PNG = _LOGO.read_bytes() if _LOGO.exists() else b""
+# Logo de ARGO NAVIS en PNG (Outlook de escritorio no muestra WebP), incrustado.
+_LOGO_PNG = LOGO_ARGO_NAVIS_CORREO.read_bytes() if LOGO_ARGO_NAVIS_CORREO.exists() else b""
 _CID_LOGO = "logo-argo-navis@argonavis.snm"
 
 # Etiquetas de los propios avisos que van en negrita al inicio de una línea del
@@ -119,7 +115,7 @@ def _grilla(campos: list[tuple[str, str]]) -> str:
         ancho = ' colspan="3"' if len(fila) == 1 else ""
         celdas = "".join(
             f"""<td width="33%" valign="top"{ancho} style="padding:6px 8px 10px 0;">
-<div style="font:700 10px {_FUENTE};letter-spacing:1.2px;color:{ORO};text-transform:uppercase;">{_esc(e)}</div>
+<div style="font:700 10px {_FUENTE};letter-spacing:1.2px;color:{AMARILLO};text-transform:uppercase;">{_esc(e)}</div>
 <div style="font:600 14px {_FUENTE};color:#FFFFFF;margin-top:3px;">{_esc(v)}</div></td>"""
             for e, v in fila
         )
@@ -142,8 +138,8 @@ font:14px/1.6 {_FUENTE};color:#17283E;">{_destacado_html(aviso.destacado)}</div>
     if aviso.boton_texto and aviso.boton_url:
         url = _esc(aviso.boton_url)
         boton = f"""<tr><td style="padding:22px 6px 24px;text-align:center;">
-  <table role="presentation" cellpadding="0" cellspacing="0" align="center"><tr><td bgcolor="{ORO}" style="border-radius:6px;">
-    <a href="{url}" style="display:inline-block;padding:13px 30px;font:700 15px {_FUENTE};color:{NAVY};text-decoration:none;">{_esc(aviso.boton_texto)}</a>
+  <table role="presentation" cellpadding="0" cellspacing="0" align="center"><tr><td bgcolor="{AMARILLO}" style="border-radius:6px;">
+    <a href="{url}" style="display:inline-block;padding:13px 30px;font:700 15px {_FUENTE};color:{MARINO};text-decoration:none;">{_esc(aviso.boton_texto)}</a>
   </td></tr></table>
   <div style="font:12px/1.5 {_FUENTE};color:#5E6D83;margin-top:12px;">Si el botón no abre, copie este enlace:<br>
     <a href="{url}" style="color:#003DA5;word-break:break-all;">{url}</a></div>
@@ -160,33 +156,33 @@ font:14px/1.6 {_FUENTE};color:#17283E;">{_destacado_html(aviso.destacado)}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#EEF4F8"><tr>
 <td align="center" style="padding:28px 12px 36px;">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
-  <tr><td bgcolor="{NAVY}" style="border-radius:14px 14px 0 0;padding:20px 24px 16px;">
+  <tr><td bgcolor="{MARINO}" style="border-radius:14px 14px 0 0;padding:20px 24px 16px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
       <td width="72" valign="middle">{logo}</td>
-      <td valign="middle" style="font:700 11px {_FUENTE};letter-spacing:2px;color:{ORO};text-transform:uppercase;">Pase de autorización marítima
-        <div style="font:600 13px {_FUENTE};letter-spacing:.4px;color:#FFFFFF;text-transform:none;margin-top:3px;">Servicio Nacional de Migración</div></td>
+      <td valign="middle" style="font:700 11px {_FUENTE};letter-spacing:2px;color:{AMARILLO};text-transform:uppercase;">Pase de autorización marítima
+        <div style="font:600 13px {_FUENTE};letter-spacing:.4px;color:#FFFFFF;text-transform:none;margin-top:3px;">{INSTITUCION}</div></td>
       <td align="right" valign="top" style="font:12px {_MONO};color:#B8C4D2;white-space:nowrap;">09° 01′ N<br>079° 32′ O</td>
     </tr></table>
     <div style="margin-top:16px;">
-      <div style="display:inline-block;vertical-align:middle;margin:0 18px 8px 0;font:800 26px {_MONO};color:{ORO};
+      <div style="display:inline-block;vertical-align:middle;margin:0 18px 8px 0;font:800 26px {_MONO};color:{AMARILLO};
         letter-spacing:1px;white-space:nowrap;">{_esc(aviso.numero)}</div>
       <div style="display:inline-block;vertical-align:middle;margin-bottom:8px;"><span style="display:inline-block;
         border:2px solid {sello};color:{sello};border-radius:6px;padding:5px 10px;font:800 13px {_FUENTE};
         letter-spacing:1.6px;text-transform:uppercase;transform:rotate(-4deg);white-space:nowrap;">{_esc(aviso.estado)}</span></div>
     </div>
   </td></tr>
-  <tr><td bgcolor="{NAVY}" style="padding:0 16px;">
+  <tr><td bgcolor="{MARINO}" style="padding:0 16px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
       <td style="border-top:2px dashed #40527A;font-size:0;line-height:0;height:1px;">&nbsp;</td></tr></table>
   </td></tr>
-  <tr><td bgcolor="{NAVY}" style="border-radius:0 0 14px 14px;padding:14px 24px 20px;">{_grilla(aviso.campos)}</td></tr>
+  <tr><td bgcolor="{MARINO}" style="border-radius:0 0 14px 14px;padding:14px 24px 20px;">{_grilla(aviso.campos)}</td></tr>
   <tr><td style="padding:24px 6px 0;">
-    <div style="font:800 20px/1.3 {_FUENTE};color:{NAVY};margin-bottom:8px;">{_esc(aviso.titulo)}</div>
+    <div style="font:800 20px/1.3 {_FUENTE};color:{MARINO};margin-bottom:8px;">{_esc(aviso.titulo)}</div>
     <div style="font:14px/1.65 {_FUENTE};color:#526176;">{_esc_multilinea(aviso.intro)}</div>{destacado}
   </td></tr>
   {boton}
   <tr><td style="border-top:1px solid #DCE4ED;padding:14px 6px 0;text-align:center;font:12px/1.6 {_FUENTE};color:#5E6D83;">
-    <b style="color:{NAVY};">Servicio Nacional de Migración · República de Panamá</b><br>
+    <b style="color:{MARINO};">{INSTITUCION} · República de Panamá</b><br>
     Mensaje automático de ARGO NAVIS: no responda a este correo. ¿Necesita ayuda?
     <a href="mailto:{_SOPORTE}" style="color:#003DA5;">{_SOPORTE}</a></td></tr>
 </table>
@@ -205,7 +201,7 @@ def _texto_plano(aviso: Aviso) -> str:
         lineas += ["", f"{aviso.boton_texto}: {aviso.boton_url}"]
     lineas += [
         "", "--",
-        "Servicio Nacional de Migración · República de Panamá",
+        f"{INSTITUCION} · República de Panamá",
         f"Mensaje automático de ARGO NAVIS: no responda a este correo. ¿Necesita ayuda? {_SOPORTE}",
     ]
     return "\n".join(lineas)

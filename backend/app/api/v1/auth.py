@@ -6,7 +6,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.infrastructure.database import obtener_sesion_bd
-from app.api.v1.dependencias import usuario_actual
+from app.api.v1.dependencias import auditar, obtener_id_usuario_actual, usuario_actual
 from app.domain.repositories.user_repository import RepositorioUsuario
 from app.domain.repositories.audit_repository import RepositorioAuditoria
 from app.domain.models.audit_log import AccionAuditoria
@@ -17,9 +17,7 @@ from app.domain.schemas.user import DatosCambiarContrasena, SolicitudLogin, Resp
 from app.core.config import obtener_configuracion
 from app.core.security import (
     cerrar_sesiones, crear_token_acceso, decodificar_token, esquema_bearer, inicio_de_sesion,
-    obtener_id_usuario_actual,
 )
-from app.core.http_utils import obtener_ip, obtener_agente
 from app.core.rate_limit import limiter
 
 configuracion = obtener_configuracion()
@@ -38,23 +36,18 @@ async def iniciar_sesion(
     try:
         resultado = await svc.login(cuerpo.username, cuerpo.password)
     except HTTPException as exc:
-        await audit.registrar(
-            AccionAuditoria.LOGIN_FALLIDO,
-            username=cuerpo.username,
+        await auditar(
+            sesion, request, AccionAuditoria.LOGIN_FALLIDO, username=cuerpo.username,
             # El motivo real (p. ej. "usuario no encontrado en el AD") solo va a la
             # bitácora; al usuario le llega el mensaje genérico (ErrorAcceso).
             detalle={"motivo": getattr(exc, "motivo", exc.detail)},
-            ip=obtener_ip(request), agente=obtener_agente(request),
         )
         # Se responde sin relanzar: así la transacción se confirma y quedan
         # guardados el intento fallido (bloqueo de la cuenta) y la bitácora.
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
-    await audit.registrar(
-        AccionAuditoria.LOGIN_EXITOSO,
-        user_id=resultado.user.id, username=resultado.user.username,
-        ip=obtener_ip(request), agente=obtener_agente(request),
-    )
+    await auditar(sesion, request, AccionAuditoria.LOGIN_EXITOSO,
+                  user_id=resultado.user.id, username=resultado.user.username)
     return resultado
 
 
@@ -73,11 +66,7 @@ async def cambiar_contrasena(
     respuesta = await ServicioAutenticacion(RepositorioUsuario(sesion), audit).cambiar_contrasena(
         usuario, datos.actual, datos.nueva,
     )
-    await audit.registrar(
-        AccionAuditoria.CONTRASENA_CAMBIADA,
-        user_id=usuario.id, username=usuario.username,
-        ip=obtener_ip(request), agente=obtener_agente(request),
-    )
+    await auditar(sesion, request, AccionAuditoria.CONTRASENA_CAMBIADA, usuario=usuario)
     return respuesta
 
 
@@ -92,12 +81,8 @@ async def cerrar_sesion(
     usuario = await RepositorioUsuario(sesion).buscar_por_id(user_id)
     if usuario:
         cerrar_sesiones(usuario)
-    await RepositorioAuditoria(sesion).registrar(
-        AccionAuditoria.CERRAR_SESION,
-        user_id=user_id,
-        username=usuario.username if usuario else None,
-        ip=obtener_ip(request), agente=obtener_agente(request),
-    )
+    await auditar(sesion, request, AccionAuditoria.CERRAR_SESION,
+                  user_id=user_id, username=usuario.username if usuario else None)
 
 
 @enrutador.post("/session-expired", status_code=204)
@@ -107,12 +92,8 @@ async def sesion_expirada(
     sesion:  AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     usuario = await RepositorioUsuario(sesion).buscar_por_id(user_id)
-    await RepositorioAuditoria(sesion).registrar(
-        AccionAuditoria.SESION_EXPIRADA,
-        user_id=user_id,
-        username=usuario.username if usuario else None,
-        ip=obtener_ip(request), agente=obtener_agente(request),
-    )
+    await auditar(sesion, request, AccionAuditoria.SESION_EXPIRADA,
+                  user_id=user_id, username=usuario.username if usuario else None)
 
 
 @enrutador.post("/refresh", response_model=RespuestaToken)

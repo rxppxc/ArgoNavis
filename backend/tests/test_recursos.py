@@ -17,7 +17,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException, UploadFile
 
-from app import main
+from app.api import middleware
 from app.core.config import obtener_configuracion
 from app.domain.models.solicitud import RangoMarino
 from app.domain.repositories.tramite_repository import RepositorioTramite
@@ -72,20 +72,20 @@ def test_nginx_tiene_los_mismos_topes_que_el_backend():
     conf = (RAIZ / "frontend" / "nginx.conf").read_text(encoding="utf-8")
     api = re.search(r"location /api/ \{.*?client_max_body_size (\d+)m;", conf, re.S)
     envio = re.search(r"location ~ (\S+) \{[^}]*client_max_body_size (\d+)m;", conf)
-    assert api and int(api.group(1)) == main.TOPE_CUERPO_MB
+    assert api and int(api.group(1)) == middleware.TOPE_CUERPO_MB
     assert envio and int(envio.group(2)) == TOPE_CUERPO_ENVIO_MB
     assert f"hasta {almacenamiento.TAMANO_MAXIMO_MB} MB" in conf   # el 413 de nginx dice el tope por archivo
     # La ruta de los envíos es la misma en nginx y en el backend.
     for ruta, es_envio in (("/api/v1/solicitudes", True), ("/api/v1/solicitudes/15", True),
                            ("/api/v1/solicitudes/15/aprobar", False), ("/api/v1/auth/login", False)):
-        assert (main.tope_del_cuerpo("POST", ruta) == TOPE_CUERPO_ENVIO_MB * MB) is es_envio, ruta
+        assert (middleware.tope_del_cuerpo("POST", ruta) == TOPE_CUERPO_ENVIO_MB * MB) is es_envio, ruta
         assert bool(re.search(envio.group(1), ruta)) is es_envio, ruta
 
 
 @asincrona
 async def test_un_cuerpo_grande_se_corta_sin_leerlo(cliente):
     """Antes el login leía cualquier cuerpo entero (a la memoria) antes de responder."""
-    grande = b"x" * (main.TOPE_CUERPO_MB * MB + 1)
+    grande = b"x" * (middleware.TOPE_CUERPO_MB * MB + 1)
     r = await cliente.post("/auth/login", content=grande, headers={"Content-Type": "application/json"})
     assert r.status_code == 413 and r.json()["detail"] == "El contenido de la petición supera el máximo permitido."
     assert r.headers.get("x-request-id"), "pasa por el código de pedido"
@@ -101,7 +101,7 @@ async def test_un_cuerpo_grande_se_corta_sin_leerlo(cliente):
 
 @asincrona
 async def test_un_envio_mas_grande_que_el_tope(cliente, admin, monkeypatch):
-    monkeypatch.setattr(main, "TOPE_CUERPO_ENVIO_MB", 2)
+    monkeypatch.setattr(middleware, "TOPE_CUERPO_ENVIO_MB", 2)
     archivo = {"archivos": ("grande.pdf", b"%PDF-1.4\n" + b"0" * (3 * MB), "application/pdf")}
     # Sin sesión también: se corta antes de leer el cuerpo (no llega a comprobar el token).
     for cabeceras in ({}, admin.headers):

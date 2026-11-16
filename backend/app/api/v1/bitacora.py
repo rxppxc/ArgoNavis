@@ -4,10 +4,11 @@ from datetime import date
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.permisos import requerir_admin_o_sysadmin
+from app.api.v1.dependencias import requerir_admin_o_sysadmin
 from app.domain.models.audit_log import AccionAuditoria
 from app.domain.repositories.audit_repository import RepositorioAuditoria
 from app.domain.schemas.auditoria import SalidaBitacora, SalidaRegistroAuditoria
+from app.domain.schemas.solicitud import MAX_PAGINA
 from app.infrastructure.database import obtener_sesion_bd
 
 enrutador = APIRouter(prefix="/admin/bitacora", tags=["admin"])
@@ -20,7 +21,7 @@ async def consultar_bitacora(
     texto:      str | None = Query(default=None, max_length=200),
     desde:      date | None = Query(default=None),
     hasta:      date | None = Query(default=None),
-    pagina:     int = Query(default=1, ge=1),
+    pagina:     int = Query(default=1, ge=1, le=MAX_PAGINA),
     por_pagina: int = Query(default=50, ge=10, le=200),
     _admin:     int = Depends(requerir_admin_o_sysadmin),
     sesion:     AsyncSession = Depends(obtener_sesion_bd, scope="function"),

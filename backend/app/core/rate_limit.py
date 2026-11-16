@@ -4,8 +4,7 @@ Usamos slowapi (basado en limits) con almacenamiento en memoria. Para
 despliegues multi-proceso o multi-host, configurar `storage_uri` a Redis.
 
 `limite_verificacion` (LIMITE_VERIFICACIONES_POR_MINUTO, por IP) limita la
-verificación pública del QR. La variable vieja RATE_LIMIT_DOWNLOADS_PER_MINUTE
-se sigue leyendo (ver core/config.py):
+verificación pública del QR:
     @enrutador.get("/{codigo}")
     @limiter.limit(limite_verificacion)
     async def verificar_autorizacion(request: Request, codigo: str, ...):

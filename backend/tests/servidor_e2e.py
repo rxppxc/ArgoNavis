@@ -15,16 +15,14 @@ import asyncio
 import os
 import secrets
 import shutil
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
-import psycopg
 from sqlalchemy.engine import make_url
-from dotenv import dotenv_values
 
-BACKEND = Path(__file__).resolve().parent.parent
+from entorno_pruebas import BACKEND, alembic, servidor_bd, sql_admin, url_admin, variables
+
 PUERTO = int(os.environ.get("E2E_PUERTO_API", "8001"))
 URL_WEB = os.environ.get("E2E_URL_WEB", "http://localhost:5174")
 NOMBRE_BD = "argonavis_e2e"
@@ -53,38 +51,21 @@ CUENTAS = [  # usuario, nombre, apellido, rol, ¿de la agencia?, ¿del puesto?, 
 
 # ── Entorno (antes de importar la app: la configuración se lee una sola vez) ──
 
-_url = os.environ.get("TEST_DATABASE_URL") or dotenv_values(BACKEND / ".env").get("DATABASE_URL")
-if not _url:
-    raise SystemExit("Define TEST_DATABASE_URL o DATABASE_URL en backend/.env.")
-_base = _url.rpartition("/")[0]
-URL_ADMIN = f"{_base}/postgres".replace("postgresql+asyncpg://", "postgresql://")
+_base = servidor_bd()
+URL_ADMIN = url_admin(_base)
 # El backend del E2E entra con su propia cuenta, con lo justo, como en producción
 # (infrastructure/permisos_bd.py): si algo pide un permiso que no tiene, el recorrido falla.
 URL_DUENA = f"{_base}/{NOMBRE_BD}"
 ROL_APP = "argonavis_e2e_app"
 URL_APP = make_url(URL_DUENA).set(username=ROL_APP, password=secrets.token_hex(16)).render_as_string(hide_password=False)
 
-os.environ.update({
-    "DATABASE_URL": URL_DUENA,          # para migrar; el backend pasa a URL_APP (main)
-    "MIGRACIONES_DATABASE_URL": "",
-    "STORAGE_PATH": str(STORAGE),
-    "APP_ENV": "test",
-    "SECRET_KEY": secrets.token_urlsafe(32),
-    "LDAP_HOST": "ldap.invalido", "LDAP_BASE_DN": "DC=prueba", "LDAP_BIND_USER": "x", "LDAP_BIND_PASSWORD": "x",
-    "MAIL_HOST": "",
-    "CORREO_UCVMM": "",
-    "LOG_CARPETA": "",
-    "PERMITIR_LOGIN_LOCAL": "true",
-    "LIMITE_VERIFICACIONES_POR_MINUTO": "0",
-    "APP_URL": URL_WEB,
-    "FRONTEND_URL": URL_WEB,
-})
+# DATABASE_URL, para migrar; el backend pasa a URL_APP (main).
+os.environ.update(variables(URL_DUENA, STORAGE, APP_URL=URL_WEB, FRONTEND_URL=URL_WEB))
 sys.path.insert(0, str(BACKEND))
 
 
 def _sql_admin(sentencia: str) -> None:
-    with psycopg.connect(URL_ADMIN, autocommit=True) as cx:
-        cx.execute(sentencia)
+    sql_admin(URL_ADMIN, sentencia)
 
 
 def limpiar() -> None:
@@ -96,11 +77,7 @@ def limpiar() -> None:
 def preparar_bd() -> None:
     limpiar()
     _sql_admin(f'CREATE DATABASE "{NOMBRE_BD}"')
-    # -I: sin la carpeta actual en sys.path, para que backend/alembic no tape al paquete.
-    migracion = subprocess.run(
-        [sys.executable, "-I", "-m", "alembic", "upgrade", "head"], cwd=BACKEND, env=os.environ.copy(),
-        capture_output=True, text=True,
-    )
+    migracion = alembic("upgrade", "head")
     if migracion.returncode:
         raise SystemExit(migracion.stderr[-3000:])
 

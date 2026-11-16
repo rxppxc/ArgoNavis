@@ -54,9 +54,18 @@ export function partesDelTexto(texto: string): { texto: string; numero: boolean 
 }
 
 /** Como mucho tres a la vez, el más nuevo arriba. Uno repetido (mismo texto y tipo) no se
- *  apila: el nuevo reemplaza al anterior y su tiempo empieza de nuevo. */
+ *  apila: el nuevo reemplaza al anterior y su tiempo empieza de nuevo. Si sobra uno, sale el
+ *  más viejo de los que se cierran solos: los que esperan al usuario (duración 0, como
+ *  «Versión nueva», que no vuelve a salir) no se pierden por el tope. */
 export const MAX_AVISOS = 3;
 
-export function agregarAviso<T extends { texto: string; tipo: TipoNotificacion }>(lista: T[], nuevo: T): T[] {
-  return [nuevo, ...lista.filter((m) => !(m.texto === nuevo.texto && m.tipo === nuevo.tipo))].slice(0, MAX_AVISOS);
+export function agregarAviso<T extends { texto: string; tipo: TipoNotificacion; duracionMs?: number }>(
+  lista: T[], nuevo: T,
+): T[] {
+  const avisos = [nuevo, ...lista.filter((m) => !(m.texto === nuevo.texto && m.tipo === nuevo.tipo))];
+  while (avisos.length > MAX_AVISOS) {
+    const masViejoQueSeCierra = avisos.findLastIndex((m, i) => i > 0 && m.duracionMs !== 0);
+    avisos.splice(masViejoQueSeCierra > 0 ? masViejoQueSeCierra : avisos.length - 1, 1);
+  }
+  return avisos;
 }

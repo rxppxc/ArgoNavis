@@ -3,15 +3,12 @@ import secrets
 
 import pytest
 
+from ayudas import login
 from conftest import crear_actor
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 CLAVE = "Clave-2026-Segura"
-
-
-async def login(cliente, usuario: str, clave: str):
-    return await cliente.post("/auth/login", json={"username": usuario, "password": clave})
 
 
 async def test_bloqueo_tras_intentos_fallidos(cliente, admin, sysadmin):

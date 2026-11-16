@@ -13,30 +13,28 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.dependencias import usuario_actual
+from app.api.v1.dependencias import auditar, requerir_algun_permiso, requerir_permiso, usuario_actual
 from app.core.email import Aviso
 from app.core.horario import ZONA_PANAMA
-from app.core.http_utils import obtener_agente, obtener_ip
-from app.core.informe_estadisticas import DatosInforme, generar_informe
-from app.core.informe_historico import generar_archivo as generar_excel_historico
-from app.core.pdf_autorizacion import generar_pdf_autorizacion
 from app.core.permisos import (
     PERMISO_PUERTO, PERMISO_REVISAR, PERMISO_SOLICITAR, PERMISO_SUPERVISAR_SECTOR, PERMISO_SUPERVISAR_TODO,
-    requerir_algun_permiso, requerir_permiso,
 )
 from app.core.rate_limit import clave_usuario, limite_envios, limite_exportaciones, limite_pdf, limiter
 from app.domain.models.audit_log import AccionAuditoria
 from app.domain.models.solicitud import Solicitud
 from app.domain.models.user import Usuario
-from app.domain.repositories.audit_repository import RepositorioAuditoria
 from app.domain.schemas.solicitud import (
     ConsultaBandeja, ConsultaHistorica, DatosAprobacion, DatosCorregirSolicitud, DatosCrearSolicitud,
     DatosFinalizar, DatosImpedimentos, DatosMotivo, PaginaSolicitudes, SalidaEstadisticasSolicitudes,
     SalidaOpcionesHistorico, SalidaSolicitud,
 )
 from app.domain.services.notificacion_service import ServicioNotificacion
-from app.domain.services.solicitud_service import ContextoAcceso, ServicioSolicitud
+from app.domain.services.acceso import ContextoAcceso
+from app.domain.services.solicitud_service import ServicioSolicitud
 from app.domain.services.uso_service import ServicioUsoSistema
+from app.informes.autorizacion_pdf import generar_pdf_autorizacion
+from app.informes.estadisticas import DatosInforme, generar_informe
+from app.informes.historico_excel import generar_archivo as generar_excel_historico
 from app.infrastructure import almacenamiento
 from app.infrastructure.cola_correos import despachar_correos, encolar_avisos
 from app.infrastructure.database import obtener_sesion_bd
@@ -108,19 +106,15 @@ def _leer_formulario(modelo: type[M], texto: str) -> M:
     try:
         return modelo.model_validate_json(texto)
     except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=_describir_errores(exc))
+        raise HTTPException(status_code=422, detail=_describir_errores(exc)) from exc
 
 
 async def _auditar(
     sesion: AsyncSession, request: Request, usuario: Usuario,
     accion: AccionAuditoria, s: Solicitud, **extra,
 ) -> None:
-    await RepositorioAuditoria(sesion).registrar(
-        accion,
-        user_id=usuario.id, username=usuario.username,
-        detalle={"solicitud_id": s.id, "numero": s.numero, "estado": s.estado, **extra},
-        ip=obtener_ip(request), agente=obtener_agente(request),
-    )
+    await auditar(sesion, request, accion, usuario=usuario,
+                  detalle={"solicitud_id": s.id, "numero": s.numero, "estado": s.estado, **extra})
 
 
 async def _programar(sesion: AsyncSession, background_tasks: BackgroundTasks, avisos: list[Aviso]) -> None:
@@ -211,7 +205,7 @@ async def exportar_estadisticas(
     sesion:  AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     """Las estadísticas del periodo (de los sectores que ve quien consulta) en un
-    archivo con la identidad del SNM, para informes (core/informe_estadisticas.py).
+    archivo con la identidad del SNM, para informes (app/informes/estadisticas.py).
     El uso del sistema va solo para quien ve todos los sectores. Quién lo generó va
     en el archivo. Se arma en un hilo, con turno (trabajo_pesado.py): es CPU-bound."""
     alcance = await svc.alcance_estadisticas(ctx, sector_id)
@@ -235,9 +229,11 @@ async def exportar_estadisticas(
 # ── Consulta histórica (2026-11-11) ──────────────────────────────────────────
 # Antes de /{solicitud_id}: si no, «historico» se leería como un id (422).
 
-@enrutador.get("/historico", response_model=PaginaSolicitudes)
+# Los filtros van en el cuerpo (POST, 2026-11-14): en la dirección, el pasajero buscado
+# quedaba en los logs de nginx y de uvicorn.
+@enrutador.post("/historico", response_model=PaginaSolicitudes)
 async def consulta_historica(
-    consulta: Annotated[ConsultaHistorica, Query()],
+    consulta: ConsultaHistorica,
     ctx:      ContextoAcceso = Depends(_contexto),
     svc:      ServicioSolicitud = Depends(_servicio),
 ):
@@ -256,11 +252,11 @@ async def opciones_historico(
     return await svc.opciones_historico(ctx)
 
 
-@enrutador.get("/historico/exportar")
+@enrutador.post("/historico/exportar")
 @limiter.limit(limite_exportaciones, key_func=clave_usuario)
 async def exportar_historico(
     request:  Request,
-    consulta: Annotated[ConsultaHistorica, Query()],
+    consulta: ConsultaHistorica,
     ctx:      ContextoAcceso = Depends(_contexto),
     svc:      ServicioSolicitud = Depends(_servicio),
     sesion:   AsyncSession = Depends(obtener_sesion_bd, scope="function"),

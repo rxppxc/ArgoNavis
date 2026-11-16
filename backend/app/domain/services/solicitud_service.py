@@ -25,19 +25,16 @@
 """
 import logging
 import secrets
-from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import obtener_configuracion
-from app.core.horario import TEXTO_HORARIO, fuera_de_horario, texto_costo
-from app.core.informe_historico import DatosHistorico, FilaHistorico, FiltrosAplicados
-from app.core.pdf_autorizacion import DatosPdfAutorizacion, TripulantePdf
+from app.core.horario import TEXTO_HORARIO, ZONA_PANAMA, fuera_de_horario, texto_costo
+from app.core.identidad import INSTITUCION
 from app.core.permisos import (
     PERMISO_PUERTO, PERMISO_REVISAR, PERMISO_SOLICITAR, PERMISO_SUPERVISAR_SECTOR, PERMISO_SUPERVISAR_TODO,
     codigos_permiso, es_admin_efectivo,
@@ -55,15 +52,19 @@ from app.domain.repositories.tramite_repository import RepositorioTramite
 from app.domain.schemas.solicitud import (
     AccionesSolicitud, AsignacionArchivo, ConsultaBandeja, ConsultaHistorica, DatosCorregirSolicitud,
     DatosCrearSolicitud, DatosImpedimentos, DatosTripulanteEntrada, FilaEstadisticaPuesto, FilaSector,
-    FilaEstadisticaSerie, FilaEstadisticaTipo, FilaFueraHorario, FilaPorHora, PaginaSolicitudes,
+    FilaEstadisticaTipo, FilaFueraHorario, FilaPorHora, PaginaSolicitudes,
     SalidaCasilla,
     SalidaDocumentoSolicitud, SalidaEstadisticasSolicitudes, SalidaEvento, SalidaSolicitud,
     OpcionFiltro, SalidaOpcionesHistorico, SalidaSolicitudResumen, SalidaTripulante,
     SalidaTripulanteVerificacion, SalidaVerificacion, _DatosFormularioSolicitud,
 )
+from app.domain.services.acceso import AlcanceEstadisticas, ContextoAcceso
+from app.domain.services.series import meses_antes, periodos_anio, periodos_dia, periodos_mes, serie
 from app.domain.services.tramite_service import (
     CasillaChecklist, ServicioTramite, TripulanteChecklist, normalizar_imo,
 )
+from app.informes.autorizacion_pdf import DatosPdfAutorizacion, TripulantePdf
+from app.informes.historico_excel import DatosHistorico, FilaHistorico, FiltrosAplicados
 from app.infrastructure import almacenamiento
 from app.infrastructure.almacenamiento import ArchivoGuardado
 from app.infrastructure.database import al_confirmar
@@ -71,14 +72,13 @@ from app.infrastructure.database import al_confirmar
 logger        = logging.getLogger(__name__)
 configuracion = obtener_configuracion()
 
-TZ_PANAMA     = ZoneInfo("America/Panama")
 CODIGO_PANAMA = "PAN"
 Estado        = EstadoSolicitud
 MAX_ERRORES_MOSTRADOS      = 8
 MAX_DOCUMENTOS_ADICIONALES = 20
 MAX_TRIPULANTES            = 30   # por solicitud (reunión del 2026-10-30); espejo en el frontend
 # Lo más que pesa un envío válido (crear o corregir), que lleva juntos todos los archivos
-# de la solicitud: es el tope del cuerpo de esas dos rutas (TopeDelCuerpo en main.py y
+# de la solicitud: es el tope del cuerpo de esas dos rutas (TopeDelCuerpo en api/middleware.py y
 # client_max_body_size en frontend/nginx.conf, revisión de recursos del 2026-11-10). Con
 # el catálogo de hoy, a un pasajero se le piden como mucho 5 documentos (uno de
 # nacionalidad restringida en Desembarque, Urgencia médica o Renovación, con la Visa
@@ -111,8 +111,7 @@ _EVENTOS_INTERNOS = {
 }
 _SIN_TEXTO_PARA_AGENCIA = {TipoEventoSolicitud.APROBADA.value, TipoEventoSolicitud.FINALIZADA.value}
 # A la agencia no se le nombran las unidades internas (UCVMM, los sectores): ve
-# a la institución (2026-11-11; antes, "UCVMM").
-INSTITUCION = "Servicio Nacional de Migración"
+# a la institución (INSTITUCION, 2026-11-11; antes, "UCVMM").
 _AUTOR_PARA_AGENCIA = {
     TipoEventoSolicitud.DEVUELTA.value:   INSTITUCION,
     TipoEventoSolicitud.APROBADA.value:   INSTITUCION,
@@ -126,11 +125,11 @@ def ahora_utc() -> datetime:
 
 
 def hoy_panama() -> date:
-    return datetime.now(TZ_PANAMA).date()
+    return datetime.now(ZONA_PANAMA).date()
 
 
 def fin_del_dia(dia: date) -> datetime:
-    return datetime.combine(dia, time(23, 59, 59), tzinfo=TZ_PANAMA)
+    return datetime.combine(dia, time(23, 59, 59), tzinfo=ZONA_PANAMA)
 
 
 def _resultado(con_impedimento: bool | None) -> str:
@@ -145,109 +144,6 @@ def _con_punto(texto: str) -> str:
 
 def _error(codigo: int, detalle: str) -> HTTPException:
     return HTTPException(status_code=codigo, detail=detalle)
-
-
-def _meses_antes(dia: date, meses: int) -> date:
-    """El primer día del mes que queda `meses` meses antes del de `dia` (negativo: después)."""
-    total = dia.year * 12 + dia.month - 1 - meses
-    return date(total // 12, total % 12 + 1, 1)
-
-
-def _periodos_dia(inicio: date, fin: date) -> list[date]:
-    return [inicio + timedelta(days=i) for i in range((fin - inicio).days + 1)]
-
-
-def _periodos_mes(inicio: date, fin: date) -> list[date]:
-    """El primer día de cada mes, del de `inicio` al de `fin`."""
-    meses: list[date] = []
-    mes = inicio.replace(day=1)
-    while mes <= fin:
-        meses.append(mes)
-        mes = _meses_antes(mes, -1)
-    return meses
-
-
-def _periodos_anio(inicio: date, fin: date) -> list[date]:
-    return [date(anio, 1, 1) for anio in range(inicio.year, fin.year + 1)]
-
-
-def _serie(
-    diaria: dict[date, dict[str, int]], periodos: list[date], clave_de: Callable[[date], str],
-) -> list[FilaEstadisticaSerie]:
-    """La serie diaria sumada en los `periodos` (días, meses o años, según `clave_de`)."""
-    cifras: dict[str, dict[str, int]] = {}
-    for dia, del_dia in diaria.items():
-        destino = cifras.setdefault(clave_de(dia), {})
-        for hito, total in del_dia.items():
-            destino[hito] = destino.get(hito, 0) + total
-    return [FilaEstadisticaSerie(periodo=clave_de(p), **cifras.get(clave_de(p), {})) for p in periodos]
-
-
-@dataclass
-class ContextoAcceso:
-    """Quién es el usuario dentro del flujo (se calcula una vez por request).
-
-    Sectores (2026-11-10): UCVMM y los supervisores de sector ven solo las
-    solicitudes de los puestos de sus sectores (`puestos_de_sectores`); el
-    Administrador y el supervisor general, las de todos."""
-    usuario:     Usuario
-    es_admin:    bool
-    es_naviera:  bool
-    es_revisor:  bool
-    es_puerto:   bool
-    puestos_ids: set[int]          # los puestos asignados (puesto de control)
-    agencia_id:  int | None
-    es_supervisor_sector:  bool = False
-    es_supervisor_general: bool = False
-    sectores_ids:          set[int] = field(default_factory=set)
-    puestos_de_sectores:   set[int] = field(default_factory=set)
-
-    @property
-    def puede_revisar(self) -> bool:
-        """Tiene el permiso de revisar (de qué solicitudes, lo dice el sector)."""
-        return self.es_admin or self.es_revisor
-
-    @property
-    def es_supervisor(self) -> bool:
-        return self.es_supervisor_sector or self.es_supervisor_general
-
-    @property
-    def ve_todos_los_sectores(self) -> bool:
-        return self.es_admin or self.es_supervisor_general
-
-    @property
-    def alcance_ucvmm(self) -> set[int] | None:
-        """Los puestos cuyas solicitudes ve como UCVMM o supervisión (None = todos)."""
-        return None if self.ve_todos_los_sectores else self.puestos_de_sectores
-
-    def en_sus_sectores(self, s: Solicitud) -> bool:
-        return self.ve_todos_los_sectores or s.puesto_control_id in self.puestos_de_sectores
-
-    def puede_revisar_esta(self, s: Solicitud) -> bool:
-        """Revisa las de los puestos de sus sectores (el Administrador, todas)."""
-        return self.es_admin or (self.es_revisor and s.puesto_control_id in self.puestos_de_sectores)
-
-    @property
-    def es_personal_snm(self) -> bool:
-        """UCVMM, supervisión, puesto de control o admin. La verificación de
-        impedimentos (y la acción tomada, p. ej. avisar a Operaciones) es
-        información interna: no se muestra a la agencia."""
-        return self.es_admin or self.es_revisor or self.es_puerto or self.es_supervisor
-
-    def es_de_su_agencia(self, s: Solicitud) -> bool:
-        return (self.es_naviera or self.es_admin) and self.agencia_id is not None and s.agencia_id == self.agencia_id
-
-
-@dataclass(frozen=True)
-class AlcanceEstadisticas:
-    """De qué solicitudes son las estadísticas de quien consulta (2026-11-10):
-    las de sus sectores, o las de todos (Administrador y supervisor general), o
-    las del sector que eligió."""
-    puestos_ids: set[int] | None          # None = todas
-    texto:       str                      # "Todos los sectores", "Sector Pacífico"…
-    sector_id:   int | None               # el sector elegido, si eligió uno
-    sectores:    list[tuple[int, str]]    # los que puede elegir
-    uso_del_sistema: bool                 # ve los totales de todo el sistema
 
 
 @dataclass
@@ -590,7 +486,7 @@ class ServicioSolicitud:
                 desde=consulta.desde, hasta=consulta.hasta,
             ),
             alcance=await self._texto_alcance(ctx),
-            generado_por=ctx.usuario.full_name, generado_en=datetime.now(TZ_PANAMA),
+            generado_por=ctx.usuario.full_name, generado_en=datetime.now(ZONA_PANAMA),
             ordenadas_por="fecha de la operación" if consulta.fecha == "operacion" else "fecha de envío",
         )
 
@@ -905,7 +801,7 @@ class ServicioSolicitud:
 
             carpeta = almacenamiento.carpeta_solicitud(s.id)
             almacenamiento.mover_carpeta(temporal, carpeta)
-            for archivo, (td, indice) in zip(guardados, asignadas):
+            for archivo, (td, indice) in zip(guardados, asignadas, strict=True):
                 tripulante_id = tripulantes_orm[indice].id if indice is not None else None
                 self.repo.agregar_registro(self._documento(s, archivo, carpeta, td, tripulante_id, ctx.usuario))
             self._registrar_casillas(s, requeridas, tripulantes_orm)
@@ -991,7 +887,7 @@ class ServicioSolicitud:
                 s.tripulantes.remove(existentes[tripulante_id])
             await self.repo.guardar()   # flush: los tripulantes nuevos ya tienen id
 
-            for archivo, (td, indice) in zip(nuevos, asignadas):
+            for archivo, (td, indice) in zip(nuevos, asignadas, strict=True):
                 tripulante_id = tripulantes_orm[indice].id if indice is not None else None
                 self.repo.agregar_registro(self._documento(s, archivo, carpeta, td, tripulante_id, ctx.usuario))
             self._registrar_casillas(s, requeridas, tripulantes_orm)
@@ -1480,14 +1376,14 @@ class ServicioSolicitud:
             fecha_operacion=s.fecha_operacion,
             nombre_puerto=s.nombre_puerto, puerto_desembarque=s.puerto_desembarque,
             clinica_hospital=s.clinica_hospital, motivo=s.motivo,
-            fecha_solicitud=s.enviada_en.astimezone(TZ_PANAMA),
-            aprobada_en=s.aprobada_en.astimezone(TZ_PANAMA),
+            fecha_solicitud=s.enviada_en.astimezone(ZONA_PANAMA),
+            aprobada_en=s.aprobada_en.astimezone(ZONA_PANAMA),
             aprobada_por=f"{aprobador} (UCVMM)" if aprobador else INSTITUCION,
             copia_interna=interno,
             fuera_de_horario=fuera_de_horario(s.aprobada_en),
             costo_fuera_de_horario=s.costo_fuera_de_horario,
-            vigente_hasta=s.vigente_hasta.astimezone(TZ_PANAMA) if s.vigente_hasta else None,
-            finalizada_en=s.finalizada_en.astimezone(TZ_PANAMA) if s.finalizada_en else None,
+            vigente_hasta=s.vigente_hasta.astimezone(ZONA_PANAMA) if s.vigente_hasta else None,
+            finalizada_en=s.finalizada_en.astimezone(ZONA_PANAMA) if s.finalizada_en else None,
             puesto_finalizacion=s.puesto_finalizacion_nombre,
             finalizada_por=f"{finalizador} (Puesto de control)" if finalizador else None,
             url_verificacion=self.url_verificacion(s.codigo_verificacion),
@@ -1571,7 +1467,7 @@ class ServicioSolicitud:
         fin = min(hasta, hoy) if hasta else hoy
         diaria = await self.repo.serie_diaria(desde, hasta, puestos)
         inicio_dias = max(desde or date.min, fin - timedelta(days=DIAS_EN_SERIE - 1))
-        inicio_meses = max(desde or date.min, _meses_antes(fin, MESES_EN_SERIE - 1))
+        inicio_meses = max(desde or date.min, meses_antes(fin, MESES_EN_SERIE - 1))
         inicio_anios = max(desde or min(diaria, default=fin), date(fin.year - ANIOS_EN_SERIE + 1, 1, 1))
 
         return SalidaEstadisticasSolicitudes(
@@ -1602,9 +1498,9 @@ class ServicioSolicitud:
                 )
                 for f in await self.repo.contar_por_tipo(desde, hasta, puestos)
             ],
-            por_dia=_serie(diaria, _periodos_dia(inicio_dias, fin), lambda d: d.isoformat()),
-            por_mes=_serie(diaria, _periodos_mes(inicio_meses, fin), lambda d: f"{d.year:04d}-{d.month:02d}"),
-            por_anio=_serie(diaria, _periodos_anio(inicio_anios, fin), lambda d: f"{d.year:04d}"),
+            por_dia=serie(diaria, periodos_dia(inicio_dias, fin), lambda d: d.isoformat()),
+            por_mes=serie(diaria, periodos_mes(inicio_meses, fin), lambda d: f"{d.year:04d}-{d.month:02d}"),
+            por_anio=serie(diaria, periodos_anio(inicio_anios, fin), lambda d: f"{d.year:04d}"),
             por_puesto=[
                 FilaEstadisticaPuesto(puesto=f.nombre, aprobadas=f.aprobadas, finalizadas=f.finalizadas,
                                       expiradas=f.expiradas)

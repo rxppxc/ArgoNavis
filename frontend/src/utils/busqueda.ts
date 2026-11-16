@@ -1,6 +1,8 @@
 /** Búsqueda de los selectores con buscador (`SelectorBuscable`, 2026-11-13): sin
  *  distinguir mayúsculas ni tildes, y con lo que empieza por lo escrito primero. */
 
+import { sinTildes } from "./texto";
+
 export interface OpcionBuscable {
   /** Lo que se guarda (el código del país). */
   valor: string;
@@ -10,7 +12,7 @@ export interface OpcionBuscable {
 
 /** «Panamá» → «panama»: sin tildes ni diéresis, en minúsculas y sin espacios de más. */
 export function normalizarBusqueda(texto: string): string {
-  return texto.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/\s+/g, " ").trim();
+  return sinTildes(texto).toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 /** Las opciones que coinciden con lo escrito, en este orden: el código exacto («PAN»),

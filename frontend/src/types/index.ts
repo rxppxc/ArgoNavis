@@ -35,7 +35,3 @@ export interface RespuestaToken {
   token_type:   string;
   user:         Usuario;
 }
-
-export interface ErrorApi {
-  detail: string;
-}

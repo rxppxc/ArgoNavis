@@ -16,15 +16,12 @@ from app.domain.models.catalogo import AgenciaNaviera, PuestoControl, usuarios_p
 from app.domain.models.solicitud import Solicitud, TripulanteSolicitud
 from app.domain.models.tramite import TipoTramite
 from app.infrastructure.database import SesionLocal
+from ayudas import panama
 from conftest import ATLANTICO, PACIFICO, crear_actor, id_sector
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 RUTA = "/solicitudes/historico"
-
-
-def _panama(*partes: int) -> datetime:
-    return datetime(*partes, tzinfo=ZONA_PANAMA)
 
 
 def _ultimo_sabado() -> date:
@@ -54,16 +51,16 @@ async def historia(cliente):
         hoy = datetime.now(ZONA_PANAMA).date()
         # clave: (agencia, puesto, trámite, estado, enviada, operación, aprobada, pasajero, pasaporte)
         datos = {
-            "marzo25":  (0, puesto_p, 0, "finalized", _panama(2025, 3, 10, 9), date(2025, 3, 12),
-                         _panama(2025, 3, 11, 10), ("Ana Maria", "Rios"), "PA%123"),
-            "julio25":  (1, puesto_a, 1, "denied", _panama(2025, 7, 1, 9), date(2025, 7, 5),
+            "marzo25":  (0, puesto_p, 0, "finalized", panama(2025, 3, 10, 9), date(2025, 3, 12),
+                         panama(2025, 3, 11, 10), ("Ana Maria", "Rios"), "PA%123"),
+            "julio25":  (1, puesto_a, 1, "denied", panama(2025, 7, 1, 9), date(2025, 7, 5),
                          None, ("Beto", "Cruz"), "XB777"),
             "revision": (0, puesto_a, 0, "review", datetime.now(ZONA_PANAMA) - timedelta(days=1), hoy + timedelta(days=3),
                          None, ("Carla", "Diaz"), "CD100"),
             "fuera":    (1, puesto_p, 1, "approved", datetime.combine(sabado, time(9), ZONA_PANAMA), hoy,
                          datetime.combine(sabado, time(10), ZONA_PANAMA), ("Dario", "Paz"), "DP200"),
-            "cerrado":  (0, puesto_viejo, 0, "finalized", _panama(2024, 5, 2, 9), date(2024, 5, 3),
-                         _panama(2024, 5, 2, 11), ("Eva", "Luna"), "EL300"),
+            "cerrado":  (0, puesto_viejo, 0, "finalized", panama(2024, 5, 2, 9), date(2024, 5, 3),
+                         panama(2024, 5, 2, 11), ("Eva", "Luna"), "EL300"),
         }
         ids: dict[str, int] = {}
         for i, (clave, (ag, puesto, tipo, estado, enviada, operacion, aprobada, (nombre, apellido), pasaporte)) \
@@ -93,7 +90,7 @@ async def historia(cliente):
 
 
 async def _ids(cliente, actor, **filtros) -> list[int]:
-    r = await cliente.get(RUTA, params={"por_pagina": 100, **filtros}, headers=actor.headers)
+    r = await cliente.post(RUTA, json={"por_pagina": 100, **filtros}, headers=actor.headers)
     assert r.status_code == 200, r.text
     return [x["id"] for x in r.json()["items"]]
 
@@ -108,7 +105,7 @@ async def test_de_cualquier_anio_y_por_fecha(cliente, admin, historia):
     assert await _ids(cliente, admin, texto=texto, fecha="operacion", desde="2025-03-12", hasta="2025-03-12") \
         == [ids["marzo25"]]
     assert await _ids(cliente, admin, texto=texto, desde="2025-03-12", hasta="2025-03-12") == []
-    r = await cliente.get(RUTA, params={"desde": "2025-12-31", "hasta": "2025-01-01"}, headers=admin.headers)
+    r = await cliente.post(RUTA, json={"desde": "2025-12-31", "hasta": "2025-01-01"}, headers=admin.headers)
     assert r.status_code == 422, "«hasta» antes de «desde»"
 
 
@@ -124,7 +121,7 @@ async def test_filtros(cliente, admin, historia):
         assert await _ids(cliente, admin, texto=texto, pasajero=buscado) == [ids["marzo25"]], buscado
     assert await _ids(cliente, admin, texto=texto, pasajero="P%3") == [], "«%» se busca tal cual, no como comodín"
     # Los conteos por estado siguen a los filtros (sin el de estado), para las pestañas.
-    r = await cliente.get(RUTA, params={"texto": texto, "estado": "finalized"}, headers=admin.headers)
+    r = await cliente.post(RUTA, json={"texto": texto, "estado": "finalized"}, headers=admin.headers)
     assert r.json()["conteos"] == {"finalized": 2, "denied": 1, "review": 1, "approved": 1}
     # El costo y el fuera del horario van en cada fila, como en las bandejas.
     fila = next(x for x in r.json()["items"] if x["id"] == ids["marzo25"])
@@ -146,17 +143,20 @@ async def test_cada_uno_ve_lo_suyo(cliente, admin, sysadmin, historia):
         await s.execute(insert(usuarios_puestos).values(usuario_id=puesto.id, puesto_id=historia["puesto_a"]))
         await s.commit()
     assert set(await _ids(cliente, puesto, texto=texto)) == {ids["marzo25"], ids["fuera"]}, "sin la denegada ni la en revisión"
-    # Lo que ven aquí, lo pueden abrir.
+    # Lo que ven aquí es justo lo que pueden abrir, ni más ni menos: `_alcance_historico`
+    # (en SQL) y `puede_ver` (el expediente) tienen que coincidir.
     for actor in (atlantico, sup_pacifico, puesto):
-        for sid in await _ids(cliente, actor, texto=texto):
-            assert (await cliente.get(f"/solicitudes/{sid}", headers=actor.headers)).status_code == 200
+        vistas = set(await _ids(cliente, actor, texto=texto))
+        for sid in ids.values():
+            abre = (await cliente.get(f"/solicitudes/{sid}", headers=actor.headers)).status_code == 200
+            assert abre == (sid in vistas), (actor.username, sid, abre)
     # La agencia usa su bandeja; el SysAdmin no trabaja solicitudes.
     for actor in (historia["naviera"], sysadmin):
-        assert (await cliente.get(RUTA, headers=actor.headers)).status_code == 403
+        assert (await cliente.post(RUTA, json={}, headers=actor.headers)).status_code == 403
         assert (await cliente.get(f"{RUTA}/opciones", headers=actor.headers)).status_code == 403
-        assert (await cliente.get(f"{RUTA}/exportar", headers=actor.headers)).status_code == 403
+        assert (await cliente.post(f"{RUTA}/exportar", json={}, headers=actor.headers)).status_code == 403
     sin_sector = await crear_actor("UCVMM", prefijo="revisor", sectores=())
-    assert (await cliente.get(RUTA, headers=sin_sector.headers)).status_code == 409
+    assert (await cliente.post(RUTA, json={}, headers=sin_sector.headers)).status_code == 409
 
 
 async def test_opciones_de_los_filtros(cliente, admin, historia):
@@ -181,7 +181,7 @@ async def test_exportar_a_excel(cliente, admin, historia, monkeypatch):
     from app.domain.services import solicitud_service
 
     ids, texto = historia["ids"], historia["sufijo"]
-    r = await cliente.get(f"{RUTA}/exportar", params={"texto": texto, "desde": "2025-01-01"}, headers=admin.headers)
+    r = await cliente.post(f"{RUTA}/exportar", json={"texto": texto, "desde": "2025-01-01"}, headers=admin.headers)
     assert r.status_code == 200, r.text
     assert r.headers["content-type"].startswith("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     assert re.fullmatch(r'attachment; filename="Consulta-historica-\d{4}-\d{2}-\d{2}\.xlsx"', r.headers["content-disposition"])
@@ -194,7 +194,7 @@ async def test_exportar_a_excel(cliente, admin, historia, monkeypatch):
 
     # Con más de las que caben, lo dice el archivo.
     monkeypatch.setattr(solicitud_service, "MAX_FILAS_EXPORTACION", 2)
-    r = await cliente.get(f"{RUTA}/exportar", params={"texto": texto}, headers=admin.headers)
+    r = await cliente.post(f"{RUTA}/exportar", json={"texto": texto}, headers=admin.headers)
     textos = _textos(r.content)
     assert "Se exportaron las primeras 2 de 5 solicitudes" in textos
     assert f"HX-{texto}-2" in textos and f"HX-{texto}-4" not in textos, "las más recientes"
@@ -208,8 +208,8 @@ async def test_exportar_tiene_tope_por_cuenta(cliente, admin, monkeypatch):
     monkeypatch.setattr(rate_limit.limiter, "enabled", True)
     rate_limit.limiter.reset()
     try:
-        assert (await cliente.get(f"{RUTA}/exportar", params={"texto": "x"}, headers=admin.headers)).status_code == 200
-        r = await cliente.get(f"{RUTA}/exportar", params={"texto": "x"}, headers=admin.headers)
+        assert (await cliente.post(f"{RUTA}/exportar", json={"texto": "x"}, headers=admin.headers)).status_code == 200
+        r = await cliente.post(f"{RUTA}/exportar", json={"texto": "x"}, headers=admin.headers)
         assert r.status_code == 429 and "Espera" in r.json()["detail"]
     finally:
         rate_limit.limiter.reset()

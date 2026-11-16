@@ -3,9 +3,10 @@ import { Link } from "react-router-dom";
 import type { EstadisticasSolicitudes } from "../../../api/solicitudes";
 import { IconoChevronDerecha } from "../../../components/Iconos";
 import { formatearFechaHora } from "../../solicitudes/presentacion";
+import { dosCifras } from "../../../utils/fechas";
 import { estadoParaVolver } from "../../../utils/volver";
 import {
-  DIAS_SEMANA, HORA_FIN_LABORAL, HORA_INICIO_LABORAL, NIVELES_CALOR, cifra, dosDigitos, horarioDeCasilla,
+  DIAS_SEMANA, HORA_FIN_LABORAL, HORA_INICIO_LABORAL, NIVELES_CALOR, cifra, horarioDeCasilla,
   nivelCalor, porcentaje, segun, textoHora,
 } from "./calculos";
 import { Globo, Medidor, TarjetaGrafico } from "./Graficos";
@@ -133,7 +134,7 @@ export default function MapaHoras({ datos }: { datos: EstadisticasSolicitudes })
             <span aria-hidden="true" />
             {HORAS.map((h) => (
               <span key={h} className={`${styles.horaEje} ${HORAS_CLAVE.has(h) ? styles.horaClave : ""}`} aria-hidden="true">
-                {dosDigitos(h)}
+                {dosCifras(h)}
               </span>
             ))}
             {DIAS_SEMANA.map((d) => (

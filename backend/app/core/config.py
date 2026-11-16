@@ -1,6 +1,6 @@
 from decimal import Decimal
 from typing import Literal
-from pydantic import AliasChoices, Field, model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
@@ -118,10 +118,8 @@ class Configuracion(BaseSettings):
     VENCIMIENTOS_INTERVALO_MINUTOS: int = 15
 
     # Rate limit de los endpoints públicos (verificación del QR), por IP y por minuto. 0 = desactivado.
-    # (Antes RATE_LIMIT_DOWNLOADS_PER_MINUTE, de las descargas del storage: se sigue leyendo.)
-    LIMITE_VERIFICACIONES_POR_MINUTO: int = Field(
-        30, validation_alias=AliasChoices("LIMITE_VERIFICACIONES_POR_MINUTO", "RATE_LIMIT_DOWNLOADS_PER_MINUTE"),
-    )
+    # (Hasta el 2026-11-14 se leía también el nombre del storage, RATE_LIMIT_DOWNLOADS_PER_MINUTE.)
+    LIMITE_VERIFICACIONES_POR_MINUTO: int = 30
     # El PDF de la autorización por el QR (2026-11-14), sin sesión: por IP y por
     # minuto (cada uno ocupa la CPU ~0,2 s), y hasta cuántos días después de la
     # operación se puede ver así. Después, la agencia lo descarga con su cuenta.

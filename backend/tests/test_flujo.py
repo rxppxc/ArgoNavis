@@ -16,7 +16,7 @@ from sqlalchemy import Date, Interval, cast, func, literal, select, text, update
 
 from app.api.v1 import solicitudes as api_solicitudes
 from app.api.v1 import verificacion as api_verificacion
-from app.core.pdf_autorizacion import generar_pdf_autorizacion
+from app.informes.autorizacion_pdf import generar_pdf_autorizacion
 from app.domain.models.audit_log import AccionAuditoria, RegistroAuditoria
 from app.domain.models.solicitud import (
     MESES_VIGENCIA_PASAPORTE, Solicitud, TripulanteSolicitud, vigencia_minima_pasaporte,
@@ -27,7 +27,7 @@ from app.domain.services.solicitud_service import MAX_TRIPULANTES, ServicioSolic
 from app.infrastructure import tareas
 from app.infrastructure.database import SesionLocal
 from app.infrastructure.tareas import expirar_solicitudes
-from ayudas import HOY, cabecera, enviar, pdf, tripulante
+from ayudas import HOY, cabecera, cuerpo_impedimentos, enviar, pdf, tripulante, verificar_impedimentos
 from conftest import STORAGE, Actor, crear_actor, id_sector
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
@@ -57,26 +57,6 @@ async def solicitud_simple(cliente, actor: Actor, puesto_id: int) -> dict:
     ])
     r = await enviar(cliente, actor, datos, [pdf("visa"), pdf("pasaporte")])
     assert r.status_code == 201, r.text
-    return r.json()
-
-
-def cuerpo_impedimentos(detalle: dict, con_impedimento: set[str] = frozenset(),
-                        comentario: str = "Sin impedimentos en SIMPLUS") -> dict:
-    """La verificación por tripulante: todos "sin impedimento" salvo los nombrados."""
-    return {
-        "tripulantes": [{"tripulante_id": t["id"], "con_impedimento": t["nombre"] in con_impedimento}
-                        for t in detalle["tripulantes"]],
-        "comentario": comentario,
-    }
-
-
-async def verificar_impedimentos(cliente, actor: Actor, solicitud_id: int,
-                                 con_impedimento: set[str] = frozenset(), ruta: str = "impedimentos") -> dict:
-    """La de UCVMM (`impedimentos`) o la del puesto de control (`impedimentos-puesto`)."""
-    detalle = (await cliente.get(f"/solicitudes/{solicitud_id}", headers=actor.headers)).json()
-    r = await cliente.post(f"/solicitudes/{solicitud_id}/{ruta}",
-                           json=cuerpo_impedimentos(detalle, con_impedimento), headers=actor.headers)
-    assert r.status_code == 200, r.text
     return r.json()
 
 

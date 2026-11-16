@@ -5,7 +5,7 @@ import type { TipoTramite } from "../api/tramites";
 /** Un trámite completo con valores neutros: cada prueba cambia solo lo que mira. */
 export function tramiteDePrueba(cambios: Partial<TipoTramite> = {}): TipoTramite {
   return {
-    id: 1, codigo: "T", nombre: "Trámite de prueba", formulario: "formulario_3",
+    id: 1, codigo: "T", nombre: "Trámite de prueba",
     requiere_buque: false, requiere_puerto: false, requiere_puerto_desembarque: false,
     requiere_motivo: false, requiere_clinica: false, permite_cambio_puerto: false, valida_vigencia: true,
     rangos_permitidos: null,

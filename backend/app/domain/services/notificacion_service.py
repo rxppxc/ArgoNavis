@@ -16,27 +16,26 @@ Destinatarios:
     cambio de puerto (2026-11-13), los del puesto nuevo, que es el que la finaliza.
 """
 from datetime import datetime
-from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import obtener_configuracion
 from app.core.email import Aviso
-from app.core.horario import aviso_fuera_de_horario, fuera_de_horario, texto_costo
+from app.core.horario import ZONA_PANAMA, aviso_fuera_de_horario, fuera_de_horario, texto_costo
+from app.core.identidad import INSTITUCION
 from app.domain.models.solicitud import EstadoSolicitud, Solicitud
 from app.domain.repositories.catalogo_repository import RepositorioCatalogo
 
 configuracion = obtener_configuracion()
-_TZ_PANAMA = ZoneInfo("America/Panama")
 _LARGO_VISTA_PREVIA = 150
 
 
 def _fecha_hora(valor: datetime | None) -> str:
-    return valor.astimezone(_TZ_PANAMA).strftime("%d/%m/%Y a las %I:%M %p") if valor else "—"
+    return valor.astimezone(ZONA_PANAMA).strftime("%d/%m/%Y a las %I:%M %p") if valor else "—"
 
 
 def _fecha_hora_corta(valor: datetime | None) -> str:
-    return valor.astimezone(_TZ_PANAMA).strftime("%d/%m %I:%M %p") if valor else "—"
+    return valor.astimezone(ZONA_PANAMA).strftime("%d/%m %I:%M %p") if valor else "—"
 
 
 def url_solicitud(s: Solicitud, sufijo: str = "") -> str:
@@ -171,7 +170,7 @@ class ServicioNotificacion:
         return self._con_destinatarios([Aviso(
             destinatarios=await self._correos_agencia(s), numero=s.numero or "", estado="Devuelta a corrección",
             titulo="La solicitud necesita correcciones",
-            intro="El Servicio Nacional de Migración revisó la solicitud y necesita que se corrija lo siguiente antes de aprobarla.",
+            intro=f"El {INSTITUCION} revisó la solicitud y necesita que se corrija lo siguiente antes de aprobarla.",
             vista_previa=_vista_previa(f"Motivo: {s.motivo_devolucion}",
                                        f"corrige antes del {_fecha_hora_corta(s.plazo_correccion)}"),
             campos=_campos(s),
@@ -187,7 +186,7 @@ class ServicioNotificacion:
         return self._con_destinatarios([Aviso(
             destinatarios=await self._correos_agencia(s), numero=s.numero or "", estado="Denegada",
             titulo="La solicitud fue denegada",
-            intro="El Servicio Nacional de Migración revisó la solicitud de autorización y no fue aprobada.",
+            intro=f"El {INSTITUCION} revisó la solicitud de autorización y no fue aprobada.",
             vista_previa=_vista_previa(f"Motivo: {s.motivo_negacion}"),
             campos=_campos(s), destacado=f"Motivo: {s.motivo_negacion}", tono="rojo",
             boton_texto="Ver solicitud", boton_url=url_solicitud(s),

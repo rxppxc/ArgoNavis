@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from starlette.requests import Request
 
 from app import main
+from app.api import manejadores
 from app.core.config import obtener_configuracion
 from app.domain.repositories.solicitud_repository import RepositorioSolicitud
 from app.infrastructure.database import SesionLocal
@@ -46,8 +47,8 @@ async def test_una_consulta_cancelada_por_el_tope_responde_503(base_de_datos):
         await s.execute(text("SET LOCAL statement_timeout = 50"))
         with pytest.raises(DBAPIError) as error:
             await s.execute(text("SELECT pg_sleep(2)"))
-    assert main._es_falla_de_disponibilidad(error.value), "SQLSTATE 57014: la BD no respondió a tiempo"
-    respuesta = await main.error_de_base_de_datos(_pedido(), error.value)
+    assert manejadores.es_falla_de_disponibilidad(error.value), "SQLSTATE 57014: la BD no respondió a tiempo"
+    respuesta = await manejadores.error_de_base_de_datos(_pedido(), error.value)
     assert respuesta.status_code == 503 and respuesta.headers["Retry-After"] == "5"
 
 
@@ -57,20 +58,20 @@ async def test_un_error_de_programacion_sigue_siendo_500(base_de_datos):
     async with SesionLocal() as s:
         with pytest.raises(DBAPIError) as error:
             await s.execute(text("SELECT columna_que_no_existe FROM users"))
-    assert not main._es_falla_de_disponibilidad(error.value)
-    respuesta = await main.error_de_base_de_datos(_pedido(), error.value)
+    assert not manejadores.es_falla_de_disponibilidad(error.value)
+    respuesta = await manejadores.error_de_base_de_datos(_pedido(), error.value)
     assert respuesta.status_code == 500
 
 
 def test_conexion_cortada_o_invalidada_es_falla_de_disponibilidad():
-    assert main._es_falla_de_disponibilidad(OperationalError("SELECT 1", {}, ConnectionResetError("se cortó")))
-    assert main._es_falla_de_disponibilidad(
+    assert manejadores.es_falla_de_disponibilidad(OperationalError("SELECT 1", {}, ConnectionResetError("se cortó")))
+    assert manejadores.es_falla_de_disponibilidad(
         DBAPIError("SELECT 1", {}, Exception("cerrada"), connection_invalidated=True))
 
 
 @asincrona
 async def test_sin_conexiones_libres_responde_503():
-    respuesta = await main.sin_conexiones_libres(_pedido(), PoolAgotado("QueuePool limit reached"))
+    respuesta = await manejadores.sin_conexiones_libres(_pedido(), PoolAgotado("QueuePool limit reached"))
     assert respuesta.status_code == 503 and b"muy ocupado" in respuesta.body
 
 
@@ -146,7 +147,7 @@ async def test_un_error_sin_controlar_responde_500_con_su_codigo_y_deja_la_traza
 
     monkeypatch.setattr(RepositorioSolicitud, "listar", rota)
     captura = _Captura()
-    registro = logging.getLogger("app.main")
+    registro = logging.getLogger("app.api.middleware")
     registro.addHandler(captura)
     try:
         r = await cliente.get("/solicitudes/revision", headers=admin.headers)

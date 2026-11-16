@@ -64,6 +64,6 @@ def test_varios_procesos_no_se_pisan_las_lineas(tmp_path):
 
     lineas = (tmp_path / f"argonavis-{date.today().isoformat()}.log").read_text(encoding="utf-8").splitlines()
     assert len(lineas) == 8000
-    assert all(l.startswith("proceso-") and l.endswith("x" * 100) and len(l) == len(lineas[0]) for l in lineas)
+    assert all(x.startswith("proceso-") and x.endswith("x" * 100) and len(x) == len(lineas[0]) for x in lineas)
     for p in range(4):
-        assert sum(l.startswith(f"proceso-{p} ") for l in lineas) == 2000
+        assert sum(x.startswith(f"proceso-{p} ") for x in lineas) == 2000

@@ -33,9 +33,7 @@
   font: inherit; font-size: .9rem;
 }
 .campo input:focus { outline: 2px solid var(--foco); border-color: transparent; }
-.pista, .invalido { font-style: normal; font-size: .76rem; }
-.pista { color: var(--muted); }
-.invalido { color: var(--acc-red); }
+.invalido { font-style: normal; font-size: .76rem; color: var(--acc-red); }
 
 .requisitos {
   list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

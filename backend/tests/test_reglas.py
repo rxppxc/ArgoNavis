@@ -54,7 +54,7 @@ def test_la_temporal_cumple_la_politica():
 
 def _tipo(*filas: tuple[str, str, str, bool]) -> TipoTramite:
     """Trámite en memoria: (codigo_documento, alcance, condicion, requiere_libreta)."""
-    tipo = TipoTramite(codigo="T", nombre="Trámite", formulario="formulario_3")
+    tipo = TipoTramite(codigo="T", nombre="Trámite")
     for orden, (codigo, alcance, condicion, libreta) in enumerate(filas, start=1):
         documento = DocumentoRequerido(id=orden, codigo=codigo, nombre=codigo, requiere_libreta=libreta)
         tipo.documentos.append(TramiteDocumento(
@@ -67,7 +67,8 @@ def test_checklist_condiciones():
     tipo = _tipo(
         ("LISTA", "solicitud", "siempre", False),
         ("PASAPORTE", "marino", "siempre", False),
-        ("LIBRETA", "marino", "solo_panamenos", True),
+        ("LIBRETA", "marino", "siempre", True),
+        ("VISA", "marino", "solo_extranjeros", False),
         ("CUSTODIA", "marino", "nacionalidad_restringida", False),
         ("CUSTODIA-GLOBAL", "solicitud", "nacionalidad_restringida", False),
     )
@@ -81,7 +82,8 @@ def test_checklist_condiciones():
     assert pares == {
         ("LISTA", None),
         ("PASAPORTE", 0), ("PASAPORTE", 1), ("PASAPORTE", 2),
-        ("LIBRETA", 0),                      # el técnico no porta seamanbook
+        ("LIBRETA", 0), ("LIBRETA", 2),      # el técnico no porta seamanbook
+        ("VISA", 2),                         # no a los panameños (2026-11-14)
         ("CUSTODIA", 2),                     # solo el restringido
         ("CUSTODIA-GLOBAL", None),           # hay al menos un restringido
     }

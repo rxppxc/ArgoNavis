@@ -69,7 +69,7 @@ trap 'rm -rf -- "$archivo_bd.parcial" "$EN_CURSO"' EXIT
 # Con las credenciales que ya viven dentro del contenedor: no hay que escribir
 # contraseñas aquí. Va a un archivo aparte que se renombra al terminar: uno
 # cortado a mitad no queda con el nombre de un respaldo bueno.
-docker exec snm_postgres sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' | gzip > "$archivo_bd.parcial"
+docker exec argonavis_postgres sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' | gzip > "$archivo_bd.parcial"
 mv "$archivo_bd.parcial" "$archivo_bd"
 log "BD respaldada: $archivo_bd ($(du -h "$archivo_bd" | cut -f1))"
 

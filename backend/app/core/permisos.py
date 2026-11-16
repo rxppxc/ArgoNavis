@@ -1,4 +1,5 @@
-"""Dependencia FastAPI para validar permisos del usuario actual.
+"""Permisos: los códigos, los roles fijos y las consultas. Las dependencias de
+FastAPI que los exigen en cada ruta (requerir_*) están en api/v1/dependencias.py.
 
 La fuente de verdad es `rol_personalizado` (rol_id en la tabla users), por
 nombre del rol:
@@ -11,11 +12,8 @@ nombre del rol:
 
 Sin rol_personalizado asignado, el usuario no tiene acceso administrativo.
 """
-from fastapi import Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.infrastructure.database import obtener_sesion_bd
-from app.core.security import obtener_id_usuario_actual
 from app.domain.models.user import Usuario
 from app.domain.models.rol import Permiso, RolPermiso
 
@@ -81,62 +79,3 @@ async def codigos_permiso(sesion: AsyncSession, usuario: Usuario) -> set[str]:
         .where(RolPermiso.rol_id == usuario.rol_id)
     )
     return {fila[0] for fila in resultado.all()}
-
-
-async def requerir_admin(
-    user_id: int = Depends(obtener_id_usuario_actual),
-    sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
-) -> int:
-    """Dependencia: solo administradores."""
-    usuario = (await sesion.execute(select(Usuario).where(Usuario.id == user_id))).scalar_one_or_none()
-    if not usuario or not es_admin_efectivo(usuario):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Se requiere rol de administrador para acceder a esta función.",
-        )
-    return user_id
-
-
-async def requerir_admin_o_sysadmin(
-    user_id: int = Depends(obtener_id_usuario_actual),
-    sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
-) -> int:
-    """Dependencia: Administrador o SysAdmin (usuarios, roles, permisos y bitácora)."""
-    usuario = (await sesion.execute(select(Usuario).where(Usuario.id == user_id))).scalar_one_or_none()
-    if not usuario or not (es_admin_efectivo(usuario) or es_sysadmin_efectivo(usuario)):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Se requiere rol de administrador para acceder a esta función.",
-        )
-    return user_id
-
-
-def requerir_permiso(codigo_permiso: str):
-    """Genera una dependencia FastAPI que valida que el usuario tenga el permiso."""
-    async def _dep(
-        user_id: int = Depends(obtener_id_usuario_actual),
-        sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
-    ) -> int:
-        if not await usuario_tiene_permiso(sesion, user_id, codigo_permiso):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"No tienes el permiso requerido: {codigo_permiso}.",
-            )
-        return user_id
-    return _dep
-
-
-def requerir_algun_permiso(*codigos: str):
-    """Dependencia que requiere al menos uno de los permisos listados."""
-    async def _dep(
-        user_id: int = Depends(obtener_id_usuario_actual),
-        sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
-    ) -> int:
-        for codigo in codigos:
-            if await usuario_tiene_permiso(sesion, user_id, codigo):
-                return user_id
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"No tienes ninguno de los permisos requeridos: {', '.join(codigos)}.",
-        )
-    return _dep

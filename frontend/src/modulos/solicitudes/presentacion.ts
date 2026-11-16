@@ -1,5 +1,6 @@
 /** Textos y formatos compartidos por las pantallas de solicitudes. */
 import type { EstadoSolicitud, EventoSolicitud, RangoMarino, Sexo } from "../../api/solicitudes";
+import { dosCifras } from "../../utils/fechas";
 import { HORA_FIN_LABORAL, HORA_INICIO_LABORAL } from "../administracion/estadisticas/calculos";
 
 export const ETIQUETA_ESTADO: Record<EstadoSolicitud, string> = {
@@ -63,7 +64,6 @@ export function textoPuestos(s: ConPuestos): string {
   return s.puesto_destino_nombre ? `${s.puesto_nombre ?? ""} → ${s.puesto_destino_nombre}` : s.puesto_nombre ?? "";
 }
 
-const dosCifras = (n: number) => String(n).padStart(2, "0");
 /** El horario laboral, como lo dicen el correo y el PDF (TEXTO_HORARIO, core/horario.py). */
 export const TEXTO_HORARIO_LABORAL =
   `lunes a viernes, de ${dosCifras(HORA_INICIO_LABORAL)}:00 a ${dosCifras(HORA_FIN_LABORAL)}:00`;
@@ -105,9 +105,8 @@ export function fechaEnPalabras(iso: string | null | undefined): string {
 export function formatearFechaHora(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso);
-  const dosDigitos = (n: number) => String(n).padStart(2, "0");
   const hora = d.toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit" });
-  return `${dosDigitos(d.getDate())}/${dosDigitos(d.getMonth() + 1)}/${d.getFullYear()}, ${hora}`;
+  return `${dosCifras(d.getDate())}/${dosCifras(d.getMonth() + 1)}/${d.getFullYear()}, ${hora}`;
 }
 
 /** Tiempo que falta hasta `iso`: `texto` corto ("1 día 4 h", "2 días", "35 min")
@@ -125,12 +124,6 @@ export function tiempoRestante(iso: string | null | undefined): { texto: string;
     : [minutos, `${minutos} min`];
   // El verbo concuerda con la primera cifra: "queda 1 día 4 h", "quedan 2 días".
   return { texto, frase: `${cifra === 1 ? "queda" : "quedan"} ${texto}`, vencido: false };
-}
-
-/** Fecha de hoy en hora local, como "YYYY-MM-DD". */
-export function hoyISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 /** IMO válido (7 dígitos, el último es el verificador). Devuelve los dígitos o null. */

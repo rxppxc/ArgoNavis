@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.database import obtener_sesion_bd
-from app.core.security import obtener_id_usuario_actual
+from app.api.v1.dependencias import obtener_id_usuario_actual
 from app.domain.models.tramite import TipoTramite, TramiteDocumento
 from app.domain.repositories.tramite_repository import RepositorioTramite
 from app.domain.schemas.tramite import (
@@ -34,7 +34,6 @@ def mapear_tipo(tipo: TipoTramite) -> SalidaTipoTramite:
         id=tipo.id,
         codigo=tipo.codigo,
         nombre=tipo.nombre,
-        formulario=tipo.formulario,
         requiere_buque=tipo.requiere_buque,
         requiere_puerto=tipo.requiere_puerto,
         requiere_puerto_desembarque=tipo.requiere_puerto_desembarque,

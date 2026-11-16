@@ -2,8 +2,8 @@
 
 Modela el Formulario 3 del SNM — Solicitud de Autorización, que llena la
 agencia naviera. Cada tipo de trámite exige una lista distinta de documentos.
-(El Formulario 4, fuera del horario laboral, se retiró por ahora; la columna
-`formulario` se conserva por si vuelve.)
+(El Formulario 4, fuera del horario laboral, se retiró; la columna `formulario`,
+que siempre decía «formulario_3», salió en la auditoría del 2026-11-14.)
 
 El catálogo vive en BD (no como enum en código) a propósito: los requisitos
 de un organismo público cambian por resolución administrativa. Hoy se
@@ -32,7 +32,6 @@ class CondicionDocumento(str, enum.Enum):
     solicitud (ver ServicioTramite.construir_casillas).
     """
     SIEMPRE                  = "siempre"
-    SOLO_PANAMENOS           = "solo_panamenos"            # hoy sin uso (antes, la Libreta de Embarque)
     NACIONALIDAD_RESTRINGIDA = "nacionalidad_restringida"  # Form. No. 6 de custodia y la Visa
     # A los panameños no se les pide (2026-11-14): la visa y el boleto aéreo de
     # Embarque y Desembarque, y la Visa Especial de Marino de Cambio de nave.
@@ -46,7 +45,6 @@ class TipoTramite(Base):
     id:         Mapped[int]       = mapped_column(Integer, primary_key=True, index=True)
     codigo:     Mapped[str]       = mapped_column(String(50), nullable=False, unique=True, index=True)
     nombre:     Mapped[str]       = mapped_column(String(200), nullable=False)
-    formulario: Mapped[str]       = mapped_column(String(20), nullable=False, index=True)   # hoy siempre "formulario_3"
 
     # Campos extra que el formulario pide según el trámite. Determinan qué
     # inputs muestra el frontend y qué valida el backend al crear la solicitud.

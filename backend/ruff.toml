@@ -1,0 +1,16 @@
+# ruff: el linter de Python del backend (auditoría del 2026-11-14). Lo corre la CI en cada
+# push y se instala con requirements-dev.txt:
+#   venv\Scripts\python -m ruff check .
+target-version = "py312"
+line-length = 120
+# Las migraciones viejas no se editan (CLAUDE.md): quedan fuera.
+extend-exclude = ["alembic/versions"]
+
+[lint]
+# E/W: estilo básico; F: importaciones, variables y nombres sin uso o sin definir;
+# B: errores comunes (argumentos mutables por defecto, except sin tipo, etc.).
+select = ["E", "W", "F", "B"]
+ignore = [
+    "E501",   # el largo de línea lo cuida quien escribe: hay tablas y SQL más anchos a propósito
+    "B008",   # FastAPI pide Depends(...) y Query(...) como valor por defecto
+]

@@ -251,7 +251,10 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     await ucvmm.getByRole("tab", { name: /^Finalizadas/ }).click();
     const fila = ucvmm.locator(`a[href="/solicitudes/${id}"]`);
     await expect(fila).toBeVisible();
-    await expect(ucvmm).toHaveURL(/pasajero=P%C3%A9rez/);   // la búsqueda queda en la URL
+    // Los filtros quedan en la URL, salvo el pasajero (un dato personal): ese viaja en el
+    // estado de la navegación, para que no quede en el historial ni en los logs (2026-11-14).
+    await expect(ucvmm).toHaveURL(/estado=finalized/);
+    expect(ucvmm.url()).not.toMatch(/pasajero|P%C3%A9rez|G%C3%B3mez/);
     const [descarga] = await Promise.all([
       ucvmm.waitForEvent("download"),
       ucvmm.getByRole("button", { name: "Exportar a Excel" }).click(),

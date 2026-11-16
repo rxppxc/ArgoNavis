@@ -40,11 +40,6 @@ class RepositorioCatalogo:
         consulta = select(PuestoControl.id).where(PuestoControl.sector_id.in_(sorted(sectores_ids)))
         return {fila[0] for fila in (await self.sesion.execute(consulta)).all()}
 
-    async def sector_por_puesto(self) -> dict[int, str]:
-        """El nombre del sector de cada puesto (pocos: se lee entero, para las bandejas)."""
-        consulta = select(PuestoControl.id, Sector.nombre).join(Sector, Sector.id == PuestoControl.sector_id)
-        return {pid: nombre for pid, nombre in (await self.sesion.execute(consulta)).all()}
-
     async def correo_sector_de_puesto(self, puesto_id: int) -> str | None:
         """El buzón del sector del puesto (el aviso de una solicitud nueva)."""
         consulta = (

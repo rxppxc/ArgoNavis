@@ -55,7 +55,7 @@ CHECKLIST = _casos("checklist.json")
 
 @pytest.mark.parametrize("caso", CHECKLIST, ids=_ids(CHECKLIST))
 def test_checklist(caso):
-    tipo = TipoTramite(codigo="T", nombre="Trámite", formulario="formulario_3")
+    tipo = TipoTramite(codigo="T", nombre="Trámite")
     for i, d in enumerate(caso["documentos"], start=1):
         documento = DocumentoRequerido(id=i, codigo=d["codigo"], nombre=d["codigo"], requiere_libreta=d["requiere_libreta"])
         tipo.documentos.append(TramiteDocumento(
@@ -101,7 +101,7 @@ def _regla(mensaje: str) -> str:
 def test_ficha_del_tripulante(caso):
     hoy = date.fromisoformat(caso["hoy"])
     operacion = date.fromisoformat(caso["fecha_operacion"])
-    tipo = TipoTramite(codigo="T", nombre="Trámite", formulario="formulario_3",
+    tipo = TipoTramite(codigo="T", nombre="Trámite",
                        valida_vigencia=caso["tramite"]["valida_vigencia"],
                        rangos_permitidos=caso["tramite"]["rangos_permitidos"])
     fichas = [DatosTripulanteEntrada(**{**TRIPULANTES["base"], **cambios}) for cambios in caso["tripulantes"]]
@@ -134,17 +134,17 @@ def test_constantes_iguales_en_el_frontend():
     assert _constante_ts("utils/contrasena.ts", "LARGO_MINIMO_CONTRASENA") == user.LARGO_MINIMO_CONTRASENA
     assert _constante_ts("utils/contrasena.ts", "LARGO_MAXIMO_CONTRASENA") == user.LARGO_MAXIMO_CONTRASENA
     assert tuple(_constante_ts("utils/contrasena.ts", "PALABRAS_PROHIBIDAS")) == user._PALABRAS_PROHIBIDAS
-    assert _constante_ts("modulos/solicitudes/validacionFormulario.ts", "EDAD_MINIMA") == tramite_service.EDAD_MINIMA
-    assert date.fromisoformat(_constante_ts("modulos/solicitudes/validacionFormulario.ts", "NACIMIENTO_MINIMO")) \
+    assert _constante_ts("modulos/solicitudes/formulario/validacionFormulario.ts", "EDAD_MINIMA") == tramite_service.EDAD_MINIMA
+    assert date.fromisoformat(_constante_ts("modulos/solicitudes/formulario/validacionFormulario.ts", "NACIMIENTO_MINIMO")) \
         == tramite_service.NACIMIENTO_MINIMO
-    assert _constante_ts("modulos/solicitudes/validacionFormulario.ts", "DIAS_MAXIMOS_ANTICIPACION") \
+    assert _constante_ts("modulos/solicitudes/formulario/validacionFormulario.ts", "DIAS_MAXIMOS_ANTICIPACION") \
         == Configuracion.model_fields["DIAS_MAXIMOS_ANTICIPACION"].default
-    assert _constante_ts("modulos/solicitudes/DocumentosAdicionales.tsx", "MAX_ADICIONALES") \
+    assert _constante_ts("modulos/solicitudes/formulario/DocumentosAdicionales.tsx", "MAX_ADICIONALES") \
         == solicitud_service.MAX_DOCUMENTOS_ADICIONALES
-    assert _constante_ts("modulos/solicitudes/validacionFormulario.ts", "MAX_TRIPULANTES") \
+    assert _constante_ts("modulos/solicitudes/formulario/validacionFormulario.ts", "MAX_TRIPULANTES") \
         == solicitud_service.MAX_TRIPULANTES
     assert set(_constante_ts("modulos/solicitudes/presentacion.ts", "RANGOS_CON_LIBRETA")) == RANGOS_CON_LIBRETA
-    assert _constante_ts("modulos/solicitudes/validacionFormulario.ts", "MESES_VIGENCIA_PASAPORTE") \
+    assert _constante_ts("modulos/solicitudes/formulario/validacionFormulario.ts", "MESES_VIGENCIA_PASAPORTE") \
         == MESES_VIGENCIA_PASAPORTE
     # El mapa de horas de las estadísticas marca el horario laboral por horas enteras.
     assert horario.INICIO_LABORAL.minute == horario.FIN_LABORAL.minute == 0

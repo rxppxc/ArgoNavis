@@ -1,49 +1,30 @@
 import { useState, useEffect, useCallback } from "react";
-import { apiAdmin, type UsuarioAD, type UsuarioSistema, type Rol } from "../../api/admin";
+import { apiAdmin, type UsuarioSistema, type Rol } from "../../api/admin";
 import { useAutenticacion } from "../../hooks/useAutenticacion";
 import { useNotificacion } from "../../components/Notificaciones";
 import { useConfirmar } from "../../components/ModalConfirmacion";
 import { MarcoPagina } from "../../components/MarcoPagina";
 import { EncabezadoPagina } from "../../components/EncabezadoPagina";
-import { EstadoCarga } from "../../components/EstadoCarga";
-import {
-  IconoBuscar, IconoUsuario, IconoCorreo, IconoMaletin, IconoMas,
-  IconoCheck, IconoBasura, IconoPoder, IconoLlave,
-} from "../../components/Iconos";
 import { copiarAlPortapapeles } from "../../utils/portapapeles";
-import { LARGO_MINIMO_CONTRASENA, problemaContrasena } from "../../utils/contrasena";
 import { mensajeDeError } from "../../utils/errores";
+import { BusquedaAD } from "./usuarios/BusquedaAD";
+import { FormularioCuentaLocal } from "./usuarios/FormularioCuentaLocal";
+import { TablaUsuarios } from "./usuarios/TablaUsuarios";
 import styles from "./PaginaUsuarios.module.css";
 
+/** Usuarios: alta desde el AD o local, rol, estado, contraseña temporal y baja.
+ *  Cada bloque es su componente (usuarios/, 2026-11-14); aquí viven la lista, los
+ *  roles y las acciones de la tabla. */
 export default function PaginaUsuarios() {
   const { usuario } = useAutenticacion();
   const { mostrar: mostrarToast } = useNotificacion();
   const confirmar = useConfirmar();
 
-  const [busqueda,     setBusqueda]     = useState("");
-  const [buscando,     setBuscando]     = useState(false);
-  const [resultadosAD, setResultadosAD] = useState<UsuarioAD[]>([]);
-  const [errorBusq,    setErrorBusq]    = useState<string | null>(null);
-
-  const [usuarios,     setUsuarios]     = useState<UsuarioSistema[]>([]);
-  // Filtro de la tabla (en el navegador): antes, para encontrar a alguien había que recorrerla entera.
-  const [filtro,       setFiltro]       = useState("");
-  const [roles,        setRoles]        = useState<Rol[]>([]);
-  const [cargando,     setCargando]     = useState(true);
-  const [creando,      setCreando]      = useState<string | null>(null);
-  const [ocupado,      setOcupado]      = useState<number | null>(null);
+  const [usuarios,      setUsuarios]      = useState<UsuarioSistema[]>([]);
+  const [roles,         setRoles]         = useState<Rol[]>([]);
+  const [cargando,      setCargando]      = useState(true);
+  const [ocupado,       setOcupado]       = useState<number | null>(null);
   const [claveTemporal, setClaveTemporal] = useState<{ username: string; clave: string } | null>(null);
-
-  // Cuenta local (sin AD): usuarios externos, como los de las agencias navieras.
-  const [mostrarLocal,   setMostrarLocal]   = useState(false);
-  const [localUsername,  setLocalUsername]  = useState("");
-  const [localPassword,  setLocalPassword]  = useState("");
-  const [localNombre,    setLocalNombre]    = useState("");
-  const [localApellido,  setLocalApellido]  = useState("");
-  const [localEmail,     setLocalEmail]     = useState("");
-  const [localRolId,     setLocalRolId]     = useState<number | "">("");
-  const [creandoLocal,   setCreandoLocal]   = useState(false);
-  const [errorLocal,     setErrorLocal]     = useState<string | null>(null);
 
   /** Relee la lista tras una acción que ya se hizo: si falla, no la da por
    *  fallida (antes decía «No se pudo agregar» de una cuenta que sí se creó). */
@@ -68,76 +49,7 @@ export default function PaginaUsuarios() {
     return () => { cancelado = true; };
   }, [mostrarToast]);
 
-  async function alBuscar(e: React.FormEvent) {
-    e.preventDefault();
-    const q = busqueda.trim();
-    if (q.length < 2) {
-      setErrorBusq("Escribe al menos 2 letras del nombre, el usuario o el correo.");
-      return;
-    }
-    setBuscando(true);
-    setErrorBusq(null);
-    setResultadosAD([]);
-    try {
-      const { data } = await apiAdmin.buscarEnAD(q);
-      setResultadosAD(data);
-      if (data.length === 0) setErrorBusq("No se encontraron usuarios con ese criterio.");
-    } catch (err) {
-      setErrorBusq(mensajeDeError(err, "No se pudo consultar el Active Directory."));
-    } finally {
-      setBuscando(false);
-    }
-  }
-
-  async function alCrear(username: string) {
-    setCreando(username);
-    try {
-      await apiAdmin.crearUsuario(username);
-      setResultadosAD(prev => prev.filter(u => u.username !== username));
-      await cargarUsuarios();
-      mostrarToast(`Usuario ${username} agregado.`, "exito");
-    } catch (err) {
-      mostrarToast(mensajeDeError(err, "No se pudo agregar el usuario."), "error");
-    } finally {
-      setCreando(null);
-    }
-  }
-
-  async function alCrearLocal(e: React.FormEvent) {
-    e.preventDefault();
-    const username = localUsername.trim();
-    if (!username) {
-      setErrorLocal("El usuario es obligatorio.");
-      return;
-    }
-    const problema = problemaContrasena(localPassword, username);
-    if (problema) {
-      setErrorLocal(problema);
-      return;
-    }
-    setCreandoLocal(true);
-    setErrorLocal(null);
-    try {
-      await apiAdmin.crearUsuarioLocal({
-        username,
-        password: localPassword,
-        name: localNombre.trim() || undefined,
-        last_name: localApellido.trim() || undefined,
-        email: localEmail.trim() || undefined,
-        rol_id: localRolId !== "" ? localRolId : undefined,
-      });
-      setLocalUsername(""); setLocalPassword(""); setLocalNombre("");
-      setLocalApellido(""); setLocalEmail(""); setLocalRolId("");
-      await cargarUsuarios();
-      mostrarToast(`Cuenta local ${username} creada. Deberá cambiar la contraseña al entrar.`, "exito");
-    } catch (err) {
-      setErrorLocal(mensajeDeError(err, "No se pudo crear la cuenta local."));
-    } finally {
-      setCreandoLocal(false);
-    }
-  }
-
-  async function alToggleEstado(u: UsuarioSistema) {
+  async function alCambiarEstado(u: UsuarioSistema) {
     setOcupado(u.id);
     const nuevoEstado = u.status === "active" ? "inactive" : "active";
     try {
@@ -210,13 +122,6 @@ export default function PaginaUsuarios() {
     mostrarToast(ok ? "Contraseña copiada." : "No se pudo copiar: cópiala a mano.", ok ? "exito" : "aviso");
   }
 
-  const usuariosRegistrados = new Set(usuarios.map(u => u.username));
-  const textoFiltro = filtro.trim().toLowerCase();
-  const visibles = textoFiltro
-    ? usuarios.filter(u => [u.full_name, u.username, u.email, u.agencia?.nombre, u.rol_personalizado?.nombre]
-      .some(dato => dato?.toLowerCase().includes(textoFiltro)))
-    : usuarios;
-
   return (
     <MarcoPagina volverA="/dashboard" ancho="amplio">
       <div className={styles.container}>
@@ -240,265 +145,13 @@ export default function PaginaUsuarios() {
           </section>
         )}
 
-        {/* Búsqueda en Active Directory */}
-        <section className={styles.panel}>
-          <div className={styles.panelHeader}>
-            <IconoBuscar />
-            Agregar un funcionario del Active Directory
-          </div>
-          <div className={styles.panelBody}>
-            <form onSubmit={alBuscar} className={styles.searchRow}>
-              <input
-                className={styles.searchInput}
-                type="text"
-                placeholder="Busca por nombre, usuario o correo del dominio…"
-                aria-label="Buscar en Active Directory"
-                maxLength={100}
-                value={busqueda}
-                onChange={e => setBusqueda(e.target.value)}
-                autoFocus
-              />
-              <button
-                type="submit"
-                className={styles.searchBtn}
-                disabled={buscando}
-              >
-                {buscando ? <span className={styles.spinner} /> : <IconoBuscar />}
-                {buscando ? "Buscando…" : "Buscar"}
-              </button>
-            </form>
-
-            {errorBusq && <p className={styles.searchError}>{errorBusq}</p>}
-
-            {resultadosAD.length > 0 && (
-              <div className={styles.adResults}>
-                {resultadosAD.map(u => {
-                  const yaExiste = usuariosRegistrados.has(u.username);
-                  return (
-                    <div key={u.username} className={styles.adCard}>
-                      <div className={styles.adAvatar}><IconoUsuario /></div>
-                      <div className={styles.adInfo}>
-                        <div className={styles.adName}>
-                          {u.name || u.last_name ? `${u.name} ${u.last_name}`.trim() : u.username}
-                        </div>
-                        <div className={styles.adMeta}>
-                          <span><IconoUsuario tamano={11} />{u.username}</span>
-                          {u.email && <span><IconoCorreo />{u.email}</span>}
-                          {u.department && <span><IconoMaletin />{u.department}</span>}
-                        </div>
-                      </div>
-                      <div className={styles.adAction}>
-                        {yaExiste ? (
-                          <span className={styles.badgeExiste}><IconoCheck /> Ya registrado</span>
-                        ) : (
-                          <button
-                            className={styles.btnAgregar}
-                            onClick={() => alCrear(u.username)}
-                            disabled={creando === u.username}
-                          >
-                            {creando === u.username ? <span className={styles.spinner} /> : <IconoMas tamano={15} />}
-                            {creando === u.username ? "Agregando…" : "Agregar"}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Cuenta local (sin AD) */}
-        <section className={styles.panel}>
-          <div className={styles.panelHeader}>
-            <IconoLlave />
-            Crear una cuenta local (agencias navieras y usuarios sin dominio)
-            <button
-              type="button"
-              className={styles.btnPanel}
-              onClick={() => setMostrarLocal(v => !v)}
-              aria-expanded={mostrarLocal}
-            >
-              {!mostrarLocal && <IconoMas tamano={14} />}
-              {mostrarLocal ? "Ocultar" : "Crear cuenta"}
-            </button>
-          </div>
-          {mostrarLocal && (
-            <div className={styles.panelBody}>
-              <p className={styles.ayudaLocal}>
-                Para usuarios sin cuenta en el Active Directory, como los de las agencias navieras. La contraseña
-                inicial debe tener al menos {LARGO_MINIMO_CONTRASENA} caracteres, con mayúscula, minúscula, número y
-                carácter especial, sin el nombre de usuario; el usuario deberá
-                cambiarla al entrar. Después, asígnalo a su agencia en Agencias, puestos y países.
-              </p>
-              {/* Con etiquetas visibles, como el resto de los formularios (antes solo
-                  el texto de ejemplo, que desaparece al escribir). */}
-              <form onSubmit={alCrearLocal} className={styles.formLocal}>
-                <label className={styles.campoLocal}>
-                  <span>Usuario *</span>
-                  <input className={styles.searchInput} autoComplete="off" spellCheck={false}
-                    value={localUsername} onChange={e => setLocalUsername(e.target.value)} maxLength={100} required />
-                </label>
-                <label className={styles.campoLocal}>
-                  <span>Contraseña inicial *</span>
-                  <input className={styles.searchInput} type="password" autoComplete="new-password"
-                    value={localPassword} onChange={e => setLocalPassword(e.target.value)} maxLength={64} required />
-                </label>
-                <label className={styles.campoLocal}>
-                  <span>Rol</span>
-                  <select className={styles.rolSelect} value={localRolId}
-                    onChange={e => setLocalRolId(e.target.value ? Number(e.target.value) : "")}>
-                    <option value="">— Sin rol —</option>
-                    {roles.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
-                  </select>
-                </label>
-                <label className={styles.campoLocal}>
-                  <span>Nombre</span>
-                  <input className={styles.searchInput} value={localNombre} onChange={e => setLocalNombre(e.target.value)} maxLength={150} />
-                </label>
-                <label className={styles.campoLocal}>
-                  <span>Apellido</span>
-                  <input className={styles.searchInput} value={localApellido} onChange={e => setLocalApellido(e.target.value)} maxLength={150} />
-                </label>
-                <label className={styles.campoLocal}>
-                  <span>Correo <em>(recibe los avisos)</em></span>
-                  <input className={styles.searchInput} type="email" value={localEmail} onChange={e => setLocalEmail(e.target.value)} maxLength={255} />
-                </label>
-                <div className={styles.formLocalAcciones}>
-                  <button type="submit" className={styles.btnCrear} disabled={creandoLocal}>
-                    {creandoLocal ? <span className={styles.spinner} /> : <IconoCheck tamano={14} />}
-                    {creandoLocal ? "Creando…" : "Crear cuenta"}
-                  </button>
-                </div>
-              </form>
-              {errorLocal && <p className={styles.searchError}>{errorLocal}</p>}
-            </div>
-          )}
-        </section>
-
-        {/* Usuarios del sistema */}
-        <section className={styles.panel}>
-          <div className={styles.panelHeader}>
-            <IconoUsuario />
-            Usuarios del sistema
-            <span className={styles.count}>{textoFiltro ? `${visibles.length} de ${usuarios.length}` : usuarios.length}</span>
-          </div>
-          <div className={styles.panelBody}>
-            {usuarios.length > 0 && (
-              <input
-                className={`${styles.searchInput} ${styles.filtroTabla}`}
-                type="search"
-                placeholder="Filtrar por nombre, usuario, correo, agencia o rol…"
-                aria-label="Filtrar los usuarios del sistema"
-                maxLength={100}
-                value={filtro}
-                onChange={e => setFiltro(e.target.value)}
-              />
-            )}
-            {cargando ? (
-              <EstadoCarga texto="Cargando usuarios…" />
-            ) : usuarios.length === 0 ? (
-              <p className={styles.empty}>No hay usuarios registrados. Usa la búsqueda de arriba para agregar el primero.</p>
-            ) : visibles.length === 0 ? (
-              <p className={styles.empty}>Ningún usuario coincide con «{filtro.trim()}».</p>
-            ) : (
-              <div className={styles.tableWrap}>
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th>Usuario</th>
-                      <th>Correo</th>
-                      <th>Agencia</th>
-                      <th>Rol</th>
-                      <th>Estado</th>
-                      <th>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibles.map(u => {
-                      const esYo = u.id === usuario?.id;
-                      const trabajando = ocupado === u.id;
-                      return (
-                        // data-etiqueta: el título de cada dato cuando la tabla pasa a fichas en el celular.
-                        <tr key={u.id} className={u.status === "inactive" ? styles.rowInactive : ""}>
-                          <td className={styles.celdaAncha}>
-                            <div className={styles.cellUser}>
-                              <div className={`${styles.cellAvatar} ${["Administrador", "SysAdmin"].includes(u.rol_personalizado?.nombre ?? "") ? styles.cellAvatarAdmin : ""}`}>
-                                {(u.name?.[0] ?? u.username[0]).toUpperCase()}
-                              </div>
-                              <div>
-                                <div className={styles.cellName}>{u.full_name}</div>
-                                <div className={styles.cellUsername}>
-                                  @{u.username}
-                                  {/* La propia cuenta: por eso Desactivar, Eliminar y el rol quedan inactivos. */}
-                                  {esYo && <span className={styles.badgeTipo}>Tú</span>}
-                                  {u.user_type === "local" && <span className={styles.badgeTipo}>Local</span>}
-                                  {u.debe_cambiar_password && <span className={styles.badgeTipo}>Cambio de clave pendiente</span>}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className={styles.cellEmail} data-etiqueta="Correo">{u.email ?? "—"}</td>
-                          <td className={styles.cellEmail} data-etiqueta="Agencia">{u.agencia?.nombre ?? "—"}</td>
-                          <td data-etiqueta="Rol">
-                            <select
-                              className={styles.rolSelect}
-                              value={u.rol_id ?? ""}
-                              onChange={e => alAsignarRol(u.id, e.target.value ? Number(e.target.value) : null)}
-                              disabled={trabajando || esYo}
-                              title={esYo ? "Tu propio rol lo cambia otra persona" : undefined}
-                              aria-label={`Rol de ${u.full_name}`}
-                            >
-                              <option value="">— Sin rol —</option>
-                              {roles.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
-                            </select>
-                          </td>
-                          <td data-etiqueta="Estado">
-                            <span className={`${styles.badge} ${u.status === "active" ? styles.badgeActive : styles.badgeInactive}`}>
-                              {u.status === "active" ? "Activo" : "Inactivo"}
-                            </span>
-                          </td>
-                          <td className={styles.celdaAncha}>
-                            <div className={styles.actions}>
-                              <button
-                                className={`${styles.actionBtn} ${u.status === "active" ? styles.btnDesactivar : styles.btnActivar}`}
-                                onClick={() => alToggleEstado(u)}
-                                disabled={trabajando || esYo}
-                                title={u.status === "active" ? "Desactivar" : "Activar"}
-                              >
-                                {trabajando ? <span className={styles.spinnerSm} /> : <IconoPoder />}
-                                {u.status === "active" ? "Desactivar" : "Activar"}
-                              </button>
-                              {u.user_type === "local" && (
-                                <button
-                                  className={`${styles.actionBtn} ${styles.btnRestablecer}`}
-                                  onClick={() => alRestablecer(u)}
-                                  disabled={trabajando}
-                                  title="Generar una contraseña temporal"
-                                >
-                                  <IconoLlave tamano={14} /> Restablecer
-                                </button>
-                              )}
-                              <button
-                                className={`${styles.actionBtn} ${styles.btnEliminar}`}
-                                onClick={() => alEliminar(u)}
-                                disabled={trabajando || esYo}
-                                title="Eliminar usuario"
-                              >
-                                <IconoBasura tamano={14} /> Eliminar
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </section>
+        <BusquedaAD registrados={new Set(usuarios.map(u => u.username))} alAgregar={cargarUsuarios} />
+        <FormularioCuentaLocal roles={roles} alCrear={cargarUsuarios} />
+        <TablaUsuarios
+          usuarios={usuarios} roles={roles} cargando={cargando} idPropio={usuario?.id} ocupado={ocupado}
+          alCambiarEstado={alCambiarEstado} alAsignarRol={alAsignarRol} alRestablecer={alRestablecer}
+          alEliminar={alEliminar}
+        />
 
       </div>
     </MarcoPagina>

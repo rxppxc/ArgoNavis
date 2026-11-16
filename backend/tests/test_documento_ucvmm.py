@@ -29,7 +29,8 @@ Seis reglas van más allá de la lectura literal, por decisión del usuario:
   - En Embarque y Desembarque, a los técnicos (técnico, supernumerario y
     superintendente) se les pedían la Carta de Responsabilidad, las Generales y
     el Contrato de Trabajo (pedido del 2026-11-11). Desde el 2026-11-13 esos dos
-    trámites admiten solo Marino, Pasajero y Militar: las filas quedan sin uso.
+    trámites admiten solo Marino, Pasajero y Militar; sus filas se borraron el
+    2026-11-14.
     El Pasajero presenta lo del Marino sin la Libreta, en todos los trámites salvo
     el de Técnico, y el cambio de puerto va solo en Embarque y Desembarque.
   - El Formulario No. 3 se adjunta en todos los trámites, uno por solicitud, con
@@ -70,16 +71,12 @@ REPORTE = ("DOC-REPORTE-MEDICO", "marino", "siempre", MARINO)         # "para ca
 CITA = ("DOC-CITA-CONSULADO", "marino", "siempre", MARINO)
 BOLETO = ("DOC-BOLETO-AEREO", "marino", "siempre", NO_MARINOS)        # reunión del 2026-10-30
 FORM3 = ("DOC-FORMULARIO-3", "solicitud", "siempre", None)           # en todos (2026-11-13)
-# Pedido del usuario del 2026-11-11: en Embarque y Desembarque, los técnicos
-# (técnico, supernumerario, superintendente) presentan además la Carta y el
-# Contrato de Trabajo; en Embarque el boleto queda solo para el militar, y en
-# Desembarque es opcional para ellos (OPCIONAL, abajo).
+# En Embarque el boleto es solo del militar (2026-11-11). Los técnicos van por su trámite
+# desde el 2026-11-13; sus filas de Embarque y Desembarque se borraron el 2026-11-14.
 TECNICOS = ("superintendente", "supernumerario", "tecnico")
 BOLETO_MILITAR = ("DOC-BOLETO-AEREO", "marino", "solo_extranjeros", ("militar",))   # no a panameños (2026-11-14)
-CARTA_TECNICOS = ("DOC-FORM7-RESPONSABILIDAD", "marino", "siempre", TECNICOS)
-CONTRATO = ("DOC-CONTRATO-TRABAJO", "marino", "siempre", TECNICOS)
-# (trámite, documento) → rangos para los que es opcional.
-OPCIONAL = {("F3-DESEMBARQUE", "DOC-BOLETO-AEREO"): TECNICOS}
+# (trámite, documento) → rangos para los que es opcional: hoy ninguno.
+OPCIONAL: dict[tuple[str, str], tuple[str, ...]] = {}
 
 # campos: los propios del trámite (además de la cabecera común del Formulario 3)
 # vigencia: si el pasaporte y el seamanbook vencidos impiden enviar (Nota de la pág. 9)
@@ -88,16 +85,14 @@ DOCUMENTO = {
     "F3-EMBARQUE": {
         "campos": [], "vigencia": True, "aviso_custodia": False, "cambio_puerto": True,
         "rangos": {"marino", "pasajero", "militar"},   # 2026-11-13: los técnicos van por su trámite
-        "documentos": {FORM3, VISA_EXTRANJEROS, GENERALES, LIBRETA, BOLETO_MILITAR, CARTA_TECNICOS, CONTRATO,
-                       VISA_RESTRINGIDOS},
+        "documentos": {FORM3, VISA_EXTRANJEROS, GENERALES, LIBRETA, BOLETO_MILITAR, VISA_RESTRINGIDOS},
     },
     "F3-DESEMBARQUE": {
         "campos": [], "vigencia": True, "aviso_custodia": True, "cambio_puerto": True,
         "rangos": {"marino", "pasajero", "militar"},
-        # El boleto aéreo lo pide el Form. 3 a todos (también al Marino), menos a los panameños
-        # (2026-11-14); a los técnicos, opcional.
+        # El boleto aéreo lo pide el Form. 3 a todos (también al Marino), menos a los panameños (2026-11-14).
         "documentos": {FORM3, ("DOC-BOLETO-AEREO", "marino", "solo_extranjeros", None), GENERALES, LIBRETA, LISTA,
-                       CUSTODIA, CARTA_TECNICOS, CONTRATO, VISA_RESTRINGIDOS},
+                       CUSTODIA, VISA_RESTRINGIDOS},
     },
     "F3-URGENCIA-MEDICA": {
         "campos": ["puerto_desembarque", "clinica_hospital"], "vigencia": True, "aviso_custodia": True,
@@ -140,8 +135,6 @@ def _aplica(documento: tuple, t: dict) -> bool:
         return False
     if codigo in LIBRETA_DOCS and t["rango"] != "marino":
         return False
-    if condicion == "solo_panamenos":
-        return t["nacionalidad"] == "PAN"
     if condicion == "solo_extranjeros":
         return t["nacionalidad"] != "PAN"
     if condicion == "nacionalidad_restringida":

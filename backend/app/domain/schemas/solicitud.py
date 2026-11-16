@@ -13,6 +13,9 @@ Estado      = Literal["review", "returned", "approved", "denied", "finalized", "
 # solicitud_service.py); estos 2000 alcanzan aun con los 300 del esquema × 4
 # documentos + 1 de la solicitud + 20 adicionales.
 MAX_ARCHIVOS_POR_ENVIO = 2000
+# Tope de la página pedida en las bandejas, la consulta histórica y la bitácora: un número
+# enorme hacía fallar el OFFSET de PostgreSQL con un 500 (auditoría del 2026-11-14).
+MAX_PAGINA = 100_000
 
 
 def _texto_o_nada(valor: str | None) -> str | None:
@@ -174,7 +177,7 @@ class ConsultaBandeja(BaseModel):
     texto:      str | None = Field(default=None, max_length=100)
     desde:      date | None = None   # fecha de envío, en hora de Panamá
     hasta:      date | None = None
-    pagina:     int = Field(default=1, ge=1)
+    pagina:     int = Field(default=1, ge=1, le=MAX_PAGINA)
     por_pagina: int = Field(default=20, ge=5, le=100)
 
     @field_validator("texto")
@@ -186,7 +189,8 @@ class ConsultaBandeja(BaseModel):
 class ConsultaHistorica(BaseModel):
     """Filtros de la consulta histórica (2026-11-11): las solicitudes que ve el
     personal del SNM, de cualquier año, con filtros que las bandejas no tienen.
-    Van en la query string; la exportación a Excel usa los mismos."""
+    Van en el cuerpo del pedido (POST, 2026-11-14), para que el pasajero buscado no
+    quede en los logs; la exportación a Excel usa los mismos."""
     texto:            str | None = Field(default=None, max_length=100)   # número, buque, IMO, agencia, puesto
     pasajero:         str | None = Field(default=None, max_length=100)   # nombre, apellido o pasaporte
     agencia_id:       int | None = Field(default=None, ge=1)
@@ -197,7 +201,7 @@ class ConsultaHistorica(BaseModel):
     fecha:            Literal["envio", "operacion"] = "envio"   # a qué fecha van desde y hasta
     desde:            date | None = None
     hasta:            date | None = None
-    pagina:           int = Field(default=1, ge=1)
+    pagina:           int = Field(default=1, ge=1, le=MAX_PAGINA)
     por_pagina:       int = Field(default=20, ge=5, le=100)
 
     @field_validator("texto", "pasajero")

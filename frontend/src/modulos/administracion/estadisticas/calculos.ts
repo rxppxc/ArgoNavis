@@ -5,6 +5,7 @@
  */
 import type { EstadoSolicitud } from "../../../api/solicitudes";
 import type { RangoFechas } from "../../../components/FiltroFechas";
+import { dosCifras, fechaISOLocal } from "../../../utils/fechas";
 
 const ESPACIO = " ";   // entre la cifra y el %, para que no se separen al cortar la línea
 
@@ -92,13 +93,9 @@ export function horarioDeCasilla(dia: number, hora: number): "laboral" | "fuera"
   return dia <= 5 && hora === HORA_FIN_LABORAL ? "borde" : "fuera";
 }
 
-export function dosDigitos(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
 /** "de 10:00 a 10:59". */
 export function textoHora(hora: number): string {
-  return `de ${dosDigitos(hora)}:00 a ${dosDigitos(hora)}:59`;
+  return `de ${dosCifras(hora)}:00 a ${dosCifras(hora)}:59`;
 }
 
 // ─── Meses ─────────────────────────────────────────────────────────────────
@@ -162,19 +159,14 @@ export const PRESETS: { id: Preset; etiqueta: string }[] = [
   { id: "anio",      etiqueta: "Este año" },
 ];
 
-/** Fecha local (no UTC) en formato YYYY-MM-DD. */
-export function fechaISO(d: Date): string {
-  return `${d.getFullYear()}-${dosDigitos(d.getMonth() + 1)}-${dosDigitos(d.getDate())}`;
-}
-
 export function rangoDePreset(preset: Preset, hoy: Date): RangoFechas {
   const anio = hoy.getFullYear(), mes = hoy.getMonth();
   switch (preset) {
     case "todo":      return { desde: null, hasta: null };
-    case "30d":       return { desde: fechaISO(new Date(anio, mes, hoy.getDate() - 29)), hasta: fechaISO(hoy) };
-    case "mes":       return { desde: fechaISO(new Date(anio, mes, 1)), hasta: fechaISO(hoy) };
-    case "mesPasado": return { desde: fechaISO(new Date(anio, mes - 1, 1)), hasta: fechaISO(new Date(anio, mes, 0)) };
-    case "anio":      return { desde: fechaISO(new Date(anio, 0, 1)), hasta: fechaISO(hoy) };
+    case "30d":       return { desde: fechaISOLocal(new Date(anio, mes, hoy.getDate() - 29)), hasta: fechaISOLocal(hoy) };
+    case "mes":       return { desde: fechaISOLocal(new Date(anio, mes, 1)), hasta: fechaISOLocal(hoy) };
+    case "mesPasado": return { desde: fechaISOLocal(new Date(anio, mes - 1, 1)), hasta: fechaISOLocal(new Date(anio, mes, 0)) };
+    case "anio":      return { desde: fechaISOLocal(new Date(anio, 0, 1)), hasta: fechaISOLocal(hoy) };
   }
 }
 

@@ -58,6 +58,19 @@ Los diagramas son archivos editables. Cada uno trae su imagen en PNG y SVG.
 
 ## Mantenimiento
 
-- Los Word son la versión editable. Cuando cambie el código, hay que actualizar el documento afectado y su versión en la portada.
+- **Los Word son la fuente** (decisión del 2026-11-14). Los guiones que generaron las primeras versiones no están en el repositorio, así que los cambios se hacen en el Word. Cuando cambie el código, hay que actualizar el documento afectado y su versión en la portada.
+- **Rutas que cambiaron el 2026-11-14** (auditoría del proyecto; los Word de la 0.6 citan las anteriores):
+
+  | Antes | Ahora |
+  |---|---|
+  | B: `core/pdf_autorizacion.py` | B: `informes/autorizacion_pdf.py` |
+  | B: `core/informe_estadisticas.py`, `informe_excel.py`, `informe_pdf.py`, `informe_csv.py` | B: `informes/estadisticas.py`, `estadisticas_excel.py`, `estadisticas_pdf.py`, `estadisticas_csv.py` |
+  | B: `core/informe_historico.py` | B: `informes/historico_excel.py` |
+  | B: `obtener_id_usuario_actual` y `requerir_*` (`core/security.py`, `core/permisos.py`) | B: `api/v1/dependencias.py` |
+  | B: manejadores de errores y middlewares (`main.py`) | B: `api/manejadores.py`, `api/middleware.py` |
+  | B: reglas de usuarios, roles y catálogos (`api/v1/admin.py`, `catalogos.py`) | B: `domain/services/usuario_service.py`, `rol_service.py`, `catalogo_service.py` |
+  | F: `modulos/solicitudes/<archivo>` | F: `modulos/solicitudes/formulario/`, `expediente/`, `bandejas/`, `historico/` o `verificacion/` |
+  | API: `GET /solicitudes/historico` y `/historico/exportar` | API: `POST`, con los filtros en el cuerpo |
+  | Contenedores `snm_postgres`, `snm_backend`, `snm_frontend` | `argonavis_postgres`, `argonavis_backend`, `argonavis_frontend` |
 - Si cambia el catálogo de trámites, también cambian el documento 04 (sección 3) y la prueba `backend/tests/test_documento_ucvmm.py`.
 - Cuando UCVMM valide un punto, anota la respuesta en la lista del documento 08 (sección 4) y en la regla correspondiente del 04.

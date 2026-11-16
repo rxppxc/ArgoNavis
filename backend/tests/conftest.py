@@ -17,60 +17,35 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-import psycopg
 import pytest
-from dotenv import dotenv_values
 
-BACKEND = Path(__file__).resolve().parent.parent
+from entorno_pruebas import BACKEND, alembic, servidor_bd, sql_admin, url_admin, variables
 
 # ── Entorno (antes de importar la app: la configuración se lee una sola vez) ──
 
-_url = os.environ.get("TEST_DATABASE_URL") or dotenv_values(BACKEND / ".env").get("DATABASE_URL")
-if not _url:
-    raise RuntimeError("Define TEST_DATABASE_URL o DATABASE_URL en backend/.env para correr las pruebas.")
-_base, _, _ = _url.rpartition("/")
+_base = servidor_bd()
 NOMBRE_BD = f"argonavis_pruebas_{secrets.token_hex(4)}"
-URL_ADMIN = f"{_base}/postgres".replace("postgresql+asyncpg://", "postgresql://")
+URL_ADMIN = url_admin(_base)
 STORAGE   = Path(tempfile.mkdtemp(prefix="argonavis_documentos_pruebas_"))
 
-os.environ.update({
-    "DATABASE_URL": f"{_base}/{NOMBRE_BD}",
-    # Vacía: si el .env de desarrollo la trae, las migraciones de las pruebas irían a otra BD.
-    "MIGRACIONES_DATABASE_URL": "",
-    "STORAGE_PATH": str(STORAGE),
-    "APP_ENV": "test",
-    "SECRET_KEY": secrets.token_urlsafe(32),
-    "LDAP_HOST": "ldap.invalido", "LDAP_BASE_DN": "DC=prueba", "LDAP_BIND_USER": "x", "LDAP_BIND_PASSWORD": "x",
-    "MAIL_HOST": "",
-    "CORREO_UCVMM": "",
-    "LOG_CARPETA": "",   # los logs de las pruebas no van a la carpeta del .env
-    "PERMITIR_LOGIN_LOCAL": "true",
-    "LIMITE_VERIFICACIONES_POR_MINUTO": "0",
-})
+os.environ.update(variables(f"{_base}/{NOMBRE_BD}", STORAGE))
 sys.path.insert(0, str(BACKEND))
 
 
 def ejecutar_alembic(*argumentos: str, url: str | None = None) -> subprocess.CompletedProcess:
-    """Corre alembic en un proceso aparte (como en el despliegue)."""
+    """Corre alembic en un proceso aparte (como en el despliegue), sobre `url` si se da."""
     entorno = os.environ.copy()
     if url:
         entorno["DATABASE_URL"] = url
-    # -I: sin la carpeta actual en sys.path, para que backend/alembic (las
-    # migraciones) no tape al paquete; y sin alembic.exe, que guarda la ruta del venv.
-    return subprocess.run(
-        [sys.executable, "-I", "-m", "alembic", *argumentos], cwd=BACKEND, capture_output=True, text=True,
-        env=entorno,
-    )
+    return alembic(*argumentos, entorno=entorno)
 
 
 def crear_bd(nombre: str) -> None:
-    with psycopg.connect(URL_ADMIN, autocommit=True) as cx:
-        cx.execute(f'CREATE DATABASE "{nombre}"')
+    sql_admin(URL_ADMIN, f'CREATE DATABASE "{nombre}"')
 
 
 def borrar_bd(nombre: str) -> None:
-    with psycopg.connect(URL_ADMIN, autocommit=True) as cx:
-        cx.execute(f'DROP DATABASE IF EXISTS "{nombre}" WITH (FORCE)')
+    sql_admin(URL_ADMIN, f'DROP DATABASE IF EXISTS "{nombre}" WITH (FORCE)')
 
 
 def url_bd(nombre: str) -> str:

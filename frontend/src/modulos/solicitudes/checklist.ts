@@ -71,7 +71,6 @@ export function construirCasillas(tipo: TipoTramite, tripulantes: TripulanteChec
     }
 
     for (const t of tripulantes) {
-      if (d.condicion === "solo_panamenos" && !t.es_panameno) continue;
       // A los panameños no se les pide visa ni boleto aéreo en Embarque y Desembarque (2026-11-14).
       if (d.condicion === "solo_extranjeros" && t.es_panameno) continue;
       if (d.condicion === "nacionalidad_restringida" && !t.restringida) continue;

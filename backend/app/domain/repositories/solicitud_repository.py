@@ -8,7 +8,7 @@ from sqlalchemy import Interval, Select, Time, and_, case, cast, extract, func, 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.horario import FIN_LABORAL, INICIO_LABORAL, entre_fechas_panama
+from app.core.horario import FIN_LABORAL, INICIO_LABORAL, ZONA_PANAMA, entre_fechas_panama
 from app.domain.models.catalogo import AgenciaNaviera, PuestoControl
 from app.domain.models.solicitud import (
     MESES_VIGENCIA_PASAPORTE, RANGOS_CON_LIBRETA, CasillaSolicitud, DocumentoSolicitud, EstadoSolicitud,
@@ -16,7 +16,7 @@ from app.domain.models.solicitud import (
 )
 from app.domain.models.tramite import TipoTramite
 
-_ZONA = "America/Panama"
+_ZONA = ZONA_PANAMA.key   # el nombre, para timezone() de PostgreSQL
 
 
 @dataclass(frozen=True)

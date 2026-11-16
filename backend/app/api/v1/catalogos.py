@@ -9,24 +9,23 @@
       · puestos de control, su sector y los funcionarios asignados a cada uno;
       · agencias navieras y sus usuarios (comparten las solicitudes de la agencia);
       · marca de nacionalidades restringidas.
-"""
-from collections.abc import Awaitable, Callable
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+Las reglas viven en domain/services/catalogo_service.py (desde el 2026-11-14):
+aquí se orquesta, se arma la salida y se deja la bitácora.
+"""
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.dependencias import auditar_admin
-from app.core.permisos import requerir_admin
-from app.core.security import obtener_id_usuario_actual
+from app.api.v1.dependencias import auditar_admin, obtener_id_usuario_actual, requerir_admin
 from app.domain.models.audit_log import AccionAuditoria
 from app.domain.models.catalogo import AgenciaNaviera, PuestoControl, Sector
 from app.domain.repositories.catalogo_repository import RepositorioCatalogo
-from app.domain.repositories.user_repository import RepositorioUsuario
 from app.domain.schemas.catalogo import (
     DatosActualizarAgencia, DatosActualizarPais, DatosActualizarPuesto, DatosActualizarSector, DatosAsignarUsuarios,
     DatosCrearAgencia, DatosCrearPuesto, SalidaAgencia, SalidaCatalogoConUsuarios, SalidaCatalogoMini,
     SalidaPais, SalidaPuesto, SalidaPuestoFormulario, SalidaSector, UsuarioAsignado,
 )
+from app.domain.services.catalogo_service import ServicioCatalogos
 from app.infrastructure.database import obtener_sesion_bd
 
 enrutador = APIRouter(tags=["catalogos"])
@@ -51,41 +50,6 @@ def _salida_sector(sector: Sector) -> SalidaSector:
         id=sector.id, nombre=sector.nombre, correo=sector.correo, usuarios=_usuarios(sector),
         puestos=[SalidaCatalogoMini(id=pu.id, nombre=pu.nombre) for pu in sector.puestos],
     )
-
-
-async def _sector_existente(repo: RepositorioCatalogo, sector_id: int) -> Sector:
-    sector = await repo.buscar_sector(sector_id)
-    if not sector:
-        raise HTTPException(status_code=400, detail="El sector elegido no existe.")
-    return sector
-
-
-async def _aplicar_cambios(
-    entidad: Entidad,
-    datos: DatosActualizarPuesto | DatosActualizarAgencia,
-    buscar_por_nombre: Callable[[str], Awaitable[Entidad | None]],
-    duplicado: str,
-) -> dict:
-    """Aplica nombre/correo/activo y devuelve lo que cambió (para la bitácora)."""
-    cambios: dict = {}
-    if datos.nombre is not None and datos.nombre != entidad.nombre:
-        otro = await buscar_por_nombre(datos.nombre)
-        if otro and otro.id != entidad.id:
-            raise HTTPException(status_code=409, detail=duplicado)
-        cambios["nombre"] = entidad.nombre = datos.nombre
-    if "correo" in datos.model_fields_set and datos.correo != entidad.correo:
-        cambios["correo"] = entidad.correo = datos.correo
-    if datos.activo is not None and datos.activo != entidad.activo:
-        cambios["activo"] = entidad.activo = datos.activo
-    return cambios
-
-
-async def _validar_usuarios(sesion: AsyncSession, usuario_ids: list[int]) -> list[int]:
-    ids = sorted(set(usuario_ids))
-    faltan = set(ids) - await RepositorioUsuario(sesion).ids_existentes(ids)
-    if faltan:
-        raise HTTPException(status_code=400, detail=f"Usuarios no encontrados: {sorted(faltan)}.")
-    return ids
 
 
 # ── Lectura para el formulario ───────────────────────────────────────────────
@@ -125,18 +89,12 @@ async def crear_puesto(
     admin_id: int = Depends(requerir_admin),
     sesion:   AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
-    repo = RepositorioCatalogo(sesion)
-    if await repo.buscar_puesto_por_nombre(datos.nombre):
-        raise HTTPException(status_code=409, detail="Ya existe un puesto de control con ese nombre.")
-    sector = await _sector_existente(repo, datos.sector_id)
-    # Con el objeto (no el id): así `puesto.sector` queda cargado para la respuesta.
-    puesto = PuestoControl(nombre=datos.nombre, correo=datos.correo, activo=True, sector=sector)
-    repo.agregar(puesto)
-    await sesion.flush()
+    svc = ServicioCatalogos(sesion)
+    puesto = await svc.crear_puesto(datos)
     await auditar_admin(sesion, request, admin_id, AccionAuditoria.PUESTO_CREADO,
                         {"puesto_id": puesto.id, "nombre": puesto.nombre, "correo": puesto.correo,
-                         "sector": sector.nombre})
-    puesto = await repo.buscar_puesto(puesto.id, con_usuarios=True)
+                         "sector": puesto.sector.nombre})
+    puesto = await svc.puesto(puesto.id, con_usuarios=True)
     return _salida(SalidaPuesto, puesto, {})
 
 
@@ -148,23 +106,12 @@ async def actualizar_puesto(
     admin_id:  int = Depends(requerir_admin),
     sesion:    AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
-    repo = RepositorioCatalogo(sesion)
-    puesto = await repo.buscar_puesto(puesto_id, con_usuarios=True)
-    if not puesto:
-        raise HTTPException(status_code=404, detail="Puesto de control no encontrado.")
-    cambios = await _aplicar_cambios(
-        puesto, datos, repo.buscar_puesto_por_nombre, "Ya existe otro puesto de control con ese nombre.",
-    )
-    if datos.sector_id is not None and datos.sector_id != puesto.sector_id:
-        # Sus solicitudes, también las abiertas, pasan a los revisores del otro sector.
-        sector = await _sector_existente(repo, datos.sector_id)
-        puesto.sector = sector
-        cambios["sector"] = sector.nombre
-    await sesion.flush()
+    svc = ServicioCatalogos(sesion)
+    puesto, cambios = await svc.actualizar_puesto(puesto_id, datos)
     if cambios:
         await auditar_admin(sesion, request, admin_id, AccionAuditoria.PUESTO_ACTUALIZADO,
                             {"puesto_id": puesto.id, **cambios})
-    return _salida(SalidaPuesto, puesto, await repo.contar_solicitudes_por_puesto())
+    return _salida(SalidaPuesto, puesto, await svc.repo.contar_solicitudes_por_puesto())
 
 
 @enrutador.delete("/admin/puestos/{puesto_id}", status_code=204)
@@ -174,17 +121,7 @@ async def eliminar_puesto(
     admin_id:  int = Depends(requerir_admin),
     sesion:    AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
-    repo = RepositorioCatalogo(sesion)
-    puesto = await repo.buscar_puesto(puesto_id)
-    if not puesto:
-        raise HTTPException(status_code=404, detail="Puesto de control no encontrado.")
-    if await repo.puesto_en_uso(puesto_id):
-        raise HTTPException(
-            status_code=409,
-            detail="El puesto tiene solicitudes registradas (autorizadas o finalizadas en él): "
-                   "desactívalo en lugar de eliminarlo.",
-        )
-    await repo.eliminar(puesto)
+    puesto = await ServicioCatalogos(sesion).eliminar_puesto(puesto_id)
     await auditar_admin(sesion, request, admin_id, AccionAuditoria.PUESTO_ELIMINADO,
                         {"puesto_id": puesto_id, "nombre": puesto.nombre})
 
@@ -198,18 +135,13 @@ async def asignar_usuarios_puesto(
     sesion:    AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     """Reemplaza la lista de funcionarios asignados al puesto."""
-    repo = RepositorioCatalogo(sesion)
-    puesto = await repo.buscar_puesto(puesto_id)
-    if not puesto:
-        raise HTTPException(status_code=404, detail="Puesto de control no encontrado.")
-    ids = await _validar_usuarios(sesion, datos.usuario_ids)
-    await repo.reemplazar_usuarios_de_puesto(puesto_id, ids)
+    svc = ServicioCatalogos(sesion)
+    puesto, ids = await svc.asignar_usuarios_puesto(puesto_id, datos.usuario_ids)
     await auditar_admin(sesion, request, admin_id, AccionAuditoria.PUESTO_ACTUALIZADO,
                         {"puesto_id": puesto_id, "usuarios_asignados": ids})
-
     sesion.expire(puesto, ["usuarios"])
-    puesto = await repo.buscar_puesto(puesto_id, con_usuarios=True)
-    return _salida(SalidaPuesto, puesto, await repo.contar_solicitudes_por_puesto())
+    puesto = await svc.puesto(puesto_id, con_usuarios=True)
+    return _salida(SalidaPuesto, puesto, await svc.repo.contar_solicitudes_por_puesto())
 
 
 # ── Administración de sectores de UCVMM ──────────────────────────────────────
@@ -233,13 +165,8 @@ async def actualizar_sector(
 ):
     """El buzón que recibe el aviso de cada solicitud nueva del sector (sin buzón,
     va al general de UCVMM)."""
-    repo = RepositorioCatalogo(sesion)
-    sector = await repo.buscar_sector(sector_id, con_usuarios=True)
-    if not sector:
-        raise HTTPException(status_code=404, detail="Sector no encontrado.")
-    if datos.correo != sector.correo:
-        sector.correo = datos.correo
-        await sesion.flush()
+    sector, cambio = await ServicioCatalogos(sesion).cambiar_correo_sector(sector_id, datos.correo)
+    if cambio:
         await auditar_admin(sesion, request, admin_id, AccionAuditoria.SECTOR_ACTUALIZADO,
                             {"sector_id": sector.id, "sector": sector.nombre, "correo": sector.correo})
     return _salida_sector(sector)
@@ -255,17 +182,12 @@ async def asignar_usuarios_sector(
 ):
     """Reemplaza los funcionarios del sector. Un revisor puede estar en los dos
     (vacaciones, refuerzos): ve las solicitudes de los puestos de ambos."""
-    repo = RepositorioCatalogo(sesion)
-    sector = await repo.buscar_sector(sector_id)
-    if not sector:
-        raise HTTPException(status_code=404, detail="Sector no encontrado.")
-    ids = await _validar_usuarios(sesion, datos.usuario_ids)
-    await repo.reemplazar_usuarios_de_sector(sector_id, ids)
+    svc = ServicioCatalogos(sesion)
+    sector, ids = await svc.asignar_usuarios_sector(sector_id, datos.usuario_ids)
     await auditar_admin(sesion, request, admin_id, AccionAuditoria.SECTOR_ACTUALIZADO,
                         {"sector_id": sector_id, "sector": sector.nombre, "usuarios_asignados": ids})
-
     sesion.expire(sector, ["usuarios"])
-    sector = await repo.buscar_sector(sector_id, con_usuarios=True)
+    sector = await svc.sector(sector_id, con_usuarios=True)
     return _salida_sector(sector)
 
 
@@ -288,15 +210,11 @@ async def crear_agencia(
     admin_id: int = Depends(requerir_admin),
     sesion:   AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
-    repo = RepositorioCatalogo(sesion)
-    if await repo.buscar_agencia_por_nombre(datos.nombre):
-        raise HTTPException(status_code=409, detail="Ya existe una agencia naviera con ese nombre.")
-    agencia = AgenciaNaviera(nombre=datos.nombre, correo=datos.correo, activo=True)
-    repo.agregar(agencia)
-    await sesion.flush()
+    svc = ServicioCatalogos(sesion)
+    agencia = await svc.crear_agencia(datos)
     await auditar_admin(sesion, request, admin_id, AccionAuditoria.AGENCIA_CREADA,
                         {"agencia_id": agencia.id, "nombre": agencia.nombre, "correo": agencia.correo})
-    agencia = await repo.buscar_agencia(agencia.id, con_usuarios=True)
+    agencia = await svc.agencia(agencia.id, con_usuarios=True)
     return _salida(SalidaAgencia, agencia, {})
 
 
@@ -310,18 +228,12 @@ async def actualizar_agencia(
 ):
     """Nombre, buzón y estado. Las solicitudes ya enviadas conservan el nombre
     que tenía la agencia al enviarlas. Una agencia inactiva no envía nuevas."""
-    repo = RepositorioCatalogo(sesion)
-    agencia = await repo.buscar_agencia(agencia_id, con_usuarios=True)
-    if not agencia:
-        raise HTTPException(status_code=404, detail="Agencia naviera no encontrada.")
-    cambios = await _aplicar_cambios(
-        agencia, datos, repo.buscar_agencia_por_nombre, "Ya existe otra agencia naviera con ese nombre.",
-    )
-    await sesion.flush()
+    svc = ServicioCatalogos(sesion)
+    agencia, cambios = await svc.actualizar_agencia(agencia_id, datos)
     if cambios:
         await auditar_admin(sesion, request, admin_id, AccionAuditoria.AGENCIA_ACTUALIZADA,
                             {"agencia_id": agencia.id, **cambios})
-    return _salida(SalidaAgencia, agencia, await repo.contar_solicitudes_por_agencia())
+    return _salida(SalidaAgencia, agencia, await svc.repo.contar_solicitudes_por_agencia())
 
 
 @enrutador.delete("/admin/agencias/{agencia_id}", status_code=204)
@@ -332,16 +244,7 @@ async def eliminar_agencia(
     sesion:     AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     """Solo una agencia sin solicitudes; sus usuarios quedan sin agencia."""
-    repo = RepositorioCatalogo(sesion)
-    agencia = await repo.buscar_agencia(agencia_id)
-    if not agencia:
-        raise HTTPException(status_code=404, detail="Agencia naviera no encontrada.")
-    if (await repo.contar_solicitudes_por_agencia()).get(agencia_id):
-        raise HTTPException(
-            status_code=409,
-            detail="La agencia tiene solicitudes registradas: desactívala en lugar de eliminarla.",
-        )
-    await repo.eliminar(agencia)
+    agencia = await ServicioCatalogos(sesion).eliminar_agencia(agencia_id)
     await auditar_admin(sesion, request, admin_id, AccionAuditoria.AGENCIA_ELIMINADA,
                         {"agencia_id": agencia_id, "nombre": agencia.nombre})
 
@@ -356,19 +259,14 @@ async def asignar_usuarios_agencia(
 ):
     """Reemplaza los usuarios de la agencia. Un usuario es de una sola agencia:
     asignarlo aquí lo saca de la que tuviera."""
-    repo = RepositorioCatalogo(sesion)
-    agencia = await repo.buscar_agencia(agencia_id)
-    if not agencia:
-        raise HTTPException(status_code=404, detail="Agencia naviera no encontrada.")
-    ids = await _validar_usuarios(sesion, datos.usuario_ids)
-    await repo.reemplazar_usuarios_de_agencia(agencia_id, ids)
+    svc = ServicioCatalogos(sesion)
+    ids = await svc.asignar_usuarios_agencia(agencia_id, datos.usuario_ids)
     await auditar_admin(sesion, request, admin_id, AccionAuditoria.AGENCIA_ACTUALIZADA,
                         {"agencia_id": agencia_id, "usuarios_asignados": ids})
-
     # Los UPDATE masivos no tocan los objetos ya cargados: se releen.
     sesion.expire_all()
-    agencia = await repo.buscar_agencia(agencia_id, con_usuarios=True)
-    return _salida(SalidaAgencia, agencia, await repo.contar_solicitudes_por_agencia())
+    agencia = await svc.agencia(agencia_id, con_usuarios=True)
+    return _salida(SalidaAgencia, agencia, await svc.repo.contar_solicitudes_por_agencia())
 
 
 # ── Administración de países (nacionalidades restringidas) ───────────────────
@@ -383,12 +281,8 @@ async def actualizar_pais(
 ):
     """Marca o desmarca una nacionalidad como restringida. Aplica a las
     solicitudes que se envíen desde ahora (las ya enviadas guardan su foto)."""
-    pais = await RepositorioCatalogo(sesion).buscar_pais(codigo)
-    if not pais:
-        raise HTTPException(status_code=404, detail="País no encontrado.")
-    if pais.nacionalidad_restringida != datos.nacionalidad_restringida:
-        pais.nacionalidad_restringida = datos.nacionalidad_restringida
-        await sesion.flush()
+    pais, cambio = await ServicioCatalogos(sesion).marcar_restringida(codigo, datos.nacionalidad_restringida)
+    if cambio:
         await auditar_admin(sesion, request, admin_id, AccionAuditoria.PAIS_ACTUALIZADO,
                             {"codigo": pais.codigo, "nombre": pais.nombre,
                              "nacionalidad_restringida": pais.nacionalidad_restringida})

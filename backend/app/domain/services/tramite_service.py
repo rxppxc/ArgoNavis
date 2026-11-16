@@ -4,8 +4,6 @@ El catálogo (`tramite_documentos`) dice QUÉ documentos exige cada trámite;
 este servicio decide CUÁLES son exigibles en una solicitud concreta, porque
 varias condiciones dependen de los datos de esa solicitud:
 
-  - SOLO_PANAMENOS           → solo a tripulantes panameños (hoy sin uso: la
-                               Libreta de Embarque se pide a todo Marino).
   - SOLO_EXTRANJEROS         → a todos menos a los panameños (2026-11-14): la
                                visa y el boleto aéreo de Embarque y Desembarque,
                                y la Visa Especial de Marino de Cambio de nave.
@@ -127,7 +125,7 @@ def normalizar_imo(valor: str) -> str | None:
     if not coincidencia:
         return None
     digitos = coincidencia.group(1)
-    suma = sum(int(d) * peso for d, peso in zip(digitos[:6], range(7, 1, -1)))
+    suma = sum(int(d) * peso for d, peso in zip(digitos[:6], range(7, 1, -1), strict=True))
     return digitos if suma % 10 == int(digitos[6]) else None
 
 
@@ -164,8 +162,6 @@ class ServicioTramite:
 
             # Alcance "marino": una casilla por cada tripulante al que aplique.
             for indice, tripulante in enumerate(tripulantes):
-                if td.condicion == CondicionDocumento.SOLO_PANAMENOS.value and not tripulante.es_panameno:
-                    continue
                 if td.condicion == CondicionDocumento.SOLO_EXTRANJEROS.value and tripulante.es_panameno:
                     continue
                 if (td.condicion == CondicionDocumento.NACIONALIDAD_RESTRINGIDA.value
