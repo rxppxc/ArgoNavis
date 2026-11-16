@@ -43,6 +43,8 @@ export const ETIQUETA_EVENTO: Record<EventoSolicitud["tipo"], string> = {
   comentario:   "Comentario del puesto de control",
   finalizada:   "Finalizada",
   expirada:     "Expirada",
+  boleta_generada: "Boleta de recargo generada",
+  boleta_anulada:  "Boleta de recargo anulada",
 };
 
 /** Rangos que portan seamanbook (al resto no se le pide libreta). */

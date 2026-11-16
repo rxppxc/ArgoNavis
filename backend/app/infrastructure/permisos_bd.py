@@ -9,6 +9,8 @@ cuenta, que:
   - solo AGREGA a la bitácora (`audit_logs`) y al historial (`solicitud_eventos`):
     no puede editarlos ni borrarlos, que es justo lo que se esperaría que
     intentara alguien que quiere tapar lo que hizo;
+  - no BORRA boletas de recargo (`boletas_recargo`, 2026-11-16): se anulan
+    (UPDATE), como en un talonario, y la anulada queda con su número;
   - no toca `alembic_version`.
 
 Las migraciones corren con la cuenta dueña (MIGRACIONES_DATABASE_URL) y después
@@ -25,6 +27,7 @@ from psycopg import sql
 from sqlalchemy.engine import make_url
 
 TABLAS_SOLO_AGREGAR = ("audit_logs", "solicitud_eventos")
+TABLAS_SIN_BORRAR = ("boletas_recargo",)
 TABLAS_SIN_ACCESO = ("alembic_version",)
 
 
@@ -59,11 +62,12 @@ def aplicar(url_duena: str, url_aplicacion: str) -> str:
             "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO {rol}",
         ]
         sentencias += [f"REVOKE UPDATE, DELETE, TRUNCATE ON {t} FROM {{rol}}" for t in TABLAS_SOLO_AGREGAR]
+        sentencias += [f"REVOKE DELETE, TRUNCATE ON {t} FROM {{rol}}" for t in TABLAS_SIN_BORRAR]
         sentencias += [f"REVOKE ALL ON {t} FROM {{rol}}" for t in TABLAS_SIN_ACCESO]
         for sentencia in sentencias:
             cx.execute(sql.SQL(sentencia).format(rol=rol, base=base))
     verbo = "creada" if accion == "CREATE" else "al día"
-    return f"Cuenta de la aplicación {aplicacion.username}: {verbo}, con lo justo (bitácora e historial solo para agregar)."
+    return f"Cuenta de la aplicación {aplicacion.username}: {verbo}, con lo justo (bitácora e historial solo para agregar, boletas sin borrar)."
 
 
 def main() -> None:

@@ -34,6 +34,10 @@ class AccionAuditoria(str, enum.Enum):
     AUTORIZACION_VERIFICADA  = "AUTORIZACION_VERIFICADA"
     DOCUMENTO_VISTO          = "DOCUMENTO_VISTO"
     DOCUMENTO_DESCARGADO     = "DOCUMENTO_DESCARGADO"
+    # Boleta de recargo por atención fuera del horario (2026-11-16).
+    BOLETA_GENERADA          = "BOLETA_GENERADA"
+    BOLETA_ANULADA           = "BOLETA_ANULADA"
+    BOLETA_DESCARGADA        = "BOLETA_DESCARGADA"
 
     # Cuentas
     CONTRASENA_CAMBIADA     = "CONTRASENA_CAMBIADA"

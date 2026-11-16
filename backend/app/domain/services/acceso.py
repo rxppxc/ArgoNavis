@@ -13,7 +13,9 @@ class ContextoAcceso:
 
     Sectores (2026-11-10): UCVMM y los supervisores de sector ven solo las
     solicitudes de los puestos de sus sectores (`puestos_de_sectores`); el
-    Administrador y el supervisor general, las de todos."""
+    Administrador, las de todos. El supervisor general (2026-11-16), las de los
+    trámites que supervisa (`tipos_tramite.supervision_general`: el de Técnico),
+    de los dos sectores."""
     usuario:     Usuario
     es_admin:    bool
     es_naviera:  bool
@@ -37,12 +39,20 @@ class ContextoAcceso:
 
     @property
     def ve_todos_los_sectores(self) -> bool:
-        return self.es_admin or self.es_supervisor_general
+        """Todas las solicitudes, sin límite de sector ni de trámite: el Administrador.
+        Hasta el 2026-11-16, también el supervisor general (ver `supervisa_tramite`)."""
+        return self.es_admin
+
+    def supervisa_tramite(self, s: Solicitud) -> bool:
+        """El supervisor general ve las de los trámites que supervisa (hoy, el de
+        Técnico, Superintendente o Supernumerario), de los dos sectores (2026-11-16)."""
+        return self.es_supervisor_general and s.tipo_tramite.supervision_general
 
     @property
-    def alcance_ucvmm(self) -> set[int] | None:
-        """Los puestos cuyas solicitudes ve como UCVMM o supervisión (None = todos)."""
-        return None if self.ve_todos_los_sectores else self.puestos_de_sectores
+    def ve_historico(self) -> bool:
+        """La consulta histórica: UCVMM, el supervisor de sector, el puesto de control
+        y el Administrador. El supervisor general, no (2026-11-16)."""
+        return self.es_admin or self.es_revisor or self.es_puerto or self.es_supervisor_sector
 
     def en_sus_sectores(self, s: Solicitud) -> bool:
         return self.ve_todos_los_sectores or s.puesto_control_id in self.puestos_de_sectores

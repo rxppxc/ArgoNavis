@@ -134,8 +134,9 @@ async def test_cada_uno_ve_lo_suyo(cliente, admin, sysadmin, historia):
     assert set(await _ids(cliente, atlantico, texto=texto)) == {ids["julio25"], ids["revision"]}
     sup_pacifico = await crear_actor("Supervisor de sector", prefijo="supervisor", sectores=(PACIFICO,))
     assert set(await _ids(cliente, sup_pacifico, texto=texto)) == {ids["marzo25"], ids["fuera"], ids["cerrado"]}
+    # El supervisor general no tiene consulta histórica desde el 2026-11-16.
     general = await crear_actor("Supervisor general", prefijo="general")
-    assert len(await _ids(cliente, general, texto=texto)) == 5
+    assert (await cliente.post(RUTA, json={"texto": texto}, headers=general.headers)).status_code == 403
     # El puesto de control: las de sus puestos, desde que se aprueban.
     puesto = await crear_actor("Puesto de Control", prefijo="puesto")
     async with SesionLocal() as s:

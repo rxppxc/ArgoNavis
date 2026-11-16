@@ -117,7 +117,7 @@ class ServicioNotificacion:
     async def aprobada(self, s: Solicitud) -> list[Aviso]:
         """A la agencia (con la autorización) y al puesto de control que la finaliza."""
         vigencia = f"Vigente hasta el {_fecha_hora(s.vigente_hasta)}."
-        # Aprobada fuera del horario: el aviso y el costo migratorio (2026-11-11),
+        # Aprobada fuera del horario: el aviso y el recargo (2026-11-11),
         # a la agencia y al puesto que la recibe.
         fuera = s.aprobada_en is not None and fuera_de_horario(s.aprobada_en)
         horario = "\n".join(aviso_fuera_de_horario(s.costo_fuera_de_horario)) if fuera else None
@@ -142,7 +142,7 @@ class ServicioNotificacion:
         ]))
         previa = _vista_previa(
             s.puesto_autorizado_nombre, _operacion(s), f"vigente hasta el {_fecha_hora_corta(s.vigente_hasta)}",
-            (f"costo migratorio de {texto_costo(s.costo_fuera_de_horario)} (fuera del horario)"
+            (f"recargo de {texto_costo(s.costo_fuera_de_horario)} (fuera del horario)"
              if s.costo_fuera_de_horario else "fuera del horario laboral") if fuera else None,
         )
         return self._con_destinatarios([

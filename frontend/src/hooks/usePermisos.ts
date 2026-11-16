@@ -14,11 +14,19 @@ export interface ValorPermisos {
 export const ContextoPermisos = createContext<ValorPermisos | null>(null);
 
 /** El personal del SNM que trabaja solicitudes: UCVMM, los supervisores y el
- *  puesto de control (el Administrador los tiene todos). Abre la consulta
- *  histórica (2026-11-11). Espejo de ContextoAcceso.es_personal_snm. */
+ *  puesto de control (el Administrador los tiene todos). Espejo de
+ *  ContextoAcceso.es_personal_snm. */
 export const PERMISOS_PERSONAL_SNM = [
   "T-PROCESAR-PACIFICO", "T-SUPERVISAR-SECTOR", "T-SUPERVISAR-TODO", "T-FINALIZAR-PUERTO",
 ];
+
+/** La consulta histórica (2026-11-11): el personal del SNM menos el supervisor general,
+ *  que no la tiene desde el 2026-11-16. Espejo de ContextoAcceso.ve_historico. */
+export const PERMISOS_HISTORICO = ["T-PROCESAR-PACIFICO", "T-SUPERVISAR-SECTOR", "T-FINALIZAR-PUERTO"];
+
+/** Las estadísticas de su alcance: UCVMM y el supervisor de sector (el supervisor general
+ *  no, desde el 2026-11-16). Espejo de _PUEDE_VER_ESTADISTICAS (api/v1/solicitudes.py). */
+export const PERMISOS_ESTADISTICAS = ["T-PROCESAR-PACIFICO", "T-SUPERVISAR-SECTOR"];
 
 /** Permisos del usuario actual. Se cargan una sola vez por sesión en
  *  <ProveedorPermisos>. La fuente de verdad de los dos roles fijos es

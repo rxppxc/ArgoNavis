@@ -29,9 +29,11 @@ export const test = base.extend<{ vigilarConsola: void }>({
     };
     vigilar(context);
     const original = browser.newContext.bind(browser);
+    const abiertos: BrowserContext[] = [];
     const conVigilancia: Browser["newContext"] = async (opciones) => {
       const contexto = await original(opciones);
       vigilar(contexto);
+      abiertos.push(contexto);
       return contexto;
     };
     browser.newContext = conVigilancia;
@@ -39,6 +41,11 @@ export const test = base.extend<{ vigilarConsola: void }>({
       await usar();
     } finally {
       browser.newContext = original;
+      // Las sesiones que abrió la prueba (una por rol, `entrar`) se cierran al terminar: el
+      // navegador es el mismo para todo el recorrido y se acumulaban, cada una consultando la
+      // campana. Con veinte abiertas, la última prueba se quedaba sin tiempo (2026-11-16).
+      // Las capturas de una prueba fallida ya se tomaron: Playwright las toma antes de esto.
+      await Promise.allSettled(abiertos.map((contexto) => contexto.close()));
     }
     expect(problemas, "errores en la consola del navegador o del servidor").toEqual([]);
   }, { auto: true }],

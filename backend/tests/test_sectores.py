@@ -2,9 +2,11 @@
 
 Cada puesto es del Sector Pacífico o del Atlántico. UCVMM y el supervisor de
 sector ven (y UCVMM revisa) solo las solicitudes de los puestos de sus
-sectores; el supervisor general y el Administrador, las de los dos. Los
-supervisores no deciden nada. El aviso de cada solicitud nueva va al buzón de
-su sector.
+sectores; el Administrador, las de los dos. El supervisor general (desde el
+2026-11-16) ve solo las del trámite de Técnico, Superintendente o
+Supernumerario, de los dos sectores, y no tiene estadísticas ni consulta
+histórica. Los supervisores no deciden nada. El aviso de cada solicitud nueva va
+al buzón de su sector.
 """
 import secrets
 from datetime import date, datetime, timedelta, timezone
@@ -24,7 +26,8 @@ pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 
 async def _escenario(cliente, admin) -> dict:
-    """Una agencia, un puesto en cada sector y una solicitud en revisión en cada uno."""
+    """Una agencia, un puesto en cada sector y una solicitud de Embarque en revisión en
+    cada uno (el supervisor general no las ve: no son del trámite de Técnico)."""
     sufijo = secrets.token_hex(3)
     puestos = {}
     for nombre in (PACIFICO, ATLANTICO):
@@ -40,7 +43,7 @@ async def _escenario(cliente, admin) -> dict:
     naviera = await crear_actor("Naviera", agencia_id=agencia.id, prefijo="naviera")
     ids = {}
     async with SesionLocal() as s:
-        tipo_id = (await s.execute(select(TipoTramite.id).limit(1))).scalar_one()
+        tipo_id = (await s.execute(select(TipoTramite.id).where(TipoTramite.codigo == "F3-EMBARQUE"))).scalar_one()
         for nombre, puesto in puestos.items():
             solicitud = Solicitud(
                 agencia_id=agencia.id, agencia_nombre=agencia.nombre, creada_por_id=naviera.id,
@@ -52,7 +55,24 @@ async def _escenario(cliente, admin) -> dict:
             await s.flush()
             ids[nombre] = solicitud.id
         await s.commit()
-    return {"sufijo": sufijo, "puestos": puestos, "ids": ids, "naviera": naviera}
+    return {"sufijo": sufijo, "puestos": puestos, "ids": ids, "naviera": naviera, "agencia_id": agencia.id,
+            "agencia": agencia.nombre}
+
+
+async def _de_tecnico(e: dict, sector: str) -> int:
+    """Una solicitud del trámite de Técnico, en revisión, en el puesto de ese sector."""
+    puesto = e["puestos"][sector]
+    async with SesionLocal() as s:
+        tipo_id = (await s.execute(select(TipoTramite.id).where(TipoTramite.codigo == "F3-TECNICO"))).scalar_one()
+        solicitud = Solicitud(
+            agencia_id=e["agencia_id"], agencia_nombre=e["agencia"], creada_por_id=e["naviera"].id,
+            tipo_tramite_id=tipo_id, puesto_control_id=puesto["id"], puesto_nombre=puesto["nombre"],
+            titulo=f"Prueba de sectores {e['sufijo']}", fecha_operacion=date.today() + timedelta(days=5),
+            cantidad_tripulantes=0, estado="review", enviada_en=datetime.now(timezone.utc),
+        )
+        s.add(solicitud)
+        await s.commit()
+        return solicitud.id
 
 
 async def _ids_en(cliente, actor, bandeja: str, sufijo: str) -> set[int]:
@@ -115,12 +135,13 @@ async def test_mover_un_puesto_de_sector_mueve_sus_solicitudes(cliente, admin):
 async def test_los_supervisores_ven_sin_decidir(cliente, admin):
     e = await _escenario(cliente, admin)
     pac, atl = e["ids"][PACIFICO], e["ids"][ATLANTICO]
+    tecnico_atl = await _de_tecnico(e, ATLANTICO)
     sup_sector = await crear_actor("Supervisor de sector", prefijo="supervisor")
     sup_general = await crear_actor("Supervisor general", prefijo="supervisor")
 
     assert await _ids_en(cliente, sup_sector, "supervision", e["sufijo"]) == {pac}
-    assert await _ids_en(cliente, sup_general, "supervision", e["sufijo"]) == {pac, atl}
-    for actor, visibles in ((sup_sector, (pac,)), (sup_general, (pac, atl))):
+    assert await _ids_en(cliente, sup_general, "supervision", e["sufijo"]) == {tecnico_atl}
+    for actor, visibles in ((sup_sector, (pac,)), (sup_general, (tecnico_atl,))):
         for sid in visibles:
             r = await cliente.get(f"/solicitudes/{sid}", headers=actor.headers)
             assert r.status_code == 200
@@ -143,7 +164,6 @@ async def test_los_supervisores_ven_sin_decidir(cliente, admin):
 async def test_estadisticas_por_sector(cliente, admin):
     e = await _escenario(cliente, admin)
     revisor_atl = await crear_actor("UCVMM", prefijo="revisor", sectores=(ATLANTICO,))
-    sup_general = await crear_actor("Supervisor general", prefijo="supervisor")
     pacifico, atlantico = await id_sector(PACIFICO), await id_sector(ATLANTICO)
 
     r = await cliente.get("/solicitudes/estadisticas", headers=revisor_atl.headers)
@@ -154,21 +174,48 @@ async def test_estadisticas_por_sector(cliente, admin):
     assert r.status_code == 403
     assert (await cliente.get("/admin/stats", headers=revisor_atl.headers)).status_code == 403
 
-    todas = (await cliente.get("/solicitudes/estadisticas", headers=sup_general.headers)).json()
+    todas = (await cliente.get("/solicitudes/estadisticas", headers=admin.headers)).json()
     assert todas["alcance"] == "Todos los sectores" and todas["uso_del_sistema"] is True
     assert [x["nombre"] for x in todas["sectores"]] == [PACIFICO, ATLANTICO]
     solo_atl = (await cliente.get("/solicitudes/estadisticas", params={"sector_id": atlantico},
-                                  headers=sup_general.headers)).json()
+                                  headers=admin.headers)).json()
     solo_pac = (await cliente.get("/solicitudes/estadisticas", params={"sector_id": pacifico},
-                                  headers=sup_general.headers)).json()
+                                  headers=admin.headers)).json()
     assert solo_atl["alcance"] == ATLANTICO and solo_atl["sector_id"] == atlantico
-    assert solo_atl["recibidas"] == est["recibidas"] >= 1, "el revisor ve lo mismo que el supervisor en su sector"
+    assert solo_atl["recibidas"] == est["recibidas"] >= 1, "el revisor ve lo mismo que el Administrador en su sector"
     assert solo_atl["recibidas"] + solo_pac["recibidas"] == todas["recibidas"]
-    assert (await cliente.get("/admin/stats", headers=sup_general.headers)).status_code == 200
+    assert (await cliente.get("/admin/stats", headers=admin.headers)).status_code == 200
     r = await cliente.get("/solicitudes/estadisticas/exportar", params={"formato": "csv", "sector_id": atlantico},
-                          headers=sup_general.headers)
+                          headers=admin.headers)
     assert r.status_code == 200 and "sector-atlantico" in r.headers["content-disposition"]
     assert e["ids"]
+
+
+async def test_supervisor_general_solo_tecnico(cliente, admin):
+    """2026-11-16: el supervisor general (Tocumen) ve solo el trámite de Técnico,
+    Superintendente o Supernumerario, de los dos sectores; Embarque y lo demás, no. Y
+    no tiene estadísticas, ni el uso del sistema, ni la consulta histórica."""
+    e = await _escenario(cliente, admin)
+    pac, atl = e["ids"][PACIFICO], e["ids"][ATLANTICO]
+    tecnico_pac, tecnico_atl = await _de_tecnico(e, PACIFICO), await _de_tecnico(e, ATLANTICO)
+    general = await crear_actor("Supervisor general", prefijo="supervisor")
+
+    assert await _ids_en(cliente, general, "supervision", e["sufijo"]) == {tecnico_pac, tecnico_atl}
+    for sid in (pac, atl):
+        r = await cliente.get(f"/solicitudes/{sid}", headers=general.headers)
+        assert r.status_code == 403, "un Embarque, aunque sea de un enlace viejo"
+    for sid in (tecnico_pac, tecnico_atl):
+        r = await cliente.get(f"/solicitudes/{sid}", headers=general.headers)
+        assert r.status_code == 200 and r.json()["tipo_tramite_codigo"] == "F3-TECNICO"
+    for ruta in ("/solicitudes/estadisticas", "/admin/stats", "/solicitudes/historico/opciones"):
+        assert (await cliente.get(ruta, headers=general.headers)).status_code == 403, ruta
+    r = await cliente.get("/solicitudes/estadisticas/exportar", params={"formato": "csv"}, headers=general.headers)
+    assert r.status_code == 403
+    for ruta in ("/solicitudes/historico", "/solicitudes/historico/exportar"):
+        assert (await cliente.post(ruta, json={}, headers=general.headers)).status_code == 403, ruta
+    # El supervisor de sector sigue igual: su sector, en todos los trámites.
+    sup_sector = await crear_actor("Supervisor de sector", prefijo="supervisor")
+    assert await _ids_en(cliente, sup_sector, "supervision", e["sufijo"]) == {pac, tecnico_pac}
 
 
 async def test_el_aviso_va_al_buzon_del_sector(cliente, admin, monkeypatch):

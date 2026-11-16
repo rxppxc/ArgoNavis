@@ -30,6 +30,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import obtener_configuracion
@@ -39,6 +40,7 @@ from app.core.permisos import (
     PERMISO_PUERTO, PERMISO_REVISAR, PERMISO_SOLICITAR, PERMISO_SUPERVISAR_SECTOR, PERMISO_SUPERVISAR_TODO,
     codigos_permiso, es_admin_efectivo,
 )
+from app.domain.models.boleta import BoletaRecargo
 from app.domain.models.catalogo import PuestoControl
 from app.domain.models.solicitud import (
     RANGOS_CON_LIBRETA, CasillaSolicitud, DocumentoSolicitud, EstadoSolicitud, EventoSolicitud, Solicitud,
@@ -56,7 +58,7 @@ from app.domain.schemas.solicitud import (
     SalidaCasilla,
     SalidaDocumentoSolicitud, SalidaEstadisticasSolicitudes, SalidaEvento, SalidaSolicitud,
     OpcionFiltro, SalidaOpcionesHistorico, SalidaSolicitudResumen, SalidaTripulante,
-    SalidaTripulanteVerificacion, SalidaVerificacion, _DatosFormularioSolicitud,
+    SalidaTripulanteVerificacion, SalidaVerificacion, _DatosFormularioSolicitud, SalidaBoleta,
 )
 from app.domain.services.acceso import AlcanceEstadisticas, ContextoAcceso
 from app.domain.services.series import meses_antes, periodos_anio, periodos_dia, periodos_mes, serie
@@ -64,6 +66,7 @@ from app.domain.services.tramite_service import (
     CasillaChecklist, ServicioTramite, TripulanteChecklist, normalizar_imo,
 )
 from app.informes.autorizacion_pdf import DatosPdfAutorizacion, TripulantePdf
+from app.informes.boleta_recargo_pdf import DatosPdfBoleta
 from app.informes.historico_excel import DatosHistorico, FilaHistorico, FiltrosAplicados
 from app.infrastructure import almacenamiento
 from app.infrastructure.almacenamiento import ArchivoGuardado
@@ -108,6 +111,8 @@ _EVENTOS_INTERNOS = {
     TipoEventoSolicitud.IMPEDIMENTOS_PUESTO.value,
     TipoEventoSolicitud.IMPEDIMENTOS_PUESTO_CORREGIDOS.value,
     TipoEventoSolicitud.COMENTARIO.value,   # ya no se registran: quedan los de antes
+    TipoEventoSolicitud.BOLETA_GENERADA.value,   # la boleta de recargo no la ve la agencia (2026-11-16)
+    TipoEventoSolicitud.BOLETA_ANULADA.value,
 }
 _SIN_TEXTO_PARA_AGENCIA = {TipoEventoSolicitud.APROBADA.value, TipoEventoSolicitud.FINALIZADA.value}
 # A la agencia no se le nombran las unidades internas (UCVMM, los sectores): ve
@@ -258,14 +263,17 @@ class ServicioSolicitud:
         )
 
     def puede_ver(self, ctx: ContextoAcceso, s: Solicitud) -> bool:
-        """La ven su agencia, el admin y el supervisor general; UCVMM y el
-        supervisor de sector, si es de un puesto de sus sectores; el puesto de
-        control, solo las de sus puestos (con cambio de puerto, los dos) y desde
-        que se aprueban. La consulta histórica aplica lo mismo en SQL
-        (`_alcance_historico`): si cambias uno, cambia el otro."""
+        """La ven su agencia y el admin; UCVMM y el supervisor de sector, si es de un
+        puesto de sus sectores; el supervisor general, si es de un trámite que
+        supervisa (el de Técnico, 2026-11-16); el puesto de control, solo las de sus
+        puestos (con cambio de puerto, los dos) y desde que se aprueban. La consulta
+        histórica aplica lo mismo en SQL (`_alcance_historico`): si cambias uno,
+        cambia el otro."""
         if ctx.ve_todos_los_sectores or ctx.es_de_su_agencia(s):
             return True
         if (ctx.es_revisor or ctx.es_supervisor_sector) and ctx.en_sus_sectores(s):
+            return True
+        if ctx.supervisa_tramite(s):
             return True
         return s.aprobada_en is not None and self._la_ve_como_puesto(ctx, s)
 
@@ -276,6 +284,7 @@ class ServicioSolicitud:
         del_puerto = vigente and self._es_del_puerto(ctx, s)
         revisable  = ctx.puede_revisar_esta(s) and s.estado == Estado.EN_REVISION.value
         conflicto  = revisable and self._tiene_conflicto(ctx, s)
+        gestiona_boleta = self.puede_gestionar_boleta(ctx, s)
         return AccionesSolicitud(
             corregir=ctx.es_de_su_agencia(s) and s.estado == Estado.EN_CORRECCION.value and en_plazo,
             revisar=revisable and not conflicto,
@@ -284,6 +293,24 @@ class ServicioSolicitud:
                 s.estado in (Estado.APROBADA.value, Estado.FINALIZADA.value) and self.puede_ver(ctx, s)
             ),
             conflicto_revision=conflicto,
+            generar_boleta=gestiona_boleta and not any(b.vigente for b in s.boletas),
+            anular_boleta=gestiona_boleta and any(b.vigente for b in s.boletas),
+        )
+
+    def puede_gestionar_boleta(self, ctx: ContextoAcceso, s: Solicitud) -> bool:
+        """Generan y anulan la boleta de recargo (2026-11-16) UCVMM y el supervisor de
+        sector (de sus sectores), el puesto de control (de los puestos que la ven) y el
+        Administrador, si la solicitud lleva recargo. La agencia y el supervisor
+        general, no."""
+        if s.costo_fuera_de_horario is None or s.aprobada_en is None:
+            return False
+        return self._gestiona_boletas_de(ctx, s)
+
+    def _gestiona_boletas_de(self, ctx: ContextoAcceso, s: Solicitud) -> bool:
+        return (
+            ctx.es_admin
+            or ((ctx.es_revisor or ctx.es_supervisor_sector) and ctx.en_sus_sectores(s))
+            or (ctx.es_puerto and s.aprobada_en is not None and self._la_ve_como_puesto(ctx, s))
         )
 
     async def obtener(self, ctx: ContextoAcceso, solicitud_id: int, *, bloquear: bool = False) -> Solicitud:
@@ -349,8 +376,9 @@ class ServicioSolicitud:
 
     @staticmethod
     def _exigir_sector(ctx: ContextoAcceso) -> None:
-        """UCVMM y el supervisor de sector necesitan su sector: sin él no verían nada."""
-        if not ctx.ve_todos_los_sectores and not ctx.sectores_ids:
+        """UCVMM y el supervisor de sector necesitan su sector: sin él no verían nada.
+        El Administrador y el supervisor general no lo necesitan."""
+        if not ctx.es_admin and (ctx.es_revisor or ctx.es_supervisor_sector) and not ctx.sectores_ids:
             raise _error(
                 status.HTTP_409_CONFLICT,
                 "Tu usuario no tiene un sector asignado (Pacífico o Atlántico). Pide al administrador que te "
@@ -368,12 +396,17 @@ class ServicioSolicitud:
         return await self._pagina(ctx, filtros, consulta, orden)
 
     async def bandeja_supervision(self, ctx: ContextoAcceso, consulta: ConsultaBandeja) -> PaginaSolicitudes:
-        """Solo lectura (2026-11-10): las de sus sectores (supervisor de sector) o
-        las de los dos (supervisor general). Sin acciones: lo dice `acciones`."""
+        """Solo lectura (2026-11-10): las de sus sectores (supervisor de sector) o las
+        del trámite de Técnico de los dos sectores (supervisor general, 2026-11-16).
+        Sin acciones de decisión: lo dice `acciones`."""
         if not (ctx.es_admin or ctx.es_supervisor):
             raise _error(status.HTTP_403_FORBIDDEN, "No tienes permiso para supervisar las solicitudes.")
         self._exigir_sector(ctx)
-        filtros = self._filtros(consulta, puestos_ids=ctx.alcance_ucvmm)
+        alcance = None if ctx.es_admin else AlcanceSnm(
+            puestos=frozenset(ctx.puestos_de_sectores) if ctx.es_supervisor_sector else frozenset(),
+            supervision_general=ctx.es_supervisor_general,
+        )
+        filtros = self._filtros(consulta, alcance_snm=alcance)
         return await self._pagina(ctx, filtros, consulta, "recientes")
 
     async def bandeja_puerto(self, ctx: ContextoAcceso, consulta: ConsultaBandeja) -> PaginaSolicitudes:
@@ -392,9 +425,12 @@ class ServicioSolicitud:
 
     def _alcance_historico(self, ctx: ContextoAcceso) -> AlcanceSnm | None:
         """Lo que ve en la consulta histórica: lo mismo que `puede_ver`, sin la vía
-        de la agencia (la consulta es del personal del SNM). None = todas."""
-        if not ctx.es_personal_snm:
-            raise _error(status.HTTP_403_FORBIDDEN, "La consulta histórica es para el personal del SNM.")
+        de la agencia (la consulta es del personal del SNM). None = todas. El
+        supervisor general no la tiene (2026-11-16): con otro permiso que la abra,
+        también le muestra lo que supervisa, como el expediente."""
+        if not ctx.ve_historico:
+            raise _error(status.HTTP_403_FORBIDDEN,
+                         "La consulta histórica es para UCVMM, los supervisores de sector y el puesto de control.")
         if ctx.ve_todos_los_sectores:
             return None
         de_sector = ctx.es_revisor or ctx.es_supervisor_sector
@@ -403,6 +439,7 @@ class ServicioSolicitud:
         return AlcanceSnm(
             puestos=frozenset(ctx.puestos_de_sectores) if de_sector else frozenset(),
             puestos_aprobadas=frozenset(ctx.puestos_ids) if ctx.es_puerto else frozenset(),
+            supervision_general=ctx.es_supervisor_general,
         )
 
     def _filtros_historico(self, ctx: ContextoAcceso, consulta: ConsultaHistorica) -> FiltrosBandeja:
@@ -426,7 +463,7 @@ class ServicioSolicitud:
     async def opciones_historico(self, ctx: ContextoAcceso) -> SalidaOpcionesHistorico:
         alcance = self._alcance_historico(ctx)
         puestos = await self.repo_catalogos.listar_puestos()
-        if alcance is not None:
+        if alcance is not None and not alcance.supervision_general:
             visibles = alcance.puestos | alcance.puestos_aprobadas
             puestos = [p for p in puestos if p.id in visibles]
         return SalidaOpcionesHistorico(
@@ -1026,7 +1063,7 @@ class ServicioSolicitud:
         s.aprobada_en            = ahora_utc()
         s.aprobada_por_id        = ctx.usuario.id
         s.observacion_aprobacion = observacion
-        # Fuera del horario laboral lleva el costo migratorio de hoy (2026-11-11).
+        # Fuera del horario laboral lleva el recargo de hoy (2026-11-11).
         costo = configuracion.COSTO_FUERA_DE_HORARIO
         s.costo_fuera_de_horario = costo if costo > 0 and fuera_de_horario(s.aprobada_en) else None
         s.vigente_hasta          = fin_del_dia(limite)
@@ -1191,7 +1228,7 @@ class ServicioSolicitud:
             tripulantes_con_alerta=con_alerta,
             tiene_nacionalidad_restringida=alguno_restringido,
             # Aprobada fuera del horario laboral (2026-11-06; antes, por la finalización).
-            # Desde el 2026-11-11 lo ve también la agencia, con el costo migratorio.
+            # Desde el 2026-11-11 lo ve también la agencia, con el recargo.
             fuera_de_horario=fuera_de_horario(s.aprobada_en) if s.aprobada_en else None,
             costo_fuera_de_horario=texto_costo(s.costo_fuera_de_horario) if s.costo_fuera_de_horario else None,
         )
@@ -1317,6 +1354,102 @@ class ServicioSolicitud:
             tripulantes=tripulantes, documentos=documentos, checklist=checklist,
             eventos=eventos,
             acciones=self.acciones(ctx, s),
+            boletas=[self.salida_boleta(b) for b in s.boletas] if interno else None,
+        )
+
+    # ── Boleta de recargo (2026-11-16) ───────────────────────────────────────
+
+    @staticmethod
+    def salida_boleta(b: BoletaRecargo) -> SalidaBoleta:
+        return SalidaBoleta(
+            id=b.id, numero_oficio=b.numero_oficio, monto=texto_costo(b.monto), generada_en=b.generada_en,
+            generada_por=b.generada_por.full_name if b.generada_por else None,
+            anulada_en=b.anulada_en, anulada_por=b.anulada_por.full_name if b.anulada_por else None,
+            motivo_anulacion=b.motivo_anulacion, vigente=b.vigente,
+        )
+
+    async def _para_boleta(self, ctx: ContextoAcceso, solicitud_id: int) -> Solicitud:
+        """La solicitud bloqueada (FOR UPDATE), si quien pide gestiona sus boletas: dos
+        funcionarios que generan a la vez no dejan dos vigentes."""
+        s = await self.obtener(ctx, solicitud_id, bloquear=True)
+        if not self._gestiona_boletas_de(ctx, s):
+            raise _error(status.HTTP_403_FORBIDDEN, "No puedes generar ni anular boletas de esta solicitud.")
+        if s.costo_fuera_de_horario is None or s.aprobada_en is None:
+            raise _error(status.HTTP_409_CONFLICT,
+                         "La solicitud no lleva recargo: no se aprobó fuera del horario laboral.")
+        return s
+
+    async def generar_boleta(
+        self, ctx: ContextoAcceso, solicitud_id: int, numero_oficio: str,
+    ) -> tuple[Solicitud, BoletaRecargo]:
+        """Una boleta nueva con el número de oficio (ya normalizado por DatosBoleta): una
+        sola vigente por solicitud y un número que ninguna otra boleta tenga, anulada o no."""
+        s = await self._para_boleta(ctx, solicitud_id)
+        if any(b.vigente for b in s.boletas):
+            raise _error(status.HTTP_409_CONFLICT,
+                         "La solicitud ya tiene una boleta vigente. Para generar otra, anula la vigente.")
+        otra = await self.repo.boleta_con_numero(numero_oficio)
+        if otra is not None:
+            duena = await self.repo.buscar_por_id(otra.solicitud_id)
+            raise _error(status.HTTP_409_CONFLICT,
+                         f"El número de oficio {otra.numero_oficio} ya está en la boleta de la solicitud "
+                         f"{duena.numero if duena and duena.numero else otra.solicitud_id}"
+                         f"{' (anulada)' if not otra.vigente else ''}.")
+        boleta = BoletaRecargo(
+            solicitud_id=s.id, numero_oficio=numero_oficio, monto=s.costo_fuera_de_horario,
+            generada_en=ahora_utc(), generada_por_id=ctx.usuario.id,
+        )
+        self.repo.agregar_registro(boleta)
+        self._registrar_evento(s, ctx.usuario, TipoEventoSolicitud.BOLETA_GENERADA, None, None,
+                               f"Oficio N.º {numero_oficio}.")
+        try:
+            await self.repo.guardar()
+        except IntegrityError as exc:
+            # La carrera que el bloqueo no cubre: el mismo número en otra solicitud a la vez.
+            raise _error(status.HTTP_409_CONFLICT,
+                         f"El número de oficio {numero_oficio} ya está en otra boleta.") from exc
+        s = await self._recargar(s.id)
+        return s, next(b for b in s.boletas if b.id == boleta.id)
+
+    async def anular_boleta(
+        self, ctx: ContextoAcceso, solicitud_id: int, boleta_id: int, motivo: str,
+    ) -> tuple[Solicitud, BoletaRecargo]:
+        """Como en un talonario: la boleta queda anulada, con su número, y se puede
+        generar otra con otro número."""
+        s = await self._para_boleta(ctx, solicitud_id)
+        boleta = next((b for b in s.boletas if b.id == boleta_id), None)
+        if boleta is None:
+            raise _error(status.HTTP_404_NOT_FOUND, "Boleta no encontrada.")
+        if not boleta.vigente:
+            raise _error(status.HTTP_409_CONFLICT, "La boleta ya está anulada.")
+        boleta.anulada_en = ahora_utc()
+        boleta.anulada_por_id = ctx.usuario.id
+        boleta.motivo_anulacion = motivo
+        self._registrar_evento(s, ctx.usuario, TipoEventoSolicitud.BOLETA_ANULADA, None, None,
+                               f"Oficio N.º {boleta.numero_oficio}. Motivo: {_con_punto(motivo)}")
+        await self.repo.guardar()
+        s = await self._recargar(s.id)
+        return s, next(b for b in s.boletas if b.id == boleta_id)
+
+    async def datos_pdf_boleta(
+        self, ctx: ContextoAcceso, solicitud_id: int, boleta_id: int,
+    ) -> tuple[Solicitud, BoletaRecargo, DatosPdfBoleta]:
+        """La boleta para el PDF: la descarga el personal del SNM que ve la solicitud
+        (el supervisor general también); la agencia, no."""
+        s = await self.obtener(ctx, solicitud_id)
+        if not ctx.es_personal_snm:
+            raise _error(status.HTTP_403_FORBIDDEN, "La boleta de recargo es del personal del SNM.")
+        boleta = next((b for b in s.boletas if b.id == boleta_id), None)
+        if boleta is None or s.aprobada_en is None:
+            raise _error(status.HTTP_404_NOT_FOUND, "Boleta no encontrada.")
+        return s, boleta, DatosPdfBoleta(
+            numero_oficio=boleta.numero_oficio, monto=boleta.monto, numero_solicitud=s.numero or str(s.id),
+            tipo_tramite=s.tipo_tramite.nombre, agencia=s.agencia_nombre, buque=s.nombre_buque, imo=s.imo,
+            puesto=s.puesto_nombre, puesto_destino=s.puesto_destino_nombre, fecha_operacion=s.fecha_operacion,
+            pasajeros=len(s.tripulantes), aprobada_en=s.aprobada_en.astimezone(ZONA_PANAMA),
+            generada_en=boleta.generada_en.astimezone(ZONA_PANAMA),
+            anulada_en=boleta.anulada_en.astimezone(ZONA_PANAMA) if boleta.anulada_en else None,
+            motivo_anulacion=boleta.motivo_anulacion,
         )
 
     # ── Autorización (PDF) y verificación pública ────────────────────────────
@@ -1433,9 +1566,9 @@ class ServicioSolicitud:
     # ── Estadísticas ─────────────────────────────────────────────────────────
 
     async def alcance_estadisticas(self, ctx: ContextoAcceso, sector_id: int | None) -> AlcanceEstadisticas:
-        """UCVMM y el supervisor de sector ven las de sus sectores; el Administrador y
-        el supervisor general, las de todos. Los que ven más de un sector pueden
-        elegir uno."""
+        """UCVMM y el supervisor de sector ven las de sus sectores; el Administrador,
+        las de todos (el supervisor general no tiene estadísticas desde el
+        2026-11-16). Los que ven más de un sector pueden elegir uno."""
         self._exigir_sector(ctx)
         sectores = await self.repo_catalogos.listar_sectores()
         elegibles = [x for x in sectores if ctx.ve_todos_los_sectores or x.id in ctx.sectores_ids]

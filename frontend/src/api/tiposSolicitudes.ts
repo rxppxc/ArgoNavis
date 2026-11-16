@@ -89,7 +89,7 @@ export interface SolicitudResumen {
   tripulantes_con_alerta: number;
   tiene_nacionalidad_restringida: boolean;
   /** Aprobada fuera del horario laboral (null: sin aprobar). Desde el 2026-11-11
-   *  lo ve también la agencia, con el costo migratorio guardado al aprobar. */
+   *  lo ve también la agencia, con el recargo guardado al aprobar. */
   fuera_de_horario: boolean | null;
   /** «B/.20.00»; null si no tiene costo (dentro del horario o aprobada antes del cambio). */
   costo_fuera_de_horario: string | null;
@@ -203,7 +203,7 @@ export interface EventoSolicitud {
   id: number;
   tipo: "creada" | "corregida" | "impedimentos" | "impedimentos_corregidos"
     | "impedimentos_puesto" | "impedimentos_puesto_corregidos" | "devuelta" | "aprobada" | "negada"
-    | "comentario" | "finalizada" | "expirada";
+    | "comentario" | "finalizada" | "expirada" | "boleta_generada" | "boleta_anulada";
   estado_anterior: EstadoSolicitud | null;
   estado_nuevo: EstadoSolicitud | null;
   comentario: string | null;
@@ -218,6 +218,24 @@ export interface AccionesSolicitud {
   descargar_autorizacion: boolean;
   /** Podría revisar, pero la creó o es de su agencia (separación de funciones). */
   conflicto_revision: boolean;
+  /** Boleta de recargo (2026-11-16): generar si no hay una vigente; anular la vigente. */
+  generar_boleta: boolean;
+  anular_boleta: boolean;
+}
+
+/** Una boleta de recargo por atención fuera del horario laboral (2026-11-16). Solo
+ *  la ve el personal del SNM: la agencia no (la imprime el SNM y se la entrega). */
+export interface BoletaRecargo {
+  id: number;
+  numero_oficio: string;
+  /** "B/.20.00" */
+  monto: string;
+  generada_en: string;
+  generada_por: string | null;
+  anulada_en: string | null;
+  anulada_por: string | null;
+  motivo_anulacion: string | null;
+  vigente: boolean;
 }
 
 export interface SolicitudDetalle extends SolicitudResumen {
@@ -262,6 +280,8 @@ export interface SolicitudDetalle extends SolicitudResumen {
   checklist: CasillaSolicitud[];
   eventos: EventoSolicitud[];
   acciones: AccionesSolicitud;
+  /** Con las anuladas. null para la agencia, que no las ve. */
+  boletas: BoletaRecargo[] | null;
 }
 
 export interface ResultadoImpedimento {

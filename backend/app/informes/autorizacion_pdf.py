@@ -95,7 +95,7 @@ class DatosPdfAutorizacion:
     finalizada_por:      str | None = None
     # Cambio de puerto (2026-11-13): el nuevo puesto, donde vale y se finaliza.
     puesto_destino:      str | None = None
-    # Aprobada fuera del horario laboral, con su costo migratorio (2026-11-11).
+    # Aprobada fuera del horario laboral, con su recargo (2026-11-11).
     fuera_de_horario:       bool = False
     costo_fuera_de_horario: Decimal | None = None
     tripulantes:         list[TripulantePdf] = field(default_factory=list)

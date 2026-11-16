@@ -24,6 +24,7 @@ import { destinoDeVolver, estadoDeVolver } from "../../../utils/volver";
 import { DocumentosSolicitud } from "./DocumentosSolicitud";
 import { HistorialSolicitud } from "./HistorialSolicitud";
 import { InsigniaEstado } from "../InsigniaEstado";
+import { PanelBoleta } from "./PanelBoleta";
 import { PanelPuerto } from "./PanelPuerto";
 import { PanelRevision } from "./PanelRevision";
 import {
@@ -33,8 +34,8 @@ import { SeccionTripulantes } from "./SeccionTripulantes";
 import { useVerificacionImpedimentos } from "./useVerificacionImpedimentos";
 import styles from "./DetalleSolicitud.module.css";
 
-/** Aprobada fuera del horario laboral: el aviso y el costo migratorio, también
- *  para la agencia (2026-11-11). Lo mismo dicen el correo de aprobación y el PDF. */
+/** Aprobada fuera del horario laboral: el aviso y el recargo, también para la
+ *  agencia (2026-11-11). Lo mismo dicen el correo de aprobación y el PDF. */
 function AvisoFueraDeHorario({ s }: { s: SolicitudDetalle }) {
   if (!s.fuera_de_horario) return null;
   return (
@@ -42,7 +43,7 @@ function AvisoFueraDeHorario({ s }: { s: SolicitudDetalle }) {
       <IconoReloj tamano={14} />
       <span>
         Aprobada fuera del horario laboral ({TEXTO_HORARIO_LABORAL}).
-        {s.costo_fuera_de_horario && <> Costo migratorio: <strong>{s.costo_fuera_de_horario}</strong>.</>}
+        {s.costo_fuera_de_horario && <> Recargo por atención fuera del horario laboral: <strong>{s.costo_fuera_de_horario}</strong>.</>}
       </span>
     </div>
   );
@@ -419,6 +420,8 @@ function Expediente({ s, onActualizada, volverA, estadoVolver }: {
           {s.acciones.finalizar && (
             <PanelPuerto solicitud={s} verificacion={verificacionPuesto} onActualizada={onActualizada} />
           )}
+          {/* La boleta de recargo (2026-11-16): solo el personal del SNM (a la agencia le llega null). */}
+          <PanelBoleta s={s} onActualizada={onActualizada} />
           <ResumenImpedimentos s={s} />
 
           <HistorialSolicitud eventos={s.eventos} puestoFinalizacion={s.puesto_finalizacion_nombre} />

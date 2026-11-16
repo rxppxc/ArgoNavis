@@ -156,7 +156,7 @@ async def test_estadisticas_e_insignia(cliente):
 
 
 async def test_aprobada_fuera_del_horario_lleva_el_costo(cliente, monkeypatch):
-    """Aprobada fuera del horario, la solicitud guarda el costo migratorio de ese
+    """Aprobada fuera del horario, la solicitud guarda el recargo de ese
     momento y la agencia lo ve en la bandeja, el expediente, el correo de
     aprobación y el PDF (2026-11-11). Cambiar el costo no toca lo ya aprobado."""
     from app.api.v1 import solicitudes as api_solicitudes
@@ -218,9 +218,10 @@ async def test_aprobada_fuera_del_horario_lleva_el_costo(cliente, monkeypatch):
     fuera = await aprobar_a_las(sabado)
     assert fuera["fuera_de_horario"] is True and fuera["costo_fuera_de_horario"] == "B/.20.00"
     agencia_aviso, puesto_aviso = avisos
-    assert f"{horario}\nCosto migratorio: B/.20.00." in agencia_aviso.destacado
+    assert f"{horario}\nRecargo por atención fuera del horario laboral: B/.20.00." in agencia_aviso.destacado
+    assert "recargo de B/.20.00" in agencia_aviso.vista_previa
     assert "B/.20.00" in agencia_aviso.vista_previa
-    assert "Costo migratorio: B/.20.00." in puesto_aviso.destacado
+    assert "Recargo por atención fuera del horario laboral: B/.20.00." in puesto_aviso.destacado
     assert armados[-1].fuera_de_horario and armados[-1].costo_fuera_de_horario == Decimal("20.00")
     r = await cliente.get("/solicitudes/agencia", headers=naviera.headers)
     assert {x["id"]: x["costo_fuera_de_horario"] for x in r.json()["items"]} == {fuera["id"]: "B/.20.00"}
@@ -235,7 +236,7 @@ async def test_aprobada_fuera_del_horario_lleva_el_costo(cliente, monkeypatch):
     monkeypatch.setattr(solicitud_service.configuracion, "COSTO_FUERA_DE_HORARIO", Decimal("0"))
     sin_costo = await aprobar_a_las(sabado)
     assert sin_costo["fuera_de_horario"] is True and sin_costo["costo_fuera_de_horario"] is None
-    assert horario in avisos[0].destacado and "Costo migratorio" not in avisos[0].destacado
+    assert horario in avisos[0].destacado and "Recargo" not in avisos[0].destacado
     assert armados[-1].fuera_de_horario and armados[-1].costo_fuera_de_horario is None
 
     # Dentro del horario: ni aviso ni costo.

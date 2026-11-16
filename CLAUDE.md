@@ -106,7 +106,8 @@ utils/              → funciones sin React (fechas, texto sin tildes, archivos,
     - La crea y la pone al día `infrastructure/permisos_bd.py` después de cada migración, con la dueña (`MIGRACIONES_DATABASE_URL`, que el entrypoint borra antes de levantar uvicorn).
     - Lee y escribe filas, pero no crea ni cambia tablas ni ejecuta programas del servidor (`COPY ... TO PROGRAM`).
     - `audit_logs` y `solicitud_eventos` son **solo para agregar** (sin UPDATE ni DELETE): la bitácora y el historial no se pueden tapar desde la aplicación. Las FK con `ON DELETE SET NULL` las aplica PostgreSQL con la dueña, así que borrar un usuario funciona igual.
-    - No conectes la aplicación como dueña ni le des UPDATE o DELETE sobre esas tablas. Una tabla nueva que necesite otro trato va en `TABLAS_SOLO_AGREGAR` o `TABLAS_SIN_ACCESO`.
+    - `boletas_recargo` (2026-11-16) va **sin borrar** (`TABLAS_SIN_BORRAR`: sin DELETE ni TRUNCATE): una boleta se anula, nunca se borra.
+    - No conectes la aplicación como dueña ni le des UPDATE o DELETE sobre esas tablas. Una tabla nueva que necesite otro trato va en `TABLAS_SOLO_AGREGAR`, `TABLAS_SIN_BORRAR` o `TABLAS_SIN_ACCESO`.
     - Lo prueban `tests/test_permisos_bd.py` y el E2E, cuyo backend entra con una cuenta así (`servidor_e2e.py`).
 
 ### Errores
@@ -212,10 +213,11 @@ Pedido del usuario: «el diseño es genérico, típico de IAs; necesitamos ident
 - Paso 1 de «Nueva solicitud» en tarjetas (`SelectorTramite`, propuesta 2A): la descripción sale del catálogo y lo que pide, del checklist. Cambiar de trámite con archivos ya adjuntos pide confirmación (se quitan).
   - Cada trámite tiene ícono y color propios (`PRESENTACION`, por código, en el frontend): mosaico sólido en un `--acc-*` con el ícono en `--card`. Con todos en gris no se distinguían (pedido del usuario del 2026-10-19). En la grilla, los colores vecinos no se parecen.
 
-## Estado actual (2026-11-15)
+## Estado actual (2026-11-16)
 
 El sistema cubre el ciclo completo de las Autorizaciones Marítimas: la agencia envía, UCVMM revisa por sector y el puesto de control finaliza. Tiene además:
 - supervisión y consulta histórica;
+- el recargo por atención fuera del horario laboral y su boleta (2026-11-16);
 - estadísticas con exportación a Excel, PDF y CSV;
 - la verificación pública del PDF por el QR;
 - la identidad «pase oficial».
@@ -271,6 +273,7 @@ Cada una salió de un problema real. El detalle está en el historial.
 - En las celdas de una tabla va `overflow-wrap: break-word`; `anywhere`, solo en los bloques de texto libre.
 - Nada de sitemap, canónico, imagen OG ni `llms.txt`: es un sistema interno y nada debe indexarse.
 - Vitest se corre desde `C:\…` en mayúscula: con `c:\…` carga dos copias de sí mismo.
+- Una acción nueva de la bitácora (`AccionAuditoria`) lleva su nombre en `ETIQUETA_ACCION` (`PaginaBitacora.tsx`): sin él, se ve el código crudo (`test_la_bitacora_nombra_todas_las_acciones`).
 
 **Pruebas**
 - Las pruebas que simulan la hora reemplazan `solicitud_service.ahora_utc`.
@@ -308,8 +311,10 @@ Cada una salió de un problema real. El detalle está en el historial.
     - los permisos se consultan en cada pedido (a veces dos veces);
     - el expediente vuelve a leer el catálogo (trámites, documentos y países) y carga `creada_por` con su rol y su agencia.
     Juntar la verificación del token con la carga del usuario y cachear el catálogo por proceso ahorraría entre 10 y 20 %. Correr `tests/carga.py` antes y después.
-17. **Documentación de la DTI, juego 0.7:** `docs/` no tiene todavía la identidad «pase oficial» ni los cambios del 2026-11-11 (documentos de los técnicos, nombre neutro para la agencia, costo fuera del horario y consulta histórica), del 2026-11-13 (cambio de puerto, Formulario No. 3 en todos los trámites, cabecera de la agencia, rango Pasajero, pasaporte con 3 meses) y del 2026-11-14 (la Visa de los restringidos, los panameños, Shore Pass, quien finalizó y el PDF por el QR).
-18. **Validar con UCVMM, del 2026-11-11:** cómo y dónde paga la agencia el costo migratorio (el sistema solo lo avisa: no dice dónde se paga ni registra el pago), (El Contrato de Trabajo de los técnicos se quitó el 2026-11-14, con sus filas de Embarque y Desembarque.)
+17. **Documentación de la DTI, juego 0.7:** `docs/` no tiene todavía la identidad «pase oficial» ni los cambios del 2026-11-11 (documentos de los técnicos, nombre neutro para la agencia, costo fuera del horario y consulta histórica), del 2026-11-13 (cambio de puerto, Formulario No. 3 en todos los trámites, cabecera de la agencia, rango Pasajero, pasaporte con 3 meses) del 2026-11-14 (la Visa de los restringidos, los panameños, Shore Pass, quien finalizó y el PDF por el QR) y del 2026-11-16 (la boleta de recargo y el alcance del supervisor general).
+18. **Recargo fuera del horario, con UCVMM:**
+    - La boleta (2026-11-16) es un **borrador**: UCVMM tiene un modelo en papel, que el usuario pasará para copiarlo tal cual (`informes/boleta_recargo_pdf.py`).
+    - El sistema no registra el pago ni dice dónde se paga (desde el 2026-11-11).
 19. **Del 2026-11-13, para decidir o validar:** si el Formulario No. 3 va firmado y sellado (lo diría la descripción del documento); generarlo prellenado con los datos del formulario, para imprimir, firmar y subir; un «Desistir» para que la agencia cierre una solicitud que ya no usará (hoy queda aprobada hasta que vence); y, con UCVMM, que los 3 meses de vigencia del pasaporte apliquen también a la gente de mar.
 20. **Del 2026-11-14:**
     - Con la DTI: publicar la verificación del QR en internet (plantilla `frontend/nginx-verificacion-publica.conf`, HTTPS, `set_real_ip_from` y `URL_VERIFICACION_PUBLICA`). Mientras tanto, el QR solo funciona dentro de la red del SNM.
@@ -330,11 +335,16 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
     - Repetirla sin cambios responde 409.
     - `corregir()` de la agencia la reinicia: la siguiente es una verificación nueva, no una corrección.
   - Aprueba, devuelve a corrección o deniega (el estado se muestra como "Denegada"; en la BD y la API sigue siendo `denied` / `/negar`).
+  - Genera y anula la boleta de recargo de las aprobadas fuera del horario de sus sectores (ver «Boleta de recargo» abajo).
 - **Puesto de Control** (`T-FINALIZAR-PUERTO` + asignación en `usuarios_puestos`) — ve las aprobadas de sus puestos, verifica los impedimentos en SIMPLUS (obligatoria desde el 2026-11-06, aparte de la de UCVMM) y las finaliza con comentario obligatorio.
   - El comentario sin finalizar (`POST /solicitudes/{id}/comentarios`) se retiró el 2026-10-20: no tenía pantalla. Los eventos `comentario` de antes se siguen mostrando, solo al SNM.
   - Finaliza siempre en el puesto autorizado (reunión del 2026-10-30; antes podía indicar otro). Con cambio de puerto (2026-11-13), el autorizado es el nuevo; el primero solo la consulta. Si la operación se hace en otro puesto, no se finaliza: vence sola y la agencia presenta una nueva solicitud. Las finalizadas en otro puesto antes del cambio se siguen mostrando así en el expediente, el PDF y la verificación pública.
   - El rol se siembra con `es_sistema = false` (el admin puede renombrarlo o borrarlo).
-- **Supervisor de sector** (`T-SUPERVISAR-SECTOR` + `usuarios_sectores`) y **Supervisor general** (`T-SUPERVISAR-TODO`; UCVMM en Tocumen) — solo lectura (2026-11-10): la bandeja «Supervisión» (`GET /solicitudes/supervision`), los expedientes con sus documentos (cada apertura queda en la bitácora), el PDF de la autorización (copia interna) y las estadísticas de su alcance, con exportación. Ningún botón de decisión (`acciones` todo en falso) y sin campana. El de sector ve las de sus sectores; el general, las de los dos, y el uso del sistema.
+  - Genera y anula la boleta de recargo de las solicitudes que ve.
+- **Supervisor de sector** (`T-SUPERVISAR-SECTOR` + `usuarios_sectores`) y **Supervisor general** (`T-SUPERVISAR-TODO`; UCVMM en Tocumen) — solo lectura (2026-11-10): la bandeja «Supervisión» (`GET /solicitudes/supervision`), los expedientes con sus documentos (cada apertura queda en la bitácora) y el PDF de la autorización (copia interna). Ningún botón de decisión (`revisar` y `finalizar` en falso) y sin campana.
+  - El de sector ve las de sus sectores, con sus estadísticas (con exportación) y la consulta histórica, y genera y anula la boleta de recargo.
+  - El general (desde el 2026-11-16) ve **solo el trámite de Técnico, Superintendente o Supernumerario**, de los dos sectores (`tipos_tramite.supervision_general`, `ContextoAcceso.supervisa_tramite`). No tiene estadísticas, ni el uso del sistema, ni la consulta histórica (`ve_historico`). Descarga las boletas de sus solicitudes, sin generarlas.
+  - `ve_todos_los_sectores` es solo del Administrador desde el 2026-11-16.
 - **Administrador** — acceso total (decisión del usuario del 2026-10-20): bandejas y expedientes (atajo a todos los `T-*`), catálogo de trámites, agencias/puestos/sectores/nacionalidades (`/admin/catalogos`), estadísticas, bitácora y también usuarios y roles (`/admin`, `/admin/roles`). Antes solo listaba usuarios y roles. No necesita sector: ve los dos.
 - **SysAdmin** — rol técnico, sin permisos `T-*` y sin atajo: usuarios (`/admin`), roles (`/admin/roles`; los permisos son fijos y solo se asignan a roles) y bitácora. No ve solicitudes (403 en la API; el frontend lo manda a `/admin`).
   - El último SysAdmin activo no se puede desactivar, borrar ni cambiar de rol (409).
@@ -395,7 +405,14 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
   - `observacion_aprobacion`, `comentario_finalizacion`, `aprobada_por`, `finalizada_por`, `con_impedimento`, `con_impedimento_puesto` y los `impedimentos_puesto_*`.
   - Los nombres de los funcionarios: el autor sale como «Servicio Nacional de Migración» (hasta el 2026-11-11, "UCVMM") o "Puesto de control". Tampoco se le nombran las unidades internas (UCVMM, los sectores).
   - Los motivos de devolución y de negación **sí** los ve.
-  - Desde el 2026-11-11 **sí** ve si se aprobó fuera del horario y su costo (`fuera_de_horario`, `costo_fuera_de_horario`).
+  - Desde el 2026-11-11 **sí** ve si se aprobó fuera del horario y su recargo (`fuera_de_horario`, `costo_fuera_de_horario`).
+  - Las boletas de recargo **no** (`boletas` le llega en null, y los eventos `boleta_generada` / `boleta_anulada` son internos): las imprime el SNM y se las entrega.
+- **Boleta de recargo** (2026-11-16, `boletas_recargo`, revisión `e5c1a7d3b902`). Aprobada fuera del horario (de 15:01 a 06:59 y el fin de semana, por la hora de la aprobación), la solicitud lleva el recargo de `COSTO_FUERA_DE_HORARIO` (B/.20.00, guardado al aprobar). Para cobrarlo:
+  - **Quién:** la generan UCVMM, el supervisor de sector, el puesto de control y el Administrador (`puede_gestionar_boleta`). El número de oficio lo escribe el funcionario.
+  - **El número:** único entre todas las boletas, anuladas incluidas, sin distinguir mayúsculas (índice sobre `lower(numero_oficio)`). Hasta 40 caracteres, sin espacios de más.
+  - **Talonario:** una vigente por solicitud (índice parcial). Una mal hecha se anula con motivo y se genera otra con otro número. No se corrige ni se borra.
+  - **Concurrencia:** se bloquea la solicitud (`_para_boleta`, FOR UPDATE): dos generaciones a la vez dejan una sola (`test_dos_generaciones_a_la_vez`).
+  - **El PDF** (`informes/boleta_recargo_pdf.py`) no lleva nombres de funcionarios: se entrega a la agencia. La anulada sale con el sello ANULADA. Bitácora: BOLETA_GENERADA, BOLETA_ANULADA y BOLETA_DESCARGADA.
 - La observación de aprobación es interna: no va en el PDF ni en el correo de aprobación. El PDF no tiene sección de observaciones.
 - El PDF de la agencia dice "Aprobada por: Servicio Nacional de Migración" (hasta el 2026-11-11, "UCVMM"), sin el nombre del funcionario: tampoco ve esos nombres en el expediente (decisión del usuario del 2026-10-15). El personal del SNM descarga una copia interna con el nombre de quien aprobó (reunión del 2026-10-30, en docs/HISTORIAL.md).
 - `agencia_nombre`, `puesto_nombre` y `puesto_finalizacion_nombre` son una foto (al enviar o al finalizar): renombrar la agencia o el puesto no cambia expedientes viejos.

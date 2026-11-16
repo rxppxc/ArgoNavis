@@ -224,7 +224,7 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     await expect(tercero.getByText("Autorización auténtica — operación finalizada")).toBeVisible();
   });
 
-  await test.step("sectores: UCVMM del Atlántico no la ve y la supervisión general la ve sin decidir", async () => {
+  await test.step("sectores: UCVMM del Atlántico no la ve, y el supervisor general tampoco (no es de Técnico)", async () => {
     // El puesto de las pruebas es del Sector Pacífico (servidor_e2e.py).
     const atlantico = await entrar(browser, CUENTAS.atlantico);
     await atlantico.goto(`/solicitudes/${id}`);
@@ -232,14 +232,21 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     await atlantico.goto("/dashboard?bandeja=revision&estado=todas");
     await expect(atlantico.getByText("No hay solicitudes aquí")).toBeVisible();
 
+    // Desde el 2026-11-16 ve solo el trámite de Técnico (e2e/boleta.spec.ts abre uno), y
+    // no tiene estadísticas ni consulta histórica.
     const supervisor = await entrar(browser, CUENTAS.supervisor);
     await supervisor.goto("/dashboard");
-    await expect(supervisor.getByText("Solicitudes de los dos sectores, en solo lectura")).toBeVisible();
+    await expect(supervisor.getByText(
+      "Trámite de Técnico, Superintendente o Supernumerario, de los dos sectores, en solo lectura")).toBeVisible();
+    await expect(supervisor.getByRole("link", { name: "Consulta histórica" })).toHaveCount(0);
+    await supervisor.getByRole("button", { name: "Menú" }).click();
+    await expect(supervisor.getByRole("link", { name: "Inicio", exact: true })).toBeVisible();   // el menú abrió
+    await expect(supervisor.getByRole("link", { name: /^(Estadísticas|Consulta histórica)$/ })).toHaveCount(0);
+    await supervisor.keyboard.press("Escape");
     await supervisor.goto(`/solicitudes/${id}`);
-    await expect(estado(supervisor, "Finalizada")).toBeVisible();
-    await expect(supervisor.getByText("Sector Pacífico", { exact: true })).toBeVisible();
-    await expect(supervisor.getByRole("button", { name: /^(Aprobar|Devolver|Denegar|Finalizar|Guardar verificación)/ }))
-      .toHaveCount(0);
+    await expect(supervisor.getByText("No tienes acceso a esta solicitud.")).toBeVisible();
+    await supervisor.goto("/admin/stats");
+    await expect(supervisor).toHaveURL(/\/dashboard$/);
   });
 
   await test.step("UCVMM la encuentra en la consulta histórica por el pasajero y la exporta a Excel", async () => {

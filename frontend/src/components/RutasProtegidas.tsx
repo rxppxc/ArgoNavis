@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { RUTA_CAMBIAR_CONTRASENA } from "../api/client";
 import { useAutenticacion } from "../hooks/useAutenticacion";
-import { PERMISOS_PERSONAL_SNM, usePermisos } from "../hooks/usePermisos";
+import { PERMISOS_ESTADISTICAS, PERMISOS_HISTORICO, usePermisos } from "../hooks/usePermisos";
 import { CargandoRuta } from "./EstadoCarga";
 
 /** Con sesión. Una cuenta con cambio de contraseña pendiente solo puede ir a cambiarla.
@@ -42,25 +42,26 @@ export function RutaRol({ roles, children }: { roles: RolFijo[]; children: React
 }
 
 export function RutaStats({ children }: { children: React.ReactNode }) {
-  const { tiene, esAdmin, cargando } = usePermisos();
+  const { tieneAlguno, esAdmin, cargando } = usePermisos();
   return (
     <RutaPrivada>
       {/* Recién iniciada la sesión los permisos aún no llegan: esperar en vez de rebotar. */}
       {cargando ? <CargandoRuta />
-        : esAdmin || tiene("T-PROCESAR-PACIFICO") || tiene("T-SUPERVISAR-SECTOR") || tiene("T-SUPERVISAR-TODO")
+        : esAdmin || tieneAlguno(...PERMISOS_ESTADISTICAS)
           ? <Suspense fallback={<CargandoRuta />}>{children}</Suspense>
           : <Navigate to="/dashboard" replace />}
     </RutaPrivada>
   );
 }
 
-/** La consulta histórica (2026-11-11): el personal del SNM que trabaja solicitudes. */
-export function RutaPersonalSnm({ children }: { children: React.ReactNode }) {
+/** La consulta histórica (2026-11-11): UCVMM, el supervisor de sector y el puesto de
+ *  control. El supervisor general no (2026-11-16). */
+export function RutaHistorico({ children }: { children: React.ReactNode }) {
   const { tieneAlguno, cargando } = usePermisos();
   return (
     <RutaPrivada>
       {cargando ? <CargandoRuta />
-        : tieneAlguno(...PERMISOS_PERSONAL_SNM)
+        : tieneAlguno(...PERMISOS_HISTORICO)
           ? <Suspense fallback={<CargandoRuta />}>{children}</Suspense>
           : <Navigate to="/dashboard" replace />}
     </RutaPrivada>

@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { RUTA_CAMBIAR_CONTRASENA } from "./api/client";
 import { CapturadorErrores } from "./components/CapturadorErrores";
 import { CargandoRuta } from "./components/EstadoCarga";
-import { RutaPersonalSnm, RutaPrivada, RutaRol, RutaSolicitudes, RutaStats } from "./components/RutasProtegidas";
+import { RutaHistorico, RutaPrivada, RutaRol, RutaSolicitudes, RutaStats } from "./components/RutasProtegidas";
 import { GestorSesion } from "./components/VigilanteSesion";
 import { VigilanteVersion } from "./components/VigilanteVersion";
 import { ProveedorNotificaciones } from "./components/Notificaciones";
@@ -66,7 +66,7 @@ export default function App() {
                           <Route path="/new"               element={<RutaSolicitudes><PaginaSolicitud /></RutaSolicitudes>} />
                           <Route path="/solicitudes/:id"          element={<RutaSolicitudes><PaginaDetalleSolicitud /></RutaSolicitudes>} />
                           <Route path="/solicitudes/:id/corregir" element={<RutaSolicitudes><PaginaSolicitud /></RutaSolicitudes>} />
-                          <Route path="/historico"         element={<RutaPersonalSnm><PaginaConsultaHistorica /></RutaPersonalSnm>} />
+                          <Route path="/historico"         element={<RutaHistorico><PaginaConsultaHistorica /></RutaHistorico>} />
                           <Route path="/admin"             element={<RutaRol roles={["admin", "sysadmin"]}><PaginaUsuarios /></RutaRol>} />
                           <Route path="/admin/roles"       element={<RutaRol roles={["admin", "sysadmin"]}><PaginaRoles /></RutaRol>} />
                           <Route path="/admin/stats"       element={<RutaStats><PaginaEstadisticas /></RutaStats>} />

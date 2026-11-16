@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.dependencias import auditar, requerir_algun_permiso, requerir_permiso, usuario_actual
 from app.core.email import Aviso
 from app.core.horario import ZONA_PANAMA
+from app.core.texto import slug
 from app.core.permisos import (
     PERMISO_PUERTO, PERMISO_REVISAR, PERMISO_SOLICITAR, PERMISO_SUPERVISAR_SECTOR, PERMISO_SUPERVISAR_TODO,
 )
@@ -24,8 +25,9 @@ from app.domain.models.audit_log import AccionAuditoria
 from app.domain.models.solicitud import Solicitud
 from app.domain.models.user import Usuario
 from app.domain.schemas.solicitud import (
-    ConsultaBandeja, ConsultaHistorica, DatosAprobacion, DatosCorregirSolicitud, DatosCrearSolicitud,
-    DatosFinalizar, DatosImpedimentos, DatosMotivo, PaginaSolicitudes, SalidaEstadisticasSolicitudes,
+    ConsultaBandeja, ConsultaHistorica, DatosAnularBoleta, DatosAprobacion, DatosBoleta, DatosCorregirSolicitud,
+    DatosCrearSolicitud, DatosFinalizar, DatosImpedimentos, DatosMotivo, PaginaSolicitudes,
+    SalidaEstadisticasSolicitudes,
     SalidaOpcionesHistorico, SalidaSolicitud,
 )
 from app.domain.services.notificacion_service import ServicioNotificacion
@@ -33,6 +35,7 @@ from app.domain.services.acceso import ContextoAcceso
 from app.domain.services.solicitud_service import ServicioSolicitud
 from app.domain.services.uso_service import ServicioUsoSistema
 from app.informes.autorizacion_pdf import generar_pdf_autorizacion
+from app.informes.boleta_recargo_pdf import generar_pdf_boleta
 from app.informes.estadisticas import DatosInforme, generar_informe
 from app.informes.historico_excel import generar_archivo as generar_excel_historico
 from app.infrastructure import almacenamiento
@@ -171,8 +174,9 @@ async def bandeja_supervision(
     return await svc.bandeja_supervision(ctx, consulta)
 
 
-# Quien ve estadísticas: UCVMM y los supervisores (el Administrador, por el atajo).
-_PUEDE_VER_ESTADISTICAS = requerir_algun_permiso(PERMISO_REVISAR, PERMISO_SUPERVISAR_SECTOR, PERMISO_SUPERVISAR_TODO)
+# Quien ve estadísticas: UCVMM y el supervisor de sector (el Administrador, por el atajo).
+# El supervisor general no, desde el 2026-11-16.
+_PUEDE_VER_ESTADISTICAS = requerir_algun_permiso(PERMISO_REVISAR, PERMISO_SUPERVISAR_SECTOR)
 
 
 @enrutador.get("/estadisticas", response_model=SalidaEstadisticasSolicitudes)
@@ -510,3 +514,67 @@ async def finalizar_solicitud(
     await _auditar(sesion, request, ctx.usuario, AccionAuditoria.SOLICITUD_FINALIZADA, s,
                    comentario=datos.comentario, puesto_finalizacion=s.puesto_finalizacion_nombre)
     return await svc.construir_detalle(ctx, s)
+
+
+# ── Boleta de recargo (2026-11-16) ───────────────────────────────────────────
+
+@enrutador.post("/{solicitud_id}/boletas", response_model=SalidaSolicitud, status_code=201)
+async def generar_boleta(
+    solicitud_id: int,
+    datos:   DatosBoleta,
+    request: Request,
+    ctx:     ContextoAcceso = Depends(_contexto),
+    svc:     ServicioSolicitud = Depends(_servicio),
+    sesion:  AsyncSession   = Depends(obtener_sesion_bd, scope="function"),
+):
+    """UCVMM, el supervisor de sector o el puesto de control generan la boleta de
+    recargo de una solicitud aprobada fuera del horario, con el número de oficio
+    (único entre todas las boletas). La agencia no la ve: la imprime el SNM."""
+    s, boleta = await svc.generar_boleta(ctx, solicitud_id, datos.numero_oficio)
+    await _auditar(sesion, request, ctx.usuario, AccionAuditoria.BOLETA_GENERADA, s,
+                   boleta_id=boleta.id, numero_oficio=boleta.numero_oficio, monto=str(boleta.monto))
+    return await svc.construir_detalle(ctx, s)
+
+
+@enrutador.post("/{solicitud_id}/boletas/{boleta_id}/anular", response_model=SalidaSolicitud)
+async def anular_boleta(
+    solicitud_id: int,
+    boleta_id: int,
+    datos:   DatosAnularBoleta,
+    request: Request,
+    ctx:     ContextoAcceso = Depends(_contexto),
+    svc:     ServicioSolicitud = Depends(_servicio),
+    sesion:  AsyncSession   = Depends(obtener_sesion_bd, scope="function"),
+):
+    """Anula la boleta vigente, con motivo, como en un talonario: queda con su número
+    y se puede generar otra con otro."""
+    s, boleta = await svc.anular_boleta(ctx, solicitud_id, boleta_id, datos.motivo)
+    await _auditar(sesion, request, ctx.usuario, AccionAuditoria.BOLETA_ANULADA, s,
+                   boleta_id=boleta.id, numero_oficio=boleta.numero_oficio, motivo=datos.motivo)
+    return await svc.construir_detalle(ctx, s)
+
+
+@enrutador.get("/{solicitud_id}/boletas/{boleta_id}/boleta.pdf")
+@limiter.limit(limite_pdf, key_func=clave_usuario)
+async def descargar_boleta(
+    solicitud_id: int,
+    boleta_id: int,
+    request: Request,
+    ctx:     ContextoAcceso = Depends(_contexto),
+    svc:     ServicioSolicitud = Depends(_servicio),
+    sesion:  AsyncSession   = Depends(obtener_sesion_bd, scope="function"),
+):
+    """El PDF de la boleta (la anulada, con el sello). Solo el personal del SNM."""
+    s, boleta, datos = await svc.datos_pdf_boleta(ctx, solicitud_id, boleta_id)
+    # La conexión vuelve al pool mientras se arma el PDF, como la autorización.
+    await sesion.commit()
+    contenido = await en_hilo_con_tope(generar_pdf_boleta, datos)
+    await _auditar(sesion, request, ctx.usuario, AccionAuditoria.BOLETA_DESCARGADA, s,
+                   boleta_id=boleta.id, numero_oficio=boleta.numero_oficio, anulada=not boleta.vigente)
+    sufijo = slug(boleta.numero_oficio)
+    nombre = f"Boleta-recargo-{datos.numero_solicitud}{f'-{sufijo}' if sufijo else ''}.pdf"
+    return Response(
+        content=contenido,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"', "Cache-Control": "no-store"},
+    )

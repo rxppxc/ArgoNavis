@@ -62,7 +62,11 @@ export function solicitudDePrueba(cambios: Partial<SolicitudDetalle> = {}): Soli
     motivo_negacion: null, comentario_finalizacion: null, finalizada_por: null,
     puesto_finalizacion_id: null, puesto_finalizacion_nombre: null,
     tripulantes: [], documentos: [], checklist: [], eventos: [],
-    acciones: { corregir: true, revisar: false, finalizar: false, descargar_autorizacion: false, conflicto_revision: false },
+    acciones: {
+      corregir: true, revisar: false, finalizar: false, descargar_autorizacion: false, conflicto_revision: false,
+      generar_boleta: false, anular_boleta: false,
+    },
+    boletas: null,
     ...cambios,
   };
 }

@@ -460,3 +460,39 @@ Pedido del usuario: revisar a fondo toda la estructura, los archivos y el códig
 **Revisado y sin cambios:**
 - Las tres asignaciones de usuarios de los catálogos: se parecen en la forma, pero cada una tiene su regla.
 - Los estilos de los campos y la franja: los valores ya son tokens, y juntarlos pide cambiar la marca HTML.
+
+
+## Boleta de recargo y supervisor general (2026-11-16, migración `e5c1a7d3b902`)
+
+Pedido del usuario: validar el recargo por atención fuera del horario, integrar una boleta para cobrarlo y limitar al supervisor general.
+
+**El recargo ya estaba como lo pidió** (desde el 2026-11-11), y se validó:
+- son B/.20.00;
+- cuenta la hora en que UCVMM aprueba;
+- de lunes a viernes, de 07:00 a 15:00, es laboral (las 15:00 en punto todavía lo es);
+- de 15:01 a 06:59 hay recargo, y el sábado y el domingo enteros.
+
+Solo cambió el nombre visible: «Costo migratorio» pasó a «Recargo por atención fuera del horario laboral», en el expediente, el correo, el PDF y el Excel de la histórica. La API sigue con `costo_fuera_de_horario`.
+
+**Boleta de recargo** (tabla `boletas_recargo`):
+- **Quién la genera:** UCVMM, el supervisor de sector y el puesto de control (decisión del usuario), y el Administrador. Antes de generarla se pide el número de oficio.
+- **El número:** único por boleta (decisión del usuario). Se compara sin distinguir mayúsculas, también contra las anuladas.
+- **Si salió mal:** se anula con motivo y se genera otra (decisión del usuario: «como un talonario»). Hay una sola vigente por solicitud.
+- **La agencia no la ve:** la imprime el SNM y se la entrega (decisión del usuario). Por eso el PDF no lleva nombres de funcionarios.
+- **El formato es un borrador:** UCVMM tiene un modelo en papel, que se copiará después.
+- **No se puede borrar:** la cuenta de la aplicación no tiene DELETE sobre la tabla (`TABLAS_SIN_BORRAR`).
+- **Concurrencia:** dos generaciones a la vez dejan una sola vigente; la solicitud se bloquea.
+
+**Supervisor general:**
+- **Qué ve:** solo el trámite de Técnico, Superintendente o Supernumerario, de los dos sectores. Embarque y Desembarque (marinos, pasajeros y militares) «no interesan».
+  - Qué trámites ve lo marca el catálogo (`tipos_tramite.supervision_general`), así que otro se suma con una migración.
+  - Se descartó filtrar por el rango de los pasajeros, porque traería Urgencias, Renovación y Cambio de nave con técnicos.
+- **Qué pierde:** las estadísticas, el uso del sistema (que queda solo para el Administrador) y la consulta histórica.
+- **El supervisor de sector** no cambió.
+
+**Pruebas:**
+- `test_boletas.py`: 12 pruebas.
+- `test_supervisor_general_solo_tecnico`.
+- La cuenta de la BD sin DELETE sobre las boletas.
+- `boleta.spec.ts` (E2E), con una solicitud de Técnico que siembra `servidor_e2e.py`.
+- El paso del supervisor general de `flujo-completo.spec.ts`.

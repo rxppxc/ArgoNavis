@@ -13,10 +13,14 @@ export const CUENTAS = {
   agencia:    "e2e.agencia",
   ucvmm:      "e2e.ucvmm",        // Sector Pacífico, el del puesto de las pruebas
   atlantico:  "e2e.atlantico",    // UCVMM del Sector Atlántico: no ve las del Pacífico
-  supervisor: "e2e.supervisor",   // Supervisor general: ve todo, sin decidir
+  supervisor: "e2e.supervisor",   // Supervisor general: solo el trámite de Técnico, sin decidir (2026-11-16)
   puesto:     "e2e.puesto",
   admin:      "e2e.admin",
 } as const;
+/** La solicitud de Técnico aprobada fuera del horario, con recargo, que siembra
+ *  servidor_e2e.py (2026-11-16): la de la boleta y la del supervisor general. Es de
+ *  la agencia de las pruebas, en el Puesto E2E Rodman. */
+export const NUMERO_RECARGO = "AM-E2E-RECARGO";
 /** Nombre completo del revisor de UCVMM: la agencia no debe verlo. */
 export const NOMBRE_REVISOR = "Ricardo Revisor";
 

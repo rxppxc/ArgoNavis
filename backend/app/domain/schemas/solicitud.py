@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.domain.models.boleta import LARGO_MOTIVO_ANULACION, LARGO_NUMERO_OFICIO
+
 RangoMarino = Literal["marino", "pasajero", "militar", "tecnico", "supernumerario", "superintendente"]
 Sexo        = Literal["M", "F", "X"]
 Estado      = Literal["review", "returned", "approved", "denied", "finalized", "expired"]
@@ -146,6 +148,32 @@ class DatosMotivo(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     motivo: str = Field(min_length=5, max_length=2000)
+
+
+class DatosBoleta(BaseModel):
+    """La boleta de recargo (2026-11-16): el número de oficio que escribe el
+    funcionario. Se le quitan los espacios de los extremos y los repetidos; es
+    único entre todas las boletas (lo comprueba el servicio)."""
+    numero_oficio: str = Field(max_length=200)
+
+    @field_validator("numero_oficio")
+    @classmethod
+    def _normalizar(cls, v: str) -> str:
+        if any(c in v for c in "\r\n\t"):
+            raise ValueError("El número de oficio va en una sola línea.")
+        v = " ".join(v.split())
+        if not v:
+            raise ValueError("Escribe el número de oficio.")
+        if len(v) > LARGO_NUMERO_OFICIO:
+            raise ValueError(f"El número de oficio admite hasta {LARGO_NUMERO_OFICIO} caracteres.")
+        return v
+
+
+class DatosAnularBoleta(BaseModel):
+    """Por qué se anula la boleta: queda con ella, en el historial y en la bitácora."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    motivo: str = Field(min_length=5, max_length=LARGO_MOTIVO_ANULACION)
 
 
 class DatosAprobacion(BaseModel):
@@ -315,6 +343,22 @@ class AccionesSolicitud(BaseModel):
     # Tendría permiso de revisar, pero la solicitud la creó él o es de su
     # agencia (separación de funciones): la interfaz explica por qué no puede.
     conflicto_revision:     bool = False
+    # Boleta de recargo (2026-11-16): generar si no hay una vigente; anular la vigente.
+    generar_boleta:         bool = False
+    anular_boleta:          bool = False
+
+
+class SalidaBoleta(BaseModel):
+    """Una boleta de recargo (2026-11-16). Solo para el personal del SNM."""
+    id:               int
+    numero_oficio:    str
+    monto:            str             # "B/.20.00"
+    generada_en:      datetime
+    generada_por:     str | None = None
+    anulada_en:       datetime | None = None
+    anulada_por:      str | None = None
+    motivo_anulacion: str | None = None
+    vigente:          bool
 
 
 class SalidaSolicitudResumen(BaseModel):
@@ -351,7 +395,7 @@ class SalidaSolicitudResumen(BaseModel):
     # trámites (se le pide la Visa); antes, solo en los que avisan la custodia.
     tiene_nacionalidad_restringida: bool = False
     # Aprobada fuera del horario laboral (None: sin aprobar). Desde el 2026-11-11
-    # lo ve también la agencia, con el costo migratorio guardado al aprobar
+    # lo ve también la agencia, con el recargo guardado al aprobar
     # ("B/.20.00"; None si no tiene).
     fuera_de_horario:               bool | None = None
     costo_fuera_de_horario:         str | None = None
@@ -413,6 +457,9 @@ class SalidaSolicitud(SalidaSolicitudResumen):
     checklist:   list[SalidaCasilla]    = Field(default_factory=list)
     eventos:     list[SalidaEvento]     = Field(default_factory=list)
     acciones:    AccionesSolicitud      = Field(default_factory=AccionesSolicitud)
+    # Las boletas de recargo, con las anuladas (2026-11-16). None para la agencia: no
+    # las ve (las imprime el SNM y se las entrega).
+    boletas:     list[SalidaBoleta] | None = None
 
 
 class SalidaTripulanteVerificacion(BaseModel):

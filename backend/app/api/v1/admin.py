@@ -4,8 +4,7 @@ en los servicios (domain/services/usuario_service.py y rol_service.py, desde el
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.dependencias import auditar_admin, requerir_admin_o_sysadmin, requerir_algun_permiso
-from app.core.permisos import PERMISO_SUPERVISAR_TODO
+from app.api.v1.dependencias import auditar_admin, requerir_admin, requerir_admin_o_sysadmin
 from app.domain.models.audit_log import AccionAuditoria
 from app.domain.schemas.rol import (
     DatosActualizarRol, DatosAsignarPermisos, DatosAsignarRol, DatosCrearRol, SalidaPermiso, SalidaRol,
@@ -205,10 +204,9 @@ async def asignar_permisos_a_rol(
 @enrutador.get("/stats", response_model=SalidaUsoSistema)
 async def obtener_estadisticas(
     # Los totales de todo el sistema (y las agencias con más solicitudes, de los dos
-    # sectores): solo quien ve todos los sectores, el supervisor general y el
-    # Administrador (por el atajo de usuario_tiene_permiso). Hasta el 2026-11-10
-    # los veía UCVMM, cuando había un solo sector.
-    _: int = Depends(requerir_algun_permiso(PERMISO_SUPERVISAR_TODO)),
+    # sectores): solo el Administrador. Hasta el 2026-11-10 los veía UCVMM, cuando
+    # había un solo sector; hasta el 2026-11-16, también el supervisor general.
+    _: int = Depends(requerir_admin),
     sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
     """Cuentas, agencias y documentos almacenados (el flujo tiene sus propias

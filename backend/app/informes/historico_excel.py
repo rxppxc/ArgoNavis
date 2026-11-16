@@ -5,7 +5,7 @@ del SNM, título, filtros, quién la generó, logo de ARGO NAVIS y la franja
 amarilla) y una fila por solicitud: número, estado (con el color de su
 insignia a la izquierda), trámite, agencia, puesto, sector, buque, IMO,
 operación, pasajeros, fechas de envío, aprobación y finalización, si se
-aprobó fuera del horario y su costo migratorio.
+aprobó fuera del horario y su recargo.
 
 La fila de encabezados queda fija al bajar y lleva los filtros de Excel. Las
 cifras son números; las fechas, fechas de Excel en hora de Panamá; el costo,
@@ -57,7 +57,7 @@ _COLUMNAS: tuple[tuple[str, int, str], ...] = (
     ("Aprobada", 18, "fecha_hora"),
     ("Finalizada", 18, "fecha_hora"),
     ("Fuera del horario", 10, "texto"),
-    ("Costo migratorio", 11, "moneda"),
+    ("Recargo", 11, "moneda"),
 )
 _FILA_NOTA = 6
 _FILA_ENCABEZADO = 7

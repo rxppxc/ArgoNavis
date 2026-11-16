@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.horario import FIN_LABORAL, INICIO_LABORAL, ZONA_PANAMA, entre_fechas_panama
+from app.domain.models.boleta import BoletaRecargo
 from app.domain.models.catalogo import AgenciaNaviera, PuestoControl
 from app.domain.models.solicitud import (
     MESES_VIGENCIA_PASAPORTE, RANGOS_CON_LIBRETA, CasillaSolicitud, DocumentoSolicitud, EstadoSolicitud,
@@ -27,6 +28,8 @@ class AlcanceSnm:
     # Desde que se aprueban (puesto de control), como primer puesto o como el nuevo de
     # un cambio de puerto.
     puestos_aprobadas: frozenset[int] = frozenset()
+    # Las de los trámites que ve el supervisor general (2026-11-16), de cualquier puesto.
+    supervision_general: bool = False
 
 
 def puesto_autorizado():
@@ -97,6 +100,7 @@ class RepositorioSolicitud:
                 selectinload(Solicitud.tripulantes),
                 selectinload(Solicitud.eventos),
                 selectinload(Solicitud.casillas),
+                selectinload(Solicitud.boletas),
             )
             .where(Solicitud.id == solicitud_id)
         )
@@ -131,11 +135,15 @@ class RepositorioSolicitud:
         if filtros.alcance_snm is not None:
             alcance = filtros.alcance_snm
             aprobadas = sorted(alcance.puestos_aprobadas) or [-1]
-            condiciones.append(or_(
+            caminos = [
                 Solicitud.puesto_control_id.in_(sorted(alcance.puestos) or [-1]),
                 and_(or_(Solicitud.puesto_control_id.in_(aprobadas), Solicitud.puesto_destino_id.in_(aprobadas)),
                      Solicitud.aprobada_en.isnot(None)),
-            ))
+            ]
+            if alcance.supervision_general:
+                caminos.append(Solicitud.tipo_tramite_id.in_(
+                    select(TipoTramite.id).where(TipoTramite.supervision_general.is_(True))))
+            condiciones.append(or_(*caminos))
         if filtros.puesto_id is not None:
             # El elegido o el nuevo de un cambio de puerto.
             condiciones.append(or_(Solicitud.puesto_control_id == filtros.puesto_id,
@@ -328,6 +336,12 @@ class RepositorioSolicitud:
 
     async def guardar(self) -> None:
         await self.sesion.flush()
+
+    async def boleta_con_numero(self, numero_oficio: str) -> BoletaRecargo | None:
+        """La boleta con ese número de oficio, sin distinguir mayúsculas (como el
+        índice único), anulada o no."""
+        consulta = select(BoletaRecargo).where(func.lower(BoletaRecargo.numero_oficio) == numero_oficio.lower())
+        return (await self.sesion.execute(consulta)).scalar_one_or_none()
 
     # ── Uso del sistema ──────────────────────────────────────────────────────
 

@@ -72,6 +72,9 @@ class TipoEventoSolicitud(str, enum.Enum):
     COMENTARIO   = "comentario"
     FINALIZADA   = "finalizada"
     EXPIRADA     = "expirada"
+    # La boleta de recargo por atención fuera del horario (2026-11-16): interna.
+    BOLETA_GENERADA = "boleta_generada"
+    BOLETA_ANULADA  = "boleta_anulada"
 
 
 def _valores(enumeracion: type[enum.Enum]) -> str:
@@ -141,7 +144,7 @@ class Solicitud(Base):
     aprobada_en:            Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     aprobada_por_id:        Mapped[int | None]      = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     observacion_aprobacion: Mapped[str | None]      = mapped_column(Text)
-    # Costo migratorio por aprobarse fuera del horario laboral (2026-11-11): el de
+    # Recargo por aprobarse fuera del horario laboral (2026-11-11): el de
     # ese momento (foto), para que cambiar COSTO_FUERA_DE_HORARIO no toque lo ya
     # aprobado. Nulo = dentro del horario, sin costo o aprobada antes del cambio.
     costo_fuera_de_horario: Mapped[Decimal | None]  = mapped_column(Numeric(8, 2))
@@ -198,6 +201,10 @@ class Solicitud(Base):
     casillas: Mapped[list["CasillaSolicitud"]] = relationship(
         back_populates="solicitud", cascade="all, delete-orphan", passive_deletes=True,
         order_by="CasillaSolicitud.orden",
+    )
+    # Boletas de recargo (2026-11-16), con las anuladas: nunca se borran.
+    boletas: Mapped[list["BoletaRecargo"]] = relationship(  # noqa: F821
+        back_populates="solicitud", order_by="BoletaRecargo.id",
     )
 
     # El puesto donde vale la autorización: el que la ve en su bandeja, recibe el
@@ -338,3 +345,9 @@ class EventoSolicitud(Base):
     creado_en:       Mapped[datetime]   = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     solicitud: Mapped["Solicitud"] = relationship(back_populates="eventos")
+
+
+# `Solicitud.boletas` nombra a BoletaRecargo (2026-11-16): el modelo tiene que estar
+# registrado cuando se configura Solicitud, también en los scripts que no cargan
+# app.main (la siembra del E2E). boleta.py no importa este módulo: no hay ciclo.
+from app.domain.models import boleta as _boleta  # noqa: E402, F401

@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { leerEspejo, type Caso } from "../../pruebas/espejo";
-import { fechaEnPalabras, normalizarImo, TEXTO_HORARIO_LABORAL } from "./presentacion";
+import { ETIQUETA_EVENTO, fechaEnPalabras, normalizarImo, TEXTO_HORARIO_LABORAL } from "./presentacion";
+
+describe("ETIQUETA_EVENTO", () => {
+  it("nombra los eventos de la boleta de recargo (2026-11-16, internos del SNM)", () => {
+    expect(ETIQUETA_EVENTO.boleta_generada).toBe("Boleta de recargo generada");
+    expect(ETIQUETA_EVENTO.boleta_anulada).toBe("Boleta de recargo anulada");
+  });
+});
 
 describe("TEXTO_HORARIO_LABORAL", () => {
   it("dice lo mismo que el correo y el PDF (TEXTO_HORARIO de core/horario.py)", () => {

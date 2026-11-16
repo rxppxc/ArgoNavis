@@ -157,3 +157,18 @@ def test_constantes_iguales_en_el_frontend():
     assert horario.TEXTO_HORARIO == (
         f"lunes a viernes, de {horario.INICIO_LABORAL:%H:%M} a {horario.FIN_LABORAL:%H:%M}"
     )
+
+
+
+def test_la_bitacora_nombra_todas_las_acciones():
+    """Cada acción de la bitácora (AccionAuditoria) tiene su nombre en la pantalla
+    (ETIQUETA_ACCION, PaginaBitacora.tsx). Sin él, el administrador veía el código
+    crudo y el filtro lo ofrecía así (pasó con las de la boleta de recargo, 2026-11-16)."""
+    from app.domain.models.audit_log import AccionAuditoria
+
+    texto = (FRONTEND / "modulos" / "administracion" / "PaginaBitacora.tsx").read_text(encoding="utf-8")
+    bloque = re.search(r"const ETIQUETA_ACCION[^{]*\{(.*?)\n\};", texto, re.S)
+    assert bloque, "no se encontró ETIQUETA_ACCION"
+    con_nombre = set(re.findall(r"^\s*([A-Z_]+):", bloque.group(1), re.M))
+    faltan = {a.value for a in AccionAuditoria} - con_nombre
+    assert not faltan, f"Acciones sin nombre en la bitácora: {sorted(faltan)}"

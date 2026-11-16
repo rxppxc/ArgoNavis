@@ -12,9 +12,11 @@ usuario del 2026-11-06); antes contaba la finalización del puesto de control.
 (`_fuera_de_horario` en solicitud_repository.py): tienen que coincidir, y lo
 comprueba tests/test_horario.py.
 
-Aprobada fuera del horario, la solicitud lleva un costo migratorio
-(`COSTO_FUERA_DE_HORARIO`, guardado al aprobar) y lo ve también la agencia
-(2026-11-11): en la bandeja, el expediente, el correo de aprobación y el PDF.
+Aprobada fuera del horario, la solicitud lleva un recargo por atención fuera
+del horario laboral (`COSTO_FUERA_DE_HORARIO`, guardado al aprobar) y lo ve
+también la agencia (2026-11-11): en la bandeja, el expediente, el correo de
+aprobación y el PDF. Para cobrarlo, el SNM genera una boleta (2026-11-16,
+`boletas_recargo`), que la agencia no ve en el sistema.
 
 Aquí vive también `entre_fechas_panama`, el filtro por días de Panamá que usan
 las bandejas, las estadísticas y la bitácora.
@@ -46,7 +48,7 @@ def aviso_fuera_de_horario(costo: Decimal | None) -> list[str]:
     dice lo mismo con TEXTO_HORARIO espejado en el frontend."""
     lineas = [f"Aprobada fuera del horario laboral ({TEXTO_HORARIO})."]
     if costo:
-        lineas.append(f"Costo migratorio: {texto_costo(costo)}.")
+        lineas.append(f"Recargo por atención fuera del horario laboral: {texto_costo(costo)}.")
     return lineas
 
 

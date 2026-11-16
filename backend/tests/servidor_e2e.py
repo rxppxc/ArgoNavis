@@ -40,6 +40,10 @@ PUESTO_MISMO_SECTOR = "Puesto E2E Rodman"
 PUESTO_OTRO_SECTOR = "Puesto E2E Atlántico"
 # A los pasajeros de esta nacionalidad se les pide la Visa (2026-11-14).
 NACIONALIDAD_RESTRINGIDA = "CUB"
+# Una solicitud del trámite de Técnico, aprobada fuera del horario con recargo, del
+# Puesto E2E Rodman (2026-11-16): para la boleta de recargo y el supervisor general, que
+# solo ve ese trámite. En Rodman, para que no aparezca en la bandeja del Puesto E2E.
+NUMERO_RECARGO = "AM-E2E-RECARGO"
 CUENTAS = [  # usuario, nombre, apellido, rol, ¿de la agencia?, ¿del puesto?, sector
     ("e2e.agencia", "Laura", "Agencia", "Naviera", True, False, None),
     ("e2e.ucvmm", "Ricardo", "Revisor", "UCVMM", False, False, "Sector Pacífico"),
@@ -83,13 +87,19 @@ def preparar_bd() -> None:
 
 
 async def sembrar() -> None:
+    from datetime import datetime, time, timedelta
+    from decimal import Decimal
+
     from sqlalchemy import insert, select, update
 
+    from app.core.horario import ZONA_PANAMA
     from app.core.security import hashear_password
     from app.domain.models.catalogo import (
         AgenciaNaviera, Pais, PuestoControl, Sector, usuarios_puestos, usuarios_sectores,
     )
     from app.domain.models.rol import Rol
+    from app.domain.models.solicitud import EventoSolicitud, Solicitud
+    from app.domain.models.tramite import TipoTramite
     from app.domain.models.user import TipoUsuario, Usuario
     from app.infrastructure.database import SesionLocal, motor_bd
 
@@ -97,22 +107,51 @@ async def sembrar() -> None:
         sectores = {x.nombre: x.id for x in (await s.execute(select(Sector))).scalars()}
         agencia = AgenciaNaviera(nombre=AGENCIA)
         puesto = PuestoControl(nombre=PUESTO, sector_id=sectores[SECTOR_DEL_PUESTO])
-        s.add_all([agencia, puesto,
-                   PuestoControl(nombre=PUESTO_MISMO_SECTOR, sector_id=sectores[SECTOR_DEL_PUESTO]),
+        rodman = PuestoControl(nombre=PUESTO_MISMO_SECTOR, sector_id=sectores[SECTOR_DEL_PUESTO])
+        s.add_all([agencia, puesto, rodman,
                    PuestoControl(nombre=PUESTO_OTRO_SECTOR, sector_id=sectores["Sector Atlántico"])])
         await s.flush()
         clave = hashear_password(CLAVE)
+        ids = {}
         for usuario, nombre, apellido, rol, de_agencia, de_puesto, sector in CUENTAS:
             rol_id = (await s.execute(select(Rol.id).where(Rol.nombre == rol))).scalar_one()
             u = Usuario(username=usuario, name=nombre, last_name=apellido, user_type=TipoUsuario.LOCAL,
                         password_hash=clave, rol_id=rol_id, agencia_id=agencia.id if de_agencia else None)
             s.add(u)
             await s.flush()
+            ids[usuario] = (u.id, u.full_name)
             if de_puesto:
                 await s.execute(insert(usuarios_puestos).values(usuario_id=u.id, puesto_id=puesto.id))
             if sector:
                 await s.execute(insert(usuarios_sectores).values(usuario_id=u.id, sector_id=sectores[sector]))
         await s.execute(update(Pais).where(Pais.codigo == NACIONALIDAD_RESTRINGIDA).values(nacionalidad_restringida=True))
+
+        # La solicitud de Técnico aprobada el último sábado a las 16:20, con el recargo.
+        tecnico = (await s.execute(select(TipoTramite.id).where(TipoTramite.codigo == "F3-TECNICO"))).scalar_one()
+        sabado = datetime.now(ZONA_PANAMA).date() - timedelta(days=1)
+        while sabado.weekday() != 5:
+            sabado -= timedelta(days=1)
+        aprobada = datetime.combine(sabado, time(16, 20), ZONA_PANAMA)
+        operacion = datetime.now(ZONA_PANAMA).date() + timedelta(days=7)
+        (agencia_id, agencia_nombre), (ucvmm_id, ucvmm_nombre) = ids["e2e.agencia"], ids["e2e.ucvmm"]
+        solicitud = Solicitud(
+            numero=NUMERO_RECARGO, agencia_id=agencia.id, agencia_nombre=AGENCIA, creada_por_id=agencia_id,
+            tipo_tramite_id=tecnico, puesto_control_id=rodman.id, puesto_nombre=PUESTO_MISMO_SECTOR,
+            titulo="Técnicos del MSC E2E", nombre_buque="MSC E2E", imo="9074729", fecha_operacion=operacion,
+            cantidad_tripulantes=0, estado="approved", enviada_en=aprobada - timedelta(hours=3),
+            aprobada_en=aprobada, aprobada_por_id=ucvmm_id, costo_fuera_de_horario=Decimal("20.00"),
+            vigente_hasta=datetime.combine(operacion, time(23, 59, 59), ZONA_PANAMA),
+            codigo_verificacion=secrets.token_urlsafe(24),
+        )
+        s.add(solicitud)
+        await s.flush()
+        s.add_all([
+            EventoSolicitud(solicitud_id=solicitud.id, tipo="creada", estado_nuevo="review", usuario_id=agencia_id,
+                            usuario_nombre=agencia_nombre, creado_en=aprobada - timedelta(hours=3)),
+            EventoSolicitud(solicitud_id=solicitud.id, tipo="aprobada", estado_anterior="review",
+                            estado_nuevo="approved", usuario_id=ucvmm_id, usuario_nombre=ucvmm_nombre,
+                            creado_en=aprobada),
+        ])
         await s.commit()
     await motor_bd.dispose()
 

@@ -112,6 +112,25 @@ export const apiSolicitudes = {
     guardarComoArchivo(blob, documento.nombre_original);
   },
 
+  /** Boleta de recargo (2026-11-16): con el número de oficio, que no se repite. */
+  generarBoleta: (id: number, numeroOficio: string) =>
+    clienteApi.post<SolicitudDetalle>(`/solicitudes/${id}/boletas`, { numero_oficio: numeroOficio })
+      .then((r) => r.data),
+
+  /** Como en un talonario: queda anulada, con su número, y se puede generar otra. */
+  anularBoleta: (id: number, boletaId: number, motivo: string) =>
+    clienteApi.post<SolicitudDetalle>(`/solicitudes/${id}/boletas/${boletaId}/anular`, { motivo })
+      .then((r) => r.data),
+
+  async descargarBoleta(id: number, boletaId: number): Promise<void> {
+    const { data, headers } = await clienteApi.get<Blob>(`/solicitudes/${id}/boletas/${boletaId}/boleta.pdf`, {
+      responseType: "blob",
+      timeout: 120_000,
+    });
+    const nombre = /filename="([^"]+)"/.exec(String(headers["content-disposition"] ?? ""))?.[1];
+    guardarComoArchivo(data, nombre ?? `Boleta-recargo-${id}.pdf`);
+  },
+
   async descargarAutorizacion(id: number, numero: string | null): Promise<void> {
     const { data, headers } = await clienteApi.get<Blob>(`/solicitudes/${id}/autorizacion.pdf`, {
       responseType: "blob",

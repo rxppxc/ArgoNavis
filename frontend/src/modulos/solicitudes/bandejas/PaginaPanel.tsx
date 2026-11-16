@@ -17,7 +17,7 @@ import {
   apiSolicitudes, type Bandeja, type ConsultaBandeja, type EstadoSolicitud, type PaginaSolicitudes,
 } from "../../../api/solicitudes";
 import { useAutenticacion } from "../../../hooks/useAutenticacion";
-import { PERMISOS_PERSONAL_SNM, usePermisos } from "../../../hooks/usePermisos";
+import { PERMISOS_HISTORICO, usePermisos } from "../../../hooks/usePermisos";
 import { MarcoPagina } from "../../../components/MarcoPagina";
 import { EncabezadoPagina } from "../../../components/EncabezadoPagina";
 import { EstadoCarga } from "../../../components/EstadoCarga";
@@ -105,8 +105,9 @@ function Panel({ bandejaPedida, estadoPedido }: { bandejaPedida: Bandeja | null;
   const veLosDos     = esAdmin || tiene("T-SUPERVISAR-TODO");
   const supervisa    = !esAdmin && (tiene("T-SUPERVISAR-SECTOR") || tiene("T-SUPERVISAR-TODO"));
   const esPuerto     = esAdmin || tiene("T-FINALIZAR-PUERTO");
-  // La consulta histórica (2026-11-11): para buscar en cualquier año, con más filtros.
-  const veHistorico  = tieneAlguno(...PERMISOS_PERSONAL_SNM);
+  // La consulta histórica (2026-11-11): para buscar en cualquier año, con más filtros. El
+  // supervisor general no la tiene (2026-11-16).
+  const veHistorico  = tieneAlguno(...PERMISOS_HISTORICO);
   // Las solicitudes son de una agencia: sin agencia el backend no deja enviar y
   // "Mi agencia" saldría vacía (le pasaba al Administrador, que tiene todos los permisos).
   const puedeCrear   = (esAdmin || tiene("T-CREAR-BASICA")) && tieneAgencia;
@@ -205,7 +206,8 @@ function Panel({ bandejaPedida, estadoPedido }: { bandejaPedida: Bandeja | null;
         </>}
         titulo="Solicitudes"
         descripcion={vista === "revision" && esAdmin ? "Solicitudes de los dos sectores"
-          : vista === "supervision" && veLosDos ? "Solicitudes de los dos sectores, en solo lectura"
+          : vista === "supervision" && veLosDos
+            ? "Trámite de Técnico, Superintendente o Supernumerario, de los dos sectores, en solo lectura"
           : VISTAS[vista].subtitulo}
         acciones={(puedeCrear || veHistorico) && (
           <>

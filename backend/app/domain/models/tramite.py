@@ -67,6 +67,9 @@ class TipoTramite(Base):
     # que debe tramitar la custodia de los tripulantes de nacionalidad
     # restringida (Desembarque, Urgencias, Renovación y Shore Pass).
     aviso_custodia: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Si lo ve el supervisor general (UCVMM en Tocumen, 2026-11-16): solo el trámite de
+    # Técnico, Superintendente o Supernumerario. Otro se suma con una migración.
+    supervision_general: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     # Cuándo se usa el trámite, en una línea (tarjetas del paso 1 de «Nueva solicitud»).
     descripcion: Mapped[str | None] = mapped_column(String(300))

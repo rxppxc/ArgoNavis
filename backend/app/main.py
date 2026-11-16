@@ -20,7 +20,7 @@ from app.core.registro import configurar_registro
 from app.core.security import CABECERA_CAMBIO_CONTRASENA
 from app.api.v1 import auth, admin, tramites, solicitudes, verificacion, catalogos, bitacora, pendientes
 # Registrar todos los modelos en el registry del ORM (relaciones por nombre).
-from app.domain.models import rol, tramite, catalogo, solicitud, correo  # noqa: F401
+from app.domain.models import rol, tramite, catalogo, solicitud, correo, boleta  # noqa: F401
 from app.infrastructure.cola_correos import tarea_correos
 from app.infrastructure.database import motor_bd
 from app.infrastructure.tareas import tarea_vencimientos

@@ -419,3 +419,31 @@
 }
 .modalCabecera { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .modalCabecera .panelTitulo { margin: 0; }
+
+/* ─── Boleta de recargo (2026-11-16): solo el personal del SNM ─── */
+.boleta {
+  display: grid; gap: 3px; margin-bottom: 4px; padding: 10px 12px;
+  border: 1px solid var(--border-2); border-left: 4px solid var(--acc-purple);
+  border-radius: var(--r-sm); background: color-mix(in srgb, var(--acc-purple) 6%, var(--card));
+}
+.boletaOficio { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.boletaOficio span {
+  color: var(--text-2); font: 700 .66rem/1.2 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
+  letter-spacing: .08em; text-transform: uppercase;
+}
+.boletaOficio strong, .boletaNumero {
+  color: var(--text); font: 600 .9rem/1.3 var(--letra-mono); overflow-wrap: anywhere;
+}
+.boletaNumero { font-size: .8rem; }
+.boletaDato { color: var(--text-2); font-size: .78rem; line-height: 1.45; }
+.btnAnular { composes: boton peligroContorno chico from "../../../components/Botones.module.css"; }
+.boletasAnuladas { margin-top: 12px; font-size: .78rem; color: var(--text-2); }
+.boletasAnuladas summary { cursor: pointer; font-weight: 600; color: var(--text); }
+.boletasAnuladas ul { list-style: none; display: grid; gap: 8px; margin-top: 8px; padding: 0; }
+.boletasAnuladas li {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
+  padding-top: 8px; border-top: 1px solid var(--border);
+}
+.textoLibre { overflow-wrap: anywhere; }
+/* La fecha con la hora («16/11/2026, 08:30 a. m.») no se parte en dos líneas. */
+.sinCorte { white-space: nowrap; }
