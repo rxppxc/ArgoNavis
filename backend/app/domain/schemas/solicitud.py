@@ -48,7 +48,8 @@ class DatosTripulanteEntrada(BaseModel):
     libreta_marino:   str | None = Field(default=None, max_length=100)   # seamanbook
     libreta_expira:   date | None = None
     rango:            RangoMarino
-    ocupacion:        str  = Field(min_length=2, max_length=150)
+    # La ocupación salió del formulario el 2026-11-16: si un navegador con la versión
+    # anterior todavía la manda, se ignora (los campos de más no se validan).
 
     @field_validator("pais_nacimiento", "nacionalidad", "pasaporte")
     @classmethod
@@ -82,6 +83,9 @@ class _DatosFormularioSolicitud(BaseModel):
     puesto_control_id: int | None  = None
     # Cambio de puerto (2026-11-13): el nuevo puesto, del mismo sector. Nulo = sin cambio.
     puesto_destino_id: int | None  = None
+    # «¿Subir y bajar?» (2026-11-16): solo en los trámites que lo ofrecen; en los demás
+    # se descarta. Con «Sí», cada pasajero adjunta la Carta de Responsabilidad.
+    subir_y_bajar:     bool        = False
     fecha_operacion:   date | None = None
 
     nombre_buque: str | None = Field(default=None, max_length=255)
@@ -277,7 +281,8 @@ class SalidaTripulante(BaseModel):
     libreta_marino:   str | None = None
     libreta_expira:   date | None = None
     rango:            str
-    ocupacion:        str
+    # Solo la traen las solicitudes enviadas antes del 2026-11-16 (salió del formulario).
+    ocupacion:        str | None = None
     es_panameno:      bool
     nacionalidad_restringida: bool
     # Verificación de impedimentos de la persona, la de UCVMM y la del puesto de
@@ -425,6 +430,9 @@ class SalidaSolicitud(SalidaSolicitudResumen):
 
     puesto_control_id:  int
     puesto_destino_id:  int | None = None
+    # «¿Subir y bajar?» (2026-11-16): la respuesta y si el trámite hace la pregunta.
+    subir_y_bajar:          bool = False
+    permite_subir_y_bajar:  bool = False
     bandera:            str | None = None
     bandera_nombre:     str | None = None
     nombre_puerto:      str | None = None

@@ -60,8 +60,15 @@ class TripulantePdf:
     pasaporte:    str
     libreta:      str
     rango:        str
-    ocupacion:    str
+    # Solo la traen las solicitudes enviadas antes del 2026-11-16 (salió del formulario).
+    ocupacion:    str | None = None
     restringida:  bool = False
+
+
+def titulo_columna_rango(tripulantes: list[TripulantePdf]) -> str:
+    """«Rango / Ocupación» si algún pasajero la tiene (una solicitud de antes del
+    2026-11-16); si no, «Rango»."""
+    return "Rango / Ocupación" if any(t.ocupacion for t in tripulantes) else "Rango"
 
 
 @dataclass
@@ -95,6 +102,8 @@ class DatosPdfAutorizacion:
     finalizada_por:      str | None = None
     # Cambio de puerto (2026-11-13): el nuevo puesto, donde vale y se finaliza.
     puesto_destino:      str | None = None
+    # «¿Subir y bajar?» (2026-11-16): None si el trámite no hace la pregunta.
+    subir_y_bajar:       bool | None = None
     # Aprobada fuera del horario laboral, con su recargo (2026-11-11).
     fuera_de_horario:       bool = False
     costo_fuera_de_horario: Decimal | None = None
@@ -232,6 +241,7 @@ def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
         ("AGENCIA NAVIERA", texto_pdf(d.agencia_naviera)),
         ("PUESTO DE CONTROL MIGRATORIO", texto_pdf(d.puesto_control)),
         *([("CAMBIO DE PUERTO A", texto_pdf(d.puesto_destino))] if d.puesto_destino else []),
+        *([("SUBIR Y BAJAR", "Sí" if d.subir_y_bajar else "No")] if d.subir_y_bajar is not None else []),
         ("BUQUE", texto_pdf(d.nombre_buque)),
         ("IMO", texto_pdf(d.imo)),
         ("BANDERA", texto_pdf(d.bandera)),
@@ -293,7 +303,7 @@ def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
 
     # ── Tripulantes ──
     historia.append(Paragraph("PASAJEROS", e_subtit))
-    cabecera = ["N°", "Apellidos", "Nombres", "Nacionalidad", "Pasaporte", "Seamanbook", "Rango / Ocupación"]
+    cabecera = ["N°", "Apellidos", "Nombres", "Nacionalidad", "Pasaporte", "Seamanbook", titulo_columna_rango(d.tripulantes)]
     filas_tripulantes = [[Paragraph(c, e_cabecera) for c in cabecera]]
     hay_restringidos = False
     for i, m in enumerate(d.tripulantes, start=1):
@@ -309,7 +319,7 @@ def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
             Paragraph(nacionalidad, e_celda),
             Paragraph(texto_pdf(m.pasaporte), e_celda),
             Paragraph(texto_pdf(m.libreta) if m.libreta else "No aplica", e_celda),
-            Paragraph(f"{escape(rango)}<br/>{texto_pdf(m.ocupacion)}", e_celda),
+            Paragraph(f"{escape(rango)}<br/>{texto_pdf(m.ocupacion)}" if m.ocupacion else escape(rango), e_celda),
         ])
     proporciones = [0.05, 0.17, 0.17, 0.15, 0.14, 0.14, 0.18]
     tabla_tripulantes = Table(filas_tripulantes, colWidths=[ancho * p for p in proporciones], repeatRows=1)

@@ -129,7 +129,7 @@ def _solicitud(puesto_id: int) -> tuple[dict, list]:
         "tripulantes": [{
             "nombre": "Luis", "apellido": "Pérez", "fecha_nacimiento": "1990-05-01", "pais_nacimiento": "PHL",
             "nacionalidad": "PHL", "sexo": "M", "pasaporte": f"P{secrets.token_hex(3)}", "pasaporte_expira": VIGENTE,
-            "rango": "marino", "ocupacion": "Marinero", "libreta_marino": f"SB{secrets.token_hex(2)}", "libreta_expira": VIGENTE,
+            "rango": "marino", "libreta_marino": f"SB{secrets.token_hex(2)}", "libreta_expira": VIGENTE,
         }],
         "asignaciones": [
             {"documento_codigo": "DOC-VISA-MARINO", "indice_tripulante": 0},

@@ -21,6 +21,8 @@ import { ChecklistSolicitud } from "./ChecklistSolicitud";
 import { DatosTramite } from "./DatosTramite";
 import { DocumentosAdicionales, MAX_ADICIONALES } from "./DocumentosAdicionales";
 import { armarEnvio, desdeSolicitud } from "./envioSolicitud";
+import { avanceFormulario } from "./pasosDelFormulario";
+import { AvanceFormulario } from "./AvanceFormulario";
 import { fechaISOLocal } from "../../../utils/fechas";
 import { formatearFechaHora, tiempoRestante } from "../presentacion";
 import { SelectorTramite } from "./SelectorTramite";
@@ -68,7 +70,9 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
   );
   const fichas = useTripulantesFormulario(precarga?.tripulantes);
   const { tripulantes } = fichas;
-  const documentos = useDocumentosFormulario(tipo, tripulantes, paisesPorCodigo, precarga);
+  // «¿Subir y bajar?» (2026-11-16): con «Sí», la Carta de Responsabilidad de cada pasajero.
+  const subirYBajar = !!tipo?.permite_subir_y_bajar && cabecera.subir_y_bajar === "si";
+  const documentos = useDocumentosFormulario(tipo, tripulantes, paisesPorCodigo, precarga, subirYBajar);
   const { faltantes } = documentos;
 
   const hoy = fechaISOLocal();
@@ -107,12 +111,16 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
       if (!ok) return false;
     }
     setCodigoTramite(codigo);
-    // Un trámite sin cambio de puerto no se queda con el «Sí» del anterior.
-    if (!tipos.find((t) => t.codigo === codigo)?.permite_cambio_puerto) {
+    // Un trámite sin cambio de puerto (o sin «¿Subir y bajar?») no se queda con el «Sí» del anterior.
+    const nuevo = tipos.find((t) => t.codigo === codigo);
+    if (!nuevo?.permite_cambio_puerto) {
       setCabecera((prev) => ({ ...prev, cambio_puerto: "no", puesto_destino_id: "" }));
     }
+    if (!nuevo?.permite_subir_y_bajar) {
+      setCabecera((prev) => ({ ...prev, subir_y_bajar: "no" }));
+    }
     documentos.descartarTodos();
-    fichas.ajustarRangos(tipos.find((t) => t.codigo === codigo)?.rangos_permitidos ?? null);
+    fichas.ajustarRangos(nuevo?.rangos_permitidos ?? null);
     return true;
   }
 
@@ -173,8 +181,11 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
       )}
 
       <form onSubmit={enviar} className={styles.form} noValidate>
+        {/* El avance de los cuatro pasos obligatorios (rediseño del 2026-11-17): cuánto falta y dónde. */}
+        <AvanceFormulario pasos={avanceFormulario({ tipoElegido: !!tipo, errores, faltantes: faltantes.length })} />
+
         {/* ── 1. Tipo de trámite ── */}
-        <section className={styles.bloque}>
+        <section className={styles.bloque} id="paso-tramite">
           <div className={styles.bloqueTitulo}><span className={styles.paso}>1</span> Tipo de trámite</div>
           <SelectorTramite tipos={tipos} elegido={tipo} fijo={corrigiendo} onElegir={elegirTramite}>
             {tipo?.nota && <div className={styles.nota}>{tipo.nota}</div>}
@@ -202,7 +213,7 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
             />
 
             {/* ── 3. Tripulantes ── */}
-            <section className={styles.bloque}>
+            <section className={styles.bloque} id="paso-pasajeros">
               <div className={styles.bloqueTitulo}>
                 <span className={styles.paso}>3</span> Pasajeros
                 <span className={styles.contador}>{tripulantes.length}</span>

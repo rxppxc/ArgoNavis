@@ -24,7 +24,7 @@ export function fichaVacia(rango: RangoMarino = "marino"): FichaTripulante {
   return {
     clave: nuevaClave("n"), nombre: "", apellido: "", fecha_nacimiento: "",
     pais_nacimiento: "", nacionalidad: "", sexo: "", pasaporte: "", pasaporte_expira: "",
-    libreta_marino: "", libreta_expira: "", rango, ocupacion: "",
+    libreta_marino: "", libreta_expira: "", rango,
   };
 }
 
@@ -44,6 +44,7 @@ export function desdeSolicitud(s: SolicitudDetalle): Precarga {
     puesto_control_id: String(s.puesto_control_id),
     cambio_puerto: s.puesto_destino_id ? "si" : "no",
     puesto_destino_id: s.puesto_destino_id ? String(s.puesto_destino_id) : "",
+    subir_y_bajar: s.subir_y_bajar ? "si" : "no",
     fecha_operacion: s.fecha_operacion,
     nombre_buque: s.nombre_buque ?? "",
     imo: s.imo ?? "",
@@ -60,7 +61,7 @@ export function desdeSolicitud(s: SolicitudDetalle): Precarga {
     pais_nacimiento: t.pais_nacimiento, nacionalidad: t.nacionalidad, sexo: t.sexo,
     pasaporte: t.pasaporte, pasaporte_expira: t.pasaporte_expira,
     libreta_marino: t.libreta_marino ?? "", libreta_expira: t.libreta_expira ?? "",
-    rango: t.rango, ocupacion: t.ocupacion,
+    rango: t.rango,
   }));
   const existentes: Record<string, DocumentoSolicitud[]> = {};
   const adicionales: DocumentoSolicitud[] = [];
@@ -117,6 +118,7 @@ export function armarEnvio(
     // Con «No» no viaja aunque haya quedado un puesto elegido.
     puesto_destino_id: cabecera.cambio_puerto === "si" && cabecera.puesto_destino_id
       ? Number(cabecera.puesto_destino_id) : null,
+    subir_y_bajar: cabecera.subir_y_bajar === "si",
     fecha_operacion: cabecera.fecha_operacion || null,
     nombre_buque: texto(cabecera.nombre_buque),
     imo,
@@ -141,7 +143,6 @@ export function armarEnvio(
         libreta_marino: conLibreta ? texto(t.libreta_marino ?? "") : null,
         libreta_expira: conLibreta ? (t.libreta_expira || null) : null,
         rango: t.rango,
-        ocupacion: t.ocupacion.trim(),
       };
     }),
     asignaciones,

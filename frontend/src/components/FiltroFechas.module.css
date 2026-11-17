@@ -39,12 +39,12 @@
   border-color: var(--input-border);
   color: var(--text);
 }
-/* Como la pestaña de estado activa: borde de tinta y la franja amarilla. */
+/* Como la pestaña de estado activa: rellena, con el principal del tema (2026-11-17; con
+   solo una raya amarilla casi no se notaba cuál estaba elegido). */
 .chipActivo, .chipActivo:hover {
-  background: var(--card);
-  border-color: var(--text);
-  box-shadow: inset 0 -3px 0 var(--franja);
-  color: var(--text);
+  background: var(--principal);
+  border-color: var(--principal);
+  color: var(--sobre-principal);
   font-weight: 700;
 }
 

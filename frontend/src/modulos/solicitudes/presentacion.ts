@@ -1,5 +1,5 @@
 /** Textos y formatos compartidos por las pantallas de solicitudes. */
-import type { EstadoSolicitud, EventoSolicitud, RangoMarino, Sexo } from "../../api/solicitudes";
+import type { EstadoSolicitud, EventoSolicitud, RangoMarino, Sexo, TripulanteSolicitud } from "../../api/solicitudes";
 import { dosCifras } from "../../utils/fechas";
 import { HORA_FIN_LABORAL, HORA_INICIO_LABORAL } from "../administracion/estadisticas/calculos";
 
@@ -49,6 +49,13 @@ export const ETIQUETA_EVENTO: Record<EventoSolicitud["tipo"], string> = {
 
 /** Rangos que portan seamanbook (al resto no se le pide libreta). */
 export const RANGOS_CON_LIBRETA: RangoMarino[] = ["marino"];
+
+/** El título de la columna del rango en el expediente: «Rango / ocupación» solo si
+ *  algún pasajero la tiene (una solicitud de antes del 2026-11-16, cuando la ocupación
+ *  salió del formulario). Lo mismo hace el PDF (titulo_columna_rango). */
+export function tituloColumnaRango(tripulantes: Pick<TripulanteSolicitud, "ocupacion">[]): "Rango / ocupación" | "Rango" {
+  return tripulantes.some((t) => t.ocupacion) ? "Rango / ocupación" : "Rango";
+}
 
 interface ConPuestos {
   puesto_nombre: string | null;

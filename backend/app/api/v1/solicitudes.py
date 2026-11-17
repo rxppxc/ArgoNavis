@@ -50,7 +50,7 @@ M = TypeVar("M", bound=BaseModel)
 _ETIQUETAS_CAMPO = {
     "codigo_tramite": "tipo de trámite",
     "puesto_control_id": "puesto de control", "puesto_destino_id": "puesto del cambio de puerto",
-    "fecha_operacion": "fecha de la operación",
+    "subir_y_bajar": "subir y bajar", "fecha_operacion": "fecha de la operación",
     "nombre_buque": "nombre del buque", "imo": "IMO", "bandera": "bandera",
     "nombre_puerto": "nombre del puerto", "puerto_desembarque": "puerto de desembarque",
     "motivo": "motivo", "clinica_hospital": "clínica u hospital", "observaciones": "observaciones",
@@ -58,7 +58,7 @@ _ETIQUETAS_CAMPO = {
     "pais_nacimiento": "país de nacimiento", "nacionalidad": "nacionalidad", "sexo": "sexo",
     "pasaporte": "N° de pasaporte", "pasaporte_expira": "vencimiento del pasaporte",
     "libreta_marino": "N° de seamanbook", "libreta_expira": "vencimiento del seamanbook",
-    "rango": "rango", "ocupacion": "ocupación",
+    "rango": "rango",
 }
 
 

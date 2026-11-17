@@ -4,9 +4,11 @@ Borrador con la identidad del sistema, como el PDF de la autorización: hay un
 modelo en papel que lo reemplazará. La imprime el SNM y se la entrega a la
 agencia para el cobro, así que no lleva nombres de funcionarios ni unidades
 internas (quién la generó queda en la bitácora y en el historial interno). Una
-boleta anulada sale con el sello ANULADA y el motivo.
+boleta anulada sale con el sello ANULADA y el motivo. El tipo de operación va en
+casillas, como en papel, con la respuesta a «¿Subir y bajar?» si el trámite la pide
+(2026-11-16).
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
 from io import BytesIO
@@ -53,6 +55,21 @@ class DatosPdfBoleta:
     generada_en:      datetime
     anulada_en:       datetime | None = None
     motivo_anulacion: str | None = None
+    # El tipo de operación en casillas (2026-11-16): los trámites activos del catálogo, en
+    # su orden; la X va en `tipo_tramite`.
+    tipos_operacion:  list[str] = field(default_factory=list)
+    # «¿Subir y bajar?»: None si el trámite no hace la pregunta.
+    subir_y_bajar:    bool | None = None
+
+
+def casillas_operacion(tipos: list[str], elegido: str) -> list[tuple[str, bool]]:
+    """Cada tipo de operación con su marca, como las casillas de un formulario en papel.
+    Si el de la solicitud ya no está entre los activos (Cambio de Puerto, desde el
+    2026-11-13), va al final, marcado."""
+    casillas = [(tipo, tipo == elegido) for tipo in tipos]
+    if elegido not in tipos:
+        casillas.append((elegido, True))
+    return casillas
 
 
 def _momento(valor: datetime) -> str:
@@ -112,6 +129,9 @@ def generar_pdf_boleta(d: DatosPdfBoleta) -> bytes:
     e_nota     = estilo("nota", fontSize=7.5, leading=10, textColor=GRIS)
     e_firma    = estilo("firma", fontSize=8, leading=10, textColor=GRIS, alignment=TA_CENTER)
     e_anulada  = estilo("anulada", fontName=negrita, fontSize=8.5, leading=11, textColor=ROJO, alignment=TA_CENTER)
+    e_opcion   = estilo("opcion", fontSize=9, leading=11)
+    e_elegida  = estilo("elegida", fontName=negrita, fontSize=9, leading=11)
+    e_marca    = estilo("marca", fontName=negrita, fontSize=8, leading=9, textColor=MARINO, alignment=TA_CENTER)
 
     def sello_anulada(canvas, documento) -> None:
         # Cruzado sobre la página, encima de todo: que no se pueda usar para cobrar.
@@ -166,7 +186,8 @@ def generar_pdf_boleta(d: DatosPdfBoleta) -> bytes:
     historia += [
         Paragraph("BOLETA DE RECARGO POR ATENCIÓN<br/>FUERA DEL HORARIO LABORAL", e_titulo),
         Spacer(1, 1.5 * mm),
-        Paragraph(f"Autorización Marítima N° {texto_pdf(d.numero_solicitud)} · {texto_pdf(d.tipo_tramite)}", e_sub),
+        # El trámite va abajo, en las casillas del tipo de operación.
+        Paragraph(f"Autorización Marítima N° {texto_pdf(d.numero_solicitud)}", e_sub),
         Spacer(1, 5 * mm),
     ]
 
@@ -182,6 +203,56 @@ def generar_pdf_boleta(d: DatosPdfBoleta) -> bytes:
             ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
         ]))
         historia += [anulada, Spacer(1, 3 * mm)]
+
+    # ── Tipo de operación, en casillas como en papel (2026-11-16) ──
+    def casilla(marcada: bool) -> Table:
+        cuadro = Table([[Paragraph("X" if marcada else "", e_marca)]], colWidths=[3.8 * mm], rowHeights=[3.8 * mm])
+        cuadro.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 0.8, MARINO if marcada else GRIS),
+            ("BACKGROUND", (0, 0), (-1, -1), CREMA if marcada else colors.white),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        return cuadro
+
+    def opcion(texto: str, marcada: bool) -> list:
+        return [casilla(marcada), Paragraph(texto_pdf(texto), e_elegida if marcada else e_opcion)]
+
+    sin_bordes = [
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+    ]
+    util = ancho - 14   # el recuadro lleva 7 pt de margen a cada lado
+    elegibles = [opcion(tipo, marcada) for tipo, marcada in casillas_operacion(d.tipos_operacion, d.tipo_tramite)]
+    if len(elegibles) % 2:
+        elegibles.append(["", ""])
+    opciones = Table([elegibles[i] + elegibles[i + 1] for i in range(0, len(elegibles), 2)],
+                     colWidths=[6 * mm, util / 2 - 6 * mm, 6 * mm, util / 2 - 6 * mm])
+    opciones.setStyle(TableStyle(sin_bordes))
+    contenido = [[Paragraph("TIPO DE OPERACIÓN", e_etiqueta)], [opciones]]
+    if d.subir_y_bajar is not None:
+        respuesta = Table([[Paragraph("SUBIR Y BAJAR", e_etiqueta), *opcion("Sí", d.subir_y_bajar),
+                            *opcion("No", not d.subir_y_bajar)]],
+                          colWidths=[30 * mm, 6 * mm, 16 * mm, 6 * mm, 16 * mm], hAlign="LEFT")
+        respuesta.setStyle(TableStyle(sin_bordes))
+        contenido.append([respuesta])
+    operacion = Table(contenido, colWidths=[ancho])
+    operacion.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.6, BORDE),
+        ("BACKGROUND", (0, 0), (-1, -1), FONDO),
+        ("LEFTPADDING", (0, 0), (-1, -1), 7),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        *([("LINEABOVE", (0, 2), (-1, 2), 0.4, BORDE)] if d.subir_y_bajar is not None else []),
+    ]))
+    historia += [operacion, Spacer(1, 3 * mm)]
 
     # ── Datos de la solicitud (rejilla de dos columnas) ──
     puesto = f"{d.puesto} → {d.puesto_destino}" if d.puesto_destino else d.puesto

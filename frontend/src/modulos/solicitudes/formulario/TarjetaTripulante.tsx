@@ -172,10 +172,6 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
                 </small>
               )}
             </label>
-            <label className={styles.campo}>
-              <span>Ocupación *</span>
-              <input type="text" maxLength={150} placeholder="Ej. Capitán, cocinero" {...campo("ocupacion")} />
-            </label>
 
             <label className={styles.campo}>
               <span>N° de pasaporte *</span>

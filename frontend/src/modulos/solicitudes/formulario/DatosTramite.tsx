@@ -22,7 +22,8 @@ interface Props {
 
 /** Paso 2 del formulario: la agencia y la fecha, el buque, la fecha de la operación y
  *  el puesto, lo que pide el trámite (puerto, clínica, motivo), con las aclaraciones
- *  del Form. 3, y al final el cambio de puerto (orden pedido el 2026-11-13). */
+ *  del Form. 3, «¿Subir y bajar?» (2026-11-16) y al final el cambio de puerto (orden
+ *  pedido el 2026-11-13). */
 export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos, opcionesPais, hoy, onCambiar }: Props) {
   const ayuda = AYUDA_CAMPOS_TRAMITE[tipo.codigo];
   // El cambio de puerto, solo en los trámites que lo admiten (Embarque y Desembarque, 2026-11-13).
@@ -45,7 +46,7 @@ export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos,
   }
 
   return (
-    <section className={styles.bloque}>
+    <section className={styles.bloque} id="paso-datos">
       <div className={styles.bloqueTitulo}><span className={styles.paso}>2</span> Datos del trámite</div>
       <div className={styles.grid}>
         <label className={styles.campo}>
@@ -114,6 +115,24 @@ export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos,
             <input type="text" maxLength={2000} value={cabecera.motivo}
               onChange={(e) => onCambiar("motivo", e.target.value)} />
           </label>
+        )}
+        {/* «¿Subir y bajar?» (2026-11-16), solo en Embarque y Desembarque: con «Sí», cada pasajero
+            adjunta la Carta de Responsabilidad. Va antes del cambio de puerto, que sigue al final. */}
+        {tipo.permite_subir_y_bajar && (
+          <div className={styles.subirBajar} role="group" aria-label="Subir y bajar">
+            <label className={styles.campo}>
+              <span>¿Subir y bajar? *</span>
+              <select value={cabecera.subir_y_bajar} onChange={(e) => onCambiar("subir_y_bajar", e.target.value)}>
+                <option value="no">No</option>
+                <option value="si">Sí</option>
+              </select>
+            </label>
+            {cabecera.subir_y_bajar === "si" && (
+              <p className={styles.subirBajarAviso}>
+                Cada pasajero adjunta la <strong>Carta de Responsabilidad (Form. No. 7)</strong> en sus documentos.
+              </p>
+            )}
+          </div>
         )}
         {/* Al final (pedido del 2026-11-13): la pregunta y el nuevo puesto, juntos; con «Sí», el
             nuevo aparece al lado, y debajo su aviso. Sin nombrar los sectores: lo lee la agencia. */}

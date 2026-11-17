@@ -19,23 +19,25 @@
   overflow: hidden;
   box-shadow: var(--sh-md);
 }
+/* El encabezado de cada bloque, en la barra marino de los títulos de sección (rediseño
+   del 2026-11-17, B + C), con el texto en mayúsculas de Archivo. */
 .panelHeader {
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 14px 20px;
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--border);
-  font-size: .80rem;
-  font-weight: 700;
+  padding: 13px 20px;
+  background: var(--seccion-fondo);
+  border-bottom: 1px solid var(--seccion-fondo);
+  font: 700 .8rem/1.3 var(--letra-titulo);
+  font-stretch: var(--ancho-titulo);
   text-transform: uppercase;
-  letter-spacing: .8px;
-  color: var(--text-2);
+  letter-spacing: .08em;
+  color: var(--seccion-texto);
 }
 .count {
   margin-left: 4px;
-  background: var(--overlay-2);
-  color: var(--text);
+  background: color-mix(in srgb, var(--seccion-texto) 16%, transparent);
+  color: var(--seccion-texto);
   font-size: .70rem;
   font-weight: 700;
   padding: 1px 8px;

@@ -38,7 +38,8 @@
 }
 .botonTabla:hover { border-color: var(--input-border); color: var(--text); }
 /* Como los filtros: lo seleccionado lleva borde de tinta y la franja amarilla. */
-.botonTabla[aria-pressed="true"] { background: var(--card); border-color: var(--text); color: var(--text); box-shadow: inset 0 -3px 0 var(--franja); }
+/* Activo, relleno con el principal del tema, como los demás filtros (2026-11-17). */
+.botonTabla[aria-pressed="true"] { background: var(--principal); border-color: var(--principal); color: var(--sobre-principal); }
 
 .vacio { color: var(--muted); font-size: .84rem; font-style: italic; padding: 8px 0; }
 

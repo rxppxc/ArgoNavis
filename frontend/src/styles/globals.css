@@ -72,6 +72,28 @@
   --principal:       #F2C94C;   /* botón principal: amarillo en oscuro, marino en claro */
   --principal-hover: #FFD633;
   --sobre-principal: #10233F;
+
+  /* Rediseño visual (B + C, elegido por el usuario el 2026-11-17). Los títulos de
+     sección van en una barra marino con el número en la franja amarilla (en oscuro,
+     un marino más claro que la tarjeta), y cada estado tiene su color y su tinte para
+     el borde y el talón de los pases y el punto de las pestañas: el de su insignia.
+     Los contrastes los comprueba styles/contraste.test.ts. */
+  --seccion-fondo: #1C3657;
+  --seccion-texto: #EEF4F8;
+  --estado-revision:   #60A5FA;  --estado-revision-tinte:   #18273A;
+  --estado-correccion: #FB923C;  --estado-correccion-tinte: #2C2118;
+  --estado-aprobada:   #34D399;  --estado-aprobada-tinte:   #14281F;
+  --estado-finalizada: #2DD4BF;  --estado-finalizada-tinte: #11282A;
+  --estado-denegada:   #F87171;  --estado-denegada-tinte:   #2D1A1E;
+  --estado-expirada:   #94A3B8;  --estado-expirada-tinte:   #212A35;
+  /* Lo desactivado, rayado y con borde punteado: no se confunde con un botón gris que
+     sí funciona («Desactivar»). Las notas informativas, en azul y no en gris (en gris
+     parecían desactivadas). */
+  --desactivado-1:     #1E2934;
+  --desactivado-2:     #243140;
+  --desactivado-borde: #4A5868;
+  --nota-fondo:        #172638;
+  --nota-borde:        #2D4A6E;
   /* Guilloche: ondas finas como las de un pasaporte o un billete (celeste del escudo). */
   --guilloche: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='80' viewBox='0 0 240 80'%3E%3Cg fill='none' stroke='%2338BDE8' stroke-opacity='.2' stroke-width='.7'%3E%3Cpath d='M0 40C30 10 90 10 120 40S210 70 240 40'/%3E%3Cpath d='M0 40C30 70 90 70 120 40S210 10 240 40'/%3E%3Cpath d='M0 30C30 4 90 4 120 30S210 56 240 30'/%3E%3Cpath d='M0 50C30 76 90 76 120 50S210 24 240 50'/%3E%3Cpath d='M0 20C40 0 80 0 120 20S200 40 240 20'/%3E%3Cpath d='M0 60C40 80 80 80 120 60S200 40 240 60'/%3E%3Cpath d='M0 40C60 0 60 80 120 40S180 0 240 40'/%3E%3Cpath d='M0 40C60 80 60 0 120 40S180 80 240 40'/%3E%3C/g%3E%3C/svg%3E");
   /* El mismo guilloche en dorado, para la tapa azul del pasaporte (login). */
@@ -162,16 +184,19 @@
 
   --y-soft:    #FFF8D8;   /* el crema de "Anuncios importantes" */
   --y-border:  #DDB323;
-  --bg:        #EEF4F8;   /* --snm-soft-2 */
+  /* Rediseño visual del 2026-11-17: con el fondo y las líneas de la web, las tarjetas
+     blancas no se despegaban del fondo («se ve lavado»). El fondo baja un tono, las
+     líneas y los textos secundarios se oscurecen y las sombras se marcan. */
+  --bg:        #E3EBF3;
   --surface:   #FFFFFF;
   --surface-2: #F6F9FC;   /* --snm-soft-1 */
   --card:      #FFFFFF;
   --card-2:    #F6F9FC;
-  --border:    #DCE4ED;   /* --snm-line */
-  --border-2:  #CAD5E1;   /* --snm-line-strong */
+  --border:    #C8D4E1;
+  --border-2:  #A9B9CC;
   --text:      #17283E;   /* --snm-text */
-  --text-2:    #526176;   /* --snm-copy */
-  --muted:     #5E6D83;   /* --snm-muted (#69788C) un poco más oscuro: 4.7:1 sobre --bg */
+  --text-2:    #3B4A5F;
+  --muted:     #4A596F;
   --quiet:     #9AA8BA;
 
   --hover:        rgba(16,35,63,.04);
@@ -190,6 +215,19 @@
   --principal:       #10233F;   /* --snm-navy: 15.6:1 con blanco */
   --principal-hover: #1D3A63;
   --sobre-principal: #FFFFFF;
+  --seccion-fondo: #10233F;   /* la barra de los títulos de sección: el marino de la tinta */
+  --seccion-texto: #FFFFFF;
+  --estado-revision:   #2563EB;  --estado-revision-tinte:   #EEF4FE;
+  --estado-correccion: #EA580C;  --estado-correccion-tinte: #FFF3EB;
+  --estado-aprobada:   #15803D;  --estado-aprobada-tinte:   #ECF7EF;
+  --estado-finalizada: #0F766E;  --estado-finalizada-tinte: #E8F6F4;
+  --estado-denegada:   #B91C1C;  --estado-denegada-tinte:   #FCEDED;
+  --estado-expirada:   #64748B;  --estado-expirada-tinte:   #F1F3F6;
+  --desactivado-1:     #F2F5F8;
+  --desactivado-2:     #E5EAF0;
+  --desactivado-borde: #97A6B8;
+  --nota-fondo:        #E8F0FB;
+  --nota-borde:        #B9CEEC;
   --guilloche: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='80' viewBox='0 0 240 80'%3E%3Cg fill='none' stroke='%2315B0DE' stroke-opacity='.3' stroke-width='.7'%3E%3Cpath d='M0 40C30 10 90 10 120 40S210 70 240 40'/%3E%3Cpath d='M0 40C30 70 90 70 120 40S210 10 240 40'/%3E%3Cpath d='M0 30C30 4 90 4 120 30S210 56 240 30'/%3E%3Cpath d='M0 50C30 76 90 76 120 50S210 24 240 50'/%3E%3Cpath d='M0 20C40 0 80 0 120 20S200 40 240 20'/%3E%3Cpath d='M0 60C40 80 80 80 120 60S200 40 240 60'/%3E%3Cpath d='M0 40C60 0 60 80 120 40S180 0 240 40'/%3E%3Cpath d='M0 40C60 80 60 0 120 40S180 80 240 40'/%3E%3C/g%3E%3C/svg%3E");
   --cabecera:         #FFFFFF;
   --cabecera-texto:   #10233F;
@@ -219,9 +257,10 @@
   --graf-fuera:      #9333EA;
   --graf-calor:      #1E7729;   /* la de «aprobada»: de la tarjeta al nivel 1, 0,16; entre niveles, 0,078 o más */
 
-  /* Sombras teñidas de marino, como las de la web (rgba(23,36,58,.10)). */
-  --sh-xs: 0 1px 2px rgba(23,36,58,.06);
-  --sh-sm: 0 1px 3px rgba(23,36,58,.10), 0 1px 2px rgba(23,36,58,.05);
+  /* Sombras teñidas de marino, como las de la web (rgba(23,36,58,.10)); desde el
+     2026-11-17, más marcadas: con ellas las tarjetas se despegan del fondo. */
+  --sh-xs: 0 1px 2px rgba(23,36,58,.08);
+  --sh-sm: 0 1px 2px rgba(23,36,58,.08), 0 4px 12px rgba(23,36,58,.08);
   --sh-md: 0 6px 18px rgba(23,36,58,.10);
   --sh-lg: 0 16px 40px rgba(23,36,58,.16);
 }

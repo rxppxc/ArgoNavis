@@ -162,6 +162,41 @@ test("el cambio de puerto ofrece solo los puestos del mismo sector", async ({ br
   await expect(nuevo).toHaveCount(0);
 });
 
+test("«¿Subir y bajar?» pide la Carta de Responsabilidad de cada pasajero (2026-11-16)", async ({ browser }) => {
+  const agencia = await entrar(browser, CUENTAS.agencia);
+  await agencia.goto("/new");
+  await agencia.getByRole("button", { name: /^Embarque/ }).click();
+  await marinoFilipino(agencia, 0, "Ana");
+  await agencia.getByRole("button", { name: "Agregar pasajero" }).click();
+  await marinoFilipino(agencia, 1, "Beto");
+
+  const pregunta = agencia.getByLabel("¿Subir y bajar? *");
+  const cartas = agencia.getByLabel(/^Adjuntar Carta de Responsabilidad \(Form\. No\. 7\) de /);
+  await expect(pregunta, "empieza en «No»").toHaveValue("no");
+  await expect(cartas).toHaveCount(0);
+
+  await pregunta.selectOption("si");
+  await expect(cartas, "una por pasajero, en su tarjeta").toHaveCount(2);
+  await expect(tarjeta(agencia, 0).getByLabel("Adjuntar Carta de Responsabilidad (Form. No. 7) de Ana")).toHaveCount(1);
+  await expect(agencia.getByText(/Cada pasajero adjunta la Carta de Responsabilidad/)).toBeVisible();
+  // Lo demás se sigue pidiendo: los tres de cada marino, el Formulario No. 3 y las dos Cartas.
+  await expect(agencia.getByText("Faltan 9 documentos por adjuntar")).toBeVisible();
+
+  await test.step("con «No» deja de pedirse", async () => {
+    await pregunta.selectOption("no");
+    await expect(cartas).toHaveCount(0);
+    await expect(agencia.getByText("Faltan 7 documentos por adjuntar")).toBeVisible();
+  });
+
+  await test.step("un trámite que no la pregunta no la muestra", async () => {
+    await pregunta.selectOption("si");
+    await agencia.getByRole("button", { name: "Cambiar", exact: true }).click();
+    await agencia.getByRole("button", { name: /^Cambio de Nave/ }).click();
+    await expect(agencia.getByLabel("¿Subir y bajar? *")).toHaveCount(0);
+    await expect(cartas).toHaveCount(0);
+  });
+});
+
 test("el pasaporte con 3 meses de vigencia; el seamanbook vencido solo avisa", async ({ browser }) => {
   const agencia = await entrar(browser, CUENTAS.agencia);
   await agencia.goto("/new");

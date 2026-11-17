@@ -11,13 +11,14 @@
 }
 .vista {
   padding: 10px 16px; margin-bottom: -1px;
-  border-bottom: 3px solid transparent;
+  border-bottom: 3px solid transparent; border-radius: var(--r-md) var(--r-md) 0 0;
   color: var(--text-2);
-  font: 700 .72rem/1.2 var(--letra-titulo); font-stretch: var(--ancho-titulo);
-  letter-spacing: .1em; text-transform: uppercase;
+  font: 700 .74rem/1.2 var(--letra-titulo); font-stretch: var(--ancho-titulo);
+  letter-spacing: .08em; text-transform: uppercase;
 }
-.vista:hover { color: var(--text); }
-.vistaActiva, .vistaActiva:hover { color: var(--text); border-bottom-color: var(--y); }
+.vista:hover { color: var(--text); background: var(--hover); }
+/* La bandeja elegida, rellena como las pestañas de estado (2026-11-17). */
+.vistaActiva, .vistaActiva:hover { background: var(--principal); color: var(--sobre-principal); border-bottom-color: var(--franja); }
 
 /* ─── Pestañas de estado (filtros): separadores de expediente sobre una línea de
    tinta; la activa lleva la franja amarilla arriba (identidad «pase oficial»). ─── */
@@ -36,18 +37,34 @@
   .pestana { flex: 0 0 auto; }
 }
 .pestana {
-  display: inline-flex; align-items: center; gap: 7px;
-  padding: 8px 13px 7px; border-radius: var(--r-md) var(--r-md) 0 0;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 15px 8px; border-radius: var(--r-md) var(--r-md) 0 0;
   border: 1px solid var(--border-2); border-bottom: 0; background: var(--card);
-  color: var(--text-2); font-size: .8rem; font-weight: 600;
+  color: var(--text-2); font-size: .86rem; font-weight: 600;
 }
-.pestana:hover { border-color: var(--input-border); color: var(--text); }
+.pestana:hover { border-color: var(--input-border); color: var(--text); background: var(--surface-2); }
+/* Rediseño del 2026-11-17: la activa, rellena (marino en claro, el principal en oscuro) con
+   la franja abajo; antes solo llevaba una raya amarilla y casi no se notaba. */
 .pestanaActiva, .pestanaActiva:hover {
-  border-color: var(--text); color: var(--text); font-weight: 700;
-  box-shadow: inset 0 3px 0 var(--franja);
+  background: var(--principal); border-color: var(--principal); color: var(--sobre-principal); font-weight: 700;
+  box-shadow: inset 0 -4px 0 var(--franja);
 }
-.pestanaConteo { font: 600 .74rem/1 var(--letra-mono); color: var(--muted); }
-.pestanaActiva .pestanaConteo { color: var(--text); }
+/* El punto del color de cada estado (decorativo: el texto dice el estado). */
+.pestana[data-estado="review"]    { --punto: var(--estado-revision); }
+.pestana[data-estado="returned"]  { --punto: var(--estado-correccion); }
+.pestana[data-estado="approved"]  { --punto: var(--estado-aprobada); }
+.pestana[data-estado="finalized"] { --punto: var(--estado-finalizada); }
+.pestana[data-estado="denied"]    { --punto: var(--estado-denegada); }
+.pestana[data-estado="expired"]   { --punto: var(--estado-expirada); }
+.pestana[data-estado]:not([data-estado="todas"])::before {
+  content: ""; flex: none; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--punto, var(--muted)); box-shadow: 0 0 0 2px var(--card);
+}
+.pestanaConteo {
+  font: 600 .74rem/1 var(--letra-mono); color: var(--text-2);
+  padding: 2px 6px; border-radius: var(--r-xs); background: var(--overlay);
+}
+.pestanaActiva .pestanaConteo { color: var(--sobre-principal); background: color-mix(in srgb, var(--sobre-principal) 16%, transparent); }
 
 /* ─── Búsqueda + fechas ─── */
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 18px; }

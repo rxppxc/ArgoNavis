@@ -3,7 +3,7 @@
   "base": {
     "nombre": "Ana", "apellido": "Pérez", "fecha_nacimiento": "1990-05-01", "pais_nacimiento": "PHL",
     "nacionalidad": "PHL", "sexo": "F", "pasaporte": "P123456", "pasaporte_expira": "2030-01-01",
-    "libreta_marino": "SB1", "libreta_expira": "2030-01-01", "rango": "marino", "ocupacion": "Marinera"
+    "libreta_marino": "SB1", "libreta_expira": "2030-01-01", "rango": "marino"
   },
   "paises": ["PHL", "PAN", "CUB"],
   "casos": [

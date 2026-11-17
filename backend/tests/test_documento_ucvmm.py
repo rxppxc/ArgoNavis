@@ -14,7 +14,7 @@ propio; si el catálogo o las reglas se apartan de ella, estas pruebas fallan:
     aplique"); los procesos de Desembarque, Urgencias, Renovación y Shore Pass
     piden avisar al aprobar que se debe tramitar la custodia.
 
-Seis reglas van más allá de la lectura literal, por decisión del usuario:
+Siete reglas van más allá de la lectura literal, por decisión del usuario:
   - Ningún documento vencido: la vigencia bloquea en los 8 trámites (la Nota
     de la pág. 9 la pedía solo en Embarque, Visita médica y Shore Pass). Desde el
     2026-11-13, el pasaporte con al menos 3 meses a partir de la operación, y el
@@ -41,6 +41,9 @@ Seis reglas van más allá de la lectura literal, por decisión del usuario:
     le pide la Visa (DOC-VISA); a los panameños no se les pide visa ni boleto aéreo
     en Embarque y Desembarque, ni la Visa Especial de Marino en Cambio de nave; y el
     Sellado de Shore Pass admite solo el rango Marino (pedido del 2026-11-14).
+  - En Embarque y Desembarque, la agencia responde «¿Subir y bajar?»; con «Sí»,
+    cada pasajero, de cualquier rango, adjunta la Carta de Responsabilidad
+    (Form. No. 7), además de lo demás (condición `subir_y_bajar`, 2026-11-16).
 """
 import secrets
 from datetime import date, timedelta
@@ -48,7 +51,7 @@ from datetime import date, timedelta
 import pytest
 
 from app.domain.models.solicitud import vigencia_minima_pasaporte
-from ayudas import HOY, MANANA, cabecera, enviar, pdf, tripulante
+from ayudas import HOY, MANANA, cabecera, enviar, pdf, tripulante, verificar_impedimentos
 from conftest import Actor, crear_actor, id_sector
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
@@ -71,6 +74,8 @@ REPORTE = ("DOC-REPORTE-MEDICO", "marino", "siempre", MARINO)         # "para ca
 CITA = ("DOC-CITA-CONSULADO", "marino", "siempre", MARINO)
 BOLETO = ("DOC-BOLETO-AEREO", "marino", "siempre", NO_MARINOS)        # reunión del 2026-10-30
 FORM3 = ("DOC-FORMULARIO-3", "solicitud", "siempre", None)           # en todos (2026-11-13)
+# 2026-11-16: en Embarque y Desembarque, con «Subir y bajar: Sí», la Carta Form. 7 de cada pasajero.
+CARTA_SUBIR_BAJAR = ("DOC-FORM7-RESPONSABILIDAD", "marino", "subir_y_bajar", None)
 # En Embarque el boleto es solo del militar (2026-11-11). Los técnicos van por su trámite
 # desde el 2026-11-13; sus filas de Embarque y Desembarque se borraron el 2026-11-14.
 TECNICOS = ("superintendente", "supernumerario", "tecnico")
@@ -83,16 +88,17 @@ OPCIONAL: dict[tuple[str, str], tuple[str, ...]] = {}
 # aviso_custodia: si el proceso pide avisar al aprobar que se tramite la custodia
 DOCUMENTO = {
     "F3-EMBARQUE": {
-        "campos": [], "vigencia": True, "aviso_custodia": False, "cambio_puerto": True,
+        "campos": [], "vigencia": True, "aviso_custodia": False, "cambio_puerto": True, "subir_y_bajar": True,
         "rangos": {"marino", "pasajero", "militar"},   # 2026-11-13: los técnicos van por su trámite
-        "documentos": {FORM3, VISA_EXTRANJEROS, GENERALES, LIBRETA, BOLETO_MILITAR, VISA_RESTRINGIDOS},
+        "documentos": {FORM3, VISA_EXTRANJEROS, GENERALES, LIBRETA, BOLETO_MILITAR, VISA_RESTRINGIDOS,
+                       CARTA_SUBIR_BAJAR},
     },
     "F3-DESEMBARQUE": {
-        "campos": [], "vigencia": True, "aviso_custodia": True, "cambio_puerto": True,
+        "campos": [], "vigencia": True, "aviso_custodia": True, "cambio_puerto": True, "subir_y_bajar": True,
         "rangos": {"marino", "pasajero", "militar"},
         # El boleto aéreo lo pide el Form. 3 a todos (también al Marino), menos a los panameños (2026-11-14).
         "documentos": {FORM3, ("DOC-BOLETO-AEREO", "marino", "solo_extranjeros", None), GENERALES, LIBRETA, LISTA,
-                       CUSTODIA, VISA_RESTRINGIDOS},
+                       CUSTODIA, VISA_RESTRINGIDOS, CARTA_SUBIR_BAJAR},
     },
     "F3-URGENCIA-MEDICA": {
         "campos": ["puerto_desembarque", "clinica_hospital"], "vigencia": True, "aviso_custodia": True,
@@ -129,7 +135,7 @@ ETIQUETAS = {
 LIBRETA_DOCS = {"DOC-LIBRETA-MARINO"}   # solo a quien porta seamanbook (rango Marino)
 
 
-def _aplica(documento: tuple, t: dict) -> bool:
+def _aplica(documento: tuple, t: dict, subir_y_bajar: bool = False) -> bool:
     codigo, _, condicion, rangos = documento
     if rangos and t["rango"] not in rangos:
         return False
@@ -139,10 +145,13 @@ def _aplica(documento: tuple, t: dict) -> bool:
         return t["nacionalidad"] != "PAN"
     if condicion == "nacionalidad_restringida":
         return t["nacionalidad"] == "CUB"
+    if condicion == "subir_y_bajar":
+        return subir_y_bajar
     return True
 
 
-def _asignaciones(codigo_tramite: str, tripulantes: list[dict], *, sin: set[str] = frozenset()):
+def _asignaciones(codigo_tramite: str, tripulantes: list[dict], *, sin: set[str] = frozenset(),
+                  subir_y_bajar: bool = False):
     """Asignaciones y archivos que el documento exige para estos tripulantes."""
     asignaciones, archivos = [], []
     for documento in sorted(DOCUMENTO[codigo_tramite]["documentos"]):
@@ -152,11 +161,13 @@ def _asignaciones(codigo_tramite: str, tripulantes: list[dict], *, sin: set[str]
         if alcance == "solicitud":
             if condicion == "nacionalidad_restringida" and not any(t["nacionalidad"] == "CUB" for t in tripulantes):
                 continue
+            if condicion == "subir_y_bajar" and not subir_y_bajar:
+                continue
             asignaciones.append({"documento_codigo": codigo})
             archivos.append(pdf(codigo))
             continue
         for i, t in enumerate(tripulantes):
-            if _aplica(documento, t):
+            if _aplica(documento, t, subir_y_bajar):
                 asignaciones.append({"documento_codigo": codigo, "indice_tripulante": i})
                 archivos.append(pdf(f"{codigo}-{i}"))
     return asignaciones, archivos
@@ -170,7 +181,8 @@ def _rango(codigo_tramite: str) -> str:
 
 def _datos(codigo_tramite: str, puesto_id: int, tripulantes: list[dict], **extra) -> tuple[dict, list]:
     campos = {c: VALORES[c] for c in DOCUMENTO[codigo_tramite]["campos"]}
-    asignaciones, archivos = _asignaciones(codigo_tramite, tripulantes, sin=extra.pop("sin", frozenset()))
+    asignaciones, archivos = _asignaciones(codigo_tramite, tripulantes, sin=extra.pop("sin", frozenset()),
+                                           subir_y_bajar=extra.get("subir_y_bajar", False))
     datos = cabecera(codigo_tramite, puesto_id, tripulantes=tripulantes, asignaciones=asignaciones, **campos)
     datos.update(extra)
     return datos, archivos
@@ -214,6 +226,7 @@ async def test_catalogo_igual_al_documento(cliente, agencia):
         assert set(tipo["rangos_permitidos"] or []) == esperado.get("rangos", set()), codigo
         assert tipo["aviso_custodia"] == esperado["aviso_custodia"], codigo
         assert tipo["permite_cambio_puerto"] == esperado.get("cambio_puerto", False), codigo
+        assert tipo["permite_subir_y_bajar"] == esperado.get("subir_y_bajar", False), codigo
 
 
 @pytest.mark.parametrize("codigo", sorted(DOCUMENTO))
@@ -677,3 +690,107 @@ async def test_shore_pass_solo_marino(cliente, agencia):
     datos, archivos = _datos("F3-SHORE-PASS", puesto_id, [tripulante("Ana", "PHL")])
     r = await enviar(cliente, naviera, datos, archivos)
     assert r.status_code == 201, r.text
+
+
+# ── 2026-11-16: «¿Subir y bajar?» en Embarque y Desembarque ─────────────────
+
+CARTA_FORM7 = "DOC-FORM7-RESPONSABILIDAD"
+
+
+@pytest.mark.parametrize("codigo", ["F3-EMBARQUE", "F3-DESEMBARQUE"])
+async def test_subir_y_bajar_pide_la_carta_por_pasajero(cliente, agencia, codigo):
+    """Con «Subir y bajar: Sí», cada pasajero (marino, pasajero o militar) adjunta la
+    Carta de Responsabilidad (Form. No. 7); lo demás del trámite se sigue pidiendo."""
+    naviera, puesto_id = agencia
+    tripulantes = [tripulante("Ana", "PHL"), tripulante("Beto", "PHL", rango="pasajero"),
+                   tripulante("Ciro", "PHL", rango="militar")]
+    datos, archivos = _datos(codigo, puesto_id, tripulantes, subir_y_bajar=True, sin={CARTA_FORM7})
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 400, (codigo, r.text)
+    for nombre in ("Ana", "Beto", "Ciro"):
+        assert f"Carta de Responsabilidad (Form. No. 7) de {nombre}" in r.json()["detail"], (codigo, nombre)
+
+    datos, archivos = _datos(codigo, puesto_id, tripulantes, subir_y_bajar=True)
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 201, (codigo, r.text)
+    s = r.json()
+    assert s["subir_y_bajar"] is True and s["permite_subir_y_bajar"] is True
+    assert all(CARTA_FORM7 in _del_pasajero(s, i) for i in range(3)), codigo
+    assert all(c["cubierta"] and c["obligatoria"] for c in s["checklist"]), codigo
+
+
+@pytest.mark.parametrize("codigo", ["F3-EMBARQUE", "F3-DESEMBARQUE"])
+async def test_sin_subir_y_bajar_no_pide_la_carta(cliente, agencia, codigo):
+    """Sin la respuesta (o con «No»), la Carta no se pide."""
+    naviera, puesto_id = agencia
+    datos, archivos = _datos(codigo, puesto_id, [tripulante("Ana", "PHL")])
+    assert "subir_y_bajar" not in datos
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 201, (codigo, r.text)
+    assert r.json()["subir_y_bajar"] is False and r.json()["permite_subir_y_bajar"] is True
+    assert CARTA_FORM7 not in _del_pasajero(r.json()), codigo
+
+
+async def test_subir_y_bajar_se_ignora_en_otros_tramites(cliente, agencia):
+    """Un trámite que no hace la pregunta descarta la respuesta (resto de otro trámite
+    elegido antes en el formulario), como el cambio de puerto."""
+    naviera, puesto_id = agencia
+    datos, archivos = _datos("F3-CAMBIO-NAVE", puesto_id, [tripulante("Ana", "PHL")], subir_y_bajar=True)
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 201, r.text
+    assert r.json()["subir_y_bajar"] is False and r.json()["permite_subir_y_bajar"] is False
+
+
+async def test_corregir_a_no_quita_la_carta(cliente, agencia):
+    """Una devuelta que se corrige con «No» ya no pide la Carta: la foto del checklist
+    se vuelve a tomar con la respuesta nueva."""
+    naviera, puesto_id = agencia
+    codigo = "F3-EMBARQUE"
+    datos, archivos = _datos(codigo, puesto_id, [tripulante("Ana", "PHL")], subir_y_bajar=True)
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 201, r.text
+    s = r.json()
+    assert CARTA_FORM7 in {c["documento_codigo"] for c in s["checklist"]}
+    revisor = await crear_actor("UCVMM", prefijo="revisor")
+    r = await cliente.post(f"/solicitudes/{s['id']}/devolver", json={"motivo": "Revisar la documentación"},
+                           headers=revisor.headers)
+    assert r.status_code == 200, r.text
+
+    t = s["tripulantes"][0]
+    ficha = tripulante("Ana", "PHL", pasaporte=t["pasaporte"], libreta_marino=t["libreta_marino"])
+    ficha["id"] = t["id"]
+    correccion, _ = _datos(codigo, puesto_id, [ficha])
+    correccion.pop("codigo_tramite")
+    correccion["asignaciones"] = []
+    correccion["documentos_conservados"] = [d["id"] for d in s["documentos"] if d["documento_codigo"] != CARTA_FORM7]
+    r = await enviar(cliente, naviera, correccion, [], metodo="PUT", ruta=f"/solicitudes/{s['id']}")
+    assert r.status_code == 200, r.text
+    corregida = r.json()
+    assert corregida["subir_y_bajar"] is False
+    assert CARTA_FORM7 not in {c["documento_codigo"] for c in corregida["checklist"]}
+    assert all(c["cubierta"] for c in corregida["checklist"])
+
+
+async def test_el_pdf_dice_subir_y_bajar(cliente, agencia):
+    """El PDF de la autorización dice la respuesta en los trámites que hacen la
+    pregunta; en los demás no la menciona (None)."""
+    from app.domain.repositories.user_repository import RepositorioUsuario
+    from app.domain.services.solicitud_service import ServicioSolicitud
+    from app.infrastructure.database import SesionLocal
+
+    naviera, puesto_id = agencia
+    revisor = await crear_actor("UCVMM", prefijo="revisor")
+    esperado = {("F3-EMBARQUE", True): True, ("F3-DESEMBARQUE", False): False, ("F3-CAMBIO-NAVE", True): None}
+    for (codigo, subir_y_bajar), en_el_pdf in esperado.items():
+        datos, archivos = _datos(codigo, puesto_id, [tripulante("Ana", "PHL")], subir_y_bajar=subir_y_bajar)
+        r = await enviar(cliente, naviera, datos, archivos)
+        assert r.status_code == 201, (codigo, r.text)
+        sid = r.json()["id"]
+        await verificar_impedimentos(cliente, revisor, sid)
+        r = await cliente.post(f"/solicitudes/{sid}/aprobar", json={}, headers=revisor.headers)
+        assert r.status_code == 200, (codigo, r.text)
+        async with SesionLocal() as sesion:
+            svc = ServicioSolicitud(sesion)
+            ctx = await svc.contexto(await RepositorioUsuario(sesion).buscar_por_id(naviera.id))
+            armado = await svc.preparar_pdf(ctx, await svc.obtener(ctx, sid))
+        assert armado.subir_y_bajar is en_el_pdf, codigo

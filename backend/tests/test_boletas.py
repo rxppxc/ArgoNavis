@@ -43,7 +43,24 @@ def _datos_pdf():
         puesto="Balboa", puesto_destino=None, fecha_operacion=date(2026, 11, 20), pasajeros=3,
         aprobada_en=panama(2026, 11, 14, 16, 20), generada_en=panama(2026, 11, 15, 10, 5),
         anulada_en=None, motivo_anulacion=None,
+        tipos_operacion=["Embarque", "Desembarque", "Cambio de Nave", "Urgencias o Atención Médica"],
+        subir_y_bajar=True,
     )
+
+
+async def test_casillas_operacion():
+    """El tipo de operación va en casillas, como en papel (2026-11-16): todos los
+    trámites, con la X en el de la solicitud."""
+    from app.informes.boleta_recargo_pdf import casillas_operacion
+
+    tipos = ["Embarque", "Desembarque", "Cambio de Nave"]
+    assert casillas_operacion(tipos, "Desembarque") == [
+        ("Embarque", False), ("Desembarque", True), ("Cambio de Nave", False),
+    ]
+    # Un trámite que ya no está activo (Cambio de Puerto, 2026-11-13) se suma al final, marcado.
+    assert casillas_operacion(tipos, "Cambio de Puerto") == [
+        ("Embarque", False), ("Desembarque", False), ("Cambio de Nave", False), ("Cambio de Puerto", True),
+    ]
 
 
 async def test_pdf_de_la_boleta():
@@ -55,6 +72,9 @@ async def test_pdf_de_la_boleta():
     anulada = generar_pdf_boleta(replace(_datos_pdf(), anulada_en=panama(2026, 11, 15, 11, 0),
                                          motivo_anulacion="El número de oficio estaba mal escrito."))
     assert anulada[:5] == b"%PDF-" and len(anulada) > len(vigente), "lleva el sello y la anulación"
+    # Un trámite que no pregunta «¿Subir y bajar?» va sin esa línea.
+    sin_pregunta = generar_pdf_boleta(replace(_datos_pdf(), tipo_tramite="Cambio de Nave", subir_y_bajar=None))
+    assert sin_pregunta[:5] == b"%PDF-" and len(sin_pregunta) < len(vigente)
 
 
 # ── Reglas, rutas y bitácora ─────────────────────────────────────────────────
@@ -299,6 +319,13 @@ async def test_pdf_de_la_boleta_por_la_api(cliente, esc, monkeypatch):
     datos = armados[-1]
     assert (datos.numero_oficio, datos.monto, datos.numero_solicitud) == (oficio, Decimal("20.00"), numero)
     assert datos.agencia == esc.agencia and datos.puesto == esc.puesto and datos.anulada_en is None
+    # El tipo de operación en casillas, como en papel (2026-11-16): los trámites activos, en su
+    # orden, con la X en el de la solicitud; Embarque hace la pregunta de «Subir y bajar».
+    async with SesionLocal() as sesion:
+        activos = (await sesion.execute(select(TipoTramite.nombre).where(TipoTramite.activo.is_(True))
+                                        .order_by(TipoTramite.orden, TipoTramite.nombre))).scalars().all()
+    assert datos.tipos_operacion == list(activos) and datos.tipo_tramite == "Embarque"
+    assert datos.subir_y_bajar is False
     [registro] = await _bitacora(AccionAuditoria.BOLETA_DESCARGADA, sid)
     assert registro["numero_oficio"] == oficio and registro["anulada"] is False
 

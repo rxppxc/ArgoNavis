@@ -3,11 +3,15 @@
 .pestana {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 10px 16px; margin-bottom: -1px;
-  border-bottom: 3px solid transparent;
+  border-bottom: 3px solid transparent; border-radius: var(--r-md) var(--r-md) 0 0;
   color: var(--text-2); font-weight: 700; font-size: .88rem;
 }
-.pestana:hover { color: var(--text); }
-.pestanaActiva { color: var(--text); border-bottom-color: var(--y); }
+.pestana:hover { color: var(--text); background: var(--hover); }
+/* La activa, rellena con el principal del tema y la franja abajo (2026-11-17), como las
+   pestañas de estado de las bandejas: con solo la raya amarilla casi no se notaba. */
+.pestanaActiva, .pestanaActiva:hover {
+  background: var(--principal); color: var(--sobre-principal); border-bottom-color: var(--franja);
+}
 .conteo {
   min-width: 22px; padding: 1px 7px; border-radius: var(--r-xs);
   background: var(--overlay-2); font-size: .72rem; text-align: center;

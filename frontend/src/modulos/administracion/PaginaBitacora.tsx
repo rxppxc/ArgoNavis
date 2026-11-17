@@ -7,6 +7,7 @@ import { useNotificacion } from "../../components/Notificaciones";
 import { mensajeDeError } from "../../utils/errores";
 import type { EstadoSolicitud } from "../../api/solicitudes";
 import { ETIQUETA_ESTADO, formatearFechaHora } from "../solicitudes/presentacion";
+import { categoriaAccion } from "./categoriaAccion";
 import styles from "./PaginaBitacora.module.css";
 
 const ETIQUETA_ACCION: Record<string, string> = {
@@ -186,7 +187,11 @@ export default function PaginaBitacora() {
                   <tr className={styles.fila} onClick={() => setAbierto(abierto === r.id ? null : r.id)}>
                     <td className={styles.nowrap}>{formatearFechaHora(r.creado_en)}</td>
                     <td>{r.username ?? "—"}</td>
-                    <td><span className={styles.accion}>{ETIQUETA_ACCION[r.accion] ?? r.accion}</span></td>
+                    <td>
+                      <span className={styles.accion} data-categoria={categoriaAccion(r.accion)}>
+                        {ETIQUETA_ACCION[r.accion] ?? r.accion}
+                      </span>
+                    </td>
                     <td className={styles.detalle}>
                       <button type="button" className={styles.verDetalle} aria-expanded={abierto === r.id}
                         onClick={(e) => { e.stopPropagation(); setAbierto(abierto === r.id ? null : r.id); }}>

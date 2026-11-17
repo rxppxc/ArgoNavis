@@ -10,6 +10,8 @@ export interface CabeceraFormulario {
   /** ¿Cambio de puerto? (2026-11-13) y, con «si», el nuevo puesto. */
   cambio_puerto: "no" | "si";
   puesto_destino_id: string;
+  /** ¿Subir y bajar? (2026-11-16): con «si», cada pasajero adjunta la Carta de Responsabilidad. */
+  subir_y_bajar: "no" | "si";
   fecha_operacion: string;
   nombre_buque: string;
   imo: string;
@@ -26,7 +28,7 @@ export interface FichaTripulante extends TripulanteEntrada {
 }
 
 export const CABECERA_VACIA: CabeceraFormulario = {
-  puesto_control_id: "", cambio_puerto: "no", puesto_destino_id: "", fecha_operacion: "",
+  puesto_control_id: "", cambio_puerto: "no", puesto_destino_id: "", subir_y_bajar: "no", fecha_operacion: "",
   nombre_buque: "", imo: "", bandera: "",
   nombre_puerto: "", puerto_desembarque: "", motivo: "", clinica_hospital: "",
   observaciones: "",
@@ -152,7 +154,6 @@ export function validarFormulario(
     if (!t.fecha_nacimiento) faltan.push("fecha de nacimiento");
     if (!paises.has(t.pais_nacimiento)) faltan.push("país de nacimiento");
     if (!paises.has(t.nacionalidad)) faltan.push("nacionalidad");
-    if (t.ocupacion.trim().length < 2) faltan.push("ocupación");
     if (t.pasaporte.trim().length < 3) faltan.push("N° de pasaporte");
     if (!t.pasaporte_expira) faltan.push("vencimiento del pasaporte");
     const conLibreta = portaLibreta(t);

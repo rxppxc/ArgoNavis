@@ -142,7 +142,7 @@ Pedido del usuario: «el diseño es genérico, típico de IAs; necesitamos ident
   - Bandejas: cada solicitud es un **pase con talón perforado** (`TarjetaSolicitud`). Las muescas son una máscara en el `.pase` interior: el anillo de foco va en el enlace exterior, porque la máscara lo recortaría.
   - Expediente: la **cabeza del documento** (franja, rótulo, trámite, «N.º» y el sello grande ladeado), las secciones de la columna principal numeradas con contadores de CSS (`content: counter() / ""`, que el lector de pantalla no lee), los datos con su rótulo encima y el valor sobre la línea, y al pie la **línea de lectura mecánica** de los pasaportes (`lineasMecanicas`, decorativa, `aria-hidden`).
   - Login: un **pasaporte abierto** sobre la carta animada: la tapa marino con guilloche dorado y el emblema de ARGO NAVIS, y la hoja con el acceso.
-  - Modales, resumen de estadísticas y tarjetas sueltas: la franja amarilla arriba. Pestañas como separadores de expediente, con la franja en la activa.
+  - Modales, resumen de estadísticas y tarjetas sueltas: la franja amarilla arriba. Pestañas como separadores de expediente; desde el 2026-11-17 la activa va rellena (abajo).
   - **Avisos emergentes «sello centrado»** (elegidos por el usuario el 2026-11-11, entre «sello», «comprobante», «cinta» y dos mezclas): una cinta centrada bajo la cabecera, del ancho de su mensaje (hasta 860 px), con el sello de tinta del resultado a la izquierda. En el celular va de borde a borde, con el sello y la X arriba (`Notificaciones.tsx`; lo que no es React, en `avisos.ts`, con sus pruebas).
     - **El sello:**
       - si la acción cambió el estado de una solicitud, el de ese estado, en el color de su insignia: ENVIADA, REENVIADA, DEVUELTA, APROBADA, DENEGADA o FINALIZADA (`mostrar(texto, "exito", { sello: "devuelta" })`);
@@ -162,6 +162,39 @@ Pedido del usuario: «el diseño es genérico, típico de IAs; necesitamos ident
   - Las mayúsculas son siempre de CSS (`text-transform`): el texto leído y los nombres accesibles no cambian, y el E2E los busca tal cual.
 - Maquetas y capturas de la elección: en el scratchpad de la sesión (`diseno/`).
 
+### Rediseño visual «B + C» (elegido por el usuario el 2026-11-17)
+Pedido del usuario: «en el modo claro hay cosas que no se distinguen»; «que cualquier persona lo entienda, no se pierda ni se frustre»; «todo: cada card, ícono, bandeja, select…». Vio maquetas sobre las pantallas reales y eligió la mezcla de **B** («Color que guía»: cada estado con su color y «Qué sigue») y **C** («Documento oficial»: títulos de sección en marino). Se aplicó con tokens y piezas compartidas, sin cambiar la identidad «pase oficial».
+- **Tokens nuevos** (`globals.css`, en los dos temas):
+  - `--seccion-fondo` / `--seccion-texto`: la barra de los títulos;
+  - `--estado-<estado>` y `--estado-<estado>-tinte`: los seis estados, con el color de su insignia;
+  - `--desactivado-*` y `--nota-*`.
+- **Claro más contrastado:** fondo #E3EBF3, líneas #C8D4E1 / #A9B9CC, textos secundarios más oscuros y sombras marcadas.
+- **Contraste:** lo comprueba `styles/contraste.test.ts`, en los dos temas (texto ≥ 4.5:1; borde de campos, estados y notas). **Un color nuevo pasa por esa prueba**: ya no se recalcula a mano.
+- **Títulos de sección:** una barra marino con el número en la franja (`styles/Secciones.module.css`: `barra`, `numero`, `contador`).
+  - Cada módulo la compone; su tarjeta declara el relleno en `--relleno-y` / `--relleno-x`.
+  - Un botón dentro de la barra usa `sobreSeccion` (`Botones.module.css`).
+  - Los modales usan `modalTitulo`, sin barra.
+- **Lo elegido, relleno:**
+  - pestañas de estado, filtros de fecha y de sector, «Día · Mes · Año», catálogos y el selector de bandeja: con `--principal` (marino en claro, amarillo en oscuro);
+  - cada pestaña de estado lleva el punto de su color (`data-estado`, decorativo).
+- **Pases de las bandejas:** el borde izquierdo y el talón llevan el color de su estado (`data-estado` en el `.pase`).
+  - La muesca se corre 6 px por ese borde (`--muesca`).
+  - La sombra va en el enlace con `drop-shadow`, porque la máscara recortaría una `box-shadow`.
+- **«Sin / Con»:** el elegido va relleno en verde o rojo, con su marca (✓ / !).
+- **Lo desactivado va rayado, con borde punteado:** en gris liso se confundía con «Desactivar», que sí funciona.
+- **«Qué sigue»** en el expediente (`QueSigue`, con la lógica en `pasosSiguientes.ts` y sus pruebas): los pasos de quien mira, según su rol y el estado, con los hechos marcados.
+  - Sin nada que hacer, no se muestra.
+  - Lo que lee la agencia no nombra a UCVMM.
+- **Formulario:**
+  - el indicador de avance de los 4 pasos (`AvanceFormulario`, con la lógica en `pasosDelFormulario.ts`), fijo arriba y con un enlace a cada sección;
+  - las casillas pendientes van en naranja y las cubiertas en verde;
+  - «Adjuntar» va en azul.
+- **Bitácora:** las etiquetas de cada acción llevan el color de su categoría (`categoriaAccion.ts`), y los rótulos y botones son los del resto.
+- **Rótulos más grandes y menos espaciados:** de .6–.66rem a .68–.74rem.
+- **La tabla de pasajeros** lleva el pasaporte y el seamanbook en una columna. Antes, en el puesto, la del impedimento quedaba fuera de la vista.
+- **Un solo ancho de página** (1240 px, `MarcoPagina`). `angosto` se queda para la contraseña y el 404.
+- Maquetas, capturas de antes y después y el script que las toma (contra la pila del E2E, sin correos): en el scratchpad (`visual/`).
+
 ### Interfaz (revisión de UI/UX del 2026-10-19)
 - **Paleta SNM** (pedido del usuario del 2026-10-19: «basate en los colores del logo y en el estándar de la página web»). Sale del escudo (amarillo `#FFE400`, negro, celeste `#15B0DE`) y de los tokens propios de migracion.gob.pa (`--snm-*`):
   - Marino `#10233F` / `#17283E` para los textos, azul institucional `#003DA5`, amarillo `#F2C94C` (hover `#FFD633`), líneas `#DCE4ED` / `#CAD5E1`, fondos `#F6F9FC` / `#EEF4F8` y crema `#FFF8D8`.
@@ -180,7 +213,7 @@ Pedido del usuario: «el diseño es genérico, típico de IAs; necesitamos ident
   - rojo: denegar, eliminar, quitar.
   
   Relleno para la acción que decide; contorno teñido (`.tono` con `--tono`) para las de una fila. Un naranja de contorno junto a uno rojo no se distingue en claro: por eso «Devolver» lleva relleno y «Desactivar» va en gris. El modal de confirmación toma el color con `tono`.
-- Botones (en mayúsculas de Archivo desde el 2026-11-11): principal marino en claro y amarillo en oscuro (`--principal`); secundario con borde de tinta; aprobar con `--exito-fuerte`, denegar/eliminar con `--peligro-fuerte` (o contorno rojo); "Volver" sólido (`--card` con borde: sobre el fondo decorativo, transparente no se leía). Desactivado en gris (`--overlay-2` + `--muted`), no amarillo a media opacidad. En `useConfirmar`, `peligroso` (rojo) o `exito` (verde) según la acción.
+- Botones (en mayúsculas de Archivo desde el 2026-11-11): principal marino en claro y amarillo en oscuro (`--principal`); secundario con borde de tinta; aprobar con `--exito-fuerte`, denegar/eliminar con `--peligro-fuerte` (o contorno rojo); "Volver" sólido (`--card` con borde: sobre el fondo decorativo, transparente no se leía). Desactivado rayado con borde punteado (desde el 2026-11-17; antes, gris liso), no amarillo a media opacidad. En `useConfirmar`, `peligroso` (rojo) o `exito` (verde) según la acción.
   - Un botón principal no se desactiva porque falten datos: al pulsarlo dice qué falta (gris y sin explicación no se entendía, 2026-10-22). Se desactiva solo mientras guarda, o cuando al lado dice por qué (revisión de UCVMM).
 - Fondo «carta celeste» entre la cabecera y el pie, en todas las vistas y el login (`FondoPagina`, elegido por el usuario el 2026-10-22). Es decorativo y tenue a propósito, porque cruza títulos y botones. `.medio` lleva `overflow: clip`, no `hidden`: con hidden deja de funcionar el panel fijo de la revisión.
   - Solo en el login tiene movimiento (`animado`), con la variante «rutas vivas» que eligió el usuario el 2026-10-23: las rutas se trazan al entrar, las recorren luces doradas y las estrellas laten. En las pantallas de trabajo no se anima, para no distraer.
@@ -191,7 +224,7 @@ Pedido del usuario: «el diseño es genérico, típico de IAs; necesitamos ident
   - Sin botón de pausa: el usuario lo quitó el 2026-10-23. La WCAG 2.2.2 pide uno para lo que se mueve solo más de 5 s; se aceptó porque es solo el login. Si el movimiento pasa a otras pantallas, el botón vuelve.
 - "En corrección" va en naranja (`--acc-orange`): el ámbar se confundía con la marca.
 - Encabezado de página: `EncabezadoPagina` (título y descripción a la izquierda, acciones a la derecha); el expediente lleva el suyo.
-- Campos con `--input-border` / `--input-bg` (borde de 3:1). Las notas informativas, neutras con borde izquierdo `--acc-blue`.
+- Campos con `--input-border` / `--input-bg` (borde de 3:1). Las notas informativas, en azul (`--nota-fondo` / `--nota-borde`, desde el 2026-11-17) con borde izquierdo `--acc-blue`.
 - Texto libre que escribe un usuario (observaciones, motivos, comentarios, nombres de archivo y de buque): con `overflow-wrap: anywhere`, para que una palabra larguísima sin espacios corte la línea en vez de salirse de su caja (2026-11-08; el `body` lleva `break-word` por defecto). Lo prueba `sinTextoDesbordado` en `e2e/flujo-completo.spec.ts`, que falla con los estilos anteriores.
 - Revisión de UX del 2026-11-08 (40 pantallas por rol, en claro, oscuro y celular):
   - Bajo cada campo de fecha del formulario va la fecha en palabras (`FechaEnPalabras`: «jueves, 13 de noviembre de 2026»). El navegador muestra la fecha en su propio formato (en un Windows en inglés, mm/dd/aaaa), y así no se confunde el día con el mes. Va con `aria-hidden`, para no cambiar el nombre del campo.
@@ -204,7 +237,7 @@ Pedido del usuario: «el diseño es genérico, típico de IAs; necesitamos ident
   - Enlace «Saltar al contenido» (clase global `.saltar-contenido`) en `MarcoPagina` y en el login, hacia `<main id="contenido">`.
   - Los íconos son decorativos (`aria-hidden` en `crearIcono`). Todo botón de solo ícono lleva `aria-label` con qué hace y sobre qué: «Ver informe.pdf», «Quitar tripulante 2».
   - Errores y avisos quedan 10 s en pantalla; éxitos e informativos, 4 s, y 6 s los que llevan el sello de un estado (`Notificaciones`, diseño «sello centrado» del 2026-11-11, en «Identidad»).
-- Si cambias un color, recalcula el contraste también sobre los fondos teñidos (insignias, avisos, contadores).
+- Si cambias un color, corre `styles/contraste.test.ts` (los tokens, en los dos temas). Y recalcula a mano los fondos teñidos con `color-mix`, que esa prueba no ve (insignias, avisos, contadores).
 - El correo (`core/email.py`) y el PDF (`informes/autorizacion_pdf.py`) usan la misma paleta (`core/identidad.py`) (2026-10-20). El color de cada estado es el de su insignia (`InsigniaEstado`): recibida en azul, aprobada en verde, devuelta en naranja, denegada en rojo, expirada en gris y, en el PDF, finalizada en verde azulado.
 - Revisión de UCVMM (propuesta 1A, elegida por el usuario el 2026-10-19):
   - Los impedimentos se marcan en una columna Sin / Con de la tabla de tripulantes (`SeccionTripulantes`). El estado vive en `useVerificacionImpedimentos`, que lo comparte con el panel de decisión (`PanelRevision`).
@@ -217,7 +250,8 @@ Pedido del usuario: «el diseño es genérico, típico de IAs; necesitamos ident
 
 El sistema cubre el ciclo completo de las Autorizaciones Marítimas: la agencia envía, UCVMM revisa por sector y el puesto de control finaliza. Tiene además:
 - supervisión y consulta histórica;
-- el recargo por atención fuera del horario laboral y su boleta (2026-11-16);
+- el recargo por atención fuera del horario laboral y su boleta, con el tipo de operación en casillas (2026-11-16);
+- «¿Subir y bajar?» en Embarque y Desembarque, con la Carta Form. 7 de cada pasajero, y la ocupación fuera del formulario (2026-11-16);
 - estadísticas con exportación a Excel, PDF y CSV;
 - la verificación pública del PDF por el QR;
 - la identidad «pase oficial».
@@ -311,7 +345,7 @@ Cada una salió de un problema real. El detalle está en el historial.
     - los permisos se consultan en cada pedido (a veces dos veces);
     - el expediente vuelve a leer el catálogo (trámites, documentos y países) y carga `creada_por` con su rol y su agencia.
     Juntar la verificación del token con la carga del usuario y cachear el catálogo por proceso ahorraría entre 10 y 20 %. Correr `tests/carga.py` antes y después.
-17. **Documentación de la DTI, juego 0.7:** `docs/` no tiene todavía la identidad «pase oficial» ni los cambios del 2026-11-11 (documentos de los técnicos, nombre neutro para la agencia, costo fuera del horario y consulta histórica), del 2026-11-13 (cambio de puerto, Formulario No. 3 en todos los trámites, cabecera de la agencia, rango Pasajero, pasaporte con 3 meses) del 2026-11-14 (la Visa de los restringidos, los panameños, Shore Pass, quien finalizó y el PDF por el QR) y del 2026-11-16 (la boleta de recargo y el alcance del supervisor general).
+17. **Documentación de la DTI, juego 0.7:** `docs/` no tiene todavía la identidad «pase oficial» ni los cambios del 2026-11-11 (documentos de los técnicos, nombre neutro para la agencia, costo fuera del horario y consulta histórica), del 2026-11-13 (cambio de puerto, Formulario No. 3 en todos los trámites, cabecera de la agencia, rango Pasajero, pasaporte con 3 meses) del 2026-11-14 (la Visa de los restringidos, los panameños, Shore Pass, quien finalizó y el PDF por el QR) y del 2026-11-16 (la boleta de recargo con el tipo de operación, el alcance del supervisor general, «¿Subir y bajar?» con la Carta Form. 7 y la ocupación fuera del formulario), ni el rediseño visual «B + C» del 2026-11-17 (las capturas de los manuales quedaron con el diseño anterior).
 18. **Recargo fuera del horario, con UCVMM:**
     - La boleta (2026-11-16) es un **borrador**: UCVMM tiene un modelo en papel, que el usuario pasará para copiarlo tal cual (`informes/boleta_recargo_pdf.py`).
     - El sistema no registra el pago ni dice dónde se paga (desde el 2026-11-11).
@@ -380,19 +414,29 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
   - Qué documentos: el recuadro del trámite en el **Formulario No. 3 oficial**. Por eso Desembarque lleva Generales de pasaporte, aunque el documento de proceso no la liste.
   - Por tripulante o por solicitud: cada proceso dice "para cada tripulante…". La única excepción escrita es la Lista de Tripulantes, que "debe subirse al trámite" (pág. 9). Por eso la Carta de responsabilidad y el Reporte médico van por tripulante.
   - Flujo y requisitos del sistema: págs. 9–10 del documento de proceso.
-  - **Seis excepciones decididas por el usuario** sobre la lectura literal:
+  - **Siete excepciones decididas por el usuario** sobre la lectura literal:
     - La vigencia se valida en todos los trámites, no solo en los 3 que la mencionan (2026-10-14). Desde el 2026-11-13, el pasaporte con al menos 3 meses a partir de la operación, y el seamanbook vencido solo se señala.
     - La libreta de Embarque se pide a todo Marino (`siempre`), no solo a los panameños (2026-10-14). La condición `solo_panamenos` se quitó el 2026-11-14 (nunca se usó).
     - A los rangos distintos de Marino solo se les piden las Generales de pasaporte y el boleto aéreo, en todos los trámites (reunión del 2026-10-30, `tramite_documentos.rangos`), salvo lo de la cuarta.
     - A los técnicos, supernumerarios y superintendentes, en Desembarque, Carta, Generales, Contrato y boleto opcional (2026-11-11). Desde el 2026-11-13 van por el trámite de Técnico, y esas filas se borraron el 2026-11-14 (migración `d9a4b7e2c315`). La lógica de lo opcional (`tramite_documentos.rangos_opcional`, `opcional_para` / `opcionalPara`) se queda, con sus pruebas, para el próximo documento opcional.
     - El Formulario No. 3 en todos los trámites, uno por solicitud y para cualquier rango; el Cambio de Puerto deja de ser un trámite: se indica en Embarque y Desembarque, con el nuevo puesto del mismo sector; y el rango Pasajero presenta lo del Marino sin la Libreta, con Embarque y Desembarque solo para Marino, Pasajero y Militar (2026-11-13).
     - La Visa (DOC-VISA) a todo pasajero de nacionalidad restringida, en todos los trámites y rangos; a los panameños, sin visa ni boleto aéreo en Embarque y Desembarque ni la Visa Especial de Marino en Cambio de nave (condición `solo_extranjeros`); y el Sellado de Shore Pass solo para el Marino (2026-11-14).
+    - «¿Subir y bajar?» (Sí / No, empieza en No) en Embarque y Desembarque. Con «Sí», cada pasajero, de cualquier rango, adjunta la Carta de Responsabilidad (Form. No. 7), además de lo demás del trámite (2026-11-16, migración `a7c2e9f4b618`):
+      - El trámite la pregunta si tiene `tipos_tramite.permite_subir_y_bajar`, y la respuesta se guarda en `solicitudes.subir_y_bajar`.
+      - La Carta va con la condición `subir_y_bajar`, espejada en `checklist.ts`: `construir_casillas(..., subir_y_bajar)`.
+      - En los demás trámites, la respuesta se descarta, como el cambio de puerto.
+      - La muestran el expediente, el PDF de la autorización y la boleta.
 - Nacionalidad restringida (`paises.nacionalidad_restringida`):
   - Desde el 2026-11-14 se le pide la **Visa** (DOC-VISA) en todos los trámites y rangos, y se señala en todos: el chip de la tarjeta, la bandeja y el expediente, y el aviso del formulario, que nombra lo que debe adjuntar.
   - El Form. No. 6 se adjunta **solo en Desembarque** ("cuando aplique", como en el Form. 3).
   - `tipos_tramite.aviso_custodia` marca los trámites cuyo proceso dice que, al aprobar, se avisa a la agencia que debe realizar el trámite de solicitud de custodia: Desembarque, Urgencias, Renovación y Shore Pass.
   - En los demás trámites no se menciona la custodia: ni en el formulario, ni en el expediente, ni en el correo, ni en el PDF.
   - **Ninguna nacionalidad viene sembrada**: la lista oficial la marca el admin.
+- La **ocupación** del pasajero salió del formulario el 2026-11-16:
+  - `solicitud_tripulantes.ocupacion` admite nulo.
+  - Las solicitudes de antes la siguen mostrando: el expediente y el PDF titulan la columna «Rango / ocupación» solo si algún pasajero la tiene (`tituloColumnaRango` / `titulo_columna_rango`).
+  - Al corregir una devuelta se borra: podría quedar pegada a otra persona si la agencia cambia a alguien en la misma ficha.
+  - Un navegador con la versión anterior que la mande no falla: se ignora.
 - `tipos_tramite.rangos_permitidos` limita los rangos del trámite (nulo = cualquiera): F3-TECNICO (sus tres rangos, por el nombre del trámite en el Form. 3), Embarque y Desembarque (Marino, Pasajero y Militar, 2026-11-13) y Shore Pass (solo Marino, 2026-11-14). Lo valida `ServicioTramite.validar_tripulantes` y lo espeja `validacionFormulario.ts`. Con un solo rango, el formulario lo trae elegido y lo dice bajo el campo y en la tarjeta del trámite.
 - Las aclaraciones del instructivo del Form. 3 para el buque y el puerto ("nueva nave a embarcar", etc.) viven en `AYUDA_CAMPOS_TRAMITE` (`modulos/solicitudes/presentacion.ts`).
 - `tipos_tramite.descripcion` (revisión `a3d9c6e1f584`) es una línea con cuándo se usa el trámite, para las tarjetas del paso 1.
@@ -413,6 +457,9 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
   - **Talonario:** una vigente por solicitud (índice parcial). Una mal hecha se anula con motivo y se genera otra con otro número. No se corrige ni se borra.
   - **Concurrencia:** se bloquea la solicitud (`_para_boleta`, FOR UPDATE): dos generaciones a la vez dejan una sola (`test_dos_generaciones_a_la_vez`).
   - **El PDF** (`informes/boleta_recargo_pdf.py`) no lleva nombres de funcionarios: se entrega a la agencia. La anulada sale con el sello ANULADA. Bitácora: BOLETA_GENERADA, BOLETA_ANULADA y BOLETA_DESCARGADA.
+  - **Tipo de operación en casillas, como en papel** (2026-11-16):
+    - Lleva los trámites activos, en su orden, con la X en el de la solicitud. Si el trámite ya está inactivo, como Cambio de Puerto, se suma al final, marcado (`casillas_operacion`).
+    - Si el trámite pregunta «¿Subir y bajar?», debajo va la respuesta.
 - La observación de aprobación es interna: no va en el PDF ni en el correo de aprobación. El PDF no tiene sección de observaciones.
 - El PDF de la agencia dice "Aprobada por: Servicio Nacional de Migración" (hasta el 2026-11-11, "UCVMM"), sin el nombre del funcionario: tampoco ve esos nombres en el expediente (decisión del usuario del 2026-10-15). El personal del SNM descarga una copia interna con el nombre de quien aprobó (reunión del 2026-10-30, en docs/HISTORIAL.md).
 - `agencia_nombre`, `puesto_nombre` y `puesto_finalizacion_nombre` son una foto (al enviar o al finalizar): renombrar la agencia o el puesto no cambia expedientes viejos.

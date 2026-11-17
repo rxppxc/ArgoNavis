@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { leerEspejo, type Caso } from "../../pruebas/espejo";
-import { ETIQUETA_EVENTO, fechaEnPalabras, normalizarImo, TEXTO_HORARIO_LABORAL } from "./presentacion";
+import { tripulanteDePrueba } from "../../pruebas/datos";
+import { ETIQUETA_EVENTO, fechaEnPalabras, normalizarImo, TEXTO_HORARIO_LABORAL, tituloColumnaRango } from "./presentacion";
+
+describe("tituloColumnaRango (la ocupación salió del formulario el 2026-11-16)", () => {
+  it("dice la ocupación solo si algún pasajero la tiene (una solicitud de antes)", () => {
+    expect(tituloColumnaRango([tripulanteDePrueba(), tripulanteDePrueba({ id: 2 })])).toBe("Rango");
+    expect(tituloColumnaRango([tripulanteDePrueba(), tripulanteDePrueba({ id: 2, ocupacion: "Cocinero" })]))
+      .toBe("Rango / ocupación");
+    expect(tituloColumnaRango([])).toBe("Rango");
+  });
+});
 
 describe("ETIQUETA_EVENTO", () => {
   it("nombra los eventos de la boleta de recargo (2026-11-16, internos del SNM)", () => {

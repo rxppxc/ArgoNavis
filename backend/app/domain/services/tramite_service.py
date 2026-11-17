@@ -11,6 +11,10 @@ varias condiciones dependen de los datos de esa solicitud:
                                la Visa, en todos los trámites y rangos
                                (2026-11-14), y el Formulario No. 6 de custodia,
                                solo en Desembarque, como en el Form. 3.
+  - SUBIR_Y_BAJAR            → solo si la solicitud indica «Subir y bajar»
+                               (2026-11-16): la Carta de Responsabilidad
+                               (Form. No. 7) de cada pasajero, en Embarque y
+                               Desembarque.
   - Documentos con `requiere_libreta` → solo a quien porta seamanbook (rango
     Marino); pasajeros, militares, técnicos, supernumerarios y superintendentes no.
     El Pasajero (2026-11-13) va en las filas del Marino: lo mismo, sin la Libreta.
@@ -137,12 +141,15 @@ class ServicioTramite:
     """Evalúa el checklist y valida el formulario de una solicitud."""
 
     def construir_casillas(
-        self, tipo: TipoTramite, tripulantes: list[TripulanteChecklist],
+        self, tipo: TipoTramite, tripulantes: list[TripulanteChecklist], subir_y_bajar: bool = False,
     ) -> list[CasillaChecklist]:
-        """Casillas que esta solicitud debe cubrir, ya resueltas las condiciones."""
+        """Casillas que esta solicitud debe cubrir, ya resueltas las condiciones.
+        `subir_y_bajar`: la respuesta de la solicitud a «¿Subir y bajar?»."""
         casillas: list[CasillaChecklist] = []
 
         for td in sorted(tipo.documentos, key=lambda x: x.orden or 0):
+            if td.condicion == CondicionDocumento.SUBIR_Y_BAJAR.value and not subir_y_bajar:
+                continue
             if td.alcance == AlcanceDocumento.SOLICITUD.value:
                 if (td.condicion == CondicionDocumento.NACIONALIDAD_RESTRINGIDA.value
                         and not any(t.nacionalidad_restringida for t in tripulantes)):
@@ -183,14 +190,14 @@ class ServicioTramite:
 
     def evaluar(
         self, tipo: TipoTramite, tripulantes: list[TripulanteChecklist],
-        cubiertas: set[tuple[int, int | None]],
+        cubiertas: set[tuple[int, int | None]], subir_y_bajar: bool = False,
     ) -> ResultadoChecklist:
         """Compara las casillas exigibles contra las que traen archivo.
 
         `cubiertas` son tuplas (documento_id, indice_tripulante) —
         indice_tripulante en None para los documentos de alcance solicitud.
         """
-        requeridas = self.construir_casillas(tipo, tripulantes)
+        requeridas = self.construir_casillas(tipo, tripulantes, subir_y_bajar)
         # Las opcionales nunca faltan (2026-11-11).
         faltantes = [
             casilla for casilla in requeridas

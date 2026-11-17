@@ -496,3 +496,85 @@ Solo cambió el nombre visible: «Costo migratorio» pasó a «Recargo por atenc
 - La cuenta de la BD sin DELETE sobre las boletas.
 - `boleta.spec.ts` (E2E), con una solicitud de Técnico que siembra `servidor_e2e.py`.
 - El paso del supervisor general de `flujo-completo.spec.ts`.
+
+## Subir y bajar, sin ocupación y tipo de operación en la boleta (2026-11-16, migración `a7c2e9f4b618`)
+
+Pedido del usuario, con sus decisiones:
+
+**«¿Subir y bajar?»:**
+- **Dónde:** solo en Embarque y Desembarque (`tipos_tramite.permite_subir_y_bajar`).
+  - La pregunta va al final de «Datos del trámite», antes del cambio de puerto, que sigue último.
+  - Empieza en «No».
+- **Con «Sí»:** cada pasajero, sea marino, pasajero o militar, adjunta la Carta de Responsabilidad (Form. No. 7), además de lo demás del trámite.
+  - Es una fila del catálogo con la condición nueva `subir_y_bajar`, espejada en `checklist.ts`.
+  - La foto del checklist la guarda, como a las demás.
+  - El Formulario No. 3 ya se pedía siempre.
+- **Dónde se guarda:** `solicitudes.subir_y_bajar`.
+- **Otros trámites:** la respuesta se descarta, como el cambio de puerto.
+- **Dónde se ve:** en el expediente, en el PDF de la autorización y en la boleta.
+- **Rangos:** Embarque y Desembarque ya admitían solo Marino, Pasajero y Militar (desde el 2026-11-13); no cambió.
+
+**Ocupación:**
+- Salió del formulario: `solicitud_tripulantes.ocupacion` admite nulo.
+- **Solicitudes viejas:** la siguen mostrando (decisión del usuario). El expediente y el PDF titulan la columna «Rango / ocupación» solo si algún pasajero la tiene. Así, un PDF ya entregado sale igual si se vuelve a descargar.
+- **Al corregir una devuelta:** se borra, porque podría quedar pegada a otra persona si la agencia cambia a alguien en la misma ficha.
+- **Versión anterior abierta:** un navegador con la versión anterior que todavía la mande no falla, porque el campo se ignora.
+
+**Boleta:**
+- El tipo de operación va en casillas, como en un formulario en papel (decisión del usuario): los trámites activos, en su orden, con la X en el de la solicitud.
+  - Una solicitud de un trámite ya inactivo (Cambio de Puerto) lo muestra al final, marcado.
+- Si el trámite pregunta «¿Subir y bajar?», debajo va la respuesta.
+- La línea bajo el título queda solo con el número de la autorización.
+
+**Pruebas:**
+- `test_documento_ucvmm.py`: el catálogo con la Carta y cinco pruebas de «subir y bajar», entre ellas la corrección de «Sí» a «No» y el PDF.
+- `test_ocupacion.py`.
+- Dos casos espejo en `checklist.json`.
+- `test_casillas_operacion` y los datos de la boleta por la API.
+- Vitest, para el envío, la precarga y la columna.
+- E2E: la pregunta en `formulario.spec.ts` y el formulario sin ocupación en `flujo-completo.spec.ts`.
+
+## Rediseño visual «B + C» (2026-11-17)
+
+Pedido del usuario:
+- «Busca todos los botones, remarcaciones y detalles, y mejóralos: más visual, más llamativo.»
+- «Especialmente en el modo claro hay cosas que no se distinguen.»
+- «Que cualquier persona lo entienda y no se pierda ni se frustre.»
+- «Todo el frontend, en cada vista.»
+
+**Proceso:**
+- Revisión de todas las vistas por rol, en claro, oscuro y celular, contra la pila del E2E.
+- Tres maquetas sobre las pantallas reales, con estilos inyectados en el navegador: A «Nítido», B «Color que guía» y C «Documento oficial».
+- El usuario eligió la **mezcla B + C**.
+
+**Lo que encontró la revisión (claro):**
+- Tarjetas lavadas sobre el fondo.
+- Lo elegido casi invisible: «Sin / Con» pálido, y la pestaña y el filtro activos con solo una raya.
+- Lo desactivado igual al gris que sí funciona.
+- La tabla de pasajeros del puesto cortaba la columna «Impedimento».
+- Anchos y lenguajes distintos entre vistas.
+- Un «−720 min» en las estadísticas, por la siembra del E2E.
+
+**Qué cambió:**
+- **Tokens:** claro más contrastado; tokens de sección, estado, desactivado y nota en los dos temas; la guarda `styles/contraste.test.ts`.
+- **Piezas compartidas:**
+  - títulos de sección en barra marino con el número en la franja (`styles/Secciones.module.css`);
+  - lo desactivado rayado y el botón `sobreSeccion`;
+  - pestañas y filtros activos rellenos, cada pestaña con el punto de su estado;
+  - «Sin / Con» sólidos y notas en azul.
+- **Bandejas e histórico:** pases con el color de su estado en el borde y el talón, y estados vacíos que dicen qué hacer.
+- **Expediente:** «Qué sigue» según el rol y el estado (`pasosSiguientes`), y la tabla de pasajeros con el pasaporte y el seamanbook en una columna.
+- **Formulario:**
+  - indicador de avance de los 4 pasos (`pasosDelFormulario`) con enlaces;
+  - casillas pendientes en naranja y cubiertas en verde;
+  - campos más altos y rótulos más grandes.
+- **Administración:**
+  - encabezados en barra marino;
+  - la bitácora con los rótulos y botones del resto y etiquetas por categoría (`categoriaAccion`);
+  - pestañas de catálogos rellenas;
+  - en las estadísticas, un tiempo negativo sale como «—» (y la siembra del E2E pone `created_at`).
+- **Un solo ancho de página** (1240 px).
+
+**Pruebas:**
+- `contraste.test.ts`, `pasosSiguientes.test.ts`, `pasosDelFormulario.test.ts` y `categoriaAccion.test.ts`, más el caso negativo de `duracion`: 63 pruebas nuevas en Vitest.
+- El E2E completo, sin cambios de selectores.

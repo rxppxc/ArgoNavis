@@ -23,7 +23,7 @@ export interface TripulanteEntrada {
   libreta_marino: string | null;  // seamanbook
   libreta_expira: string | null;
   rango: RangoMarino;
-  ocupacion: string;
+  // La ocupación salió del formulario el 2026-11-16.
 }
 
 /** A qué documento corresponde cada archivo enviado (en el mismo orden).
@@ -37,6 +37,8 @@ export interface DatosFormularioSolicitud {
   puesto_control_id: number | null;
   /** Cambio de puerto (2026-11-13): el nuevo puesto, del mismo sector. null = sin cambio. */
   puesto_destino_id: number | null;
+  /** «¿Subir y bajar?» (2026-11-16): el servidor lo descarta si el trámite no lo pregunta. */
+  subir_y_bajar: boolean;
   fecha_operacion: string | null;
   nombre_buque: string | null;
   imo: string | null;
@@ -158,7 +160,8 @@ export interface TripulanteSolicitud {
   libreta_marino: string | null;
   libreta_expira: string | null;
   rango: RangoMarino;
-  ocupacion: string;
+  /** Solo la traen las solicitudes enviadas antes del 2026-11-16 (salió del formulario). */
+  ocupacion: string | null;
   es_panameno: boolean;
   nacionalidad_restringida: boolean;
   /** Verificación de impedimentos de la persona (solo personal SNM; null = sin verificar):
@@ -250,6 +253,9 @@ export interface SolicitudDetalle extends SolicitudResumen {
   valida_vigencia: boolean;
   puesto_control_id: number;
   puesto_destino_id: number | null;
+  /** «¿Subir y bajar?» (2026-11-16): la respuesta y si el trámite hace la pregunta. */
+  subir_y_bajar: boolean;
+  permite_subir_y_bajar: boolean;
   bandera: string | null;
   bandera_nombre: string | null;
   nombre_puerto: string | null;

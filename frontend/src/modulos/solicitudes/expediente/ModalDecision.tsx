@@ -125,7 +125,7 @@ export function ModalDecision({ decision, solicitud, conImpedimento, onCerrar, o
     <div className={styles.modalFondo} onClick={() => { if (!trabajando) onCerrar(); }}>
       <div ref={refModal} className={`${styles.modal} ${styles.modalAngosto}`} role="dialog" aria-modal="true"
         aria-labelledby="titulo-decision" aria-describedby="mensaje-decision" onClick={(e) => e.stopPropagation()}>
-        <h2 id="titulo-decision" className={styles.panelTitulo}>{t.titulo}</h2>
+        <h2 id="titulo-decision" className={styles.modalTitulo}>{t.titulo}</h2>
         <p id="mensaje-decision" className={styles.modalMensaje}>{mensaje(decision, conImpedimento)}</p>
         <label className={styles.etiqueta} htmlFor="texto-decision">{t.etiqueta}</label>
         <textarea id="texto-decision" className={styles.textarea} rows={4} maxLength={2000} data-focus-inicial

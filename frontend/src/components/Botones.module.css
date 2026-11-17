@@ -11,7 +11,7 @@
 
 .boton {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  min-height: 38px; padding: 8px 16px; border-radius: var(--r-sm);
+  min-height: 40px; padding: 8px 16px; border-radius: var(--r-sm);
   border: 1.5px solid transparent; background: transparent; color: var(--text);
   font: 700 .74rem/1.2 var(--letra-titulo); font-stretch: var(--ancho-titulo);
   letter-spacing: .08em; text-transform: uppercase;
@@ -19,8 +19,11 @@
   transition: background var(--t) var(--ease), border-color var(--t) var(--ease),
     color var(--t) var(--ease), box-shadow var(--t) var(--ease), filter var(--t) var(--ease);
 }
+/* Rayado y con borde punteado (rediseño del 2026-11-17): en gris liso se confundía con
+   los botones grises que sí funcionan («Desactivar»). */
 .boton:disabled {
-  background: var(--overlay-2); border-color: transparent; color: var(--muted);
+  background: repeating-linear-gradient(135deg, var(--desactivado-1) 0 6px, var(--desactivado-2) 6px 12px);
+  border: 1.5px dashed var(--desactivado-borde); color: var(--muted);
   box-shadow: none; filter: none; cursor: not-allowed;
 }
 
@@ -32,7 +35,16 @@
 
 .texto { min-height: 0; padding: 8px 10px; color: var(--text-2); }
 .texto:hover:not(:disabled) { color: var(--text); background: var(--hover); }
-.texto:disabled { background: transparent; }
+.texto:disabled { background: transparent; border-color: transparent; opacity: .6; }
+
+/* Dentro de una barra de título de sección (marino, Secciones.module.css): contorno claro. */
+.sobreSeccion {
+  background: transparent; color: var(--seccion-texto);
+  border-color: color-mix(in srgb, var(--seccion-texto) 70%, transparent);
+}
+.sobreSeccion:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--seccion-texto) 12%, transparent); border-color: var(--seccion-texto);
+}
 
 /* Cada acción con su color (pedido del usuario del 2026-10-22: «colores
    diferenciadores»). El color dice qué pasa al pulsar y, en las solicitudes,
@@ -79,7 +91,7 @@
 /* Solo ícono (lleva aria-label): cuadrado y neutro. */
 .icono { width: 32px; height: 32px; min-height: 0; padding: 0; border-color: var(--border-2); color: var(--text-2); }
 .icono:hover:not(:disabled) { color: var(--text); border-color: var(--input-border); background: var(--hover); }
-.icono:disabled { background: transparent; border-color: var(--border); opacity: .45; }
+.icono:disabled { background: transparent; border: 1.5px solid var(--border); opacity: .45; }
 .icono.chico { width: 28px; height: 28px; }
 /* Ícono que abre o descarga un documento: en azul, como el resto de consultar. */
 .iconoConsultar { color: var(--acc-blue); }

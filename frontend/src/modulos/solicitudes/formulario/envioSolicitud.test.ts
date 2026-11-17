@@ -54,7 +54,7 @@ describe("desdeSolicitud: la precarga de una solicitud devuelta", () => {
 describe("armarEnvio: lo que se manda al servidor", () => {
   const ana: FichaTripulante = {
     ...fichaVacia(), clave: "t11", id: 11, nombre: " Ana ", apellido: " Ríos ", pasaporte: " P123 ",
-    libreta_marino: " SB-1 ", libreta_expira: "2030-01-01", ocupacion: " Cocinera ",
+    libreta_marino: " SB-1 ", libreta_expira: "2030-01-01",
   };
   const beto: FichaTripulante = {
     ...fichaVacia("tecnico"), clave: "n2", nombre: "Beto", libreta_marino: "SB-9", libreta_expira: "2030-01-01",
@@ -99,9 +99,9 @@ describe("armarEnvio: lo que se manda al servidor", () => {
       puesto_control_id: 3, imo: "9074729", nombre_buque: null, motivo: "Compras",
       fecha_operacion: null, bandera: null, observaciones: null,
     });
-    expect(datos.tripulantes[0]).toMatchObject({
-      id: 11, nombre: "Ana", apellido: "Ríos", pasaporte: "P123", ocupacion: "Cocinera",
-    });
+    expect(datos.tripulantes[0]).toMatchObject({ id: 11, nombre: "Ana", apellido: "Ríos", pasaporte: "P123" });
+    // La ocupación salió del formulario (2026-11-16).
+    expect(datos.tripulantes[0]).not.toHaveProperty("ocupacion");
   });
 
   it("un IMO que no es válido va tal cual: el servidor responde con su mensaje", () => {
@@ -149,5 +149,18 @@ describe("cambio de puerto (2026-11-13)", () => {
     expect(armarEnvio({ ...base, cambio_puerto: "no" }, [], SIN_DOCUMENTOS).datos.puesto_destino_id).toBeNull();
     expect(armarEnvio({ ...base, cambio_puerto: "si", puesto_destino_id: "" }, [], SIN_DOCUMENTOS).datos.puesto_destino_id)
       .toBeNull();
+  });
+});
+
+describe("subir y bajar (2026-11-16)", () => {
+  it("la precarga trae la respuesta de la devuelta", () => {
+    expect(desdeSolicitud(solicitudDePrueba({ subir_y_bajar: true })).cabecera.subir_y_bajar).toBe("si");
+    expect(desdeSolicitud(solicitudDePrueba({ subir_y_bajar: false })).cabecera.subir_y_bajar).toBe("no");
+  });
+
+  it("viaja como sí o no; el formulario empieza en «No»", () => {
+    expect(CABECERA_VACIA.subir_y_bajar).toBe("no");
+    expect(armarEnvio({ ...CABECERA_VACIA, subir_y_bajar: "si" }, [], SIN_DOCUMENTOS).datos.subir_y_bajar).toBe(true);
+    expect(armarEnvio(CABECERA_VACIA, [], SIN_DOCUMENTOS).datos.subir_y_bajar).toBe(false);
   });
 });

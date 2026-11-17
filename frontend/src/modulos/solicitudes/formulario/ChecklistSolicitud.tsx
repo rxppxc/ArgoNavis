@@ -22,7 +22,7 @@ export function ChecklistSolicitud({ documentos, tripulantes, onIrATripulante, o
   const obligatorias = casillas.filter((c) => c.obligatoria).length;
 
   return (
-    <section className={styles.bloque}>
+    <section className={styles.bloque} id="paso-documentos">
       <div className={styles.bloqueTitulo}>
         {/* Sin documentos propios de la solicitud, la sección es solo el resumen: antes
             decía «no pide documentos» junto a «0 / 3 en total» y se contradecía. */}

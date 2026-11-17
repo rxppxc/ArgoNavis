@@ -1,7 +1,7 @@
 import type { SolicitudDetalle, TripulanteSolicitud } from "../../../api/solicitudes";
 import BarraProgreso from "../../../components/BarraProgreso";
 import { IconoArchivo, IconoCheck } from "../../../components/Iconos";
-import { ETIQUETA_RANGO, ETIQUETA_SEXO, formatearFecha, formatearFechaHora } from "../presentacion";
+import { ETIQUETA_RANGO, ETIQUETA_SEXO, formatearFecha, formatearFechaHora, tituloColumnaRango } from "../presentacion";
 import type { VerificacionImpedimentos } from "./useVerificacionImpedimentos";
 import { MESES_VIGENCIA_PASAPORTE } from "../formulario/validacionFormulario";
 import styles from "./DetalleSolicitud.module.css";
@@ -21,6 +21,8 @@ interface Props {
 export function SeccionTripulantes({ solicitud: s, verificacion: v, onVerDocumentacion }: Props) {
   const total = s.tripulantes.length;
   const marcados = v ? total - v.pendientes : 0;
+  // La ocupación salió del formulario el 2026-11-16: solo la nombran las solicitudes de antes.
+  const columnaRango = tituloColumnaRango(s.tripulantes);
 
   return (
     <section className={styles.panel}>
@@ -63,10 +65,11 @@ export function SeccionTripulantes({ solicitud: s, verificacion: v, onVerDocumen
               <th>#</th>
               <th>Pasajero</th>
               <th>Nacionalidad</th>
-              <th>Pasaporte</th>
-              <th>Seamanbook</th>
+              {/* Pasaporte y seamanbook juntos (2026-11-17): en dos columnas, la del impedimento
+                  quedaba fuera de la vista en el puesto y el nombre se partía en cinco líneas. */}
+              <th>Pasaporte y seamanbook</th>
               {/* Para UCVMM el rango va debajo del nombre y deja lugar a la columna de impedimentos. */}
-              {!v && <th>Rango / ocupación</th>}
+              {!v && <th>{columnaRango}</th>}
               <th>Documentos</th>
               {v && <th>Impedimento</th>}
             </tr>
@@ -83,7 +86,11 @@ export function SeccionTripulantes({ solicitud: s, verificacion: v, onVerDocumen
                   <td className={styles.celdaOrden}>{i + 1}</td>
                   <td className={styles.celdaAncha}>
                     <div className={styles.celdaPrincipal}>{m.nombre_completo}</div>
-                    {v && <div className={styles.celdaSecundaria}>{ETIQUETA_RANGO[m.rango]} · {m.ocupacion}</div>}
+                    {v && (
+                      <div className={styles.celdaSecundaria}>
+                        {ETIQUETA_RANGO[m.rango]}{m.ocupacion && <> · {m.ocupacion}</>}
+                      </div>
+                    )}
                     <div className={styles.celdaSecundaria}>
                       {ETIQUETA_SEXO[m.sexo]} · Nacimiento: {formatearFecha(m.fecha_nacimiento)}
                       {m.pais_nacimiento_nombre && <> · {m.pais_nacimiento_nombre}</>}
@@ -105,30 +112,29 @@ export function SeccionTripulantes({ solicitud: s, verificacion: v, onVerDocumen
                       <div className={styles.chipRestringida}>Restringida</div>
                     )}
                   </td>
-                  <td data-etiqueta="Pasaporte">
+                  <td data-etiqueta="Pasaporte y seamanbook">
                     <div className={styles.celdaPrincipal}>{m.pasaporte}</div>
                     <div className={m.pasaporte_vencido || m.pasaporte_vigencia_corta ? styles.vencido : styles.celdaSecundaria}>
                       Vence {formatearFecha(m.pasaporte_expira)}
                       {m.pasaporte_vencido && " — vencido"}
                       {m.pasaporte_vigencia_corta && ` — menos de ${MESES_VIGENCIA_PASAPORTE} meses de vigencia`}
                     </div>
-                  </td>
-                  <td data-etiqueta="Seamanbook">
-                    {m.porta_libreta ? (
-                      <>
-                        <div className={styles.celdaPrincipal}>{m.libreta_marino ?? "—"}</div>
+                    {/* Solo el rango Marino porta seamanbook. */}
+                    {m.porta_libreta && (
+                      <div className={styles.libreta}>
+                        <div className={styles.celdaSecundaria}>
+                          Seamanbook <span className={styles.celdaPrincipal}>{m.libreta_marino ?? "—"}</span>
+                        </div>
                         <div className={m.libreta_vencida ? styles.vencido : styles.celdaSecundaria}>
                           Vence {formatearFecha(m.libreta_expira)}{m.libreta_vencida && " — vencido"}
                         </div>
-                      </>
-                    ) : (
-                      <span className={styles.celdaSecundaria}>No aplica</span>
+                      </div>
                     )}
                   </td>
                   {!v && (
-                    <td data-etiqueta="Rango / ocupación">
+                    <td data-etiqueta={columnaRango}>
                       <div className={styles.celdaPrincipal}>{ETIQUETA_RANGO[m.rango]}</div>
-                      <div className={styles.celdaSecundaria}>{m.ocupacion}</div>
+                      {m.ocupacion && <div className={styles.celdaSecundaria}>{m.ocupacion}</div>}
                     </td>
                   )}
                   <td className={v ? undefined : styles.celdaAncha} data-etiqueta={v ? "Documentos" : undefined}>

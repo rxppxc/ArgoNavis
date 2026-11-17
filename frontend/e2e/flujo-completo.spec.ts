@@ -77,7 +77,8 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     // Colombiano: a un panameño no se le pide la Visa Especial de Marino (2026-11-14).
     await elegirPais(agencia.getByRole("combobox", { name: "País de nacimiento *" }), "Colombia");
     await elegirPais(agencia.getByRole("combobox", { name: "Nacionalidad *" }), "Colombia");
-    await agencia.getByLabel("Ocupación *").fill("Primer oficial");
+    // Sin ocupación: salió del formulario el 2026-11-16.
+    await expect(agencia.getByLabel(/^Ocupación/)).toHaveCount(0);
     await agencia.getByLabel("N° de pasaporte *").fill("PA1234567");
     await agencia.getByLabel("Vence el pasaporte *").fill("2030-05-01");
     await agencia.getByLabel("N° de seamanbook *").fill("SB-778812");

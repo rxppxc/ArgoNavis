@@ -54,6 +54,7 @@ export default function PaginaTramites() {
                 t.requiere_puerto_desembarque && "Puerto de desembarque",
                 t.requiere_clinica && "Clínica u hospital",
                 t.requiere_motivo && "Motivo",
+                t.permite_subir_y_bajar && "¿Subir y bajar? (Sí / No)",
                 t.permite_cambio_puerto && "Cambio de puerto (opcional)",
               ].filter(Boolean) as string[];
 

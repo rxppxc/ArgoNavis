@@ -32,9 +32,10 @@ export function segun(n: number, uno: string, varios: string): string {
   return n === 1 ? uno : varios;
 }
 
-/** Tiempo legible: "45 min", "6 h 24 min", "2 días y 3 h". */
+/** Tiempo legible: "45 min", "6 h 24 min", "2 días y 3 h". Uno negativo no es un tiempo
+ *  (datos con fechas desordenadas): "—", como sin datos. */
 export function duracion(horas: number | null): string {
-  if (horas === null) return "—";
+  if (horas === null || horas < 0) return "—";
   const minutos = Math.round(horas * 60);
   if (minutos < 60) return `${minutos} min`;
   if (minutos < 48 * 60) {

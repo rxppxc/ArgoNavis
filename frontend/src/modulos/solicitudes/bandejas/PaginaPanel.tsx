@@ -239,7 +239,9 @@ function Panel({ bandejaPedida, estadoPedido }: { bandejaPedida: Bandeja | null;
 
       <div className={styles.pestanas} role="tablist" aria-label="Estado">
         {PESTANAS[vista].map((p) => (
-          <button key={p.id} type="button" role="tab" aria-selected={p.id === filtro}
+          // data-estado: el punto del color de su estado (rediseño del 2026-11-17; decorativo:
+          // el texto ya dice el estado).
+          <button key={p.id} type="button" role="tab" aria-selected={p.id === filtro} data-estado={p.id}
             className={`${styles.pestana} ${p.id === filtro ? styles.pestanaActiva : ""}`}
             onClick={() => cambiarFiltro(p.id)}>
             {p.etiqueta}
@@ -274,12 +276,15 @@ function Panel({ bandejaPedida, estadoPedido }: { bandejaPedida: Bandeja | null;
           <div className={styles.vacio}>
             <div className={styles.vacioIcono}><IconoBandeja tamano={30} /></div>
             <h3>{hayFiltros ? "Sin resultados" : sinAgencia ? "Tu usuario no tiene agencia" : "No hay solicitudes aquí"}</h3>
+            {/* Cada vacío dice qué hacer o dónde mirar (rediseño del 2026-11-17: que nadie se pierda). */}
             <p>
-              {hayFiltros ? "Nada coincide con la búsqueda o el rango de fechas."
+              {hayFiltros ? "Nada coincide con la búsqueda o el rango de fechas. Borra la búsqueda o elige «Cualquier fecha»."
                 : sinAgencia ? "Para ver y enviar solicitudes, pide al administrador que te asigne a tu agencia naviera."
-                : vista === "agencia" ? "Cuando tu agencia envíe una solicitud de autorización aparecerá en esta lista."
-                : vista === "puerto" ? "Aquí verás las autorizaciones aprobadas para tus puestos de control."
-                : "No hay solicitudes en este estado."}
+                : filtro !== "todas" ? "No hay solicitudes en este estado. Pulsa «Todas» para ver las demás."
+                : vista === "agencia" ? "Cuando tu agencia envíe una solicitud de autorización aparecerá en esta lista. Para empezar, pulsa «Nueva solicitud»."
+                : vista === "puerto" ? "Aquí verás las autorizaciones aprobadas para tus puestos de control, para verificarlas y finalizarlas."
+                : vista === "revision" ? "Cuando una agencia envíe una solicitud para los puestos de tus sectores, aparecerá aquí para que la revises."
+                : "Aquí verás, en solo lectura, las solicitudes que te toca supervisar."}
             </p>
             {vista === "agencia" && puedeCrear && !hayFiltros && (
               <Link to="/new" className={styles.btnNuevo}><IconoMas /> Nueva solicitud</Link>

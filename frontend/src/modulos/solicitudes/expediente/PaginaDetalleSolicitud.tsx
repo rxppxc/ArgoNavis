@@ -27,6 +27,8 @@ import { InsigniaEstado } from "../InsigniaEstado";
 import { PanelBoleta } from "./PanelBoleta";
 import { PanelPuerto } from "./PanelPuerto";
 import { PanelRevision } from "./PanelRevision";
+import { pasosSiguientes } from "./pasosSiguientes";
+import { QueSigue } from "./QueSigue";
 import {
   formatearFecha, formatearFechaHora, puestoAutorizado, TEXTO_HORARIO_LABORAL, textoPuestos, tiempoRestante,
 } from "../presentacion";
@@ -167,7 +169,7 @@ function ModalDocumentacion({ tripulante, tapado, onCerrar, children }: {
       <div ref={refModal} className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="titulo-documentacion"
         onClick={(e) => e.stopPropagation()}>
         <div className={styles.modalCabecera}>
-          <h2 id="titulo-documentacion" className={styles.panelTitulo}>Documentación de {tripulante.nombre_completo}</h2>
+          <h2 id="titulo-documentacion" className={styles.modalTitulo}>Documentación de {tripulante.nombre_completo}</h2>
           <button type="button" className={styles.btnIcono} onClick={onCerrar} aria-label="Cerrar" data-focus-inicial>
             <IconoX tamano={14} />
           </button>
@@ -361,6 +363,16 @@ function Expediente({ s, onActualizada, volverA, estadoVolver }: {
       </header>
 
       <BannerEstado s={s} />
+      {/* «Qué sigue» (rediseño del 2026-11-17): lo que le toca hacer a quien mira, en orden.
+          La agencia es quien recibe `boletas` en null (el backend no se las manda). */}
+      <QueSigue pasos={pasosSiguientes({
+        estado: s.estado, acciones: s.acciones, esAgencia: s.boletas === null,
+        verificacion: verificacionTabla
+          ? { pendientes: verificacionTabla.pendientes, guardada: verificacionTabla.etapa === "puesto" ? s.impedimentos_puesto_verificados : s.impedimentos_verificados }
+          : null,
+        plazo: s.plazo_correccion ? formatearFechaHora(s.plazo_correccion) : null,
+        puesto: puestoAutorizado(s),
+      })} />
 
       <div className={`${styles.columnas} ${verificacionTabla ? styles.columnasRevision : ""}`}>
         <div className={styles.principal}>
@@ -373,6 +385,8 @@ function Expediente({ s, onActualizada, volverA, estadoVolver }: {
               <Dato etiqueta="Puesto de Control Migratorio" valor={s.puesto_nombre} />
               {/* Cambio de puerto (2026-11-13): el nuevo puesto, que la finaliza. */}
               <Dato etiqueta="Cambio de puerto a" valor={s.puesto_destino_nombre} />
+              {/* «¿Subir y bajar?» (2026-11-16): solo en los trámites que lo preguntan. */}
+              {s.permite_subir_y_bajar && <Dato etiqueta="Subir y bajar" valor={s.subir_y_bajar ? "Sí" : "No"} />}
               {/* El sector de UCVMM (2026-11-10): solo le llega al SNM. */}
               {s.sector_nombre && <Dato etiqueta="Sector" valor={s.sector_nombre} />}
               <Dato etiqueta="Fecha de la operación" valor={formatearFecha(s.fecha_operacion)} />

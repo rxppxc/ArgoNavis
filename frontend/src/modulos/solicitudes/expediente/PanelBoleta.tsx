@@ -179,7 +179,7 @@ function ModalBoleta({ modo, solicitud, onCerrar, onActualizada }: {
     <div className={styles.modalFondo} onClick={() => { if (!trabajando) onCerrar(); }}>
       <div ref={refModal} className={`${styles.modal} ${styles.modalAngosto}`} role="dialog" aria-modal="true"
         aria-labelledby="titulo-modal-boleta" aria-describedby="mensaje-modal-boleta" onClick={(e) => e.stopPropagation()}>
-        <h2 id="titulo-modal-boleta" className={styles.panelTitulo}>{titulo}</h2>
+        <h2 id="titulo-modal-boleta" className={styles.modalTitulo}>{titulo}</h2>
         <p id="mensaje-modal-boleta" className={styles.modalMensaje}>
           {generar
             ? `Recargo de ${solicitud.costo_fuera_de_horario} por atención fuera del horario laboral. El número de `

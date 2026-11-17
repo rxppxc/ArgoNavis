@@ -27,7 +27,8 @@ export function TarjetaSolicitud({ s, vista, volverA, conSector = false }: {
     // El enlace lleva el foco; el pase, dentro, lleva las muescas (una máscara
     // recortaría también el anillo de foco).
     <Link to={`/solicitudes/${s.id}`} state={volverA ? { volverA } : undefined} className={styles.enlace}>
-      <div className={`${styles.pase} ${styles[s.estado] ?? ""}`}>
+      {/* data-estado: el color de su estado en el borde y el talón (rediseño del 2026-11-17). */}
+      <div className={`${styles.pase} ${styles[s.estado] ?? ""}`} data-estado={s.estado}>
         <div className={styles.talon}>
           <span className={styles.numero}><small>N.º</small>{s.numero ?? `#${s.id}`}</span>
           <InsigniaEstado estado={s.estado} inclinado />

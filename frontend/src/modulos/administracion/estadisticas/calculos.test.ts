@@ -26,6 +26,8 @@ describe("duracion", () => {
     [51, "2 días y 3 h"],
     [72, "3 días"],
     [null, "—"],
+    // Un promedio negativo no es un tiempo (2026-11-17: salía «−720 min» con datos sembrados).
+    [-12, "—"],
   ])("%s h = %s", (horas, esperado) => {
     expect(duracion(horas)).toBe(esperado);
   });

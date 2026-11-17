@@ -104,20 +104,24 @@
 }
 /* El panel de la decisión (UCVMM, puesto): con la franja amarilla arriba. */
 .panelAccion { border-top: 6px solid var(--franja); }
-/* Títulos de sección como en un formulario impreso: mayúsculas espaciadas y,
-   en la columna principal, numerados (1 Datos del trámite, 2 Pasajeros…). */
-.panelTitulo {
-  display: flex; align-items: center; gap: 10px;
-  margin-bottom: 14px; color: var(--text);
-  font: 700 .8rem/1.3 var(--letra-titulo); font-stretch: var(--ancho-titulo);
-  letter-spacing: .1em; text-transform: uppercase;
-}
+/* Títulos de sección como en un formulario impreso: desde el rediseño del 2026-11-17
+   (B + C), una barra marino de borde a borde con el número en la franja amarilla; en la
+   columna principal, numerados (1 Datos del trámite, 2 Pasajeros…). */
+.panelTitulo { composes: barra from "../../../styles/Secciones.module.css"; }
 .principal { counter-reset: seccion; }
 .principal .panelTitulo::before {
   counter-increment: seccion;
   content: counter(seccion) / "";   /* el número es decorativo: no se lee */
-  display: inline-grid; place-items: center; flex: none; width: 24px; height: 24px;
-  border: 1.5px solid var(--text); letter-spacing: 0; font: 700 .76rem/1 var(--letra-mono);
+  display: inline-grid; place-items: center; flex: none; width: 26px; height: 26px;
+  background: var(--franja); color: var(--seccion-fondo); letter-spacing: 0; font: 700 .8rem/1 var(--letra-mono);
+}
+.panelTitulo .contador { background: color-mix(in srgb, var(--seccion-texto) 16%, transparent); color: var(--seccion-texto); }
+/* El título de un modal: sin barra (el modal ya lleva la franja amarilla arriba). */
+.modalTitulo {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 14px; color: var(--text);
+  font: 700 .82rem/1.3 var(--letra-titulo); font-stretch: var(--ancho-titulo);
+  letter-spacing: .1em; text-transform: uppercase;
 }
 .contador {
   font: 600 .74rem/1.2 var(--letra-mono); letter-spacing: 0;
@@ -131,17 +135,18 @@
 .datos { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px 24px; }
 /* Cada dato con su rótulo arriba y el valor sobre la línea, como un formulario impreso. */
 .dato { padding-bottom: 6px; border-bottom: 1px solid var(--border-2); }
+/* Rótulos más grandes y menos espaciados (2026-11-17): se leen sin esfuerzo. */
 .dato dt {
   color: var(--muted);
-  font: 600 .6rem/1.4 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
-  letter-spacing: .16em; text-transform: uppercase;
+  font: 600 .7rem/1.4 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
+  letter-spacing: .07em; text-transform: uppercase;
 }
-.dato dd { color: var(--text); font-size: .9rem; margin-top: 3px; overflow-wrap: anywhere; }
-/* Nota informativa del trámite: neutra con acento azul, como el resto de las notas. */
+.dato dd { color: var(--text); font-size: .94rem; margin-top: 3px; overflow-wrap: anywhere; }
+/* Nota informativa del trámite: en azul (2026-11-17; en gris parecía desactivada). */
 .nota {
   margin-top: 14px; padding: 10px 13px; border-radius: var(--r-sm);
-  background: var(--overlay); border: 1px solid var(--border); border-left: 3px solid var(--acc-blue);
-  color: var(--text); font-size: .82rem;
+  background: var(--nota-fondo); border: 1px solid var(--nota-borde); border-left: 4px solid var(--acc-blue);
+  color: var(--text); font-size: .86rem;
 }
 /* Lo que escribió la agencia, con la franja amarilla al costado: crema en claro,
    neutro en oscuro (el amarillo mezclado con el fondo oscuro se veía oliva). */
@@ -153,8 +158,8 @@
 :global([data-theme="light"]) .observaciones { background: var(--y-soft); }
 .observaciones span {
   display: block; margin-bottom: 4px; color: var(--muted);
-  font: 600 .6rem/1.4 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
-  letter-spacing: .16em; text-transform: uppercase;
+  font: 600 .7rem/1.4 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
+  letter-spacing: .07em; text-transform: uppercase;
 }
 
 /* El pie del documento: la línea de lectura mecánica de un pasaporte (decorativa). */
@@ -170,14 +175,17 @@
 .tabla { width: 100%; border-collapse: collapse; font-size: .84rem; }
 .tabla th {
   text-align: left; color: var(--muted);
-  font: 600 .6rem/1.4 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
-  letter-spacing: .16em; text-transform: uppercase;
+  font: 600 .66rem/1.4 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
+  letter-spacing: .08em; text-transform: uppercase;
   padding: 8px 10px; border-bottom: 2px solid var(--text);
 }
 .tabla td { padding: 10px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: top; }
 .tabla tr:last-child td { border-bottom: 0; }
 .celdaPrincipal { color: var(--text); font-weight: 600; }
-.celdaSecundaria { color: var(--text-2); font-size: .76rem; margin-top: 2px; }
+.celdaSecundaria { color: var(--text-2); font-size: .78rem; margin-top: 2px; }
+/* El seamanbook, bajo el pasaporte (2026-11-17). */
+.libreta { margin-top: 7px; padding-top: 6px; border-top: 1px dashed var(--border); }
+.libreta .celdaPrincipal { white-space: nowrap; }
 .vencido { color: var(--acc-red); font-size: .76rem; font-weight: 700; margin-top: 2px; }
 .chipRestringida {
   display: block; width: fit-content; margin-top: 4px;
@@ -271,8 +279,12 @@
 .segmentoFijo { cursor: default; }
 .segmentoFijo:hover { background: var(--card); color: var(--text-2); }
 .segmentoFijo:not(.segmentoSin):not(.segmentoCon) { opacity: .45; }
-.segmentoSin, .segmentoSin:hover { background: var(--green-soft); color: var(--acc-green); }
-.segmentoCon, .segmentoCon:hover { background: var(--red-soft); color: var(--acc-red); }
+/* Lo elegido, relleno y con su marca (2026-11-17): en verde y rojo pálidos casi no se
+   distinguía qué estaba marcado. La marca es decorativa: el texto dice «Sin» o «Con». */
+.segmentoSin, .segmentoSin:hover { background: var(--exito-fuerte); color: var(--sobre-fuerte); }
+.segmentoCon, .segmentoCon:hover { background: var(--peligro-fuerte); color: var(--sobre-fuerte); }
+.segmentoSin::before { content: "✓" / ""; margin-right: 5px; }
+.segmentoCon::before { content: "!" / ""; margin-right: 5px; font-weight: 800; }
 .tabla tr.filaConImpedimento { background: var(--red-soft); }
 .verifPie {
   display: flex; flex-direction: column; gap: 8px;

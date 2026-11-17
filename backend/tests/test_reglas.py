@@ -109,7 +109,7 @@ def _ficha(**cambios):
     from app.domain.schemas.solicitud import DatosTripulanteEntrada
     datos = dict(nombre="Ana", apellido="Pérez", fecha_nacimiento=date(1990, 5, 1), pais_nacimiento="PHL",
                  nacionalidad="PHL", sexo="F", pasaporte="P123456", pasaporte_expira=date(2030, 1, 1),
-                 libreta_marino="SB1", libreta_expira=date(2030, 1, 1), rango="marino", ocupacion="Marinera")
+                 libreta_marino="SB1", libreta_expira=date(2030, 1, 1), rango="marino")
     datos.update(cambios)
     return DatosTripulanteEntrada(**datos)
 

@@ -167,5 +167,37 @@
       {"nombre": "Liu", "es_panameno": false, "rango": "marino", "restringida": false}
     ],
     "esperado": [["EXTRANJEROS", null]]
+  },
+  {
+    "caso": "con subir y bajar se pide la Carta de cada pasajero, de cualquier rango (2026-11-16)",
+    "subir_y_bajar": true,
+    "documentos": [
+      {"codigo": "GENERALES", "alcance": "marino", "condicion": "siempre", "requiere_libreta": false, "orden": 1},
+      {"codigo": "CARTA", "alcance": "marino", "condicion": "subir_y_bajar", "requiere_libreta": false, "orden": 2},
+      {"codigo": "CARTA-GLOBAL", "alcance": "solicitud", "condicion": "subir_y_bajar", "requiere_libreta": false, "orden": 3}
+    ],
+    "tripulantes": [
+      {"nombre": "Marino", "es_panameno": false, "rango": "marino", "restringida": false},
+      {"nombre": "Pasajero panameño", "es_panameno": true, "rango": "pasajero", "restringida": false},
+      {"nombre": "Militar", "es_panameno": false, "rango": "militar", "restringida": false}
+    ],
+    "esperado": [
+      ["GENERALES", 0], ["GENERALES", 1], ["GENERALES", 2],
+      ["CARTA", 0], ["CARTA", 1], ["CARTA", 2],
+      ["CARTA-GLOBAL", null]
+    ]
+  },
+  {
+    "caso": "sin subir y bajar no se pide la Carta",
+    "documentos": [
+      {"codigo": "GENERALES", "alcance": "marino", "condicion": "siempre", "requiere_libreta": false, "orden": 1},
+      {"codigo": "CARTA", "alcance": "marino", "condicion": "subir_y_bajar", "requiere_libreta": false, "orden": 2},
+      {"codigo": "CARTA-GLOBAL", "alcance": "solicitud", "condicion": "subir_y_bajar", "requiere_libreta": false, "orden": 3}
+    ],
+    "tripulantes": [
+      {"nombre": "Marino", "es_panameno": false, "rango": "marino", "restringida": false},
+      {"nombre": "Militar", "es_panameno": false, "rango": "militar", "restringida": false}
+    ],
+    "esperado": [["GENERALES", 0], ["GENERALES", 1]]
   }
 ]

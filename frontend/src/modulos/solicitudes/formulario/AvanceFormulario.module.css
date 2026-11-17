@@ -1,0 +1,32 @@
+/* El avance del formulario (rediseño visual del 2026-11-17): una tira con los cuatro pasos
+   obligatorios, como el índice de un formulario impreso. Lo listo, en verde con su ✓; lo
+   pendiente, con su número en la franja y lo que falta en naranja. Va pegada arriba al
+   bajar, para que siempre se vea cuánto falta. */
+.avance {
+  position: sticky; top: 8px; z-index: 5;
+  background: var(--card); border: 1px solid var(--border-2); border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm); padding: 8px;
+}
+.pasos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; list-style: none; }
+.enlace {
+  display: flex; align-items: center; gap: 10px; height: 100%;
+  padding: 8px 10px; border-radius: var(--r-md); color: inherit; text-decoration: none;
+}
+.enlace:hover { background: var(--hover); }
+.numero {
+  display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 50%;
+  background: var(--seccion-fondo); color: var(--franja); font: 700 .82rem/1 var(--letra-mono);
+}
+.texto { display: flex; flex-direction: column; min-width: 0; }
+.titulo {
+  color: var(--text);
+  font: 700 .72rem/1.3 var(--letra-titulo); font-stretch: var(--ancho-titulo);
+  letter-spacing: .06em; text-transform: uppercase;
+}
+.detalle { color: var(--aviso-fuerte); font-size: .8rem; font-weight: 600; }
+.completo .numero { background: var(--exito-fuerte); color: var(--sobre-fuerte); }
+.completo .detalle { color: var(--acc-green); }
+@media (max-width: 760px) {
+  .avance { position: static; }
+  .pasos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

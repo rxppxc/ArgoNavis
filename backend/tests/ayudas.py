@@ -74,7 +74,7 @@ def tripulante(nombre: str, nacionalidad: str = "PHL", rango: str = "marino", **
         "nombre": nombre, "apellido": "Pérez", "fecha_nacimiento": "1990-05-01",
         "pais_nacimiento": nacionalidad, "nacionalidad": nacionalidad, "sexo": "M",
         "pasaporte": f"P{secrets.token_hex(3)}", "pasaporte_expira": VIGENTE,
-        "rango": rango, "ocupacion": "Marinero",
+        "rango": rango,   # sin ocupación: salió del formulario el 2026-11-16
     }
     if rango == "marino":
         datos.update({"libreta_marino": f"SB{secrets.token_hex(2)}", "libreta_expira": VIGENTE})

@@ -22,10 +22,9 @@
 .periodoIcono { composes: icono from "../../../components/FiltroFechas.module.css"; }
 .chips { composes: chips from "../../../components/FiltroFechas.module.css"; }
 .chip { composes: chip from "../../../components/FiltroFechas.module.css"; }
-/* Como el filtro de fechas activo: borde de tinta y la franja amarilla. */
+/* Como el filtro de fechas activo: relleno con el principal del tema (2026-11-17). */
 .chip[aria-pressed="true"], .chip[aria-pressed="true"]:hover {
-  background: var(--card); border-color: var(--text); color: var(--text); font-weight: 700;
-  box-shadow: inset 0 -3px 0 var(--franja);
+  background: var(--principal); border-color: var(--principal); color: var(--sobre-principal); font-weight: 700;
 }
 .fechas { display: flex; flex-wrap: wrap; gap: 8px 14px; }
 .fechas label { display: inline-flex; align-items: center; gap: 7px; color: var(--text-2); font-size: .8rem; font-weight: 600; }

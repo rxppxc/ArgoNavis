@@ -53,6 +53,14 @@ describe("ficha del pasajero (espejo de validar_pasajeros)", () => {
   });
 });
 
+describe("sin ocupación (2026-11-16)", () => {
+  it("la ficha del pasajero ya no la pide", () => {
+    const cabecera = { ...CABECERA_VACIA, puesto_control_id: "1", fecha_operacion: "2026-10-20" };
+    const errores = validarFormulario(tramiteDePrueba(), cabecera, [ficha()], paises, "2026-10-14");
+    expect(errores).toEqual([]);
+  });
+});
+
 describe("datos del trámite", () => {
   const hoy = "2026-10-14";
   const completa: CabeceraFormulario = {

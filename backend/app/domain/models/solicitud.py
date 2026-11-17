@@ -105,6 +105,9 @@ class Solicitud(Base):
         ForeignKey("puestos_control.id", ondelete="RESTRICT", name="fk_solicitudes_puesto_destino"), index=True,
     )
     puesto_destino_nombre: Mapped[str | None] = mapped_column(String(200))
+    # «¿Subir y bajar?» (2026-11-16), solo en los trámites que lo ofrecen (Embarque y
+    # Desembarque). Con «Sí», cada pasajero adjunta la Carta de Responsabilidad.
+    subir_y_bajar:         Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     titulo:               Mapped[str]  = mapped_column(String(255))
     fecha_operacion:      Mapped[date] = mapped_column(Date)
@@ -248,7 +251,8 @@ class TripulanteSolicitud(Base):
     libreta_marino:   Mapped[str | None]  = mapped_column(String(100))   # seamanbook
     libreta_expira:   Mapped[date | None] = mapped_column(Date)
     rango:            Mapped[str]         = mapped_column(String(20))
-    ocupacion:        Mapped[str]         = mapped_column(String(150))
+    # Salió del formulario el 2026-11-16: la conservan las solicitudes enviadas antes.
+    ocupacion:        Mapped[str | None]  = mapped_column(String(150))
     es_panameno:      Mapped[bool]        = mapped_column(Boolean, default=False, server_default="false")
     nacionalidad_restringida: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # Verificación de impedimentos (SIMPLUS) de esta persona: None = sin verificar.

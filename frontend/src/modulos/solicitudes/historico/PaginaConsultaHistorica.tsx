@@ -298,7 +298,9 @@ export default function PaginaConsultaHistorica() {
 
       <div className={panel.pestanas} role="tablist" aria-label="Estado">
         {PESTANAS.map((p) => (
+          // data-estado: el punto del color de su estado, como en las bandejas (2026-11-17).
           <button key={p.id || "todas"} type="button" role="tab" aria-selected={p.id === filtros.estado}
+            data-estado={p.id || "todas"}
             className={`${panel.pestana} ${p.id === filtros.estado ? panel.pestanaActiva : ""}`}
             onClick={() => cambiar({ estado: p.id })}>
             {p.etiqueta}

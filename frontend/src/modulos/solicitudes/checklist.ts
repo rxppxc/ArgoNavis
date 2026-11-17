@@ -45,12 +45,17 @@ export function opcionalPara(d: Pick<TramiteDocumento, "rangos_opcional">, rango
 }
 
 /** Casillas que la solicitud debe cubrir, ya resueltas las condiciones.
+ *  `subirYBajar`: la respuesta a «¿Subir y bajar?» (2026-11-16); con «Sí» se pide
+ *  la Carta de Responsabilidad de cada pasajero.
  *  Espeja ServicioTramite.construir_casillas del backend: si cambias uno,
  *  cambia el otro. */
-export function construirCasillas(tipo: TipoTramite, tripulantes: TripulanteChecklist[]): CasillaFormulario[] {
+export function construirCasillas(
+  tipo: TipoTramite, tripulantes: TripulanteChecklist[], subirYBajar = false,
+): CasillaFormulario[] {
   const resultado: CasillaFormulario[] = [];
 
   for (const d of [...tipo.documentos].sort((a, b) => a.orden - b.orden)) {
+    if (d.condicion === "subir_y_bajar" && !subirYBajar) continue;
     if (d.alcance === "solicitud") {
       if (d.condicion === "nacionalidad_restringida" && !tripulantes.some((t) => t.restringida)) continue;
       if (d.condicion === "solo_extranjeros" && tripulantes.every((t) => t.es_panameno)) continue;

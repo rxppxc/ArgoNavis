@@ -1,0 +1,27 @@
+/* «Qué sigue» (rediseño visual del 2026-11-17): un recuadro crema, como una anotación
+   sobre el documento, con los pasos numerados en círculos marino y la cifra en la franja.
+   Los hechos quedan con un ✓ verde y el texto atenuado y tachado. */
+.queSigue {
+  display: flex; align-items: center; gap: 12px 22px; flex-wrap: wrap;
+  margin: -4px 0 18px;   /* bajo el aviso del estado (.banner, con 18px abajo) */
+  padding: 12px 18px; border-radius: var(--r-lg);
+  background: var(--y-soft); border: 1px solid var(--y-border);
+  box-shadow: var(--sh-xs);
+}
+.titulo {
+  flex: none; color: var(--text);
+  font: 800 .78rem/1.2 var(--letra-titulo); font-stretch: var(--ancho-titulo);
+  letter-spacing: .12em; text-transform: uppercase;
+}
+.pasos { display: flex; flex-wrap: wrap; gap: 10px 22px; list-style: none; }
+.pasos li { display: flex; align-items: center; gap: 9px; color: var(--text); font-size: .9rem; line-height: 1.35; }
+.numero {
+  display: inline-grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--seccion-fondo); color: var(--franja); font: 700 .8rem/1 var(--letra-mono);
+}
+.hecho .numero { background: var(--exito-fuerte); color: var(--sobre-fuerte); }
+.hecho .texto { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--border-2); }
+@media (max-width: 640px) {
+  .queSigue { align-items: flex-start; flex-direction: column; }
+  .pasos { flex-direction: column; gap: 8px; }
+}

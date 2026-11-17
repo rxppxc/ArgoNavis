@@ -1,0 +1,28 @@
+/* Títulos de sección del rediseño visual (B + C, elegido por el usuario el 2026-11-17):
+   una barra marino de borde a borde de su tarjeta, con el texto en mayúsculas de Archivo y
+   el número de la sección en la franja amarilla, como el encabezado de un formulario impreso.
+   Cada módulo la compone:
+     .panelTitulo { composes: barra from "../../../styles/Secciones.module.css"; }
+   La barra se sale del relleno de su tarjeta con márgenes negativos: la tarjeta declara su
+   relleno en --relleno-y / --relleno-x (por defecto, 18px y 20px). */
+.barra {
+  display: flex; align-items: center; gap: 10px;
+  margin: calc(-1 * var(--relleno-y, 18px)) calc(-1 * var(--relleno-x, 20px)) 16px;
+  padding: 12px var(--relleno-x, 20px);
+  background: var(--seccion-fondo); color: var(--seccion-texto);
+  border-radius: calc(var(--r-lg) - 1px) calc(var(--r-lg) - 1px) 0 0;
+  font: 700 .82rem/1.3 var(--letra-titulo); font-stretch: var(--ancho-titulo);
+  letter-spacing: .1em; text-transform: uppercase;
+}
+/* El número de la sección, en la franja. */
+.numero {
+  display: inline-grid; place-items: center; flex: none; width: 26px; height: 26px;
+  background: var(--franja); color: var(--seccion-fondo);
+  font: 700 .8rem/1 var(--letra-mono); letter-spacing: 0;
+}
+/* Un contador dentro de la barra («Pasajeros 3»). */
+.contador {
+  font: 600 .74rem/1.2 var(--letra-mono); letter-spacing: 0;
+  padding: 2px 8px; border-radius: var(--r-xs);
+  background: color-mix(in srgb, var(--seccion-texto) 16%, transparent); color: var(--seccion-texto);
+}

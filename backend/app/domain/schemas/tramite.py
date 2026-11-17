@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Literal
 
-CondicionDocumento = Literal["siempre", "nacionalidad_restringida", "solo_extranjeros"]
+CondicionDocumento = Literal["siempre", "nacionalidad_restringida", "solo_extranjeros", "subir_y_bajar"]
 
 
 # ── Documento dentro del checklist de un trámite ─────────────────────────────
@@ -41,6 +41,8 @@ class SalidaTipoTramite(BaseModel):
     requiere_clinica:            bool = False
     # El formulario ofrece el cambio de puerto (2026-11-13: Embarque y Desembarque).
     permite_cambio_puerto:       bool = False
+    # El formulario pregunta «¿Subir y bajar?» (2026-11-16: Embarque y Desembarque).
+    permite_subir_y_bajar:       bool = False
     valida_vigencia:             bool = False
     # Rangos de tripulante admitidos (nulo = cualquiera).
     rangos_permitidos: list[str] | None = None

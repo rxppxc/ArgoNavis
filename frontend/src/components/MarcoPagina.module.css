@@ -11,11 +11,14 @@
 /* overflow: clip y no hidden: hidden rompería el panel fijo (sticky) del expediente. */
 .medio { flex: 1; position: relative; overflow: clip; display: flex; }
 
+/* Un solo ancho para las páginas de trabajo (rediseño del 2026-11-17): con dos (1040 y
+   1240 px), al pasar de la bandeja al formulario o a las estadísticas todo se corría y no
+   parecía el mismo sistema. «angosto» queda para las páginas chicas (contraseña, 404). */
 .contenido {
   position: relative;
   flex: 1;
   width: 100%;
-  max-width: 1040px;
+  max-width: 1240px;
   margin: 0 auto;
   padding: 30px 28px 64px;
 }

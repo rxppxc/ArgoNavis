@@ -7,21 +7,35 @@
 
 .pase {
   --talon: 210px;
+  /* La muesca va sobre la línea del talón: el borde del estado (6px) la corre. */
+  --muesca: calc(var(--talon) + 6px);
   display: grid; grid-template-columns: var(--talon) minmax(0, 1fr);
   background: var(--card); border: 1px solid var(--border-2); border-radius: var(--r-lg);
+  /* El color de su estado (rediseño del 2026-11-17): de un vistazo se sabe en qué está. */
+  border-left: 6px solid var(--estado, var(--border-2));
   /* Solo transparencia: no es un color de la interfaz. */
-  -webkit-mask: radial-gradient(circle 9px at var(--talon) 0, #0000 96%, #000) top / 100% 51% no-repeat,
-    radial-gradient(circle 9px at var(--talon) 100%, #0000 96%, #000) bottom / 100% 51% no-repeat;
-  mask: radial-gradient(circle 9px at var(--talon) 0, #0000 96%, #000) top / 100% 51% no-repeat,
-    radial-gradient(circle 9px at var(--talon) 100%, #0000 96%, #000) bottom / 100% 51% no-repeat;
+  -webkit-mask: radial-gradient(circle 9px at var(--muesca) 0, #0000 96%, #000) top / 100% 51% no-repeat,
+    radial-gradient(circle 9px at var(--muesca) 100%, #0000 96%, #000) bottom / 100% 51% no-repeat;
+  mask: radial-gradient(circle 9px at var(--muesca) 0, #0000 96%, #000) top / 100% 51% no-repeat,
+    radial-gradient(circle 9px at var(--muesca) 100%, #0000 96%, #000) bottom / 100% 51% no-repeat;
   transition: background var(--t) var(--ease), border-color var(--t) var(--ease);
 }
-.enlace:hover .pase { background: var(--surface-2); border-color: var(--input-border); }
+.pase[data-estado="review"]    { --estado: var(--estado-revision);   --estado-tinte: var(--estado-revision-tinte); }
+.pase[data-estado="returned"]  { --estado: var(--estado-correccion); --estado-tinte: var(--estado-correccion-tinte); }
+.pase[data-estado="approved"]  { --estado: var(--estado-aprobada);   --estado-tinte: var(--estado-aprobada-tinte); }
+.pase[data-estado="finalized"] { --estado: var(--estado-finalizada); --estado-tinte: var(--estado-finalizada-tinte); }
+.pase[data-estado="denied"]    { --estado: var(--estado-denegada);   --estado-tinte: var(--estado-denegada-tinte); }
+.pase[data-estado="expired"]   { --estado: var(--estado-expirada);   --estado-tinte: var(--estado-expirada-tinte); }
+/* La sombra va en el enlace y sigue la forma del pase (con sus muescas): la máscara
+   recortaría una box-shadow del propio pase. */
+:global([data-theme="light"]) .enlace { filter: drop-shadow(0 1px 1px rgba(23,36,58,.08)) drop-shadow(0 3px 8px rgba(23,36,58,.07)); }
+.enlace:hover .pase { background: var(--surface-2); border-color: var(--input-border); border-left-color: var(--estado, var(--input-border)); }
 .expired { opacity: .8; }
 
 .talon {
   display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 10px;
   padding: 14px 18px; border-right: 1.5px dashed var(--border-2);
+  background: var(--estado-tinte, transparent);
 }
 .numero { font: 600 .9rem/1.25 var(--letra-mono); letter-spacing: .03em; color: var(--text); }
 .numero small {
@@ -37,11 +51,12 @@
 }
 .datos { display: flex; flex-wrap: wrap; gap: 6px 24px; }
 .datos div { min-width: 0; }
+/* Rótulos más grandes y menos espaciados (2026-11-17): se leen sin esfuerzo. */
 .datos dt {
-  font: 600 .6rem/1.4 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
-  letter-spacing: .16em; text-transform: uppercase; color: var(--muted);
+  font: 600 .68rem/1.4 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
+  letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
 }
-.datos dd { font-size: .84rem; color: var(--text); overflow-wrap: anywhere; }
+.datos dd { font-size: .88rem; color: var(--text); overflow-wrap: anywhere; }
 .mono { font-family: var(--letra-mono); font-size: .8rem; }
 
 .marcas { display: flex; flex-wrap: wrap; gap: 6px; }

@@ -2,8 +2,9 @@ import { clienteApi } from "./client";
 import type { RangoMarino } from "./solicitudes";
 
 export type AlcanceDocumento = "solicitud" | "marino";
-/** `solo_extranjeros` (2026-11-14): a todos menos a los panameños. */
-export type CondicionDocumento = "siempre" | "nacionalidad_restringida" | "solo_extranjeros";
+/** `solo_extranjeros` (2026-11-14): a todos menos a los panameños. `subir_y_bajar`
+ *  (2026-11-16): solo si la solicitud indica «Subir y bajar». */
+export type CondicionDocumento = "siempre" | "nacionalidad_restringida" | "solo_extranjeros" | "subir_y_bajar";
 
 /** Una fila del checklist de un trámite. */
 export interface TramiteDocumento {
@@ -36,6 +37,8 @@ export interface TipoTramite {
   requiere_clinica: boolean;
   /** El formulario ofrece el cambio de puerto (2026-11-13: Embarque y Desembarque). */
   permite_cambio_puerto: boolean;
+  /** El formulario pregunta «¿Subir y bajar?» (2026-11-16: Embarque y Desembarque). */
+  permite_subir_y_bajar: boolean;
   /** Pasaporte con al menos 3 meses de vigencia desde la operación (2026-11-13; el
    *  seamanbook vencido solo se señala). */
   valida_vigencia: boolean;
@@ -76,4 +79,5 @@ export const ETIQUETA_CONDICION: Record<CondicionDocumento, string> = {
   siempre: "Siempre",
   nacionalidad_restringida: "Nacionalidad restringida",
   solo_extranjeros: "No a panameños",
+  subir_y_bajar: "Solo con subir y bajar",
 };

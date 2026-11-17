@@ -40,6 +40,7 @@ def mapear_tipo(tipo: TipoTramite) -> SalidaTipoTramite:
         requiere_motivo=tipo.requiere_motivo,
         requiere_clinica=tipo.requiere_clinica,
         permite_cambio_puerto=tipo.permite_cambio_puerto,
+        permite_subir_y_bajar=tipo.permite_subir_y_bajar,
         valida_vigencia=tipo.valida_vigencia,
         rangos_permitidos=tipo.rangos_permitidos,
         aviso_custodia=tipo.aviso_custodia,

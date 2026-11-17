@@ -672,11 +672,18 @@ class ServicioSolicitud:
                 f"Se admiten hasta {MAX_DOCUMENTOS_ADICIONALES} documentos adicionales por solicitud.",
             )
 
+    @staticmethod
+    def _subir_y_bajar(tipo: TipoTramite, datos: _DatosFormularioSolicitud) -> bool:
+        """La respuesta a «¿Subir y bajar?» (2026-11-16), solo si el trámite hace la
+        pregunta: en los demás se descarta, como el cambio de puerto."""
+        return tipo.permite_subir_y_bajar and datos.subir_y_bajar
+
     def _exigir_checklist(
         self, tipo: TipoTramite, tripulantes: list[_TripulanteResuelto], cubiertas: set[tuple[int, int | None]],
+        subir_y_bajar: bool,
     ) -> list[CasillaChecklist]:
         """400 si falta un documento exigible; si no, las casillas exigidas (la foto que se guarda)."""
-        resultado = self.tramites.evaluar(tipo, [t.para_checklist() for t in tripulantes], cubiertas)
+        resultado = self.tramites.evaluar(tipo, [t.para_checklist() for t in tripulantes], cubiertas, subir_y_bajar)
         if not resultado.completo:
             raise _error(
                 status.HTTP_400_BAD_REQUEST,
@@ -719,6 +726,7 @@ class ServicioSolicitud:
         s.puesto_nombre        = puesto.nombre
         s.puesto_destino_id     = destino.id if destino else None
         s.puesto_destino_nombre = destino.nombre if destino else None
+        s.subir_y_bajar        = self._subir_y_bajar(tipo, datos)
         s.fecha_operacion      = datos.fecha_operacion
         s.cantidad_tripulantes = cantidad_tripulantes
         s.nombre_buque         = datos.nombre_buque if tipo.requiere_buque else None
@@ -745,7 +753,10 @@ class ServicioSolicitud:
         orm.libreta_marino   = e.libreta_marino if t.porta_libreta else None
         orm.libreta_expira   = e.libreta_expira if t.porta_libreta else None
         orm.rango            = e.rango
-        orm.ocupacion        = e.ocupacion
+        # La ocupación salió del formulario (2026-11-16). Al corregir una solicitud vieja
+        # también se borra: si no, podría quedar pegada a otra persona cuando la agencia
+        # cambia a alguien en la misma ficha.
+        orm.ocupacion        = None
         orm.es_panameno      = e.nacionalidad == CODIGO_PANAMA
         orm.nacionalidad_restringida = t.restringido
         orm.orden            = orden
@@ -810,6 +821,7 @@ class ServicioSolicitud:
         self._limitar_adicionales(sum(1 for td, _ in asignadas if td is None))
         requeridas = self._exigir_checklist(
             tipo, tripulantes, {(td.documento_id, indice) for td, indice in asignadas if td is not None},
+            self._subir_y_bajar(tipo, datos),
         )
 
         # Los archivos se validan y escriben antes de registrar la solicitud:
@@ -899,7 +911,7 @@ class ServicioSolicitud:
                 continue
             indice = None if documento.tripulante_id is None else indice_por_id.get(documento.tripulante_id)
             cubiertas.add((documento.documento_id, indice))
-        requeridas = self._exigir_checklist(tipo, tripulantes, cubiertas)
+        requeridas = self._exigir_checklist(tipo, tripulantes, cubiertas, self._subir_y_bajar(tipo, datos))
 
         carpeta = almacenamiento.carpeta_solicitud(s.id)
         nuevos = await almacenamiento.guardar_archivos(carpeta, archivos)
@@ -1328,6 +1340,7 @@ class ServicioSolicitud:
             requiere_motivo=tipo.requiere_motivo, requiere_clinica=tipo.requiere_clinica,
             valida_vigencia=tipo.valida_vigencia,
             puesto_control_id=s.puesto_control_id, puesto_destino_id=s.puesto_destino_id,
+            subir_y_bajar=s.subir_y_bajar, permite_subir_y_bajar=tipo.permite_subir_y_bajar,
             bandera=s.bandera, bandera_nombre=await self._nombre_pais(s.bandera),
             nombre_puerto=s.nombre_puerto, puerto_desembarque=s.puerto_desembarque,
             motivo=s.motivo, clinica_hospital=s.clinica_hospital, observaciones=s.observaciones,
@@ -1442,6 +1455,8 @@ class ServicioSolicitud:
         boleta = next((b for b in s.boletas if b.id == boleta_id), None)
         if boleta is None or s.aprobada_en is None:
             raise _error(status.HTTP_404_NOT_FOUND, "Boleta no encontrada.")
+        # El tipo de operación en casillas (2026-11-16): los trámites activos, en su orden.
+        tipos = await self.repo_tramites.listar_tipos(solo_activos=True)
         return s, boleta, DatosPdfBoleta(
             numero_oficio=boleta.numero_oficio, monto=boleta.monto, numero_solicitud=s.numero or str(s.id),
             tipo_tramite=s.tipo_tramite.nombre, agencia=s.agencia_nombre, buque=s.nombre_buque, imo=s.imo,
@@ -1450,6 +1465,8 @@ class ServicioSolicitud:
             generada_en=boleta.generada_en.astimezone(ZONA_PANAMA),
             anulada_en=boleta.anulada_en.astimezone(ZONA_PANAMA) if boleta.anulada_en else None,
             motivo_anulacion=boleta.motivo_anulacion,
+            tipos_operacion=[t.nombre for t in tipos],
+            subir_y_bajar=s.subir_y_bajar if s.tipo_tramite.permite_subir_y_bajar else None,
         )
 
     # ── Autorización (PDF) y verificación pública ────────────────────────────
@@ -1506,6 +1523,8 @@ class ServicioSolicitud:
             agencia_naviera=s.agencia_nombre,
             nombre_buque=s.nombre_buque, imo=s.imo, bandera=await self._nombre_pais(s.bandera),
             puesto_control=s.puesto_nombre, puesto_destino=s.puesto_destino_nombre,
+            # Solo en los trámites que hacen la pregunta (Embarque y Desembarque, 2026-11-16).
+            subir_y_bajar=s.subir_y_bajar if s.tipo_tramite.permite_subir_y_bajar else None,
             fecha_operacion=s.fecha_operacion,
             nombre_puerto=s.nombre_puerto, puerto_desembarque=s.puerto_desembarque,
             clinica_hospital=s.clinica_hospital, motivo=s.motivo,
