@@ -82,6 +82,30 @@ class TopeDelCuerpo:
         await self.app(scope, recibir, send)
 
 
+MENSAJE_ESQUEMA_ATRASADO = ("El sistema no está disponible: falta poner al día la base de datos. "
+                            "Avisa al administrador del sistema.")
+
+
+class EsquemaAlDia:
+    """Mientras a la base le falte algo que el código usa, la API responde 503 con el
+    motivo, que el frontend muestra (2026-11-17). Antes era un 500 «Error interno» en
+    cada pedido, sin pista: el código se había puesto al día y la base no. Lo revisa el
+    arranque (infrastructure/esquema.py), que deja la lista en `app.state.esquema_faltante`
+    y en el log dice qué falta y qué hacer. /api/health lo dice por su cuenta."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        estado = getattr(scope.get("app"), "state", None)
+        if (scope["type"] == "http" and scope["path"].startswith("/api/") and scope["path"] != "/api/health"
+                and getattr(estado, "esquema_faltante", None)):
+            respuesta = JSONResponse(status_code=503, content={"detail": MENSAJE_ESQUEMA_ATRASADO})
+            await respuesta(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
+
+
 _CODIGO_VALIDO = re.compile(r"[A-Za-z0-9._-]{8,64}")
 
 

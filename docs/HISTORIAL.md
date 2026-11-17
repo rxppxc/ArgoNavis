@@ -578,3 +578,24 @@ Pedido del usuario:
 **Pruebas:**
 - `contraste.test.ts`, `pasosSiguientes.test.ts`, `pasosDelFormulario.test.ts` y `categoriaAccion.test.ts`, más el caso negativo de `duracion`: 63 pruebas nuevas en Vitest.
 - El E2E completo, sin cambios de selectores.
+
+## Revisión del esquema al arrancar (2026-11-17, migración `c4e8a2f6d915`)
+
+**Qué pasó:** tras las migraciones de la boleta y de «subir y bajar», el backend de desarrollo (con `--reload`) tomó el código nuevo, pero nadie corrió `migrate.bat`. Cada pedido respondía «Error interno del servidor (código …)», y la causa («no existe la columna solicitudes.subir_y_bajar») solo estaba en el log. Las pruebas no lo ven: arman su propia base, migrada hasta la última revisión. El usuario lo pidió «para hacer el despliegue»: en Windows, `migrate.bat` se corre a mano.
+
+**Qué cambió:**
+- Al arrancar, el backend compara la base con el ORM (`infrastructure/esquema.py`): tablas, columnas, tipos enum y sus valores. Solo mira lo que **falta**: una base más nueva que el código, como al volver a una versión anterior, no es una falla.
+- Si falta algo:
+  - el log dice qué falta y qué hacer («Corre migrate.bat y vuelve a levantar el backend»);
+  - la API responde 503 con el motivo, que el frontend muestra (`EsquemaAlDia`, `api/middleware.py`);
+  - `/api/health` responde 503, «base de datos sin migrar»;
+  - las tareas de fondo no arrancan, porque fallarían en cada vuelta.
+- Una base que no responde al arrancar no lo impide, como antes: queda un aviso en el log.
+
+**Decisiones:**
+- **El catálogo de PostgreSQL, no `alembic_version`:** la cuenta de la aplicación no puede leer esa tabla (`permisos_bd.py`), y así no hubo que darle más permisos.
+- **No tumba el proceso:** uvicorn reinicia sin parar los procesos que caen al arrancar (0.49, `Multiprocess.keep_subprocess_alive`). Con varios procesos, eso llenaría el log cada medio segundo.
+
+**Lo que encontró:** una base migrada desde cero no tenía `CHAT_CONSULTA` en el tipo de la bitácora. Ese valor lo dejó una función de chat ya retirada, que lo agregaba fuera de las migraciones: solo lo tenían las bases viejas, y el ORM lo conserva para leer sus registros. Sin arreglarlo, cada instalación nueva habría quedado en 503. Lo agrega la revisión `c4e8a2f6d915` (`IF NOT EXISTS`: en las bases viejas no hace nada).
+
+**Pruebas:** `tests/test_esquema.py`, con 7 pruebas. `test_la_base_migrada_tiene_todo_lo_que_usa_el_codigo` falla también si un modelo cambia sin su migración.

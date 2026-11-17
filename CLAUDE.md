@@ -296,6 +296,12 @@ Cada una salió de un problema real. El detalle está en el historial.
 - Si agregas algo que el despliegue necesite (una variable, un servicio, un puerto), súmale su chequeo a `verificar-despliegue.sh`.
 - Los topes del cuerpo (`api/middleware.py`) y los de nginx tienen que coincidir (`test_nginx_tiene_los_mismos_topes_que_el_backend`).
   - Si el catálogo pide más documentos, sube `MAX_DOCUMENTOS_*` y los dos topes.
+- Al arrancar, el backend compara la base con el ORM (`infrastructure/esquema.py`, 2026-11-17). Si le falta una tabla, una columna o un valor de enum:
+  - el log dice qué falta y que se corra `migrate.bat`;
+  - la API responde 503 con el motivo (`EsquemaAlDia`) y `/api/health`, «base de datos sin migrar»;
+  - las tareas de fondo no arrancan.
+  - Compara con el catálogo de PostgreSQL y no con `alembic_version`, que la cuenta de la aplicación no lee. **No tumba el proceso:** uvicorn reinicia sin parar los procesos que caen al arrancar.
+  - `test_la_base_migrada_tiene_todo_lo_que_usa_el_codigo` falla si un modelo cambia sin su migración. Un valor nuevo de un enum también necesita la suya.
 
 **Frontend**
 - **No borres `ultima-actividad` al cerrar sesión:** las otras pestañas lo leerían como 15 minutos sin actividad.

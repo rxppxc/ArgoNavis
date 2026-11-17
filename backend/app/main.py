@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from starlette.formparsers import MultiPartParser
 from app.api.manejadores import registrar_manejadores
-from app.api.middleware import CodigoDePedido, TopeDelCuerpo
+from app.api.middleware import CodigoDePedido, EsquemaAlDia, TopeDelCuerpo
 from app.core.config import obtener_configuracion
 from app.core.rate_limit import limiter
 from app.core.registro import configurar_registro
@@ -23,6 +23,7 @@ from app.api.v1 import auth, admin, tramites, solicitudes, verificacion, catalog
 from app.domain.models import rol, tramite, catalogo, solicitud, correo, boleta  # noqa: F401
 from app.infrastructure.cola_correos import tarea_correos
 from app.infrastructure.database import motor_bd
+from app.infrastructure.esquema import revisar_esquema
 from app.infrastructure.tareas import tarea_vencimientos
 
 configurar_registro()
@@ -37,14 +38,19 @@ async def ciclo_vida(app: FastAPI):
     """Ciclo de vida de la aplicación: deja corriendo en segundo plano la tarea
     que expira las solicitudes con plazos vencidos (infrastructure/tareas.py) y
     la que reintenta los correos pendientes (infrastructure/cola_correos.py).
-    El esquema de BD lo maneja Alembic (`alembic upgrade head`, corrido por el
-    entrypoint del contenedor antes de levantar uvicorn).
+    El esquema de BD lo maneja Alembic (`alembic upgrade head`: migrate.bat, o el
+    entrypoint del contenedor antes de levantar uvicorn). Si a la base le falta algo
+    que el código usa, lo dice el log, la API responde 503 con el motivo y las tareas
+    no arrancan, porque fallarían en cada vuelta (infrastructure/esquema.py, 2026-11-17).
     Al apagar (Ctrl+C / SIGTERM) cancela las tareas limpiamente y cierra las
     conexiones del pool (si no, PostgreSQL las ve cortarse de golpe)."""
     if configuracion.MAIL_USERNAME and not (configuracion.MAIL_USAR_SSL or configuracion.MAIL_STARTTLS):
         logger.warning("Correo con usuario y sin TLS: la contraseña del SMTP viaja en claro "
                        "(activa MAIL_STARTTLS o MAIL_USAR_SSL).")
-    tareas = [asyncio.create_task(tarea_vencimientos()), asyncio.create_task(tarea_correos())]
+    app.state.esquema_faltante = await revisar_esquema(motor_bd)
+    tareas = [] if app.state.esquema_faltante else [
+        asyncio.create_task(tarea_vencimientos()), asyncio.create_task(tarea_correos()),
+    ]
     yield
     for tarea in tareas:
         tarea.cancel()
@@ -71,6 +77,8 @@ registrar_manejadores(aplicacion)
 
 # El primero que se agrega queda por dentro de todos: el 413 lleva CORS y el código de pedido.
 aplicacion.add_middleware(TopeDelCuerpo)
+# Con la base sin migrar, 503 con el motivo (también con CORS y el código de pedido).
+aplicacion.add_middleware(EsquemaAlDia)
 
 # Cada archivo de un envío pasa al disco temporal desde los 64 KB (Starlette deja en
 # memoria cada uno de hasta 1 MB): un envío de 142 archivos de casi 1 MB ocupaba ~140 MB
@@ -127,7 +135,8 @@ async def _bd_responde() -> bool:
 @aplicacion.get("/api/health")
 async def verificar_salud(response: Response):
     """Viva y con base de datos. Si la BD no responde, 503: así el healthcheck
-    marca el servicio como no sano (antes respondía «ok» con la BD caída)."""
+    marca el servicio como no sano (antes respondía «ok» con la BD caída). También
+    503 si al arrancar a la base le faltaba algo que el código usa (sin migrar)."""
     ahora = time.monotonic()
     if ahora - _salud["momento"] >= _SALUD_VIGENCIA_S:
         # Antes de consultar: las que lleguen mientras tanto usan el resultado anterior
@@ -137,6 +146,9 @@ async def verificar_salud(response: Response):
     if not _salud["bd_ok"]:
         response.status_code = 503
         return {"estado": "sin base de datos", "aplicacion": configuracion.APP_NAME}
+    if getattr(aplicacion.state, "esquema_faltante", None):
+        response.status_code = 503
+        return {"estado": "base de datos sin migrar", "aplicacion": configuracion.APP_NAME}
     return {"estado": "ok", "aplicacion": configuracion.APP_NAME}
 
 
