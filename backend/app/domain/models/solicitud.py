@@ -136,7 +136,7 @@ class Solicitud(Base):
     )
     puesto_destino_nombre: Mapped[str | None] = mapped_column(String(200))
     # «¿Subir y bajar?» (2026-11-16), solo en los trámites que lo ofrecen (Embarque y
-    # Desembarque). Con «Sí», cada pasajero adjunta la Carta de Responsabilidad.
+    # Desembarque). Con «Sí», cada tripulante adjunta la Carta de Responsabilidad.
     subir_y_bajar:         Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # Embarque, Desembarque o Subir y bajar (OperacionTecnico, 2026-11-18), solo en los
     # trámites que la piden (el de Técnico). Nulo en los demás y en las de antes.

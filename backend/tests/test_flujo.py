@@ -150,7 +150,7 @@ async def test_validaciones_de_creacion(cliente, escenario: Escenario):
 
     datos = cabecera("F3-EMBARQUE", pid, tripulantes=[{"nombre": "Juan"}], asignaciones=[])
     r = await enviar(cliente, e.nav_a1, datos, [])
-    assert r.status_code == 422 and "Pasajero 1" in r.json()["detail"]
+    assert r.status_code == 422 and "Tripulante 1" in r.json()["detail"]
 
     datos = cabecera("F3-EMBARQUE", pid, nombre_buque=None, tripulantes=[tripulante("Juan")], asignaciones=[])
     r = await enviar(cliente, e.nav_a1, datos, [])
@@ -165,7 +165,7 @@ async def test_validaciones_de_creacion(cliente, escenario: Escenario):
     # Más de 30 tripulantes: se rechaza antes de mirar los documentos
     tripulacion = [tripulante(f"Marino{i}") for i in range(MAX_TRIPULANTES + 1)]
     r = await enviar(cliente, e.nav_a1, cabecera("F3-CAMBIO-NAVE", pid, tripulantes=tripulacion, asignaciones=[]), [])
-    assert r.status_code == 400 and f"hasta {MAX_TRIPULANTES} pasajeros" in r.json()["detail"]
+    assert r.status_code == 400 and f"hasta {MAX_TRIPULANTES} tripulantes" in r.json()["detail"]
 
     # Más de 20 documentos adicionales
     asignaciones = [{"documento_codigo": None}] * 21
@@ -217,8 +217,9 @@ async def test_ciclo_completo(cliente, escenario: Escenario, monkeypatch):
     asignaciones.append({"documento_codigo": "DOC-FORM6-CUSTODIA", "indice_tripulante": 1})
     archivos.append(pdf("custodia"))
     r = await enviar(cliente, e.nav_a1, cabecera("F3-DESEMBARQUE", pid, tripulantes=tripulantes, asignaciones=asignaciones), archivos)
-    assert r.status_code == 400 and "Visa de Raúl" in r.json()["detail"], "al restringido se le pide la Visa (2026-11-14)"
-    asignaciones.append({"documento_codigo": "DOC-VISA", "indice_tripulante": 1})
+    # Al marino restringido, la Visa Especial de Marino (2026-11-18; del 14 al 18, la «Visa»).
+    assert r.status_code == 400 and "Visa Especial de Marino de Raúl" in r.json()["detail"], r.text
+    asignaciones.append({"documento_codigo": "DOC-VISA-MARINO", "indice_tripulante": 1})
     archivos.append(pdf("visa-raul"))
     r = await enviar(cliente, e.nav_a1, cabecera("F3-DESEMBARQUE", pid, tripulantes=tripulantes, asignaciones=asignaciones), archivos)
     assert r.status_code == 201, r.text
@@ -226,7 +227,7 @@ async def test_ciclo_completo(cliente, escenario: Escenario, monkeypatch):
     sid = s["id"]
     assert s["estado"] == "review" and s["numero"] == f"AM-{HOY.year}-{sid:06d}"
     assert s["agencia_id"] == e.agencia_a["id"] and s["agencia_nombre"] == e.agencia_a["nombre"]
-    # 3 por pasajero × 2, la Lista de Tripulantes, la custodia y la Visa de Raúl y el Formulario No. 3.
+    # 3 por tripulante × 2, la Lista de Tripulantes, la custodia y la Visa Especial de Marino de Raúl y el Formulario No. 3.
     assert len(s["checklist"]) == 10 and all(c["cubierta"] for c in s["checklist"])
     assert len(s["documentos"]) == 11
     assert [d["nombre_original"] for d in s["documentos"] if d["documento_id"] is None] == ["carta-del-capitan.pdf"]
@@ -249,7 +250,9 @@ async def test_ciclo_completo(cliente, escenario: Escenario, monkeypatch):
     assert sid not in [x["id"] for x in r.json()["items"]]
     r = await cliente.get("/solicitudes/revision", headers=e.nav_a1.headers)
     assert r.status_code == 403
-    r = await cliente.get("/solicitudes/revision", params={"estado": "review", "por_pagina": 100}, headers=e.revisor.headers)
+    # Por su número: con las demás pruebas, la bandeja tiene más de una página en revisión.
+    r = await cliente.get("/solicitudes/revision", params={"estado": "review", "texto": s["numero"]},
+                          headers=e.revisor.headers)
     assert sid in [x["id"] for x in r.json()["items"]]
 
     # ── Revisión ──
@@ -454,7 +457,7 @@ async def test_impedimentos_por_tripulante(cliente, escenario: Escenario, admin)
     r = await cliente.post(f"/solicitudes/{sid}/impedimentos", json=sin_comentario, headers=e.revisor.headers)
     assert r.status_code == 200, "el comentario de la acción tomada es opcional"
     assert r.json()["comentario_impedimentos"] is None
-    assert r.json()["eventos"][-1]["comentario"] == "Sin impedimentos (2 pasajeros)."
+    assert r.json()["eventos"][-1]["comentario"] == "Sin impedimentos (2 tripulantes)."
     eventos = len(r.json()["eventos"])
     r = await cliente.post(f"/solicitudes/{sid}/impedimentos", json=sin_comentario, headers=e.revisor.headers)
     assert r.status_code == 409, "repetir la misma verificación no suma otra entrada al historial"
@@ -770,9 +773,10 @@ async def test_postgresql_suma_los_meses_como_python(operacion):
 
 async def test_estadisticas_y_uso(cliente, escenario: Escenario, admin):
     e = escenario
-    antes = (await cliente.get("/solicitudes/estadisticas", headers=e.revisor.headers)).json()
+    supervisor = await crear_actor("Supervisor de sector", prefijo="supervisor")   # UCVMM no, desde el 2026-11-18
+    antes = (await cliente.get("/solicitudes/estadisticas", headers=supervisor.headers)).json()
     await solicitud_simple(cliente, e.nav_a1, e.puesto_a["id"])
-    r = await cliente.get("/solicitudes/estadisticas", headers=e.revisor.headers)
+    r = await cliente.get("/solicitudes/estadisticas", headers=supervisor.headers)
     est = r.json()
     assert r.status_code == 200 and (len(est["por_dia"]), len(est["por_mes"])) == (31, 12)
     assert est["recibidas"] == antes["recibidas"] + 1 == sum(est["por_estado"].values())

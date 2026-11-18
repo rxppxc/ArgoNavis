@@ -16,9 +16,9 @@ export interface PasoAvance {
 const LISTO = "Listo";
 const plural = (n: number, uno: string, varios: string) => (n === 1 ? uno : varios);
 
-/** Los avisos que son de la lista de pasajeros y no de uno en particular. */
+/** Los avisos que son de la lista de tripulantes y no de uno en particular. */
 function esDeLaLista(error: string): boolean {
-  return error.startsWith("Registra al menos un pasajero") || error.startsWith("Una solicitud admite hasta");
+  return error.startsWith("Registra al menos un tripulante") || error.startsWith("Una solicitud admite hasta");
 }
 
 export function avanceFormulario({ tipoElegido, errores, faltantes }: {
@@ -29,13 +29,13 @@ export function avanceFormulario({ tipoElegido, errores, faltantes }: {
     return [
       { numero: 1, titulo: "Tipo de trámite", completo: false, detalle: "Elige el trámite", ancla: "paso-tramite" },
       { numero: 2, titulo: "Datos del trámite", completo: false, detalle: antes, ancla: "paso-datos" },
-      { numero: 3, titulo: "Pasajeros", completo: false, detalle: antes, ancla: "paso-pasajeros" },
+      { numero: 3, titulo: "Tripulantes", completo: false, detalle: antes, ancla: "paso-tripulantes" },
       { numero: 4, titulo: "Documentos", completo: false, detalle: antes, ancla: "paso-documentos" },
     ];
   }
 
-  const deDatos = errores.filter((e) => !e.startsWith("Pasajero") && !esDeLaLista(e)).length;
-  const pasajeros = new Set(errores.map((e) => /^Pasajero (\d+)/.exec(e)?.[1]).filter(Boolean)).size;
+  const deDatos = errores.filter((e) => !e.startsWith("Tripulante") && !esDeLaLista(e)).length;
+  const tripulantes = new Set(errores.map((e) => /^Tripulante (\d+)/.exec(e)?.[1]).filter(Boolean)).size;
   const deLaLista = errores.filter(esDeLaLista).length;
 
   return [
@@ -45,8 +45,8 @@ export function avanceFormulario({ tipoElegido, errores, faltantes }: {
       detalle: deDatos === 0 ? LISTO : `${plural(deDatos, "Falta", "Faltan")} ${deDatos} ${plural(deDatos, "dato", "datos")}`,
     },
     {
-      numero: 3, titulo: "Pasajeros", completo: pasajeros === 0 && deLaLista === 0, ancla: "paso-pasajeros",
-      detalle: pasajeros > 0 ? `${pasajeros} ${plural(pasajeros, "pasajero", "pasajeros")} por completar`
+      numero: 3, titulo: "Tripulantes", completo: tripulantes === 0 && deLaLista === 0, ancla: "paso-tripulantes",
+      detalle: tripulantes > 0 ? `${tripulantes} ${plural(tripulantes, "tripulante", "tripulantes")} por completar`
         : deLaLista > 0 ? `${deLaLista} ${plural(deLaLista, "aviso", "avisos")} por revisar` : LISTO,
     },
     {

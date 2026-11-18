@@ -83,7 +83,7 @@ def _describir_errores(exc: ValidationError) -> str:
     for err in errores[:6]:
         loc = err.get("loc", ())
         if len(loc) >= 3 and loc[0] == "tripulantes" and isinstance(loc[1], int):
-            sujeto = f"Pasajero {loc[1] + 1}, {_ETIQUETAS_CAMPO.get(str(loc[2]), str(loc[2]))}"
+            sujeto = f"Tripulante {loc[1] + 1}, {_ETIQUETAS_CAMPO.get(str(loc[2]), str(loc[2]))}"
         elif loc:
             sujeto = _ETIQUETAS_CAMPO.get(str(loc[-1]), str(loc[-1]))
         else:
@@ -175,9 +175,9 @@ async def bandeja_supervision(
     return await svc.bandeja_supervision(ctx, consulta)
 
 
-# Quien ve estadísticas: UCVMM y el supervisor de sector (el Administrador, por el atajo).
-# El supervisor general no, desde el 2026-11-16.
-_PUEDE_VER_ESTADISTICAS = requerir_algun_permiso(PERMISO_REVISAR, PERMISO_SUPERVISAR_SECTOR)
+# Quien ve estadísticas: el supervisor de sector (el Administrador, por el atajo). UCVMM no,
+# desde el 2026-11-18 (pedido del usuario); el supervisor general tampoco, desde el 2026-11-16.
+_PUEDE_VER_ESTADISTICAS = requerir_algun_permiso(PERMISO_SUPERVISAR_SECTOR)
 
 
 @enrutador.get("/estadisticas", response_model=SalidaEstadisticasSolicitudes)
@@ -234,7 +234,7 @@ async def exportar_estadisticas(
 # ── Consulta histórica (2026-11-11) ──────────────────────────────────────────
 # Antes de /{solicitud_id}: si no, «historico» se leería como un id (422).
 
-# Los filtros van en el cuerpo (POST, 2026-11-14): en la dirección, el pasajero buscado
+# Los filtros van en el cuerpo (POST, 2026-11-14): en la dirección, el tripulante buscado
 # quedaba en los logs de nginx y de uvicorn.
 @enrutador.post("/historico", response_model=PaginaSolicitudes)
 async def consulta_historica(
@@ -243,7 +243,7 @@ async def consulta_historica(
     svc:      ServicioSolicitud = Depends(_servicio),
 ):
     """Las solicitudes que ve el personal del SNM, de cualquier año, con filtros
-    que las bandejas no tienen (agencia, puesto, trámite, pasajero, fecha de la
+    que las bandejas no tienen (agencia, puesto, trámite, tripulante, fecha de la
     operación, fuera del horario). La agencia usa su bandeja."""
     return await svc.consulta_historica(ctx, consulta)
 

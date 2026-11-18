@@ -51,7 +51,7 @@ export function TarjetaSolicitud({ s, vista, volverA, conSector = false }: {
             {!deAgencia && <div><dt>Agencia</dt><dd>{s.agencia_nombre}</dd></div>}
             <div><dt>Puesto</dt><dd>{textoPuestos(s)}{conSector && s.sector_nombre && <> · {s.sector_nombre}</>}</dd></div>
             <div><dt>Operación</dt><dd className={styles.mono}>{formatearFecha(s.fecha_operacion)}</dd></div>
-            <div><dt>Pasajeros</dt><dd className={styles.mono}>{s.cantidad_tripulantes}</dd></div>
+            <div><dt>Tripulantes</dt><dd className={styles.mono}>{s.cantidad_tripulantes}</dd></div>
             <div><dt>Enviada</dt><dd>{formatearFechaHora(s.enviada_en)}{!deAgencia && s.creada_por && <> por {s.creada_por}</>}</dd></div>
           </dl>
 

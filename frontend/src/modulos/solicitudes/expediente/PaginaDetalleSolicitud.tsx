@@ -390,8 +390,11 @@ function Expediente({ s, onActualizada, volverA, estadoVolver }: {
               <Dato etiqueta="Operación" valor={s.operacion ? ETIQUETA_OPERACION[s.operacion] : null} />
               {/* Los días del sellado de Shore Pass (2026-11-18). */}
               <Dato etiqueta="Días del sellado" valor={s.dias_sellado ? textoDias(s.dias_sellado) : null} />
-              {/* «¿Subir y bajar?» (2026-11-16): solo en los trámites que lo preguntan. */}
-              {s.permite_subir_y_bajar && <Dato etiqueta="Subir y bajar" valor={s.subir_y_bajar ? "Sí" : "No"} />}
+              {/* «¿Subir y bajar?»: en los trámites que lo preguntan y en las de antes que dijeron «Sí»
+                  (Embarque y Desembarque, del 2026-11-16 al 18). */}
+              {(s.permite_subir_y_bajar || s.subir_y_bajar) && (
+                <Dato etiqueta="Subir y bajar" valor={s.subir_y_bajar ? "Sí" : "No"} />
+              )}
               {/* El sector de UCVMM (2026-11-10): solo le llega al SNM. */}
               {s.sector_nombre && <Dato etiqueta="Sector" valor={s.sector_nombre} />}
               <Dato etiqueta="Fecha de la operación" valor={formatearFecha(s.fecha_operacion)} />

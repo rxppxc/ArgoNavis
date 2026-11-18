@@ -223,7 +223,7 @@ export default function PaginaConsultaHistorica() {
               onChange={(e) => setEscrito((v) => ({ ...v, texto: e.target.value }))} />
           </label>
           <label className={styles.campo}>
-            <span>Pasajero</span>
+            <span>Tripulante</span>
             <input type="search" value={escrito.pasajero} maxLength={100} placeholder="Ej. nombre, apellido o pasaporte"
               onChange={(e) => setEscrito((v) => ({ ...v, pasajero: e.target.value }))} />
           </label>

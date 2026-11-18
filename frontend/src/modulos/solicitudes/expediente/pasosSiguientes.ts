@@ -33,13 +33,13 @@ export function pasosSiguientes(e: EntradaPasos): PasoSiguiente[] {
 
   if (e.acciones.revisar) {
     pasos.push(
-      { texto: "Marca «Sin» o «Con» a cada pasajero en la tabla", hecho: guardada || e.verificacion?.pendientes === 0 },
+      { texto: "Marca «Sin» o «Con» a cada tripulante en la tabla", hecho: guardada || e.verificacion?.pendientes === 0 },
       { texto: "Guarda la verificación", hecho: guardada },
       { texto: "Aprueba, devuelve a corrección o deniega la solicitud", hecho: false },
     );
   } else if (e.acciones.finalizar) {
     pasos.push(
-      { texto: "Verifica los impedimentos de cada pasajero en SIMPLUS y guarda la verificación", hecho: guardada },
+      { texto: "Verifica los impedimentos de cada tripulante en SIMPLUS y guarda la verificación", hecho: guardada },
       { texto: "Escribe el comentario de la operación", hecho: false },
       { texto: `Finaliza la solicitud (solo si la operación se hizo en ${e.puesto})`, hecho: false },
     );

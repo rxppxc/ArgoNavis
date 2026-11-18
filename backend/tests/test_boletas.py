@@ -328,12 +328,12 @@ async def test_pdf_de_la_boleta_por_la_api(cliente, esc, monkeypatch):
     assert (datos.numero_oficio, datos.monto, datos.numero_solicitud) == (oficio, Decimal("20.00"), numero)
     assert datos.agencia == esc.agencia and datos.puesto == esc.puesto and datos.anulada_en is None
     # El tipo de operación en casillas, como en papel (2026-11-16): los trámites activos, en su
-    # orden, con la X en el de la solicitud; Embarque hace la pregunta de «Subir y bajar».
+    # orden, con la X en el de la solicitud. Embarque ya no pregunta «Subir y bajar» (2026-11-18).
     async with SesionLocal() as sesion:
         activos = (await sesion.execute(select(TipoTramite.nombre).where(TipoTramite.activo.is_(True))
                                         .order_by(TipoTramite.orden, TipoTramite.nombre))).scalars().all()
     assert datos.tipos_operacion == list(activos) and datos.tipo_tramite == "Embarque"
-    assert datos.subir_y_bajar is False and datos.elecciones == []
+    assert datos.subir_y_bajar is None and datos.elecciones == []
     [registro] = await _bitacora(AccionAuditoria.BOLETA_DESCARGADA, sid)
     assert registro["numero_oficio"] == oficio and registro["anulada"] is False
 

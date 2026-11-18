@@ -22,7 +22,7 @@ export interface CasillaFormulario {
   nombre_tripulante: string | null;
   /** Opcional: se puede enviar sin ella y no cuenta como faltante (2026-11-11). */
   obligatoria: boolean;
-  /** La condición de su fila: la tarjeta del pasajero nombra los documentos que
+  /** La condición de su fila: la tarjeta del tripulante nombra los documentos que
    *  se le piden por su nacionalidad restringida (2026-11-14). */
   condicion?: CondicionDocumento;
 }
@@ -44,9 +44,19 @@ export function opcionalPara(d: Pick<TramiteDocumento, "rangos_opcional">, rango
   return !!d.rangos_opcional && d.rangos_opcional.includes(rango);
 }
 
+/** Si se pide la Carta de Responsabilidad (Form. No. 7) de cada tripulante (la condición
+ *  `subir_y_bajar`): con la operación «Subir y bajar» del trámite de Técnico (2026-11-18) o
+ *  con «¿Subir y bajar? Sí» donde se pregunte (Embarque y Desembarque, del 2026-11-16 al 18).
+ *  Espeja ServicioSolicitud.con_carta_subir_y_bajar. */
+export function conCartaSubirYBajar(
+  tipo: Pick<TipoTramite, "permite_subir_y_bajar" | "pide_operacion">, respuesta: "si" | "no", operacion: string,
+): boolean {
+  return (tipo.pide_operacion && operacion === "subir_y_bajar") || (tipo.permite_subir_y_bajar && respuesta === "si");
+}
+
 /** Casillas que la solicitud debe cubrir, ya resueltas las condiciones.
- *  `subirYBajar`: la respuesta a «¿Subir y bajar?» (2026-11-16); con «Sí» se pide
- *  la Carta de Responsabilidad de cada pasajero.
+ *  `subirYBajar`: si se pide la Carta de Responsabilidad de cada tripulante
+ *  (`conCartaSubirYBajar`).
  *  Espeja ServicioTramite.construir_casillas del backend: si cambias uno,
  *  cambia el otro. */
 export function construirCasillas(

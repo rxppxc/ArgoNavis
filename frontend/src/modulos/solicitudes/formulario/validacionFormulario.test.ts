@@ -35,7 +35,7 @@ const REGLAS: Record<string, string> = {
   pasaporte_vigencia_corta: "meses de vigencia",   // 2026-11-13; el seamanbook vencido ya no bloquea
   rango_no_permitido: "el rango debe ser",
   marino_sin_seamanbook: "falta N° de seamanbook",
-  pasaporte_repetido: "ya está registrado en el pasajero",
+  pasaporte_repetido: "ya está registrado en el tripulante",
 };
 
 function regla(mensaje: string): string {
@@ -44,17 +44,17 @@ function regla(mensaje: string): string {
   return claves[0];
 }
 
-describe("ficha del pasajero (espejo de validar_pasajeros)", () => {
+describe("ficha del tripulante (espejo de validar_tripulantes)", () => {
   it.each(espejo.casos)("$caso", ({ hoy, fecha_operacion, tramite, tripulantes, esperado }) => {
     const fichas = tripulantes.map((cambios, i) => ficha(cambios, `n${i}`));
     const errores = validarFormulario(tramiteDePrueba(tramite), { ...CABECERA_VACIA, fecha_operacion }, fichas, paises, hoy)
-      .filter((e) => e.startsWith("Pasajero"));
+      .filter((e) => e.startsWith("Tripulante"));
     expect(errores.map(regla).sort()).toEqual([...esperado].sort());
   });
 });
 
 describe("sin ocupación (2026-11-16)", () => {
-  it("la ficha del pasajero ya no la pide", () => {
+  it("la ficha del tripulante ya no la pide", () => {
     const cabecera = { ...CABECERA_VACIA, puesto_control_id: "1", fecha_operacion: "2026-10-20" };
     const errores = validarFormulario(tramiteDePrueba(), cabecera, [ficha()], paises, "2026-10-14");
     expect(errores).toEqual([]);
@@ -94,15 +94,15 @@ describe("datos del trámite", () => {
     ]);
   });
 
-  it("al menos un pasajero", () => {
-    expect(validarFormulario(tramiteDePrueba(), completa, [], paises, hoy)).toEqual(["Registra al menos un pasajero."]);
+  it("al menos un tripulante", () => {
+    expect(validarFormulario(tramiteDePrueba(), completa, [], paises, hoy)).toEqual(["Registra al menos un tripulante."]);
   });
 
-  it(`hasta ${MAX_TRIPULANTES} pasajeros`, () => {
+  it(`hasta ${MAX_TRIPULANTES} tripulantes`, () => {
     const tripulacion = (n: number) => Array.from({ length: n }, (_, i) => ficha({ pasaporte: `P${1000 + i}` }, `n${i}`));
     expect(validarFormulario(tramiteDePrueba(), completa, tripulacion(MAX_TRIPULANTES), paises, hoy)).toEqual([]);
     expect(validarFormulario(tramiteDePrueba(), completa, tripulacion(MAX_TRIPULANTES + 2), paises, hoy)).toEqual([
-      `Una solicitud admite hasta ${MAX_TRIPULANTES} pasajeros: quita 2 y preséntalos en otra solicitud.`,
+      `Una solicitud admite hasta ${MAX_TRIPULANTES} tripulantes: quita 2 y preséntalos en otra solicitud.`,
     ]);
   });
 });

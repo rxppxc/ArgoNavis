@@ -16,7 +16,7 @@ import { useNotificacion } from "../../../components/Notificaciones";
 import { TAMANO_MAX_MB } from "../../../utils/archivos";
 import type { OpcionBuscable } from "../../../utils/busqueda";
 import { mensajeDeError } from "../../../utils/errores";
-import type { CasillaFormulario } from "../checklist";
+import { conCartaSubirYBajar, type CasillaFormulario } from "../checklist";
 import { ChecklistSolicitud } from "./ChecklistSolicitud";
 import { DatosTramite } from "./DatosTramite";
 import { DocumentosAdicionales, MAX_ADICIONALES } from "./DocumentosAdicionales";
@@ -70,8 +70,8 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
   );
   const fichas = useTripulantesFormulario(precarga?.tripulantes);
   const { tripulantes } = fichas;
-  // «¿Subir y bajar?» (2026-11-16): con «Sí», la Carta de Responsabilidad de cada pasajero.
-  const subirYBajar = !!tipo?.permite_subir_y_bajar && cabecera.subir_y_bajar === "si";
+  // «Subir y bajar» (la operación de Técnico desde el 2026-11-18): la Carta de Responsabilidad de cada tripulante.
+  const subirYBajar = !!tipo && conCartaSubirYBajar(tipo, cabecera.subir_y_bajar, cabecera.operacion);
   const documentos = useDocumentosFormulario(tipo, tripulantes, paisesPorCodigo, precarga, subirYBajar);
   const { faltantes } = documentos;
 
@@ -104,7 +104,7 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
       const ok = await confirmar({
         titulo: "Cambiar de trámite",
         mensaje: `Cada trámite pide sus propios documentos: ${cuales} que adjuntaste en el checklist. `
-          + "Los datos, los pasajeros y los documentos adicionales se conservan.",
+          + "Los datos, los tripulantes y los documentos adicionales se conservan.",
         textoOk: "Cambiar de trámite",
         peligroso: true,
       });
@@ -219,14 +219,14 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
             />
 
             {/* ── 3. Tripulantes ── */}
-            <section className={styles.bloque} id="paso-pasajeros">
+            <section className={styles.bloque} id="paso-tripulantes">
               <div className={styles.bloqueTitulo}>
-                <span className={styles.paso}>3</span> Pasajeros
+                <span className={styles.paso}>3</span> Tripulantes
                 <span className={styles.contador}>{tripulantes.length}</span>
               </div>
               <p className={styles.ayudaSeccion}>
                 Escribe nombres, apellidos y números de pasaporte y de libreta tal como aparecen en esos
-                documentos. Los documentos de cada pasajero se adjuntan en su propia tarjeta: PDF, Word o
+                documentos. Los documentos de cada tripulante se adjuntan en su propia tarjeta: PDF, Word o
                 Excel, con un máximo permitido de {TAMANO_MAX_MB} MB por archivo.
               </p>
               {tripulantes.map((t, i) => (
@@ -256,11 +256,11 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
               {tripulantes.length < MAX_TRIPULANTES ? (
                 <button type="button" className={styles.btnAgregar}
                   onClick={() => fichas.agregar(tipo.rangos_permitidos?.[0])}>
-                  <IconoMas /> Agregar pasajero
+                  <IconoMas /> Agregar tripulante
                 </button>
               ) : (
                 <p className={styles.ayudaSeccion}>
-                  Llegaste al máximo de {MAX_TRIPULANTES} pasajeros por solicitud. Si son más, preséntalos en otra
+                  Llegaste al máximo de {MAX_TRIPULANTES} tripulantes por solicitud. Si son más, preséntalos en otra
                   solicitud.
                 </p>
               )}

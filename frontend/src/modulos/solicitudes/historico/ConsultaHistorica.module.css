@@ -83,7 +83,7 @@
   color: var(--acc-purple); font-size: .68rem; font-weight: 700; white-space: nowrap;
 }
 
-/* En el celular la tabla pasa a fichas, como la de pasajeros del expediente. */
+/* En el celular la tabla pasa a fichas, como la de tripulantes del expediente. */
 @media (max-width: 720px) {
   .tablaMarco { overflow-x: visible; padding: 0 14px; }
   .tabla thead { display: none; }

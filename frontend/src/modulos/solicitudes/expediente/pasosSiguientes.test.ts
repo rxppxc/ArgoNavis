@@ -21,7 +21,7 @@ describe("pasosSiguientes: «Qué sigue» del expediente (rediseño del 2026-11-
   it("UCVMM al revisar: marcar, guardar y decidir; los pasos hechos se marcan", () => {
     const revisar = { ...NINGUNA, revisar: true };
     expect(textos(entrada({ acciones: revisar, verificacion: { pendientes: 3, guardada: false } }))).toEqual([
-      "Marca «Sin» o «Con» a cada pasajero en la tabla",
+      "Marca «Sin» o «Con» a cada tripulante en la tabla",
       "Guarda la verificación",
       "Aprueba, devuelve a corrección o deniega la solicitud",
     ]);
@@ -34,7 +34,7 @@ describe("pasosSiguientes: «Qué sigue» del expediente (rediseño del 2026-11-
     const finalizar = { ...NINGUNA, finalizar: true };
     const pasos = entrada({ estado: "approved", acciones: finalizar, verificacion: { pendientes: 2, guardada: false } });
     expect(textos(pasos)).toEqual([
-      "Verifica los impedimentos de cada pasajero en SIMPLUS y guarda la verificación",
+      "Verifica los impedimentos de cada tripulante en SIMPLUS y guarda la verificación",
       "Escribe el comentario de la operación",
       "Finaliza la solicitud (solo si la operación se hizo en Puesto de Balboa)",
     ]);

@@ -44,7 +44,8 @@ from app.domain.models.boleta import BoletaRecargo
 from app.domain.models.catalogo import PuestoControl
 from app.domain.models.solicitud import (
     DIAS_SELLADO, ETIQUETA_OPERACION, RANGOS_CON_LIBRETA, CasillaSolicitud, DocumentoSolicitud, EstadoSolicitud,
-    EventoSolicitud, Solicitud, TipoEventoSolicitud, TripulanteSolicitud, texto_dias, vigencia_minima_pasaporte,
+    EventoSolicitud, OperacionTecnico, Solicitud, TipoEventoSolicitud, TripulanteSolicitud, texto_dias,
+    vigencia_minima_pasaporte,
 )
 from app.domain.models.tramite import AlcanceDocumento, TipoTramite, TramiteDocumento
 from app.domain.models.user import Usuario
@@ -83,7 +84,7 @@ MAX_TRIPULANTES            = 30   # por solicitud (reunión del 2026-10-30); esp
 # Lo más que pesa un envío válido (crear o corregir), que lleva juntos todos los archivos
 # de la solicitud: es el tope del cuerpo de esas dos rutas (TopeDelCuerpo en api/middleware.py y
 # client_max_body_size en frontend/nginx.conf, revisión de recursos del 2026-11-10). Con
-# el catálogo de hoy, a un pasajero se le piden como mucho 5 documentos (uno de
+# el catálogo de hoy, a un tripulante se le piden como mucho 5 documentos (uno de
 # nacionalidad restringida en Desembarque, Urgencia médica o Renovación, con la Visa
 # desde el 2026-11-14) y a la solicitud, 2 (el Formulario No. 3, desde el 2026-11-13, y
 # la Lista de Tripulantes): 30 × 5 + 2 + 20 adicionales = 172 archivos de 2 MB, más
@@ -592,11 +593,11 @@ class ServicioSolicitud:
                 )
 
         if not datos.tripulantes:
-            raise _error(status.HTTP_400_BAD_REQUEST, "Debes registrar al menos un pasajero en la solicitud.")
+            raise _error(status.HTTP_400_BAD_REQUEST, "Debes registrar al menos un tripulante en la solicitud.")
         if len(datos.tripulantes) > MAX_TRIPULANTES:
             raise _error(
                 status.HTTP_400_BAD_REQUEST,
-                f"Una solicitud admite hasta {MAX_TRIPULANTES} pasajeros. Si son más, presenta otra solicitud.",
+                f"Una solicitud admite hasta {MAX_TRIPULANTES} tripulantes. Si son más, presenta otra solicitud.",
             )
 
         codigos = {t.nacionalidad for t in datos.tripulantes} | {t.pais_nacimiento for t in datos.tripulantes}
@@ -615,7 +616,7 @@ class ServicioSolicitud:
         if errores:
             extra = len(errores) - MAX_ERRORES_MOSTRADOS
             detalle = " ".join(errores[:MAX_ERRORES_MOSTRADOS]) + (f" (y {extra} más)" if extra > 0 else "")
-            raise _error(status.HTTP_400_BAD_REQUEST, f"Revisa los datos de los pasajeros: {detalle}")
+            raise _error(status.HTTP_400_BAD_REQUEST, f"Revisa los datos de los tripulantes: {detalle}")
 
         resueltos = [
             _TripulanteResuelto(entrada=t, restringido=paises[t.nacionalidad].nacionalidad_restringida)
@@ -651,11 +652,11 @@ class ServicioSolicitud:
                 if indice is None or not 0 <= indice < total_tripulantes:
                     raise _error(
                         status.HTTP_400_BAD_REQUEST,
-                        f"Pasajero inválido para el documento '{td.documento.nombre}'.",
+                        f"Tripulante inválido para el documento '{td.documento.nombre}'.",
                     )
             casilla = (td.documento.codigo, indice)
             if casilla in ocupadas:
-                de_quien = f" del pasajero {indice + 1}" if indice is not None else ""
+                de_quien = f" del tripulante {indice + 1}" if indice is not None else ""
                 raise _error(
                     status.HTTP_400_BAD_REQUEST,
                     f"Llegó más de un archivo para «{td.documento.nombre}»{de_quien}: adjunta uno solo por documento.",
@@ -675,8 +676,18 @@ class ServicioSolicitud:
     @staticmethod
     def _subir_y_bajar(tipo: TipoTramite, datos: _DatosFormularioSolicitud) -> bool:
         """La respuesta a «¿Subir y bajar?» (2026-11-16), solo si el trámite hace la
-        pregunta: en los demás se descarta, como el cambio de puerto."""
+        pregunta: en los demás se descarta, como el cambio de puerto. Desde el 2026-11-18
+        ningún trámite la hace: «Subir y bajar» es una operación del de Técnico."""
         return tipo.permite_subir_y_bajar and datos.subir_y_bajar
+
+    @classmethod
+    def con_carta_subir_y_bajar(cls, tipo: TipoTramite, datos: _DatosFormularioSolicitud) -> bool:
+        """Si se pide la Carta de Responsabilidad (Form. No. 7) de cada tripulante (la
+        condición SUBIR_Y_BAJAR): con la operación «Subir y bajar» del trámite de Técnico
+        (2026-11-18) o con «¿Subir y bajar? Sí» donde se pregunte. Espejo:
+        conCartaSubirYBajar (checklist.ts)."""
+        operacion = tipo.pide_operacion and datos.operacion == OperacionTecnico.SUBIR_Y_BAJAR.value
+        return operacion or cls._subir_y_bajar(tipo, datos)
 
     def _exigir_checklist(
         self, tipo: TipoTramite, tripulantes: list[_TripulanteResuelto], cubiertas: set[tuple[int, int | None]],
@@ -712,7 +723,7 @@ class ServicioSolicitud:
         partes = [tipo.nombre]
         if nombre_buque:
             partes.append(nombre_buque)
-        partes.append(f"{cantidad} pasajero{'' if cantidad == 1 else 's'}")
+        partes.append(f"{cantidad} tripulante{'' if cantidad == 1 else 's'}")
         return " — ".join(partes)[:255]
 
     def _aplicar_cabecera(
@@ -824,7 +835,7 @@ class ServicioSolicitud:
         self._limitar_adicionales(sum(1 for td, _ in asignadas if td is None))
         requeridas = self._exigir_checklist(
             tipo, tripulantes, {(td.documento_id, indice) for td, indice in asignadas if td is not None},
-            self._subir_y_bajar(tipo, datos),
+            self.con_carta_subir_y_bajar(tipo, datos),
         )
 
         # Los archivos se validan y escriben antes de registrar la solicitud:
@@ -888,7 +899,7 @@ class ServicioSolicitud:
         existentes = {t.id: t for t in s.tripulantes}
         ids = [t.entrada.id for t in tripulantes if t.entrada.id is not None]
         if len(ids) != len(set(ids)) or any(i not in existentes for i in ids):
-            raise _error(status.HTTP_400_BAD_REQUEST, "La lista de pasajeros no coincide con la solicitud.")
+            raise _error(status.HTTP_400_BAD_REQUEST, "La lista de tripulantes no coincide con la solicitud.")
         quitados = set(existentes) - set(ids)
 
         # ── Documentos que se conservan (los de un tripulante quitado se van con él) ──
@@ -914,7 +925,7 @@ class ServicioSolicitud:
                 continue
             indice = None if documento.tripulante_id is None else indice_por_id.get(documento.tripulante_id)
             cubiertas.add((documento.documento_id, indice))
-        requeridas = self._exigir_checklist(tipo, tripulantes, cubiertas, self._subir_y_bajar(tipo, datos))
+        requeridas = self._exigir_checklist(tipo, tripulantes, cubiertas, self.con_carta_subir_y_bajar(tipo, datos))
 
         carpeta = almacenamiento.carpeta_solicitud(s.id)
         nuevos = await almacenamiento.guardar_archivos(carpeta, archivos)
@@ -958,7 +969,7 @@ class ServicioSolicitud:
 
             resumen = (
                 f"Documentos nuevos: {len(nuevos)}. Documentos retirados: {len(retirados)}. "
-                f"Pasajeros: {len(tripulantes)}."
+                f"Tripulantes: {len(tripulantes)}."
             )
             if datos.observaciones:
                 resumen += f" Observaciones: {datos.observaciones}"
@@ -1017,7 +1028,7 @@ class ServicioSolicitud:
         if len(recibidos) != len(datos.tripulantes) or set(recibidos) != set(por_id):
             raise _error(
                 status.HTTP_400_BAD_REQUEST,
-                "Indica el resultado de la verificación de cada pasajero de la solicitud (una vez cada uno).",
+                "Indica el resultado de la verificación de cada tripulante de la solicitud (una vez cada uno).",
             )
 
         correccion = getattr(s, etapa.verificados)
@@ -1051,10 +1062,10 @@ class ServicioSolicitud:
             # El título del evento ya dice "Verificación de impedimentos": aquí solo el resultado.
             total = len(recibidos)
             if not con:
-                texto = "Sin impedimento." if total == 1 else f"Sin impedimentos ({total} pasajeros)."
+                texto = "Sin impedimento." if total == 1 else f"Sin impedimentos ({total} tripulantes)."
             else:
                 texto = f"Con impedimento: {', '.join(con)}"
-                texto += f" ({len(con)} de {total} pasajeros)." if total > 1 else "."
+                texto += f" ({len(con)} de {total} tripulantes)." if total > 1 else "."
             if datos.comentario:
                 texto += f" {datos.comentario}"
             tipo = etapa.evento
@@ -1065,7 +1076,7 @@ class ServicioSolicitud:
     async def aprobar(self, ctx: ContextoAcceso, solicitud_id: int, observacion: str | None) -> Solicitud:
         s = await self._para_revision(ctx, solicitud_id)
         if not s.impedimentos_verificados or any(t.con_impedimento is None for t in s.tripulantes):
-            raise _error(status.HTTP_409_CONFLICT, "Antes de aprobar registra la verificación de impedimentos de cada pasajero.")
+            raise _error(status.HTTP_409_CONFLICT, "Antes de aprobar registra la verificación de impedimentos de cada tripulante.")
         limite = s.fecha_operacion + timedelta(days=configuracion.DIAS_GRACIA_FINALIZACION)
         if limite < hoy_panama():
             raise _error(
@@ -1157,7 +1168,7 @@ class ServicioSolicitud:
         if not s.impedimentos_puesto_verificados or any(t.con_impedimento_puesto is None for t in s.tripulantes):
             raise _error(
                 status.HTTP_409_CONFLICT,
-                "Antes de finalizar registra la verificación de impedimentos de cada pasajero en SIMPLUS.",
+                "Antes de finalizar registra la verificación de impedimentos de cada tripulante en SIMPLUS.",
             )
         anterior = s.estado
         s.estado                     = Estado.FINALIZADA.value
@@ -1470,9 +1481,16 @@ class ServicioSolicitud:
             anulada_en=boleta.anulada_en.astimezone(ZONA_PANAMA) if boleta.anulada_en else None,
             motivo_anulacion=boleta.motivo_anulacion,
             tipos_operacion=[t.nombre for t in tipos],
-            subir_y_bajar=s.subir_y_bajar if s.tipo_tramite.permite_subir_y_bajar else None,
+            subir_y_bajar=self._respuesta_subir_y_bajar(s),
             elecciones=self._elecciones_boleta(s),
         )
+
+    @staticmethod
+    def _respuesta_subir_y_bajar(s: Solicitud) -> bool | None:
+        """La respuesta a «¿Subir y bajar?» para el PDF y la boleta: None si el trámite no
+        pregunta, salvo en las de antes que respondieron «Sí» (Embarque y Desembarque, del
+        2026-11-16 al 18), que lo siguen diciendo."""
+        return s.subir_y_bajar if s.tipo_tramite.permite_subir_y_bajar or s.subir_y_bajar else None
 
     @staticmethod
     def _elecciones_boleta(s: Solicitud) -> list[tuple[str, tuple[str, ...], str]]:
@@ -1540,7 +1558,7 @@ class ServicioSolicitud:
             nombre_buque=s.nombre_buque, imo=s.imo, bandera=await self._nombre_pais(s.bandera),
             puesto_control=s.puesto_nombre, puesto_destino=s.puesto_destino_nombre,
             # Solo en los trámites que hacen la pregunta (Embarque y Desembarque, 2026-11-16).
-            subir_y_bajar=s.subir_y_bajar if s.tipo_tramite.permite_subir_y_bajar else None,
+            subir_y_bajar=self._respuesta_subir_y_bajar(s),
             # La operación de Técnico y los días del sellado de Shore Pass (2026-11-18); None en
             # los demás trámites y en las de antes.
             operacion=ETIQUETA_OPERACION.get(s.operacion or ""),

@@ -10,7 +10,7 @@ export interface CabeceraFormulario {
   /** ¿Cambio de puerto? (2026-11-13) y, con «si», el nuevo puesto. */
   cambio_puerto: "no" | "si";
   puesto_destino_id: string;
-  /** ¿Subir y bajar? (2026-11-16): con «si», cada pasajero adjunta la Carta de Responsabilidad. */
+  /** ¿Subir y bajar? (2026-11-16): con «si», cada tripulante adjunta la Carta de Responsabilidad. */
   subir_y_bajar: "no" | "si";
   /** La del trámite de Técnico (2026-11-18): empieza sin elegir («»). */
   operacion: "" | Operacion;
@@ -83,7 +83,7 @@ export function vigenciaMinimaPasaporte(referencia: string): string {
 }
 
 /** Cómo está el pasaporte para la operación: vencido, vigente pero con menos de 3
- *  meses, o bien. Lo usan la validación y el aviso de la tarjeta del pasajero. */
+ *  meses, o bien. Lo usan la validación y el aviso de la tarjeta del tripulante. */
 export function estadoPasaporte(vence: string, referencia: string): "vencido" | "corto" | "bien" {
   if (!vence) return "bien";
   if (vence < referencia) return "vencido";
@@ -143,10 +143,10 @@ export function validarFormulario(
   // Obligatorios en Shore Pass (2026-11-18); el backend: validar_campos_cabecera.
   if (tipo.pide_dias_sellado && !c.dias_sellado) errores.push("Elige los días del sellado: 5 o 15.");
 
-  if (tripulantes.length === 0) errores.push("Registra al menos un pasajero.");
+  if (tripulantes.length === 0) errores.push("Registra al menos un tripulante.");
   // Solo pasa al corregir una solicitud enviada antes del tope: el botón no deja agregar más.
   if (tripulantes.length > MAX_TRIPULANTES) {
-    errores.push(`Una solicitud admite hasta ${MAX_TRIPULANTES} pasajeros: quita ${tripulantes.length - MAX_TRIPULANTES} `
+    errores.push(`Una solicitud admite hasta ${MAX_TRIPULANTES} tripulantes: quita ${tripulantes.length - MAX_TRIPULANTES} `
       + "y preséntalos en otra solicitud.");
   }
 
@@ -155,7 +155,7 @@ export function validarFormulario(
   const rangos = tipo.rangos_permitidos;
   const rangosTexto = rangos?.map((r) => ETIQUETA_RANGO[r]).join(", ");
   tripulantes.forEach((t, i) => {
-    const quien = `Pasajero ${i + 1}${t.nombre.trim() ? ` (${t.nombre.trim()} ${t.apellido.trim()})` : ""}`;
+    const quien = `Tripulante ${i + 1}${t.nombre.trim() ? ` (${t.nombre.trim()} ${t.apellido.trim()})` : ""}`;
     const faltan: string[] = [];
     if (t.nombre.trim().length < 2) faltan.push("nombre");
     if (t.apellido.trim().length < 2) faltan.push("apellido");
@@ -201,7 +201,7 @@ export function validarFormulario(
     const clave = `${t.nacionalidad}|${t.pasaporte.trim().toUpperCase()}`;
     if (t.pasaporte.trim()) {
       const previo = pasaportes.get(clave);
-      if (previo !== undefined) errores.push(`${quien}: el pasaporte ya está registrado en el pasajero ${previo + 1}.`);
+      if (previo !== undefined) errores.push(`${quien}: el pasaporte ya está registrado en el tripulante ${previo + 1}.`);
       else pasaportes.set(clave, i);
     }
   });

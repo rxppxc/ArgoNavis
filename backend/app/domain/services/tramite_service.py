@@ -13,7 +13,7 @@ varias condiciones dependen de los datos de esa solicitud:
                                solo en Desembarque, como en el Form. 3.
   - SUBIR_Y_BAJAR            → solo si la solicitud indica «Subir y bajar»
                                (2026-11-16): la Carta de Responsabilidad
-                               (Form. No. 7) de cada pasajero, en Embarque y
+                               (Form. No. 7) de cada tripulante, en Embarque y
                                Desembarque.
   - Documentos con `requiere_libreta` → solo a quien porta seamanbook (rango
     Marino); pasajeros, militares, técnicos, supernumerarios y superintendentes no.
@@ -259,7 +259,7 @@ class ServicioTramite:
         rangos_texto = ", ".join(ETIQUETA_RANGO.get(r, r) for r in tipo.rangos_permitidos or [])
 
         for indice, t in enumerate(tripulantes, start=1):
-            quien = f"Pasajero {indice} ({t.nombre} {t.apellido})"
+            quien = f"Tripulante {indice} ({t.nombre} {t.apellido})"
 
             if t.nacionalidad not in codigos_pais_validos:
                 errores.append(f"{quien}: la nacionalidad no es válida.")
@@ -278,7 +278,7 @@ class ServicioTramite:
 
             clave = (t.nacionalidad, t.pasaporte)
             if clave in pasaportes_vistos:
-                errores.append(f"{quien}: el pasaporte {t.pasaporte} ya está en el pasajero {pasaportes_vistos[clave]}.")
+                errores.append(f"{quien}: el pasaporte {t.pasaporte} ya está en el tripulante {pasaportes_vistos[clave]}.")
             else:
                 pasaportes_vistos[clave] = indice
 

@@ -88,7 +88,7 @@ class _DatosFormularioSolicitud(BaseModel):
     # Cambio de puerto (2026-11-13): el nuevo puesto, del mismo sector. Nulo = sin cambio.
     puesto_destino_id: int | None  = None
     # «¿Subir y bajar?» (2026-11-16): solo en los trámites que lo ofrecen; en los demás
-    # se descarta. Con «Sí», cada pasajero adjunta la Carta de Responsabilidad.
+    # se descarta. Con «Sí», cada tripulante adjunta la Carta de Responsabilidad.
     subir_y_bajar:     bool        = False
     # Embarque, Desembarque o Subir y bajar (2026-11-18): obligatoria en los trámites que
     # la piden (el de Técnico); en los demás se descarta.
@@ -416,7 +416,7 @@ class SalidaSolicitudResumen(BaseModel):
     expirada_en:          datetime | None = None
     veces_devuelta:       int = 0
     tripulantes_con_alerta:         int = 0
-    # Algún pasajero de nacionalidad restringida: desde el 2026-11-14, en todos los
+    # Algún tripulante de nacionalidad restringida: desde el 2026-11-14, en todos los
     # trámites (se le pide la Visa); antes, solo en los que avisan la custodia.
     tiene_nacionalidad_restringida: bool = False
     # Aprobada fuera del horario laboral (None: sin aprobar). Desde el 2026-11-11

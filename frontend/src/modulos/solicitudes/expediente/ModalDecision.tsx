@@ -49,7 +49,7 @@ function mensaje(decision: Decision, conImpedimento: string[]): string {
     : "La solicitud quedará denegada de forma definitiva y se avisará a la agencia.";
 }
 
-/** Motivo sugerido al devolver: qué pasajeros tienen el pasaporte vencido o con menos
+/** Motivo sugerido al devolver: qué tripulantes tienen el pasaporte vencido o con menos
  *  de 3 meses de vigencia a la fecha de la operación (el documento de UCVMM pide
  *  informarlo). El seamanbook vencido no va: desde el 2026-11-13 no impide enviar. */
 function motivoPorVencimientos(s: SolicitudDetalle): string {
@@ -64,7 +64,7 @@ function motivoPorVencimientos(s: SolicitudDetalle): string {
   return [
     `Pasaportes vencidos o con menos de ${MESES_VIGENCIA_PASAPORTE} meses de vigencia a partir de la operación:`,
     ...lineas,
-    "Adjunta la documentación vigente o retira a esos pasajeros de la solicitud.",
+    "Adjunta la documentación vigente o retira a esos tripulantes de la solicitud.",
   ].join("\n");
 }
 

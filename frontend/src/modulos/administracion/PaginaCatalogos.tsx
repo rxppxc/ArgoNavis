@@ -461,7 +461,7 @@ export default function PaginaCatalogos() {
       ) : (
         <>
           <p className={styles.descripcion}>
-            A los pasajeros de una nacionalidad restringida se les exige el Formulario No. 6 de custodia en
+            A los tripulantes de una nacionalidad restringida se les exige el Formulario No. 6 de custodia en
             Desembarque. En Desembarque, Urgencias, Renovación de pasaporte y Shore Pass, al aprobar se avisa a la
             agencia que debe realizar el trámite de solicitud de custodia. El cambio aplica a las solicitudes que se
             envíen desde ahora.

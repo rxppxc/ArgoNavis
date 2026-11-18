@@ -105,7 +105,7 @@ export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos,
         {tipo.requiere_clinica && (
           <label className={styles.campo}>
             <span>Clínica u hospital *</span>
-            <input type="text" maxLength={255} placeholder="Donde será llevado el pasajero"
+            <input type="text" maxLength={255} placeholder="Donde será llevado el tripulante"
               value={cabecera.clinica_hospital}
               onChange={(e) => onCambiar("clinica_hospital", e.target.value)} />
           </label>
@@ -117,8 +117,8 @@ export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos,
               onChange={(e) => onCambiar("motivo", e.target.value)} />
           </label>
         )}
-        {/* La operación del trámite de Técnico (pedido del usuario del 2026-11-18): obligatoria, empieza
-            sin elegir y no cambia los documentos. */}
+        {/* La operación del trámite de Técnico (pedido del usuario del 2026-11-18): obligatoria y empieza
+            sin elegir. «Subir y bajar» pide además la Carta de Responsabilidad de cada tripulante. */}
         {tipo.pide_operacion && (
           <label className={styles.campo}>
             <span>Operación *</span>
@@ -127,6 +127,12 @@ export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos,
               {OPERACIONES.map((o) => <option key={o} value={o}>{ETIQUETA_OPERACION[o]}</option>)}
             </select>
           </label>
+        )}
+        {tipo.pide_operacion && cabecera.operacion === "subir_y_bajar" && (
+          <p className={styles.operacionAviso}>
+            Con «Subir y bajar», cada tripulante adjunta la <strong>Carta de Responsabilidad (Form. No. 7)</strong> en
+            sus documentos.
+          </p>
         )}
         {/* Los días del sellado de Shore Pass (pedido del usuario del 2026-11-18): obligatorios, empiezan
             sin elegir y no cambian los documentos ni la vigencia. */}
@@ -139,8 +145,9 @@ export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos,
             </select>
           </label>
         )}
-        {/* «¿Subir y bajar?» (2026-11-16), solo en Embarque y Desembarque: con «Sí», cada pasajero
-            adjunta la Carta de Responsabilidad. Va antes del cambio de puerto, que sigue al final. */}
+        {/* «¿Subir y bajar?» (Sí / No), en los trámites que lo pregunten: con «Sí», cada tripulante adjunta
+            la Carta de Responsabilidad. Embarque y Desembarque lo preguntaron del 2026-11-16 al 18; desde
+            entonces, ninguno («Subir y bajar» es una operación del trámite de Técnico). */}
         {tipo.permite_subir_y_bajar && (
           <div className={styles.subirBajar} role="group" aria-label="Subir y bajar">
             <label className={styles.campo}>
@@ -152,7 +159,7 @@ export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos,
             </label>
             {cabecera.subir_y_bajar === "si" && (
               <p className={styles.subirBajarAviso}>
-                Cada pasajero adjunta la <strong>Carta de Responsabilidad (Form. No. 7)</strong> en sus documentos.
+                Cada tripulante adjunta la <strong>Carta de Responsabilidad (Form. No. 7)</strong> en sus documentos.
               </p>
             )}
           </div>

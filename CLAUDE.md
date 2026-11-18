@@ -32,7 +32,7 @@ Todo el código nuevo va en **español** (variables, funciones, clases, componen
 
 Cuando agregues nombres nuevos, hazlo en español. Cuando toques nombres existentes, no los renombres "porque sí" — verifica primero si son de los inamovibles arriba.
 
-En pantalla se dice **«pasajeros»** (desde el 2026-11-10; antes «tripulantes»), pero en el código, la API y la BD sigue `tripulante(s)`: es contrato (ver «Sectores, supervisión y pasajeros» en docs/HISTORIAL.md).
+En pantalla se dice **«tripulantes»**: es la forma general de llamar a todos los rangos (2026-11-18; del 2026-11-10 al 18 se dijo «pasajeros»). El rango **«Pasajero»** (2026-11-13) conserva su nombre: es uno de los rangos. En el código, la API y la BD siempre fue `tripulante(s)`; quedan en `pasajero` el filtro de la consulta histórica y el estado de «Volver», que son contrato (ver «Tripulantes otra vez» en docs/HISTORIAL.md).
 
 ### Naming
 - Backend Python: `snake_case` funciones/variables, `PascalCase` clases, `UPPER_SNAKE` constantes.
@@ -191,7 +191,7 @@ Pedido del usuario: «en el modo claro hay cosas que no se distinguen»; «que c
   - «Adjuntar» va en azul.
 - **Bitácora:** las etiquetas de cada acción llevan el color de su categoría (`categoriaAccion.ts`), y los rótulos y botones son los del resto.
 - **Rótulos más grandes y menos espaciados:** de .6–.66rem a .68–.74rem.
-- **La tabla de pasajeros** lleva el pasaporte y el seamanbook en una columna. Antes, en el puesto, la del impedimento quedaba fuera de la vista.
+- **La tabla de tripulantes** lleva el pasaporte y el seamanbook en una columna. Antes, en el puesto, la del impedimento quedaba fuera de la vista.
 - **Un solo ancho de página** (1240 px, `MarcoPagina`). `angosto` se queda para la contraseña y el 404.
 - Maquetas, capturas de antes y después y el script que las toma (contra la pila del E2E, sin correos): en el scratchpad (`visual/`).
 
@@ -251,8 +251,8 @@ Pedido del usuario: «en el modo claro hay cosas que no se distinguen»; «que c
 El sistema cubre el ciclo completo de las Autorizaciones Marítimas: la agencia envía, UCVMM revisa por sector y el puesto de control finaliza. Tiene además:
 - supervisión y consulta histórica;
 - el recargo por atención fuera del horario laboral y su boleta, con el tipo de operación en casillas (2026-11-16);
-- «¿Subir y bajar?» en Embarque y Desembarque, con la Carta Form. 7 de cada pasajero, y la ocupación fuera del formulario (2026-11-16);
-- la operación del trámite de Técnico (Embarque, Desembarque o Subir y bajar) y los días del sellado de Shore Pass (5 o 15) (2026-11-18);
+- la ocupación fuera del formulario (2026-11-16);
+- la operación del trámite de Técnico (Embarque, Desembarque o Subir y bajar, que pide la Carta Form. 7 de cada tripulante) y los días del sellado de Shore Pass (5 o 15) (2026-11-18);
 - estadísticas con exportación a Excel, PDF y CSV;
 - la verificación pública del PDF por el QR;
 - la identidad «pase oficial».
@@ -345,21 +345,21 @@ Cada una salió de un problema real. El detalle está en el historial.
 15. **De la auditoría del 2026-11-08, para decidir:**
     - Retención de la bitácora (`audit_logs`): es la tabla que más crece (cada documento visto, cada login) y no se purga. Va con la política de retención (punto 7).
     - Búsqueda por texto de las bandejas y la bitácora: `ILIKE '%…%'` recorre la tabla. Con muchos miles de filas, un índice trigram (`pg_trgm`) la acelera; hoy no hace falta.
-    - Lo mismo la consulta histórica (2026-11-11): busca pasajeros con `ILIKE` y filtra por `fecha_operacion`, que no tiene índice.
+    - Lo mismo la consulta histórica (2026-11-11): busca tripulantes con `ILIKE` y filtra por `fecha_operacion`, que no tiene índice.
     - Tope global del login y de la verificación en nginx (`limit_req`): el de slowapi es por proceso. Antes, confirmar si las agencias salen de la VPN con una sola IP (las frenaría a todas juntas).
 16. **Menos consultas por pedido, si crece el uso** (prueba de carga del 2026-11-08). Hoy cada pedido hace 6 consultas solo para saber quién es el usuario:
     - `obtener_id_usuario_actual` y `usuario_actual` leen el mismo usuario dos veces;
     - los permisos se consultan en cada pedido (a veces dos veces);
     - el expediente vuelve a leer el catálogo (trámites, documentos y países) y carga `creada_por` con su rol y su agencia.
     Juntar la verificación del token con la carga del usuario y cachear el catálogo por proceso ahorraría entre 10 y 20 %. Correr `tests/carga.py` antes y después.
-17. **Documentación de la DTI, juego 0.7:** `docs/` no tiene todavía la identidad «pase oficial» ni los cambios del 2026-11-11 (documentos de los técnicos, nombre neutro para la agencia, costo fuera del horario y consulta histórica), del 2026-11-13 (cambio de puerto, Formulario No. 3 en todos los trámites, cabecera de la agencia, rango Pasajero, pasaporte con 3 meses) del 2026-11-14 (la Visa de los restringidos, los panameños, Shore Pass, quien finalizó y el PDF por el QR) y del 2026-11-16 (la boleta de recargo con el tipo de operación, el alcance del supervisor general, «¿Subir y bajar?» con la Carta Form. 7 y la ocupación fuera del formulario), ni el rediseño visual «B + C» del 2026-11-17 (las capturas de los manuales quedaron con el diseño anterior), ni la operación del trámite de Técnico y los días del sellado de Shore Pass del 2026-11-18.
+17. **Documentación de la DTI, juego 0.7:** `docs/` no tiene todavía la identidad «pase oficial» ni los cambios del 2026-11-11 (documentos de los técnicos, nombre neutro para la agencia, costo fuera del horario y consulta histórica), del 2026-11-13 (cambio de puerto, Formulario No. 3 en todos los trámites, cabecera de la agencia, rango Pasajero, pasaporte con 3 meses) del 2026-11-14 (la Visa de los restringidos, los panameños, Shore Pass, quien finalizó y el PDF por el QR) y del 2026-11-16 (la boleta de recargo con el tipo de operación, el alcance del supervisor general, «¿Subir y bajar?» con la Carta Form. 7 y la ocupación fuera del formulario), ni el rediseño visual «B + C» del 2026-11-17 (las capturas de los manuales quedaron con el diseño anterior), ni lo del 2026-11-18 (la operación del trámite de Técnico con «Subir y bajar», los días del sellado de Shore Pass, las visas de los restringidos según el trámite y el rango, las estadísticas sin UCVMM y «tripulantes» otra vez).
 18. **Recargo fuera del horario, con UCVMM:**
     - La boleta (2026-11-16) es un **borrador**: UCVMM tiene un modelo en papel, que el usuario pasará para copiarlo tal cual (`informes/boleta_recargo_pdf.py`).
     - El sistema no registra el pago ni dice dónde se paga (desde el 2026-11-11).
 19. **Del 2026-11-13, para decidir o validar:** si el Formulario No. 3 va firmado y sellado (lo diría la descripción del documento); generarlo prellenado con los datos del formulario, para imprimir, firmar y subir; un «Desistir» para que la agencia cierre una solicitud que ya no usará (hoy queda aprobada hasta que vence); y, con UCVMM, que los 3 meses de vigencia del pasaporte apliquen también a la gente de mar.
 20. **Del 2026-11-14:**
     - Con la DTI: publicar la verificación del QR en internet (plantilla `frontend/nginx-verificacion-publica.conf`, HTTPS, `set_real_ip_from` y `URL_VERIFICACION_PUBLICA`). Mientras tanto, el QR solo funciona dentro de la red del SNM.
-    - Con UCVMM: el nombre y la descripción de la Visa de los restringidos (hoy «Visa», «Para el pasajero de nacionalidad restringida.»; se cambian con una migración).
+    - Con UCVMM: el nombre y la descripción de la Visa de los restringidos (hoy «Visa», «Para el tripulante de nacionalidad restringida.»; se cambian con una migración).
     - Si las agencias van a entrar al sistema desde internet sin VPN (el usuario lo mencionó), es otra decisión con la DTI: hoy todo está pensado para la VPN. Publicar todo pediría al menos HTTPS, el segundo factor de las agencias (punto 8) y un WAF.
 
 ### Flujo actual: Autorizaciones Marítimas (UCVMM)
@@ -369,7 +369,7 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
 **Roles:**
 - **Naviera** (`T-CREAR-BASICA` + `users.agencia_id`) — envía solicitudes de su agencia (`/new`) y corrige las devueltas dentro del plazo. Cualquier usuario de la agencia ve y corrige las de la agencia. Sin agencia no puede enviar; con la agencia desactivada no entra.
 - **UCVMM** (`T-PROCESAR-PACIFICO` + asignación en `usuarios_sectores`; el rol se llamaba «Sector Pacífico» hasta el 2026-11-10) — revisa las solicitudes de los puestos de **sus sectores** (ver «Sectores, supervisión y pasajeros» en docs/HISTORIAL.md). Sin sector asignado, su bandeja responde 409:
-  - Verifica impedimentos **por pasajero** (`solicitud_tripulantes.con_impedimento`, NULL = sin verificar). Todos marcados es obligatorio para aprobar; con impedimento igual se puede aprobar. El comentario es opcional.
+  - Verifica impedimentos **por tripulante** (`solicitud_tripulantes.con_impedimento`, NULL = sin verificar). Todos marcados es obligatorio para aprobar; con impedimento igual se puede aprobar. El comentario es opcional.
   - Registrada, la verificación queda de solo lectura. Cambiarla es una **corrección**:
     - Exige `motivo_correccion`.
     - Deja un evento `impedimentos_corregidos` (interno, como `impedimentos`) con qué cambió y por qué.
@@ -384,6 +384,7 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
   - Genera y anula la boleta de recargo de las solicitudes que ve.
 - **Supervisor de sector** (`T-SUPERVISAR-SECTOR` + `usuarios_sectores`) y **Supervisor general** (`T-SUPERVISAR-TODO`; UCVMM en Tocumen) — solo lectura (2026-11-10): la bandeja «Supervisión» (`GET /solicitudes/supervision`), los expedientes con sus documentos (cada apertura queda en la bitácora) y el PDF de la autorización (copia interna). Ningún botón de decisión (`revisar` y `finalizar` en falso) y sin campana.
   - El de sector ve las de sus sectores, con sus estadísticas (con exportación) y la consulta histórica, y genera y anula la boleta de recargo.
+  - **Las estadísticas son solo del supervisor de sector y del Administrador** (pedido del usuario del 2026-11-18): UCVMM ya no las ve (`_PUEDE_VER_ESTADISTICAS`, espejo en `PERMISOS_ESTADISTICAS`).
   - El general (desde el 2026-11-16) ve **solo el trámite de Técnico, Superintendente o Supernumerario**, de los dos sectores (`tipos_tramite.supervision_general`, `ContextoAcceso.supervisa_tramite`). No tiene estadísticas, ni el uso del sistema, ni la consulta histórica (`ve_historico`). Descarga las boletas de sus solicitudes, sin generarlas.
   - `ve_todos_los_sectores` es solo del Administrador desde el 2026-11-16.
 - **Administrador** — acceso total (decisión del usuario del 2026-10-20): bandejas y expedientes (atajo a todos los `T-*`), catálogo de trámites, agencias/puestos/sectores/nacionalidades (`/admin/catalogos`), estadísticas, bitácora y también usuarios y roles (`/admin`, `/admin/roles`). Antes solo listaba usuarios y roles. No necesita sector: ve los dos.
@@ -427,14 +428,12 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
     - A los rangos distintos de Marino solo se les piden las Generales de pasaporte y el boleto aéreo, en todos los trámites (reunión del 2026-10-30, `tramite_documentos.rangos`), salvo lo de la cuarta.
     - A los técnicos, supernumerarios y superintendentes, en Desembarque, Carta, Generales, Contrato y boleto opcional (2026-11-11). Desde el 2026-11-13 van por el trámite de Técnico, y esas filas se borraron el 2026-11-14 (migración `d9a4b7e2c315`). La lógica de lo opcional (`tramite_documentos.rangos_opcional`, `opcional_para` / `opcionalPara`) se queda, con sus pruebas, para el próximo documento opcional.
     - El Formulario No. 3 en todos los trámites, uno por solicitud y para cualquier rango; el Cambio de Puerto deja de ser un trámite: se indica en Embarque y Desembarque, con el nuevo puesto del mismo sector; y el rango Pasajero presenta lo del Marino sin la Libreta, con Embarque y Desembarque solo para Marino, Pasajero y Militar (2026-11-13).
-    - La Visa (DOC-VISA) a todo pasajero de nacionalidad restringida, en todos los trámites y rangos; a los panameños, sin visa ni boleto aéreo en Embarque y Desembarque ni la Visa Especial de Marino en Cambio de nave (condición `solo_extranjeros`); y el Sellado de Shore Pass solo para el Marino (2026-11-14).
-    - «¿Subir y bajar?» (Sí / No, empieza en No) en Embarque y Desembarque. Con «Sí», cada pasajero, de cualquier rango, adjunta la Carta de Responsabilidad (Form. No. 7), además de lo demás del trámite (2026-11-16, migración `a7c2e9f4b618`):
-      - El trámite la pregunta si tiene `tipos_tramite.permite_subir_y_bajar`, y la respuesta se guarda en `solicitudes.subir_y_bajar`.
-      - La Carta va con la condición `subir_y_bajar`, espejada en `checklist.ts`: `construir_casillas(..., subir_y_bajar)`.
-      - En los demás trámites, la respuesta se descarta, como el cambio de puerto.
-      - La muestran el expediente, el PDF de la autorización y la boleta.
+    - La visa de los restringidos (2026-11-18; del 14 al 18, la «Visa» en todos los trámites y rangos, migración `f4c9b2e7a813`): la «Visa» (DOC-VISA) en el trámite de Técnico, a cualquiera de sus rangos, y al Militar en los demás; al Marino y al Pasajero de los demás trámites, la Visa Especial de Marino (DOC-VISA-MARINO, condición `nacionalidad_restringida`; en Embarque y Cambio de nave ya la lleva todo extranjero). Además, desde el 2026-11-14: a los panameños, sin visa ni boleto aéreo en Embarque y Desembarque ni la Visa Especial de Marino en Cambio de nave (condición `solo_extranjeros`); y el Sellado de Shore Pass solo para el Marino.
+    - «Subir y bajar», con la Carta de Responsabilidad (Form. No. 7) de cada tripulante, además de lo demás del trámite. Del 2026-11-16 al 18 fue la pregunta «¿Subir y bajar?» (Sí / No) de Embarque y Desembarque; desde el 2026-11-18 es **solo** la operación «Subir y bajar» del trámite de Técnico (migración `f4c9b2e7a813`):
+      - La Carta va con la condición `subir_y_bajar`. Se pide si `ServicioSolicitud.con_carta_subir_y_bajar` (espejo `conCartaSubirYBajar`, `checklist.ts`, con sus casos en `espejo/subir_y_bajar.json`): la operación de Técnico o el «Sí» donde se pregunte (`tipos_tramite.permite_subir_y_bajar`, hoy ningún trámite).
+      - `solicitudes.subir_y_bajar` guarda solo el «Sí / No» de la pregunta: en las de Técnico queda en falso (la operación ya lo dice). Las de Embarque y Desembarque que respondieron «Sí» lo siguen mostrando en el expediente, el PDF y la boleta.
 - Nacionalidad restringida (`paises.nacionalidad_restringida`):
-  - Desde el 2026-11-14 se le pide la **Visa** (DOC-VISA) en todos los trámites y rangos, y se señala en todos: el chip de la tarjeta, la bandeja y el expediente, y el aviso del formulario, que nombra lo que debe adjuntar.
+  - Se señala en todos los trámites (desde el 2026-11-14): el chip de la tarjeta, la bandeja y el expediente, y el aviso del formulario, que nombra la visa que debe adjuntar (desde el 2026-11-18, la «Visa» en Técnico y al Militar, y la Visa Especial de Marino al Marino y al Pasajero; ver las excepciones del catálogo).
   - El Form. No. 6 se adjunta **solo en Desembarque** ("cuando aplique", como en el Form. 3).
   - `tipos_tramite.aviso_custodia` marca los trámites cuyo proceso dice que, al aprobar, se avisa a la agencia que debe realizar el trámite de solicitud de custodia: Desembarque, Urgencias, Renovación y Shore Pass.
   - En los demás trámites no se menciona la custodia: ni en el formulario, ni en el expediente, ni en el correo, ni en el PDF.
@@ -447,7 +446,7 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
 - `tipos_tramite.rangos_permitidos` limita los rangos del trámite (nulo = cualquiera): F3-TECNICO (sus tres rangos, por el nombre del trámite en el Form. 3), Embarque y Desembarque (Marino, Pasajero y Militar, 2026-11-13) y Shore Pass (solo Marino, 2026-11-14). Lo valida `ServicioTramite.validar_tripulantes` y lo espeja `validacionFormulario.ts`. Con un solo rango, el formulario lo trae elegido y lo dice bajo el campo y en la tarjeta del trámite.
 - **La operación del trámite de Técnico** (pedido del usuario del 2026-11-18, migración `b8f3d6a1c472`): Embarque, Desembarque o Subir y bajar.
   - Un select obligatorio que empieza en «Selecciona…» (`tipos_tramite.pide_operacion`; la respuesta, en `solicitudes.operacion`, con CHECK).
-  - **Solo se registra: no cambia los documentos** (decisión del usuario). Su «Subir y bajar» no es el de Embarque y Desembarque: no pide la Carta Form. 7.
+  - Embarque y Desembarque piden lo mismo; **«Subir y bajar» suma la Carta Form. 7 de cada tripulante** (2026-11-18, segundo pedido del día; el primero fue que no cambiara nada). Es el único «Subir y bajar» del sistema.
   - La muestran el pase de la bandeja (junto al nombre del trámite), el expediente, el PDF de la autorización y la boleta (en casillas, con la X en la elegida).
   - En los demás trámites se descarta, como «¿Subir y bajar?»; las solicitudes de antes quedan sin ella y no la muestran.
   - Los valores: `OperacionTecnico` y `ETIQUETA_OPERACION` (`models/solicitud.py`), espejados en `OPERACIONES` (`tiposSolicitudes.ts`) y `ETIQUETA_OPERACION` (`presentacion.ts`).
@@ -477,7 +476,7 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
   - **El PDF** (`informes/boleta_recargo_pdf.py`) no lleva nombres de funcionarios: se entrega a la agencia. La anulada sale con el sello ANULADA. Bitácora: BOLETA_GENERADA, BOLETA_ANULADA y BOLETA_DESCARGADA.
   - **Tipo de operación en casillas, como en papel** (2026-11-16):
     - Lleva los trámites activos, en su orden, con la X en el de la solicitud. Si el trámite ya está inactivo, como Cambio de Puerto, se suma al final, marcado (`casillas_operacion`).
-    - Si el trámite pregunta «¿Subir y bajar?», debajo va la respuesta.
+    - Si el trámite pregunta «¿Subir y bajar?» (o es una de antes que dijo «Sí»), debajo va la respuesta; la operación de Técnico y los días del sellado van en sus propias filas (`elecciones`).
 - La observación de aprobación es interna: no va en el PDF ni en el correo de aprobación. El PDF no tiene sección de observaciones.
 - El PDF de la agencia dice "Aprobada por: Servicio Nacional de Migración" (hasta el 2026-11-11, "UCVMM"), sin el nombre del funcionario: tampoco ve esos nombres en el expediente (decisión del usuario del 2026-10-15). El personal del SNM descarga una copia interna con el nombre de quien aprobó (reunión del 2026-10-30, en docs/HISTORIAL.md).
 - `agencia_nombre`, `puesto_nombre` y `puesto_finalizacion_nombre` son una foto (al enviar o al finalizar): renombrar la agencia o el puesto no cambia expedientes viejos.

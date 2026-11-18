@@ -67,6 +67,10 @@ VISA = ("DOC-VISA-MARINO", "marino", "siempre", MARINO)
 # y la Visa de las nacionalidades restringidas, en todos los trámites y para cualquier rango.
 VISA_EXTRANJEROS = ("DOC-VISA-MARINO", "marino", "solo_extranjeros", MARINO)
 VISA_RESTRINGIDOS = ("DOC-VISA", "marino", "nacionalidad_restringida", None)
+# 2026-11-18: fuera del trámite de Técnico, la «Visa» de los restringidos es solo del Militar;
+# al Marino y al Pasajero restringidos se les exige la Visa Especial de Marino.
+VISA_MILITAR_RESTRINGIDO = ("DOC-VISA", "marino", "nacionalidad_restringida", ("militar",))
+VISA_MARINO_RESTRINGIDO = ("DOC-VISA-MARINO", "marino", "nacionalidad_restringida", MARINO)
 LIBRETA = ("DOC-LIBRETA-MARINO", "marino", "siempre", None)           # solo el Marino: requiere_libreta
 LISTA = ("DOC-LISTA-TRIPULANTES", "solicitud", "siempre", None)       # "debe subirse al trámite"
 CARTA = ("DOC-FORM7-RESPONSABILIDAD", "marino", "siempre", MARINO)    # "para cada tripulante"
@@ -74,7 +78,8 @@ REPORTE = ("DOC-REPORTE-MEDICO", "marino", "siempre", MARINO)         # "para ca
 CITA = ("DOC-CITA-CONSULADO", "marino", "siempre", MARINO)
 BOLETO = ("DOC-BOLETO-AEREO", "marino", "siempre", NO_MARINOS)        # reunión del 2026-10-30
 FORM3 = ("DOC-FORMULARIO-3", "solicitud", "siempre", None)           # en todos (2026-11-13)
-# 2026-11-16: en Embarque y Desembarque, con «Subir y bajar: Sí», la Carta Form. 7 de cada pasajero.
+# Con «Subir y bajar», la Carta Form. 7 de cada tripulante: en Embarque y Desembarque del
+# 2026-11-16 al 18; desde entonces, solo en el trámite de Técnico (su operación «Subir y bajar»).
 CARTA_SUBIR_BAJAR = ("DOC-FORM7-RESPONSABILIDAD", "marino", "subir_y_bajar", None)
 # En Embarque el boleto es solo del militar (2026-11-11). Los técnicos van por su trámite
 # desde el 2026-11-13; sus filas de Embarque y Desembarque se borraron el 2026-11-14.
@@ -88,40 +93,44 @@ OPCIONAL: dict[tuple[str, str], tuple[str, ...]] = {}
 # aviso_custodia: si el proceso pide avisar al aprobar que se tramite la custodia
 DOCUMENTO = {
     "F3-EMBARQUE": {
-        "campos": [], "vigencia": True, "aviso_custodia": False, "cambio_puerto": True, "subir_y_bajar": True,
+        "campos": [], "vigencia": True, "aviso_custodia": False, "cambio_puerto": True,
         "rangos": {"marino", "pasajero", "militar"},   # 2026-11-13: los técnicos van por su trámite
-        "documentos": {FORM3, VISA_EXTRANJEROS, GENERALES, LIBRETA, BOLETO_MILITAR, VISA_RESTRINGIDOS,
-                       CARTA_SUBIR_BAJAR},
+        # La Visa Especial de Marino de todo extranjero cubre al Marino y al Pasajero restringidos.
+        "documentos": {FORM3, VISA_EXTRANJEROS, GENERALES, LIBRETA, BOLETO_MILITAR, VISA_MILITAR_RESTRINGIDO},
     },
     "F3-DESEMBARQUE": {
-        "campos": [], "vigencia": True, "aviso_custodia": True, "cambio_puerto": True, "subir_y_bajar": True,
+        "campos": [], "vigencia": True, "aviso_custodia": True, "cambio_puerto": True,
         "rangos": {"marino", "pasajero", "militar"},
         # El boleto aéreo lo pide el Form. 3 a todos (también al Marino), menos a los panameños (2026-11-14).
         "documentos": {FORM3, ("DOC-BOLETO-AEREO", "marino", "solo_extranjeros", None), GENERALES, LIBRETA, LISTA,
-                       CUSTODIA, VISA_RESTRINGIDOS, CARTA_SUBIR_BAJAR},
+                       CUSTODIA, VISA_MILITAR_RESTRINGIDO, VISA_MARINO_RESTRINGIDO},
     },
     "F3-URGENCIA-MEDICA": {
         "campos": ["puerto_desembarque", "clinica_hospital"], "vigencia": True, "aviso_custodia": True,
-        "documentos": {FORM3, CARTA, REPORTE, GENERALES, LIBRETA, BOLETO, VISA_RESTRINGIDOS},
+        "documentos": {FORM3, CARTA, REPORTE, GENERALES, LIBRETA, BOLETO, VISA_MILITAR_RESTRINGIDO,
+                       VISA_MARINO_RESTRINGIDO},
     },
     "F3-RENOV-PASAPORTE": {
         "campos": ["puerto_desembarque"], "vigencia": True, "aviso_custodia": True,
-        "documentos": {FORM3, GENERALES, CARTA, LISTA, LIBRETA, CITA, BOLETO, VISA_RESTRINGIDOS},
+        "documentos": {FORM3, GENERALES, CARTA, LISTA, LIBRETA, CITA, BOLETO, VISA_MILITAR_RESTRINGIDO,
+                       VISA_MARINO_RESTRINGIDO},
     },
     "F3-SHORE-PASS": {
         "campos": ["motivo"], "vigencia": True, "aviso_custodia": True, "dias_sellado": True,
         "rangos": {"marino"},   # 2026-11-14: solo el rango Marino
-        "documentos": {FORM3, GENERALES, LISTA, LIBRETA, BOLETO, VISA_RESTRINGIDOS},
+        # Solo el Marino: sin la «Visa» del Militar (2026-11-18).
+        "documentos": {FORM3, GENERALES, LISTA, LIBRETA, BOLETO, VISA_MARINO_RESTRINGIDO},
     },
     "F3-TECNICO": {
         "campos": [], "vigencia": True, "aviso_custodia": False, "operacion": True,
         "rangos": {"tecnico", "superintendente", "supernumerario"},
         # El Form. 3 pide la Carta Form. 7; desde el 2026-10-30, estos rangos presentan Generales y boleto.
-        "documentos": {FORM3, GENERALES, BOLETO, VISA_RESTRINGIDOS},
+        # La «Visa» de los restringidos, a cualquiera de sus rangos, y la Carta con «Subir y bajar».
+        "documentos": {FORM3, GENERALES, BOLETO, VISA_RESTRINGIDOS, CARTA_SUBIR_BAJAR},
     },
     "F3-CAMBIO-NAVE": {
         "campos": [], "vigencia": True, "aviso_custodia": False,
-        "documentos": {FORM3, VISA_EXTRANJEROS, GENERALES, BOLETO, VISA_RESTRINGIDOS},
+        "documentos": {FORM3, VISA_EXTRANJEROS, GENERALES, BOLETO, VISA_MILITAR_RESTRINGIDO},
     },
     # F3-CAMBIO-PUERTO: desde el 2026-11-13 no es un trámite (test_cambio_de_puerto_ya_no_es_un_tramite).
 }
@@ -181,8 +190,9 @@ def _rango(codigo_tramite: str) -> str:
 
 def _datos(codigo_tramite: str, puesto_id: int, tripulantes: list[dict], **extra) -> tuple[dict, list]:
     campos = {c: VALORES[c] for c in DOCUMENTO[codigo_tramite]["campos"]}
+    subir_y_bajar = extra.get("subir_y_bajar", False) or extra.get("operacion") == "subir_y_bajar"
     asignaciones, archivos = _asignaciones(codigo_tramite, tripulantes, sin=extra.pop("sin", frozenset()),
-                                           subir_y_bajar=extra.get("subir_y_bajar", False))
+                                           subir_y_bajar=subir_y_bajar)
     datos = cabecera(codigo_tramite, puesto_id, tripulantes=tripulantes, asignaciones=asignaciones, **campos)
     datos.update(extra)
     return datos, archivos
@@ -629,31 +639,44 @@ def _del_pasajero(salida: dict, indice: int = 0) -> set[str]:
     return {c["documento_codigo"] for c in salida["checklist"] if c["tripulante_id"] == tid}
 
 
-@pytest.mark.parametrize("codigo", sorted(DOCUMENTO))
-async def test_visa_a_los_restringidos_en_todos_los_tramites(cliente, agencia, codigo):
-    """A un pasajero de nacionalidad restringida se le exige la Visa en cualquier
-    trámite; a uno que no lo es, no."""
+# 2026-11-18: la visa que se le exige al tripulante de nacionalidad restringida, según el trámite
+# y el rango (None: ninguna; se le sigue señalando).
+VISA, VEM_ = "DOC-VISA", "DOC-VISA-MARINO"
+VISA_ESPERADA = {
+    ("F3-TECNICO", "tecnico"): VISA, ("F3-TECNICO", "superintendente"): VISA,
+    ("F3-EMBARQUE", "marino"): VEM_, ("F3-EMBARQUE", "pasajero"): VEM_, ("F3-EMBARQUE", "militar"): VISA,
+    ("F3-DESEMBARQUE", "marino"): VEM_, ("F3-DESEMBARQUE", "pasajero"): VEM_, ("F3-DESEMBARQUE", "militar"): VISA,
+    ("F3-URGENCIA-MEDICA", "marino"): VEM_, ("F3-URGENCIA-MEDICA", "militar"): VISA,
+    ("F3-URGENCIA-MEDICA", "tecnico"): None,   # un técnico fuera de su trámite: sin visa
+    ("F3-RENOV-PASAPORTE", "pasajero"): VEM_, ("F3-RENOV-PASAPORTE", "militar"): VISA,
+    ("F3-SHORE-PASS", "marino"): VEM_,
+    ("F3-CAMBIO-NAVE", "marino"): VEM_, ("F3-CAMBIO-NAVE", "militar"): VISA,
+}
+NOMBRE_VISA = {VISA: "Visa de Raúl", VEM_: "Visa Especial de Marino de Raúl"}
+
+
+@pytest.mark.parametrize(("codigo", "rango"), sorted(VISA_ESPERADA))
+async def test_la_visa_de_los_restringidos(cliente, agencia, codigo, rango):
+    """Pedido del usuario del 2026-11-18: la «Visa» de los restringidos solo en el trámite de
+    Técnico y al Militar de los demás; al Marino y al Pasajero restringidos, la Visa Especial
+    de Marino. Del 2026-11-14 al 18, la «Visa» en todos los trámites y a cualquier rango."""
     naviera, puesto_id = agencia
-    tripulantes = [tripulante("Raúl", "CUB", rango=_rango(codigo)), tripulante("Ana", "PHL", rango=_rango(codigo))]
-    datos, archivos = _datos(codigo, puesto_id, tripulantes, sin={"DOC-VISA"})
-    r = await enviar(cliente, naviera, datos, archivos)
-    assert r.status_code == 400 and "Visa de Raúl" in r.json()["detail"], (codigo, r.text)
-    assert "Visa de Ana" not in r.json()["detail"], codigo
+    visa = VISA_ESPERADA[(codigo, rango)]
+    tripulantes = [tripulante("Raúl", "CUB", rango=rango), tripulante("Ana", "DEU", rango=rango)]
+    if visa:
+        datos, archivos = _datos(codigo, puesto_id, tripulantes, sin={visa})
+        r = await enviar(cliente, naviera, datos, archivos)
+        assert r.status_code == 400 and NOMBRE_VISA[visa] in r.json()["detail"], (codigo, rango, r.text)
 
     datos, archivos = _datos(codigo, puesto_id, tripulantes)
     r = await enviar(cliente, naviera, datos, archivos)
-    assert r.status_code == 201, (codigo, r.text)
-    assert "DOC-VISA" in _del_pasajero(r.json(), 0) and "DOC-VISA" not in _del_pasajero(r.json(), 1), codigo
-
-
-@pytest.mark.parametrize("rango", ["marino", "pasajero", "militar", "tecnico"])
-async def test_visa_a_los_restringidos_de_cualquier_rango(cliente, agencia, rango):
-    """En Urgencia médica, que admite cualquier rango, la Visa se le pide a todos los restringidos."""
-    naviera, puesto_id = agencia
-    datos, archivos = _datos("F3-URGENCIA-MEDICA", puesto_id, [tripulante("Raúl", "CUB", rango=rango)])
-    r = await enviar(cliente, naviera, datos, archivos)
-    assert r.status_code == 201, (rango, r.text)
-    assert "DOC-VISA" in _del_pasajero(r.json()), rango
+    assert r.status_code == 201, (codigo, rango, r.text)
+    del_restringido, del_otro = _del_pasajero(r.json(), 0), _del_pasajero(r.json(), 1)
+    otras = {VISA, VEM_} - {visa}
+    assert (visa is None or visa in del_restringido) and not (otras - (del_otro & otras)) & del_restringido, (
+        codigo, rango, del_restringido)
+    assert VISA not in del_otro, "a quien no es restringido no se le pide la «Visa»"
+    assert r.json()["tiene_nacionalidad_restringida"] is True, "se le sigue señalando"
 
 
 GEN, LIB, VEM, BOL = "DOC-GENERALES-PASAPORTE", "DOC-LIBRETA-MARINO", "DOC-VISA-MARINO", "DOC-BOLETO-AEREO"
@@ -694,108 +717,116 @@ async def test_shore_pass_solo_marino(cliente, agencia):
     assert r.status_code == 201, r.text
 
 
-# ── 2026-11-16: «¿Subir y bajar?» en Embarque y Desembarque ─────────────────
+# ── «Subir y bajar»: del 2026-11-16 al 18, en Embarque y Desembarque; desde entonces, solo
+#    en el trámite de Técnico, como una de sus operaciones ────────────────────────────────
 
 CARTA_FORM7 = "DOC-FORM7-RESPONSABILIDAD"
 
 
-@pytest.mark.parametrize("codigo", ["F3-EMBARQUE", "F3-DESEMBARQUE"])
-async def test_subir_y_bajar_pide_la_carta_por_pasajero(cliente, agencia, codigo):
-    """Con «Subir y bajar: Sí», cada pasajero (marino, pasajero o militar) adjunta la
-    Carta de Responsabilidad (Form. No. 7); lo demás del trámite se sigue pidiendo."""
+async def test_subir_y_bajar_del_tecnico_pide_la_carta_por_tripulante(cliente, agencia):
+    """Con la operación «Subir y bajar», cada tripulante adjunta la Carta de Responsabilidad
+    (Form. No. 7), además de lo demás del trámite (pedido del usuario del 2026-11-18). Con
+    Embarque o Desembarque, no."""
     naviera, puesto_id = agencia
-    tripulantes = [tripulante("Ana", "PHL"), tripulante("Beto", "PHL", rango="pasajero"),
-                   tripulante("Ciro", "PHL", rango="militar")]
-    datos, archivos = _datos(codigo, puesto_id, tripulantes, subir_y_bajar=True, sin={CARTA_FORM7})
+    tripulantes = [tripulante("Hans", "DEU", rango="tecnico"), tripulante("Ivo", "DEU", rango="superintendente")]
+    datos, archivos = _datos("F3-TECNICO", puesto_id, tripulantes, operacion="subir_y_bajar", sin={CARTA_FORM7})
     r = await enviar(cliente, naviera, datos, archivos)
-    assert r.status_code == 400, (codigo, r.text)
-    for nombre in ("Ana", "Beto", "Ciro"):
-        assert f"Carta de Responsabilidad (Form. No. 7) de {nombre}" in r.json()["detail"], (codigo, nombre)
+    assert r.status_code == 400, r.text
+    for nombre in ("Hans", "Ivo"):
+        assert f"Carta de Responsabilidad (Form. No. 7) de {nombre}" in r.json()["detail"], nombre
 
-    datos, archivos = _datos(codigo, puesto_id, tripulantes, subir_y_bajar=True)
+    datos, archivos = _datos("F3-TECNICO", puesto_id, tripulantes, operacion="subir_y_bajar")
     r = await enviar(cliente, naviera, datos, archivos)
-    assert r.status_code == 201, (codigo, r.text)
+    assert r.status_code == 201, r.text
     s = r.json()
-    assert s["subir_y_bajar"] is True and s["permite_subir_y_bajar"] is True
-    assert all(CARTA_FORM7 in _del_pasajero(s, i) for i in range(3)), codigo
-    assert all(c["cubierta"] and c["obligatoria"] for c in s["checklist"]), codigo
+    assert all(CARTA_FORM7 in _del_pasajero(s, i) for i in range(2))
+    assert all(c["cubierta"] and c["obligatoria"] for c in s["checklist"])
+    # Es la operación, no la pregunta de antes: el expediente no dice «Subir y bajar: Sí».
+    assert s["operacion"] == "subir_y_bajar" and s["subir_y_bajar"] is False
+
+    for operacion in ("embarque", "desembarque"):
+        datos, archivos = _datos("F3-TECNICO", puesto_id, [tripulante("Hans", "DEU", rango="tecnico")],
+                                 operacion=operacion)
+        r = await enviar(cliente, naviera, datos, archivos)
+        assert r.status_code == 201, (operacion, r.text)
+        assert CARTA_FORM7 not in _del_pasajero(r.json()), operacion
 
 
-@pytest.mark.parametrize("codigo", ["F3-EMBARQUE", "F3-DESEMBARQUE"])
-async def test_sin_subir_y_bajar_no_pide_la_carta(cliente, agencia, codigo):
-    """Sin la respuesta (o con «No»), la Carta no se pide."""
+@pytest.mark.parametrize("codigo", ["F3-EMBARQUE", "F3-DESEMBARQUE", "F3-CAMBIO-NAVE"])
+async def test_los_demas_tramites_no_preguntan_subir_y_bajar(cliente, agencia, codigo):
+    """Ningún otro trámite lo pregunta: una respuesta que llegue (un navegador con la versión
+    anterior) se descarta, y la Carta no se pide."""
     naviera, puesto_id = agencia
-    datos, archivos = _datos(codigo, puesto_id, [tripulante("Ana", "PHL")])
-    assert "subir_y_bajar" not in datos
+    datos, archivos = _datos(codigo, puesto_id, [tripulante("Ana", "PHL")], subir_y_bajar=True)
     r = await enviar(cliente, naviera, datos, archivos)
     assert r.status_code == 201, (codigo, r.text)
-    assert r.json()["subir_y_bajar"] is False and r.json()["permite_subir_y_bajar"] is True
+    assert r.json()["subir_y_bajar"] is False and r.json()["permite_subir_y_bajar"] is False
     assert CARTA_FORM7 not in _del_pasajero(r.json()), codigo
 
 
-async def test_subir_y_bajar_se_ignora_en_otros_tramites(cliente, agencia):
-    """Un trámite que no hace la pregunta descarta la respuesta (resto de otro trámite
-    elegido antes en el formulario), como el cambio de puerto."""
+async def test_corregir_a_otra_operacion_quita_la_carta(cliente, agencia):
+    """Una devuelta que se corrige con Embarque ya no pide la Carta: la foto del checklist
+    se vuelve a tomar con la operación nueva."""
     naviera, puesto_id = agencia
-    datos, archivos = _datos("F3-CAMBIO-NAVE", puesto_id, [tripulante("Ana", "PHL")], subir_y_bajar=True)
-    r = await enviar(cliente, naviera, datos, archivos)
-    assert r.status_code == 201, r.text
-    assert r.json()["subir_y_bajar"] is False and r.json()["permite_subir_y_bajar"] is False
-
-
-async def test_corregir_a_no_quita_la_carta(cliente, agencia):
-    """Una devuelta que se corrige con «No» ya no pide la Carta: la foto del checklist
-    se vuelve a tomar con la respuesta nueva."""
-    naviera, puesto_id = agencia
-    codigo = "F3-EMBARQUE"
-    datos, archivos = _datos(codigo, puesto_id, [tripulante("Ana", "PHL")], subir_y_bajar=True)
+    datos, archivos = _datos("F3-TECNICO", puesto_id, [tripulante("Hans", "DEU", rango="tecnico")],
+                             operacion="subir_y_bajar")
     r = await enviar(cliente, naviera, datos, archivos)
     assert r.status_code == 201, r.text
     s = r.json()
     assert CARTA_FORM7 in {c["documento_codigo"] for c in s["checklist"]}
     revisor = await crear_actor("UCVMM", prefijo="revisor")
-    r = await cliente.post(f"/solicitudes/{s['id']}/devolver", json={"motivo": "Revisar la documentación"},
+    r = await cliente.post(f"/solicitudes/{s['id']}/devolver", json={"motivo": "Revisar la operación"},
                            headers=revisor.headers)
     assert r.status_code == 200, r.text
 
     t = s["tripulantes"][0]
-    ficha = tripulante("Ana", "PHL", pasaporte=t["pasaporte"], libreta_marino=t["libreta_marino"])
+    ficha = tripulante("Hans", "DEU", rango="tecnico", pasaporte=t["pasaporte"])
     ficha["id"] = t["id"]
-    correccion, _ = _datos(codigo, puesto_id, [ficha])
+    correccion, _ = _datos("F3-TECNICO", puesto_id, [ficha], operacion="embarque")
     correccion.pop("codigo_tramite")
     correccion["asignaciones"] = []
     correccion["documentos_conservados"] = [d["id"] for d in s["documentos"] if d["documento_codigo"] != CARTA_FORM7]
     r = await enviar(cliente, naviera, correccion, [], metodo="PUT", ruta=f"/solicitudes/{s['id']}")
     assert r.status_code == 200, r.text
     corregida = r.json()
-    assert corregida["subir_y_bajar"] is False
+    assert corregida["operacion"] == "embarque"
     assert CARTA_FORM7 not in {c["documento_codigo"] for c in corregida["checklist"]}
     assert all(c["cubierta"] for c in corregida["checklist"])
 
 
-async def test_el_pdf_dice_subir_y_bajar(cliente, agencia):
-    """El PDF de la autorización dice la respuesta en los trámites que hacen la
-    pregunta; en los demás no la menciona (None)."""
+async def test_el_pdf_dice_subir_y_bajar_solo_en_las_de_antes(cliente, agencia):
+    """Ningún trámite pregunta ya «¿Subir y bajar?»: el PDF lo dice solo en las de Embarque y
+    Desembarque que respondieron «Sí» del 2026-11-16 al 18."""
+    from sqlalchemy import update
+
+    from app.domain.models.solicitud import Solicitud
     from app.domain.repositories.user_repository import RepositorioUsuario
     from app.domain.services.solicitud_service import ServicioSolicitud
     from app.infrastructure.database import SesionLocal
 
     naviera, puesto_id = agencia
     revisor = await crear_actor("UCVMM", prefijo="revisor")
-    esperado = {("F3-EMBARQUE", True): True, ("F3-DESEMBARQUE", False): False, ("F3-CAMBIO-NAVE", True): None}
-    for (codigo, subir_y_bajar), en_el_pdf in esperado.items():
-        datos, archivos = _datos(codigo, puesto_id, [tripulante("Ana", "PHL")], subir_y_bajar=subir_y_bajar)
-        r = await enviar(cliente, naviera, datos, archivos)
-        assert r.status_code == 201, (codigo, r.text)
-        sid = r.json()["id"]
-        await verificar_impedimentos(cliente, revisor, sid)
-        r = await cliente.post(f"/solicitudes/{sid}/aprobar", json={}, headers=revisor.headers)
-        assert r.status_code == 200, (codigo, r.text)
+    datos, archivos = _datos("F3-EMBARQUE", puesto_id, [tripulante("Ana", "PHL")])
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 201, r.text
+    sid = r.json()["id"]
+    await verificar_impedimentos(cliente, revisor, sid)
+    r = await cliente.post(f"/solicitudes/{sid}/aprobar", json={}, headers=revisor.headers)
+    assert r.status_code == 200, r.text
+
+    async def armar():
         async with SesionLocal() as sesion:
             svc = ServicioSolicitud(sesion)
             ctx = await svc.contexto(await RepositorioUsuario(sesion).buscar_por_id(naviera.id))
-            armado = await svc.preparar_pdf(ctx, await svc.obtener(ctx, sid))
-        assert armado.subir_y_bajar is en_el_pdf, codigo
+            return await svc.preparar_pdf(ctx, await svc.obtener(ctx, sid))
+
+    assert (await armar()).subir_y_bajar is None
+    async with SesionLocal() as sesion:   # como una de antes que respondió «Sí»
+        await sesion.execute(update(Solicitud).where(Solicitud.id == sid).values(subir_y_bajar=True))
+        await sesion.commit()
+    assert (await armar()).subir_y_bajar is True
+    detalle = (await cliente.get(f"/solicitudes/{sid}", headers=naviera.headers)).json()
+    assert detalle["subir_y_bajar"] is True and detalle["permite_subir_y_bajar"] is False
 
 
 # ── 2026-11-18: la operación del trámite de Técnico ─────────────────────────
@@ -809,7 +840,8 @@ def _tecnico(nombre: str = "Hans", **extra) -> dict:
 
 async def test_el_tramite_de_tecnico_pide_la_operacion(cliente, agencia):
     """Embarque, Desembarque o Subir y bajar (pedido del usuario del 2026-11-18): es
-    obligatoria y no cambia los documentos (decisión del usuario)."""
+    obligatoria. Embarque y Desembarque piden lo mismo; Subir y bajar suma la Carta Form. 7
+    de cada tripulante (test_subir_y_bajar_del_tecnico_pide_la_carta_por_tripulante)."""
     naviera, puesto_id = agencia
     datos, archivos = _datos("F3-TECNICO", puesto_id, [_tecnico()], operacion=None)
     r = await enviar(cliente, naviera, datos, archivos)
@@ -818,12 +850,16 @@ async def test_el_tramite_de_tecnico_pide_la_operacion(cliente, agencia):
     checklists = set()
     for operacion in OPERACIONES:
         datos, archivos = _datos("F3-TECNICO", puesto_id, [_tecnico()], operacion=operacion)
+        if operacion == "subir_y_bajar":
+            r = await enviar(cliente, naviera, datos, archivos)
+            assert r.status_code == 201 and r.json()["operacion"] == operacion, r.text
+            continue
         r = await enviar(cliente, naviera, datos, archivos)
         assert r.status_code == 201, (operacion, r.text)
         s = r.json()
         assert s["operacion"] == operacion and s["pide_operacion"] is True, operacion
         checklists.add(frozenset((c["documento_codigo"], c["tripulante_id"] is None) for c in s["checklist"]))
-    assert len(checklists) == 1, "las tres piden los mismos documentos"
+    assert len(checklists) == 1, "Embarque y Desembarque piden los mismos documentos"
 
 
 async def test_una_operacion_que_no_existe(cliente, agencia):
@@ -873,10 +909,10 @@ async def test_la_operacion_en_la_bandeja_la_correccion_y_el_pdf(cliente, agenci
     ruta = f"/solicitudes/{s['id']}"
     r = await enviar(cliente, naviera, correccion, [], metodo="PUT", ruta=ruta)
     assert r.status_code == 400 and "Operación" in r.json()["detail"], r.text
-    correccion["operacion"] = "subir_y_bajar"
+    correccion["operacion"] = "desembarque"
     r = await enviar(cliente, naviera, correccion, [], metodo="PUT", ruta=ruta)
     assert r.status_code == 200, r.text
-    assert r.json()["operacion"] == "subir_y_bajar"
+    assert r.json()["operacion"] == "desembarque"
 
     await verificar_impedimentos(cliente, revisor, s["id"])
     r = await cliente.post(f"/solicitudes/{s['id']}/aprobar", json={}, headers=revisor.headers)
@@ -885,7 +921,7 @@ async def test_la_operacion_en_la_bandeja_la_correccion_y_el_pdf(cliente, agenci
         svc = ServicioSolicitud(sesion)
         ctx = await svc.contexto(await RepositorioUsuario(sesion).buscar_por_id(naviera.id))
         armado = await svc.preparar_pdf(ctx, await svc.obtener(ctx, s["id"]))
-    assert armado.operacion == "Subir y bajar" and armado.subir_y_bajar is None
+    assert armado.operacion == "Desembarque" and armado.subir_y_bajar is None
 
 
 # ── 2026-11-18: los días del sellado de Shore Pass ──────────────────────────

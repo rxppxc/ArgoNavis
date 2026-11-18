@@ -36,8 +36,9 @@ class CondicionDocumento(str, enum.Enum):
     # A los panameños no se les pide (2026-11-14): la visa y el boleto aéreo de
     # Embarque y Desembarque, y la Visa Especial de Marino de Cambio de nave.
     SOLO_EXTRANJEROS         = "solo_extranjeros"
-    # Solo si la solicitud indica «Subir y bajar» (2026-11-16): la Carta de
-    # Responsabilidad (Form. No. 7) de cada pasajero, en Embarque y Desembarque.
+    # Solo con «Subir y bajar»: la Carta de Responsabilidad (Form. No. 7) de cada
+    # tripulante. En Embarque y Desembarque del 2026-11-16 al 18; desde entonces, con la
+    # operación «Subir y bajar» del trámite de Técnico (ServicioSolicitud.con_carta_subir_y_bajar).
     SUBIR_Y_BAJAR            = "subir_y_bajar"
 
 
@@ -58,8 +59,8 @@ class TipoTramite(Base):
     requiere_clinica:            Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # Si el formulario ofrece el cambio de puerto (2026-11-13): solo Embarque y Desembarque.
     permite_cambio_puerto:       Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
-    # Si el formulario pregunta «¿Subir y bajar?» (2026-11-16): solo Embarque y Desembarque.
-    # Con «Sí», cada pasajero adjunta la Carta de Responsabilidad (condición SUBIR_Y_BAJAR).
+    # Si el formulario pregunta «¿Subir y bajar?» (Sí / No). Embarque y Desembarque, del
+    # 2026-11-16 al 18; desde entonces, ninguno: es una operación del trámite de Técnico.
     permite_subir_y_bajar:       Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # Si el formulario pide la operación: Embarque, Desembarque o Subir y bajar
     # (2026-11-18, solo el trámite de Técnico). Obligatoria; no cambia los documentos.

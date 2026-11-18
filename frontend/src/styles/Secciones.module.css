@@ -20,7 +20,7 @@
   background: var(--franja); color: var(--seccion-fondo);
   font: 700 .8rem/1 var(--letra-mono); letter-spacing: 0;
 }
-/* Un contador dentro de la barra («Pasajeros 3»). */
+/* Un contador dentro de la barra («Tripulantes 3»). */
 .contador {
   font: 600 .74rem/1.2 var(--letra-mono); letter-spacing: 0;
   padding: 2px 8px; border-radius: var(--r-xs);

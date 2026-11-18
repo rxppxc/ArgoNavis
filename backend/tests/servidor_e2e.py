@@ -49,6 +49,8 @@ CUENTAS = [  # usuario, nombre, apellido, rol, ¿de la agencia?, ¿del puesto?, 
     ("e2e.ucvmm", "Ricardo", "Revisor", "UCVMM", False, False, "Sector Pacífico"),
     ("e2e.atlantico", "Marta", "Atlántico", "UCVMM", False, False, "Sector Atlántico"),
     ("e2e.supervisor", "Sofía", "Supervisora", "Supervisor general", False, False, None),
+    # Las estadísticas, desde el 2026-11-18 (UCVMM ya no las ve).
+    ("e2e.supsector", "Sergio", "Sectorial", "Supervisor de sector", False, False, "Sector Pacífico"),
     ("e2e.puesto", "Ana", "Puesto", "Puesto de Control", False, True, None),
     ("e2e.admin", "José", "Administrador", "Administrador", False, False, None),
 ]

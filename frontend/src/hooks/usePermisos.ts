@@ -24,9 +24,10 @@ export const PERMISOS_PERSONAL_SNM = [
  *  que no la tiene desde el 2026-11-16. Espejo de ContextoAcceso.ve_historico. */
 export const PERMISOS_HISTORICO = ["T-PROCESAR-PACIFICO", "T-SUPERVISAR-SECTOR", "T-FINALIZAR-PUERTO"];
 
-/** Las estadísticas de su alcance: UCVMM y el supervisor de sector (el supervisor general
- *  no, desde el 2026-11-16). Espejo de _PUEDE_VER_ESTADISTICAS (api/v1/solicitudes.py). */
-export const PERMISOS_ESTADISTICAS = ["T-PROCESAR-PACIFICO", "T-SUPERVISAR-SECTOR"];
+/** Las estadísticas de su alcance: el supervisor de sector (y el Administrador). UCVMM no,
+ *  desde el 2026-11-18; el supervisor general tampoco, desde el 2026-11-16. Espejo de
+ *  _PUEDE_VER_ESTADISTICAS (api/v1/solicitudes.py). */
+export const PERMISOS_ESTADISTICAS = ["T-SUPERVISAR-SECTOR"];
 
 /** Permisos del usuario actual. Se cargan una sola vez por sesión en
  *  <ProveedorPermisos>. La fuente de verdad de los dos roles fijos es

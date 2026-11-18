@@ -1,0 +1,23 @@
+[
+  {"caso": "Técnico con la operación «Subir y bajar»: pide la Carta",
+   "tramite": {"permite_subir_y_bajar": false, "pide_operacion": true}, "subir_y_bajar": false,
+   "operacion": "subir_y_bajar", "esperado": true},
+  {"caso": "Técnico con Embarque: sin la Carta",
+   "tramite": {"permite_subir_y_bajar": false, "pide_operacion": true}, "subir_y_bajar": false,
+   "operacion": "embarque", "esperado": false},
+  {"caso": "Técnico con Desembarque: sin la Carta",
+   "tramite": {"permite_subir_y_bajar": false, "pide_operacion": true}, "subir_y_bajar": false,
+   "operacion": "desembarque", "esperado": false},
+  {"caso": "Técnico sin operación elegida: sin la Carta",
+   "tramite": {"permite_subir_y_bajar": false, "pide_operacion": true}, "subir_y_bajar": false,
+   "operacion": null, "esperado": false},
+  {"caso": "un trámite que no pide la operación descarta «Subir y bajar»",
+   "tramite": {"permite_subir_y_bajar": false, "pide_operacion": false}, "subir_y_bajar": false,
+   "operacion": "subir_y_bajar", "esperado": false},
+  {"caso": "«¿Subir y bajar? Sí» donde se pregunta (Embarque y Desembarque hasta el 2026-11-18)",
+   "tramite": {"permite_subir_y_bajar": true, "pide_operacion": false}, "subir_y_bajar": true,
+   "operacion": null, "esperado": true},
+  {"caso": "«Sí» donde no se pregunta se descarta",
+   "tramite": {"permite_subir_y_bajar": false, "pide_operacion": false}, "subir_y_bajar": true,
+   "operacion": null, "esperado": false}
+]

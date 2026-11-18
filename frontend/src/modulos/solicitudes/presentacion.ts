@@ -66,7 +66,7 @@ export const ETIQUETA_EVENTO: Record<EventoSolicitud["tipo"], string> = {
 export const RANGOS_CON_LIBRETA: RangoMarino[] = ["marino"];
 
 /** El título de la columna del rango en el expediente: «Rango / ocupación» solo si
- *  algún pasajero la tiene (una solicitud de antes del 2026-11-16, cuando la ocupación
+ *  algún tripulante la tiene (una solicitud de antes del 2026-11-16, cuando la ocupación
  *  salió del formulario). Lo mismo hace el PDF (titulo_columna_rango). */
 export function tituloColumnaRango(tripulantes: Pick<TripulanteSolicitud, "ocupacion">[]): "Rango / ocupación" | "Rango" {
   return tripulantes.some((t) => t.ocupacion) ? "Rango / ocupación" : "Rango";

@@ -4,7 +4,7 @@ Una hoja, «Solicitudes», con la identidad del informe de estadísticas (escudo
 del SNM, título, filtros, quién la generó, logo de ARGO NAVIS y la franja
 amarilla) y una fila por solicitud: número, estado (con el color de su
 insignia a la izquierda), trámite, agencia, puesto, sector, buque, IMO,
-operación, pasajeros, fechas de envío, aprobación y finalización, si se
+operación, tripulantes, fechas de envío, aprobación y finalización, si se
 aprobó fuera del horario y su recargo.
 
 La fila de encabezados queda fija al bajar y lleva los filtros de Excel. Las
@@ -52,7 +52,7 @@ _COLUMNAS: tuple[tuple[str, int, str], ...] = (
     ("Buque", 20, "texto"),
     ("IMO", 10, "texto"),
     ("Operación", 11, "fecha"),
-    ("Pasajeros", 9, "numero"),
+    ("Tripulantes", 11, "numero"),
     ("Enviada", 18, "fecha_hora"),
     ("Aprobada", 18, "fecha_hora"),
     ("Finalizada", 18, "fecha_hora"),
@@ -124,7 +124,7 @@ def describir_filtros(f: FiltrosAplicados) -> str:
         if valor:
             partes.append(f"{etiqueta}: {valor}")
     if f.pasajero:
-        partes.append(f"Pasajero: «{f.pasajero}»")
+        partes.append(f"Tripulante: «{f.pasajero}»")
     if f.texto:
         partes.append(f"Texto: «{f.texto}»")
     if f.fuera_de_horario:

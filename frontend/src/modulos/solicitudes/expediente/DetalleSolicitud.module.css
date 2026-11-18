@@ -106,7 +106,7 @@
 .panelAccion { border-top: 6px solid var(--franja); }
 /* Títulos de sección como en un formulario impreso: desde el rediseño del 2026-11-17
    (B + C), una barra marino de borde a borde con el número en la franja amarilla; en la
-   columna principal, numerados (1 Datos del trámite, 2 Pasajeros…). */
+   columna principal, numerados (1 Datos del trámite, 2 Tripulantes…). */
 .panelTitulo { composes: barra from "../../../styles/Secciones.module.css"; }
 .principal { counter-reset: seccion; }
 .principal .panelTitulo::before {

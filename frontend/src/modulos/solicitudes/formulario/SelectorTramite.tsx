@@ -39,7 +39,7 @@ function resumenRequisitos(t: TipoTramite): string {
   const fijos = Math.min(n, ...porRango.map((r) => r.fijos));
   const unico = t.rangos_permitidos?.length === 1 ? t.rangos_permitidos[0] : null;
   const partes = [
-    n > 0 && `${fijos < n ? "Hasta " : ""}${n} documento${n === 1 ? "" : "s"} por pasajero`,
+    n > 0 && `${fijos < n ? "Hasta " : ""}${n} documento${n === 1 ? "" : "s"} por tripulante`,
     // Un solo rango (Sellado de Shore Pass: solo Marino, 2026-11-14).
     unico && `solo rango ${ETIQUETA_RANGO[unico]}`,
     ...t.documentos.filter((d) => d.alcance === "solicitud" && d.condicion === "siempre").map((d) => d.nombre),

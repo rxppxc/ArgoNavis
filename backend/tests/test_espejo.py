@@ -72,6 +72,21 @@ def test_checklist(caso):
     assert [[c.codigo_documento, c.indice_tripulante] for c in casillas if not c.obligatoria] == caso.get("opcionales", [])
 
 
+# ── La Carta de «Subir y bajar» (2026-11-18) ───────────────────────────────
+
+SUBIR_Y_BAJAR = _casos("subir_y_bajar.json")
+
+
+@pytest.mark.parametrize("caso", SUBIR_Y_BAJAR, ids=_ids(SUBIR_Y_BAJAR))
+def test_carta_de_subir_y_bajar(caso):
+    from app.domain.schemas.solicitud import DatosCrearSolicitud
+    from app.domain.services.solicitud_service import ServicioSolicitud
+
+    tipo = TipoTramite(codigo="T", nombre="Trámite", **caso["tramite"])
+    datos = DatosCrearSolicitud(codigo_tramite="T", subir_y_bajar=caso["subir_y_bajar"], operacion=caso["operacion"])
+    assert ServicioSolicitud.con_carta_subir_y_bajar(tipo, datos) is caso["esperado"]
+
+
 # ── Ficha del tripulante ─────────────────────────────────────────────────────
 
 TRIPULANTES = _casos("tripulantes.json")
@@ -87,7 +102,7 @@ REGLAS = {
     "pasaporte_vigencia_corta": "meses de vigencia",   # 2026-11-13; el seamanbook vencido ya no bloquea
     "rango_no_permitido": "el rango debe ser",
     "marino_sin_seamanbook": "requiere el número de seamanbook",
-    "pasaporte_repetido": "ya está en el pasajero",
+    "pasaporte_repetido": "ya está en el tripulante",
 }
 
 

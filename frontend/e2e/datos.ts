@@ -14,6 +14,7 @@ export const CUENTAS = {
   ucvmm:      "e2e.ucvmm",        // Sector Pacífico, el del puesto de las pruebas
   atlantico:  "e2e.atlantico",    // UCVMM del Sector Atlántico: no ve las del Pacífico
   supervisor: "e2e.supervisor",   // Supervisor general: solo el trámite de Técnico, sin decidir (2026-11-16)
+  supsector:  "e2e.supsector",    // Supervisor de sector del Pacífico: el que ve las estadísticas (2026-11-18)
   puesto:     "e2e.puesto",
   admin:      "e2e.admin",
 } as const;

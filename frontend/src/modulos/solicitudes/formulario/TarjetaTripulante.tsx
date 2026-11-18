@@ -46,9 +46,13 @@ function enumerar(nombres: string[]): string {
   return citados.length < 2 ? citados.join("") : `${citados.slice(0, -1).join(", ")} y ${citados[citados.length - 1]}`;
 }
 
-/** El aviso de un pasajero de nacionalidad restringida: lo que debe adjuntar (la Visa,
- *  desde el 2026-11-14, y el Form. No. 6 en Desembarque) y, en los trámites que lo
- *  dicen, que al aprobarse se tramita la custodia. */
+/** Las visas, que el aviso de un restringido nombra aunque su condición sea otra. */
+const VISAS = ["DOC-VISA", "DOC-VISA-MARINO"];
+
+/** El aviso de un tripulante de nacionalidad restringida: lo que debe adjuntar (la Visa en
+ *  el trámite de Técnico y al Militar, la Visa Especial de Marino al Marino y al Pasajero,
+ *  desde el 2026-11-18, y el Form. No. 6 en Desembarque) y, en los trámites que lo dicen,
+ *  que al aprobarse se tramita la custodia. */
 function textoRestringida(documentos: string[], avisoCustodia: boolean): string {
   const partes = ["Nacionalidad restringida:"];
   if (documentos.length) partes.push(`debe adjuntar ${enumerar(documentos)}.`);
@@ -69,10 +73,14 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
 }: Props) {
   const conLibreta = portaLibreta(ficha);
   const pais = paises.get(ficha.nacionalidad);
-  // Desde el 2026-11-14 se señala en todos los trámites: se le pide la Visa.
+  // Se señala en todos los trámites (desde el 2026-11-14), con la visa que le corresponda.
   const restringida = pais?.nacionalidad_restringida ?? false;
-  // Lo que se le pide por su nacionalidad (la Visa y, en Desembarque, el Form. No. 6).
-  const porRestringida = casillas.filter((c) => c.condicion === "nacionalidad_restringida").map((c) => c.documento_nombre);
+  // Lo que se le pide por su nacionalidad (la visa y, en Desembarque, el Form. No. 6). Desde el 2026-11-18,
+  // al Marino y al Pasajero, la Visa Especial de Marino, que en Embarque y Cambio de nave ya se le pide a
+  // todo extranjero (otra condición): también se nombra.
+  const porRestringida = casillas
+    .filter((c) => c.condicion === "nacionalidad_restringida" || VISAS.includes(c.documento_codigo))
+    .map((c) => c.documento_nombre);
   // El pasaporte, con al menos 3 meses de vigencia desde la operación (2026-11-13).
   const pasaporte = estadoPasaporte(ficha.pasaporte_expira, fechaReferencia);
   const pasaporteVencido = pasaporte === "vencido";
@@ -101,7 +109,7 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
     <div id={`tripulante-${ficha.clave}`} className={`${styles.marino} ${contraida ? styles.marinoContraido : ""}`}>
       <div className={styles.marinoCabecera}>
         <span className={styles.marinoNum}>{indice + 1}</span>
-        <span className={styles.marinoTitulo}>{nombre || "Nuevo pasajero"}</span>
+        <span className={styles.marinoTitulo}>{nombre || "Nuevo tripulante"}</span>
         {restringida && <span className={styles.chipRestringida}>Nacionalidad restringida</span>}
         {casillas.length > 0 && (
           <span className={completo ? styles.chipDocsOk : styles.chipDocsFalta}>
@@ -109,14 +117,14 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
           </span>
         )}
         <button type="button" className={styles.btnContraer} onClick={() => onAlternar(ficha.clave)}
-          aria-expanded={!contraida} aria-label={contraida ? `Expandir pasajero ${indice + 1}` : `Contraer pasajero ${indice + 1}`}
+          aria-expanded={!contraida} aria-label={contraida ? `Expandir tripulante ${indice + 1}` : `Contraer tripulante ${indice + 1}`}
           title={contraida ? "Expandir" : "Contraer"}>
           <span className={contraida ? styles.chevronCerrado : styles.chevronAbierto}><IconoChevronAbajo /></span>
         </button>
         {puedeQuitar && (
           <button type="button" className={styles.btnQuitar}
-            onClick={() => onQuitar(ficha.clave)} title="Quitar pasajero"
-            aria-label={`Quitar pasajero ${indice + 1}`}>
+            onClick={() => onQuitar(ficha.clave)} title="Quitar tripulante"
+            aria-label={`Quitar tripulante ${indice + 1}`}>
             <IconoBasura tamano={14} />
           </button>
         )}
@@ -237,7 +245,7 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
 
           {casillas.length > 0 && (
             <div className={styles.marinoDocs}>
-              <div className={styles.marinoDocsTitulo}>Documentos de {nombre || `pasajero ${indice + 1}`}</div>
+              <div className={styles.marinoDocsTitulo}>Documentos de {nombre || `tripulante ${indice + 1}`}</div>
               <ChecklistDocumentos
                 casillas={casillas}
                 nuevos={nuevos}

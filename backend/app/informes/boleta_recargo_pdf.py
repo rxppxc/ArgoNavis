@@ -274,7 +274,7 @@ def generar_pdf_boleta(d: DatosPdfBoleta) -> bytes:
         ("PUESTO DE CONTROL", texto_pdf(puesto)),
         ("BUQUE", texto_pdf(buque)),
         ("FECHA DE LA OPERACIÓN", f"{d.fecha_operacion:%d/%m/%Y}"),
-        ("PASAJEROS", str(d.pasajeros)),
+        ("TRIPULANTES", str(d.pasajeros)),
         ("APROBADA EL", _momento(d.aprobada_en)),
         ("HORARIO LABORAL", texto_pdf(TEXTO_HORARIO)),
         ("BOLETA GENERADA EL", _momento(d.generada_en)),

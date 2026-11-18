@@ -76,7 +76,7 @@ export const apiTramites = {
  *  solo para técnicos o militares se leía contradictorio). */
 export const ETIQUETA_ALCANCE: Record<AlcanceDocumento, string> = {
   solicitud: "Por solicitud",
-  marino: "Por pasajero",
+  marino: "Por tripulante",
 };
 
 export const ETIQUETA_CONDICION: Record<CondicionDocumento, string> = {

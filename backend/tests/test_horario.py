@@ -69,6 +69,7 @@ def _ultimo(dia_semana: int) -> date:
 async def test_estadisticas_e_insignia(cliente):
     sufijo = secrets.token_hex(3)
     revisor = await crear_actor("UCVMM", prefijo="revisor")
+    supervisor = await crear_actor("Supervisor de sector", prefijo="supervisor")   # las estadísticas, desde el 2026-11-18
     async with SesionLocal() as s:
         agencia = AgenciaNaviera(nombre=f"Agencia Horario {sufijo}")
         puesto = PuestoControl(nombre=f"Puesto Horario {sufijo}", sector_id=await id_sector())
@@ -87,7 +88,7 @@ async def test_estadisticas_e_insignia(cliente):
                      datetime.combine(sabado, time(20, 0), ZONA_PANAMA)),                       # se finalice fuera
     }
     fuera = {"sabado", "tarde"}
-    antes = (await cliente.get("/solicitudes/estadisticas", headers=revisor.headers)).json()
+    antes = (await cliente.get("/solicitudes/estadisticas", headers=supervisor.headers)).json()
     ids: dict[str, int] = {}
     async with SesionLocal() as s:
         tipo_id = (await s.execute(select(TipoTramite.id).limit(1))).scalar_one()
@@ -109,7 +110,7 @@ async def test_estadisticas_e_insignia(cliente):
                               creado_en=momentos["tarde"][0]))
         await s.commit()
 
-    r = await cliente.get("/solicitudes/estadisticas", headers=revisor.headers)
+    r = await cliente.get("/solicitudes/estadisticas", headers=supervisor.headers)
     est = r.json()
     assert r.status_code == 200 and est["horario_laboral"]
     assert est["aprobadas_fuera_horario"] == antes["aprobadas_fuera_horario"] + len(fuera)
@@ -249,11 +250,11 @@ async def test_aprobada_fuera_del_horario_lleva_el_costo(cliente, monkeypatch):
 
 async def test_series_del_periodo(cliente):
     """Con un periodo, la serie muestra sus días, meses y años (hasta hoy)."""
-    revisor = await crear_actor("UCVMM", prefijo="revisor")
+    supervisor = await crear_actor("Supervisor de sector", prefijo="supervisor")
     hoy = datetime.now(ZONA_PANAMA).date()
     desde = hoy.replace(day=1)
     r = await cliente.get("/solicitudes/estadisticas", params={"desde": desde.isoformat(), "hasta": hoy.isoformat()},
-                          headers=revisor.headers)
+                          headers=supervisor.headers)
     est = r.json()
     assert r.status_code == 200
     assert [f["periodo"] for f in est["por_dia"]] == [(desde + timedelta(days=i)).isoformat()

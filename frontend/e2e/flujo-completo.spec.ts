@@ -250,16 +250,16 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     await expect(supervisor).toHaveURL(/\/dashboard$/);
   });
 
-  await test.step("UCVMM la encuentra en la consulta histórica por el pasajero y la exporta a Excel", async () => {
+  await test.step("UCVMM la encuentra en la consulta histórica por el tripulante y la exporta a Excel", async () => {
     await ucvmm.goto("/dashboard");
     await ucvmm.getByRole("link", { name: "Consulta histórica" }).click();
     await expect(ucvmm.getByRole("heading", { name: "Consulta histórica" })).toBeVisible();
-    await ucvmm.getByLabel("Pasajero").fill("Pérez Gómez");
+    await ucvmm.getByLabel("Tripulante").fill("Pérez Gómez");
     await ucvmm.getByLabel("Año").selectOption(String(new Date().getFullYear()));
     await ucvmm.getByRole("tab", { name: /^Finalizadas/ }).click();
     const fila = ucvmm.locator(`a[href="/solicitudes/${id}"]`);
     await expect(fila).toBeVisible();
-    // Los filtros quedan en la URL, salvo el pasajero (un dato personal): ese viaja en el
+    // Los filtros quedan en la URL, salvo el tripulante (un dato personal): ese viaja en el
     // estado de la navegación, para que no quede en el historial ni en los logs (2026-11-14).
     await expect(ucvmm).toHaveURL(/estado=finalized/);
     expect(ucvmm.url()).not.toMatch(/pasajero|P%C3%A9rez|G%C3%B3mez/);
@@ -276,7 +276,7 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     await expect(ucvmm.getByText("Autorización marítima · Formulario No. 3")).toBeVisible();
     await ucvmm.getByRole("link", { name: "Volver" }).click();
     await expect(ucvmm).toHaveURL(busqueda);
-    await expect(ucvmm.getByLabel("Pasajero")).toHaveValue("Pérez Gómez");
+    await expect(ucvmm.getByLabel("Tripulante")).toHaveValue("Pérez Gómez");
     await expect(fila).toBeVisible();
     // Y de la consulta se vuelve al inicio: con «Volver» o con «Inicio» del menú.
     await ucvmm.getByRole("link", { name: "Volver" }).click();
@@ -288,8 +288,8 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     await expect(ucvmm).toHaveURL(/\/dashboard$/);
     await ucvmm.goBack();
     await expect(ucvmm).toHaveURL(busqueda);
-    // Un pasajero que no está: sin resultados.
-    await ucvmm.getByLabel("Pasajero").fill("Nadie Inexistente");
+    // Un tripulante que no está: sin resultados.
+    await ucvmm.getByLabel("Tripulante").fill("Nadie Inexistente");
     await expect(ucvmm.getByText("Ninguna solicitud coincide con los filtros.")).toBeVisible();
     // La agencia usa su bandeja: la consulta es del personal del SNM.
     await agencia.goto("/historico");

@@ -161,9 +161,17 @@ async def test_los_supervisores_ven_sin_decidir(cliente, admin):
     assert (await cliente.get("/solicitudes/supervision", headers=revisor.headers)).status_code == 403
 
 
+async def test_ucvmm_no_ve_las_estadisticas(cliente):
+    """Desde el 2026-11-18, solo el supervisor de sector y el Administrador (pedido del usuario)."""
+    revisor = await crear_actor("UCVMM", prefijo="revisor")
+    assert (await cliente.get("/solicitudes/estadisticas", headers=revisor.headers)).status_code == 403
+    r = await cliente.get("/solicitudes/estadisticas/exportar", params={"formato": "csv"}, headers=revisor.headers)
+    assert r.status_code == 403
+
+
 async def test_estadisticas_por_sector(cliente, admin):
     e = await _escenario(cliente, admin)
-    revisor_atl = await crear_actor("UCVMM", prefijo="revisor", sectores=(ATLANTICO,))
+    revisor_atl = await crear_actor("Supervisor de sector", prefijo="supervisor", sectores=(ATLANTICO,))
     pacifico, atlantico = await id_sector(PACIFICO), await id_sector(ATLANTICO)
 
     r = await cliente.get("/solicitudes/estadisticas", headers=revisor_atl.headers)

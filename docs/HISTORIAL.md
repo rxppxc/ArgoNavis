@@ -616,3 +616,27 @@ Pedido del usuario: en la Autorización de Técnico, Superintendente o Supernume
 - Se leen «15 días» en el pase de la bandeja, el expediente, el PDF de la autorización («DÍAS DEL SELLADO») y la boleta.
 - La boleta recibe ahora las dos en `elecciones` (rótulo, opciones, elegida): cada una es una fila de casillas.
 - **Pruebas:** las mismas que la operación, en `test_documento_ucvmm.py`, `test_boletas.py` (parametrizada con las dos), Vitest y `formulario.spec.ts`.
+
+## Tripulantes otra vez, «Subir y bajar» solo en Técnico, visas según el trámite y estadísticas sin UCVMM (2026-11-18, migraciones `f4c9b2e7a813` y `a1d6f3b8c524`)
+
+Pedido del usuario: «la opción de subir y bajar solo va en el trámite de autorización de técnico, superintendente y supernumerario, no en ningún otro trámite»; la visa de los restringidos «solo también en trámite de autorización de técnico»; «cuando dice pasajeros que se normalice a tripulante»; y «la opción de estadísticas solo la debe ver el supervisor de sector, no UCVMM». Decisiones del usuario: con la operación «Subir y bajar», la Carta Form. 7 de cada tripulante; el rango Pasajero conserva su nombre («es un tipo; lo otro es una forma general de llamar a todos los rangos»); el Administrador sigue viendo las estadísticas; al Marino y al Pasajero restringidos de los demás trámites se les exige la Visa Especial de Marino, y el Militar «se mantiene como está».
+
+- **«Subir y bajar»:**
+  - Embarque y Desembarque dejan de preguntarlo (`permite_subir_y_bajar` en falso) y de pedir la Carta.
+  - El trámite de Técnico la pide con su operación «Subir y bajar» (`con_carta_subir_y_bajar`, espejado en `conCartaSubirYBajar`, con sus casos en `espejo/subir_y_bajar.json`). Bajo el select, un aviso lo dice.
+  - Las solicitudes de Embarque y Desembarque que respondieron «Sí» (del 16 al 18) conservan su Carta en la foto del checklist y lo siguen mostrando en el expediente, el PDF y la boleta.
+- **Visas de los restringidos:**
+  - La «Visa» (DOC-VISA): en Técnico, a todos sus rangos; en los demás trámites, solo al Militar; Shore Pass, que admite solo al Marino, la pierde.
+  - La Visa Especial de Marino (DOC-VISA-MARINO), al Marino y al Pasajero restringidos de los demás trámites. En Embarque y Cambio de nave ya la lleva todo extranjero.
+  - Un técnico que vaya por otro trámite no lleva visa: sigue señalado.
+  - El aviso de la tarjeta nombra la visa que corresponde, aunque su condición sea otra (`VISAS`, `TarjetaTripulante.tsx`).
+- **Estadísticas:** solo el supervisor de sector y el Administrador (`_PUEDE_VER_ESTADISTICAS` y `PERMISOS_ESTADISTICAS`). UCVMM recibe 403 y no las ve en el menú. El E2E entra con un supervisor de sector nuevo (`e2e.supsector`).
+- **«Tripulantes»** en todo lo que ve el usuario: pantallas, mensajes de error, correos, PDF de la autorización, boleta, consulta histórica (su Excel y su filtro) y las descripciones del catálogo (migración `a1d6f3b8c524`, que deshace la `d5b8e2f1a9c3`).
+  - El rango «Pasajero» se queda.
+  - Los títulos y los textos del historial ya guardados (por ejemplo, «… — 2 pasajeros») no cambian.
+  - Los nombres que son contrato tampoco: el filtro `pasajero` de la consulta histórica y el estado de «Volver».
+- **Pruebas:**
+  - `test_documento_ucvmm.py`: la tabla literal; la visa según el trámite y el rango (`test_la_visa_de_los_restringidos`); la Carta de «Subir y bajar» en Técnico y en ningún otro trámite; la corrección; y el PDF de las de antes.
+  - `test_sectores.py`: UCVMM sin estadísticas. Las pruebas de estadísticas pasan al supervisor de sector.
+  - El espejo `subir_y_bajar.json`.
+  - E2E: `formulario.spec.ts` y `estadisticas.spec.ts`.

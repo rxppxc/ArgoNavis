@@ -9,7 +9,7 @@
  * - Si se sale con el mouse sin elegir, vale lo escrito solo si es un nombre, un
  *   código o una sola coincidencia (`opcionEscrita`); si no, queda lo que había.
  *   Con el campo vacío, queda sin elegir.
- * - Solo se pinta la lista mientras está abierta: con 30 pasajeros eran 60 listas
+ * - Solo se pinta la lista mientras está abierta: con 30 tripulantes eran 60 listas
  *   de ~250 países en la página.
  * - La lista no va dentro del <label>: su texto se sumaría al nombre del campo.
  */

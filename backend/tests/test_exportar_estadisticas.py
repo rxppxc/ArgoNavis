@@ -49,11 +49,11 @@ HOJAS = ["Resumen", "Por día", "Por mes", "Por año", "Por trámite", "Por pues
 
 @asincrona
 async def test_exporta_en_los_tres_formatos(cliente, admin):
-    revisor = await crear_actor("UCVMM", prefijo="revisor")
-    est = (await cliente.get("/solicitudes/estadisticas", headers=revisor.headers)).json()
+    supervisor = await crear_actor("Supervisor de sector", prefijo="supervisor")
+    est = (await cliente.get("/solicitudes/estadisticas", headers=supervisor.headers)).json()
     hoy = datetime.now(ZONA_PANAMA).date()
 
-    r = await cliente.get(RUTA, params={"formato": "xlsx"}, headers=revisor.headers)
+    r = await cliente.get(RUTA, params={"formato": "xlsx"}, headers=supervisor.headers)
     assert r.status_code == 200, r.text
     assert r.headers["content-type"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     # Las de su sector (2026-11-10): lo dicen el nombre del archivo y el encabezado.
@@ -62,7 +62,7 @@ async def test_exporta_en_los_tres_formatos(cliente, admin):
     assert r.headers["cache-control"] == "no-store"
     hojas, textos, xml_hojas = _hojas(r.content)
     assert hojas == HOJAS, "sin el uso del sistema: no ve todos los sectores"
-    assert "Revisor Prueba" in textos and "Uso interno del SNM" in textos and "Todo el historial" in textos
+    assert "Supervisor Prueba" in textos and "Uso interno del SNM" in textos and "Todo el historial" in textos
     assert "Sector Pacífico" in textos
     assert not any("<f>" in x for x in xml_hojas), "solo valores: ninguna fórmula"
 
@@ -73,16 +73,16 @@ async def test_exporta_en_los_tres_formatos(cliente, admin):
     assert r.headers["content-disposition"] == (
         f'attachment; filename="Estadisticas-autorizaciones-inicio_{hoy.isoformat()}.xlsx"')
 
-    r = await cliente.get(RUTA, params={"formato": "pdf"}, headers=revisor.headers)
+    r = await cliente.get(RUTA, params={"formato": "pdf"}, headers=supervisor.headers)
     assert r.status_code == 200 and r.headers["content-type"] == "application/pdf"
     assert r.content.startswith(b"%PDF-") and r.headers["content-disposition"].endswith('.pdf"')
 
-    r = await cliente.get(RUTA, params={"formato": "csv"}, headers=revisor.headers)
+    r = await cliente.get(RUTA, params={"formato": "csv"}, headers=supervisor.headers)
     assert r.status_code == 200 and r.headers["content-type"] == "text/csv; charset=utf-8"
     filas = _csv(r.content)
     assert filas[0] == ["ARGO NAVIS · Sistema Interno Marítimo"]
     generado = next(f for f in filas if f and f[0] == "Generado")
-    assert generado[1].endswith("por Revisor Prueba")
+    assert generado[1].endswith("por Supervisor Prueba")
     # Las mismas cifras que la pantalla.
     recibidas = next(f for f in filas if f and f[0] == "Recibidas")
     assert int(recibidas[1]) == est["recibidas"]
@@ -92,18 +92,18 @@ async def test_exporta_en_los_tres_formatos(cliente, admin):
 
 @asincrona
 async def test_periodo_unidad_y_validacion(cliente):
-    revisor = await crear_actor("UCVMM", prefijo="revisor")
+    supervisor = await crear_actor("Supervisor de sector", prefijo="supervisor")
     params = {"formato": "pdf", "desde": "2026-10-01", "hasta": "2026-10-31", "unidad": "dia"}
-    r = await cliente.get(RUTA, params=params, headers=revisor.headers)
+    r = await cliente.get(RUTA, params=params, headers=supervisor.headers)
     assert r.status_code == 200, r.text
     assert 'filename="Estadisticas-autorizaciones-sector-pacifico-2026-10-01_2026-10-31.pdf"' in \
         r.headers["content-disposition"]
-    r = await cliente.get(RUTA, params={**params, "formato": "xlsx", "unidad": "anio"}, headers=revisor.headers)
+    r = await cliente.get(RUTA, params={**params, "formato": "xlsx", "unidad": "anio"}, headers=supervisor.headers)
     hojas, textos, _ = _hojas(r.content)
     assert r.status_code == 200 and "Del 1 al 31 de octubre de 2026" in textos
     assert "Solicitudes por año" in textos, "la hoja «Resumen» lleva la serie que se veía en pantalla"
     for malo in ({"formato": "docx"}, {"formato": "pdf", "unidad": "semana"}, {}):
-        r = await cliente.get(RUTA, params=malo, headers=revisor.headers)
+        r = await cliente.get(RUTA, params=malo, headers=supervisor.headers)
         assert r.status_code == 422, malo
 
 

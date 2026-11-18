@@ -59,7 +59,7 @@ def _campos(s: Solicitud) -> list[tuple[str, str]]:
         ("Trámite",         s.tipo_tramite.nombre if s.tipo_tramite else ""),
         ("Puesto",          _puestos(s)),
         ("Operación",       s.fecha_operacion.strftime("%d/%m/%Y")),
-        ("Pasajeros",       str(s.cantidad_tripulantes)),
+        ("Tripulantes",     str(s.cantidad_tripulantes)),
         ("Agencia naviera", s.agencia_nombre),
     ]
 

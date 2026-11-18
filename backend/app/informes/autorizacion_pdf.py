@@ -66,7 +66,7 @@ class TripulantePdf:
 
 
 def titulo_columna_rango(tripulantes: list[TripulantePdf]) -> str:
-    """«Rango / Ocupación» si algún pasajero la tiene (una solicitud de antes del
+    """«Rango / Ocupación» si algún tripulante la tiene (una solicitud de antes del
     2026-11-16); si no, «Rango»."""
     return "Rango / Ocupación" if any(t.ocupacion for t in tripulantes) else "Rango"
 
@@ -265,7 +265,7 @@ def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
         ("FECHA DE LA SOLICITUD", _f(d.fecha_solicitud, True)),
         ("FECHA DE APROBACIÓN", _f(d.aprobada_en, True)),
         ("APROBADA POR", texto_pdf(d.aprobada_por)),
-        ("PASAJEROS AUTORIZADOS", str(len(d.tripulantes))),
+        ("TRIPULANTES AUTORIZADOS", str(len(d.tripulantes))),
     ]
     if d.estado == "finalized":
         pares += [
@@ -308,7 +308,7 @@ def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
         ]
 
     # ── Tripulantes ──
-    historia.append(Paragraph("PASAJEROS", e_subtit))
+    historia.append(Paragraph("TRIPULANTES", e_subtit))
     cabecera = ["N°", "Apellidos", "Nombres", "Nacionalidad", "Pasaporte", "Seamanbook", titulo_columna_rango(d.tripulantes)]
     filas_tripulantes = [[Paragraph(c, e_cabecera) for c in cabecera]]
     hay_restringidos = False

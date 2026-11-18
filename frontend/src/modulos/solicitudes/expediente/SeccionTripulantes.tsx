@@ -27,7 +27,7 @@ export function SeccionTripulantes({ solicitud: s, verificacion: v, onVerDocumen
   return (
     <section className={styles.panel}>
       <h2 className={styles.panelTitulo}>
-        Pasajeros <span className={styles.contador}>{total}</span>
+        Tripulantes <span className={styles.contador}>{total}</span>
       </h2>
       {s.valida_vigencia && (
         <p className={styles.ayuda}>
@@ -63,7 +63,7 @@ export function SeccionTripulantes({ solicitud: s, verificacion: v, onVerDocumen
           <thead>
             <tr>
               <th>#</th>
-              <th>Pasajero</th>
+              <th>Tripulante</th>
               <th>Nacionalidad</th>
               {/* Pasaporte y seamanbook juntos (2026-11-17): en dos columnas, la del impedimento
                   quedaba fuera de la vista en el puesto y el nombre se partía en cinco líneas. */}
@@ -223,7 +223,7 @@ function PieVerificacion({ verificacion: v }: { verificacion: VerificacionImpedi
       <div className={styles.filaBotones}>
         {v.pendientes > 0 && (
           <span className={styles.ayuda}>
-            Falta marcar {v.pendientes} pasajero{v.pendientes === 1 ? "" : "s"}.
+            Falta marcar {v.pendientes} tripulante{v.pendientes === 1 ? "" : "s"}.
           </span>
         )}
         {v.corrigiendo && (
@@ -233,7 +233,7 @@ function PieVerificacion({ verificacion: v }: { verificacion: VerificacionImpedi
         )}
         <button type="button" className={styles.btnPrimario} onClick={v.guardar}
           disabled={v.trabajando || v.pendientes > 0 || !v.hayCambios}
-          title={v.pendientes > 0 ? "Marca el resultado de todos los pasajeros"
+          title={v.pendientes > 0 ? "Marca el resultado de todos los tripulantes"
             : v.hayCambios ? undefined : "No hay cambios que guardar"}>
           {v.corrigiendo ? "Guardar corrección" : "Guardar verificación"}
         </button>

@@ -1,6 +1,6 @@
 /**
  * El formulario de «Nueva solicitud», sin enviarlo: lo que hace con los
- * documentos al quitar un pasajero, cambiarle el rango (el Pasajero presenta lo
+ * documentos al quitar un tripulante, cambiarle el rango (el Pasajero presenta lo
  * del Marino sin la Libreta, 2026-11-13) o cambiar de trámite, el cambio de
  * puerto, el resumen de lo que falta, los adicionales y el aviso de lo que hay que revisar.
  */
@@ -19,7 +19,7 @@ async function marinoFilipino(pagina: Page, indice: number, nombre: string) {
   await elegirPais(tarjeta(pagina, indice).getByRole("combobox", { name: "Nacionalidad *" }), "Filipinas");
 }
 
-test("el formulario cuida los documentos al quitar un pasajero o cambiar de trámite", async ({ browser }) => {
+test("el formulario cuida los documentos al quitar un tripulante o cambiar de trámite", async ({ browser }) => {
   const agencia = await entrar(browser, CUENTAS.agencia);
   await agencia.goto("/new");
   await agencia.getByRole("button", { name: /^Embarque/ }).click();
@@ -27,7 +27,7 @@ test("el formulario cuida los documentos al quitar un pasajero o cambiar de trá
   // Dos marinos filipinos: Embarque pide tres documentos a cada uno, en su tarjeta,
   // y el Formulario No. 3 a la solicitud (2026-11-13).
   await marinoFilipino(agencia, 0, "Ana");
-  await agencia.getByRole("button", { name: "Agregar pasajero" }).click();
+  await agencia.getByRole("button", { name: "Agregar tripulante" }).click();
   await marinoFilipino(agencia, 1, "Beto");
   await expect(agencia.getByText("Faltan 7 documentos por adjuntar")).toBeVisible();
 
@@ -35,9 +35,9 @@ test("el formulario cuida los documentos al quitar un pasajero o cambiar de trá
   await agencia.getByLabel("Adjuntar Visa Especial de Marino de Beto").setInputFiles(pdf("visa-beto.pdf"));
   await expect(agencia.getByText("Faltan 5 documentos por adjuntar")).toBeVisible();
 
-  await test.step("al quitar un pasajero se van sus archivos", async () => {
+  await test.step("al quitar un tripulante se van sus archivos", async () => {
     await expect(agencia.getByText("visa-beto.pdf")).toBeVisible();
-    await agencia.getByRole("button", { name: "Quitar pasajero 2" }).click();
+    await agencia.getByRole("button", { name: "Quitar tripulante 2" }).click();
     await expect(agencia.getByText("Faltan 3 documentos por adjuntar")).toBeVisible();
     await expect(agencia.getByText("visa-beto.pdf")).toHaveCount(0);
   });
@@ -66,10 +66,10 @@ test("el formulario cuida los documentos al quitar un pasajero o cambiar de trá
   });
 
   await test.step("el resumen lleva a la tarjeta y la expande", async () => {
-    await agencia.getByRole("button", { name: "Contraer pasajero 1" }).click();
-    await expect(agencia.getByRole("button", { name: "Expandir pasajero 1" })).toBeVisible();
+    await agencia.getByRole("button", { name: "Contraer tripulante 1" }).click();
+    await expect(agencia.getByRole("button", { name: "Expandir tripulante 1" })).toBeVisible();
     await agencia.getByRole("button", { name: /^1\. Ana/ }).click();
-    await expect(agencia.getByRole("button", { name: "Contraer pasajero 1" })).toBeVisible();
+    await expect(agencia.getByRole("button", { name: "Contraer tripulante 1" })).toBeVisible();
   });
 
   await test.step("cambiar de trámite con archivos adjuntos pide confirmación y los quita", async () => {
@@ -162,38 +162,38 @@ test("el cambio de puerto ofrece solo los puestos del mismo sector", async ({ br
   await expect(nuevo).toHaveCount(0);
 });
 
-test("«¿Subir y bajar?» pide la Carta de Responsabilidad de cada pasajero (2026-11-16)", async ({ browser }) => {
+test("«Subir y bajar» del trámite de Técnico pide la Carta de Responsabilidad de cada tripulante (2026-11-18)", async ({ browser }) => {
   const agencia = await entrar(browser, CUENTAS.agencia);
   await agencia.goto("/new");
-  await agencia.getByRole("button", { name: /^Embarque/ }).click();
-  await marinoFilipino(agencia, 0, "Ana");
-  await agencia.getByRole("button", { name: "Agregar pasajero" }).click();
-  await marinoFilipino(agencia, 1, "Beto");
 
-  const pregunta = agencia.getByLabel("¿Subir y bajar? *");
-  const cartas = agencia.getByLabel(/^Adjuntar Carta de Responsabilidad \(Form\. No\. 7\) de /);
-  await expect(pregunta, "empieza en «No»").toHaveValue("no");
-  await expect(cartas).toHaveCount(0);
-
-  await pregunta.selectOption("si");
-  await expect(cartas, "una por pasajero, en su tarjeta").toHaveCount(2);
-  await expect(tarjeta(agencia, 0).getByLabel("Adjuntar Carta de Responsabilidad (Form. No. 7) de Ana")).toHaveCount(1);
-  await expect(agencia.getByText(/Cada pasajero adjunta la Carta de Responsabilidad/)).toBeVisible();
-  // Lo demás se sigue pidiendo: los tres de cada marino, el Formulario No. 3 y las dos Cartas.
-  await expect(agencia.getByText("Faltan 9 documentos por adjuntar")).toBeVisible();
-
-  await test.step("con «No» deja de pedirse", async () => {
-    await pregunta.selectOption("no");
-    await expect(cartas).toHaveCount(0);
-    await expect(agencia.getByText("Faltan 7 documentos por adjuntar")).toBeVisible();
+  await test.step("Embarque ya no pregunta «¿Subir y bajar?»", async () => {
+    await agencia.getByRole("button", { name: /^Embarque/ }).click();
+    await expect(agencia.getByLabel("¿Subir y bajar? *")).toHaveCount(0);
+    await agencia.getByRole("button", { name: "Cambiar", exact: true }).click();
   });
 
-  await test.step("un trámite que no la pregunta no la muestra", async () => {
-    await pregunta.selectOption("si");
-    await agencia.getByRole("button", { name: "Cambiar", exact: true }).click();
-    await agencia.getByRole("button", { name: /^Cambio de Nave/ }).click();
-    await expect(agencia.getByLabel("¿Subir y bajar? *")).toHaveCount(0);
+  await agencia.getByRole("button", { name: /^Autorización de Técnico/ }).click();
+  await tarjeta(agencia, 0).getByLabel("Nombre(s) *", { exact: true }).fill("Hans");
+  await agencia.getByRole("button", { name: "Agregar tripulante" }).click();
+  await tarjeta(agencia, 1).getByLabel("Nombre(s) *", { exact: true }).fill("Ivo");
+
+  const operacion = agencia.getByLabel("Operación *");
+  const cartas = agencia.getByLabel(/^Adjuntar Carta de Responsabilidad \(Form\. No\. 7\) de /);
+  const resumen = agencia.getByText(/^Faltan? \d+ documentos? por adjuntar$/);
+  await operacion.selectOption("embarque");
+  await expect(cartas).toHaveCount(0);
+  const conEmbarque = Number(/\d+/.exec((await resumen.textContent()) ?? "")?.[0]);
+
+  await operacion.selectOption("subir_y_bajar");
+  await expect(cartas, "una por tripulante, en su tarjeta").toHaveCount(2);
+  await expect(tarjeta(agencia, 0).getByLabel("Adjuntar Carta de Responsabilidad (Form. No. 7) de Hans")).toHaveCount(1);
+  await expect(agencia.getByText(/cada tripulante adjunta la Carta de Responsabilidad/)).toBeVisible();
+  await expect(resumen, "lo demás se sigue pidiendo, más las dos Cartas").toHaveText(`Faltan ${conEmbarque + 2} documentos por adjuntar`);
+
+  await test.step("con Desembarque deja de pedirse", async () => {
+    await operacion.selectOption("desembarque");
     await expect(cartas).toHaveCount(0);
+    await expect(resumen).toHaveText(`Faltan ${conEmbarque} documentos por adjuntar`);
   });
 });
 
@@ -212,13 +212,14 @@ test("el trámite de Técnico pide la operación: Embarque, Desembarque o Subir 
   await agencia.getByRole("button", { name: "Enviar solicitud" }).click();
   await expect(agencia.getByText("Elige la operación: Embarque, Desembarque o Subir y bajar.")).toBeVisible();
 
-  await test.step("no cambia los documentos (decisión del usuario)", async () => {
+  await test.step("elegida, deja de faltar; Embarque y Desembarque piden lo mismo", async () => {
     const resumen = agencia.getByText(/^Faltan? \d+ documentos? por adjuntar$/);
     const antes = await resumen.textContent();
-    await operacion.selectOption("subir_y_bajar");
+    await operacion.selectOption("embarque");
     await expect(datos).toContainText(`${faltanAntes - 1}`);
     await expect(resumen).toHaveText(antes ?? "");
-    await expect(agencia.getByLabel(/^Adjuntar Carta de Responsabilidad/)).toHaveCount(0);
+    await operacion.selectOption("desembarque");
+    await expect(resumen).toHaveText(antes ?? "");
   });
 
   await test.step("otro trámite no la muestra, y al volver empieza otra vez sin elegir", async () => {
@@ -327,7 +328,7 @@ test("bandera, país de nacimiento y nacionalidad se eligen con buscador", async
     await expect(bandera).toHaveValue("Venezuela");
   });
 
-  await test.step("los del pasajero, con Tab", async () => {
+  await test.step("los del tripulante, con Tab", async () => {
     const nacimiento = tarjeta(agencia, 0).getByRole("combobox", { name: "País de nacimiento *" });
     await nacimiento.fill("colom");
     await agencia.keyboard.press("Tab");
@@ -357,13 +358,20 @@ test("panameños sin visa, la Visa de los restringidos y Shore Pass solo para ma
     await expect(ficha.getByText("0/2 documentos")).toBeVisible();
   });
 
-  await test.step("al restringido se le pide la Visa, y se dice", async () => {
+  await test.step("al marino restringido se le pide la Visa Especial de Marino, y se dice (2026-11-18)", async () => {
     await elegirPais(nacionalidad, NACIONALIDAD_RESTRINGIDA);
     await expect(ficha.getByText("Nacionalidad restringida", { exact: true })).toBeVisible();
+    await expect(ficha.getByText(/^Nacionalidad restringida: debe adjuntar «Visa Especial de Marino»\./)).toBeVisible();
+    await expect(agencia.getByLabel("Adjuntar Visa Especial de Marino de Ana")).toBeAttached();
+    await expect(agencia.getByLabel("Adjuntar Visa de Ana", { exact: true })).toHaveCount(0);
+    await expect(ficha.getByText("0/3 documentos")).toBeVisible();
+  });
+
+  await test.step("al militar restringido, la «Visa», como antes", async () => {
+    await ficha.getByLabel("Rango *").selectOption("militar");
     await expect(ficha.getByText(/^Nacionalidad restringida: debe adjuntar «Visa»\./)).toBeVisible();
     await expect(agencia.getByLabel("Adjuntar Visa de Ana", { exact: true })).toBeAttached();
-    await expect(agencia.getByLabel("Adjuntar Visa Especial de Marino de Ana")).toBeAttached();
-    await expect(ficha.getByText("0/4 documentos")).toBeVisible();
+    await ficha.getByLabel("Rango *").selectOption("marino");
   });
 
   await test.step("en Shore Pass, solo el rango Marino, ya elegido y dicho", async () => {

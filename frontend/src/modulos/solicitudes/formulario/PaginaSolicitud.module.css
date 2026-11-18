@@ -128,6 +128,16 @@
   margin: 0 0 12px;
   color: var(--text-2); font-size: .82rem; line-height: 1.5;
 }
+/* Con la operación «Subir y bajar» del trámite de Técnico (2026-11-18): la Carta, en una fila propia. */
+.operacionAviso {
+  grid-column: 1 / -1;
+  margin: -4px 0 13px; padding: 8px 12px;
+  border-radius: var(--r-sm);
+  background: var(--nota-fondo);
+  border: 1px solid var(--nota-borde);
+  border-left: 4px solid var(--acc-blue);
+  color: var(--text-2); font-size: .84rem; line-height: 1.5;
+}
 
 /* ─── Tripulantes ─── */
 .marino {
