@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from app.domain.models.solicitud import (
-    MESES_VIGENCIA_PASAPORTE, RANGOS_CON_LIBRETA, RangoMarino, vigencia_minima_pasaporte,
+    MESES_VIGENCIA_PASAPORTE, RANGOS_CON_LIBRETA, OperacionTecnico, RangoMarino, vigencia_minima_pasaporte,
 )
 from app.domain.models.tramite import AlcanceDocumento, CondicionDocumento, TipoTramite, TramiteDocumento
 from app.domain.schemas.solicitud import DatosTripulanteEntrada
@@ -137,18 +137,27 @@ def _fecha(d: date) -> str:
     return d.strftime("%d/%m/%Y")
 
 
+# Las operaciones del trámite de Técnico con la condición EMBARQUE_O_DESEMBARQUE (2026-11-18).
+OPERACIONES_EMBARQUE_O_DESEMBARQUE = (OperacionTecnico.EMBARQUE.value, OperacionTecnico.DESEMBARQUE.value)
+
+
 class ServicioTramite:
     """Evalúa el checklist y valida el formulario de una solicitud."""
 
     def construir_casillas(
         self, tipo: TipoTramite, tripulantes: list[TripulanteChecklist], subir_y_bajar: bool = False,
+        operacion: str | None = None,
     ) -> list[CasillaChecklist]:
         """Casillas que esta solicitud debe cubrir, ya resueltas las condiciones.
-        `subir_y_bajar`: la respuesta de la solicitud a «¿Subir y bajar?»."""
+        `subir_y_bajar`: si se pide la Carta de «Subir y bajar» (ServicioSolicitud.con_carta_subir_y_bajar).
+        `operacion`: la del trámite de Técnico (2026-11-18), o None en los que no la piden."""
         casillas: list[CasillaChecklist] = []
 
         for td in sorted(tipo.documentos, key=lambda x: x.orden or 0):
             if td.condicion == CondicionDocumento.SUBIR_Y_BAJAR.value and not subir_y_bajar:
+                continue
+            if (td.condicion == CondicionDocumento.EMBARQUE_O_DESEMBARQUE.value
+                    and operacion not in OPERACIONES_EMBARQUE_O_DESEMBARQUE):
                 continue
             if td.alcance == AlcanceDocumento.SOLICITUD.value:
                 if (td.condicion == CondicionDocumento.NACIONALIDAD_RESTRINGIDA.value
@@ -190,14 +199,14 @@ class ServicioTramite:
 
     def evaluar(
         self, tipo: TipoTramite, tripulantes: list[TripulanteChecklist],
-        cubiertas: set[tuple[int, int | None]], subir_y_bajar: bool = False,
+        cubiertas: set[tuple[int, int | None]], subir_y_bajar: bool = False, operacion: str | None = None,
     ) -> ResultadoChecklist:
         """Compara las casillas exigibles contra las que traen archivo.
 
         `cubiertas` son tuplas (documento_id, indice_tripulante) —
         indice_tripulante en None para los documentos de alcance solicitud.
         """
-        requeridas = self.construir_casillas(tipo, tripulantes, subir_y_bajar)
+        requeridas = self.construir_casillas(tipo, tripulantes, subir_y_bajar, operacion)
         # Las opcionales nunca faltan (2026-11-11).
         faltantes = [
             casilla for casilla in requeridas

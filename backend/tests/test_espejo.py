@@ -67,7 +67,8 @@ def test_checklist(caso):
                             nacionalidad_restringida=t["restringida"])
         for t in caso["tripulantes"]
     ]
-    casillas = ServicioTramite().construir_casillas(tipo, tripulantes, subir_y_bajar=caso.get("subir_y_bajar", False))
+    casillas = ServicioTramite().construir_casillas(tipo, tripulantes, subir_y_bajar=caso.get("subir_y_bajar", False),
+                                                    operacion=caso.get("operacion"))
     assert [[c.codigo_documento, c.indice_tripulante] for c in casillas] == caso["esperado"]
     assert [[c.codigo_documento, c.indice_tripulante] for c in casillas if not c.obligatoria] == caso.get("opcionales", [])
 

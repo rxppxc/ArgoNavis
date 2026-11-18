@@ -101,13 +101,13 @@ export function portaLibreta(ficha: Pick<TripulanteEntrada, "rango">): boolean {
   return RANGOS_CON_LIBRETA.includes(ficha.rango);
 }
 
-/** Los puestos a los que se puede cambiar desde el elegido (2026-11-13): los del
- *  mismo sector, sin él. Si el nuevo puerto es del otro sector, va una solicitud
- *  nueva. El backend lo vuelve a validar (`_validar_cambio_de_puerto`). */
+/** Los puestos a los que se puede cambiar desde el elegido: todos los demás, también los
+ *  del otro sector desde el 2026-11-18 (del 13 al 18, solo los del mismo). El backend lo
+ *  vuelve a validar (`_validar_cambio_de_puerto`). */
 export function puestosParaCambio(puestos: PuestoMini[], puestoControlId: string): PuestoMini[] {
   const elegido = puestos.find((p) => String(p.id) === puestoControlId);
   if (!elegido) return [];
-  return puestos.filter((p) => p.sector_id === elegido.sector_id && p.id !== elegido.id);
+  return puestos.filter((p) => p.id !== elegido.id);
 }
 
 export function validarFormulario(

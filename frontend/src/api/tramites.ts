@@ -4,7 +4,8 @@ import type { RangoMarino } from "./solicitudes";
 export type AlcanceDocumento = "solicitud" | "marino";
 /** `solo_extranjeros` (2026-11-14): a todos menos a los panameños. `subir_y_bajar`
  *  (2026-11-16): solo si la solicitud indica «Subir y bajar». */
-export type CondicionDocumento = "siempre" | "nacionalidad_restringida" | "solo_extranjeros" | "subir_y_bajar";
+export type CondicionDocumento =
+  "siempre" | "nacionalidad_restringida" | "solo_extranjeros" | "subir_y_bajar" | "embarque_o_desembarque";
 
 /** Una fila del checklist de un trámite. */
 export interface TramiteDocumento {
@@ -84,4 +85,5 @@ export const ETIQUETA_CONDICION: Record<CondicionDocumento, string> = {
   nacionalidad_restringida: "Nacionalidad restringida",
   solo_extranjeros: "No a panameños",
   subir_y_bajar: "Solo con subir y bajar",
+  embarque_o_desembarque: "Solo con Embarque o Desembarque",
 };

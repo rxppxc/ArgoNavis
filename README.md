@@ -259,7 +259,7 @@ Administrador y SysAdmin se reconocen por el nombre del rol (`rol_personalizado.
   - Sellado de Shore Pass (14/11/2026): solo el rango Marino.
 - Subir y bajar (16/11/2026): en Embarque y Desembarque la agencia responde «¿Subir y bajar?» (Sí / No). Con «Sí», cada pasajero adjunta además la Carta de Responsabilidad (Form. No. 7).
 - La ocupación del pasajero ya no se pide (16/11/2026). Las solicitudes de antes la siguen mostrando.
-- Cambio de puerto (13/11/2026): no es un trámite aparte. En Embarque y Desembarque la agencia indica si hay cambio de puerto y elige el nuevo puesto de control, que tiene que ser del mismo sector que el primero; si el nuevo puerto es del otro sector, presenta una nueva solicitud y la original vence sola. La finaliza el puesto nuevo; el primero la puede consultar.
+- Cambio de puerto (13/11/2026): no es un trámite aparte. En Embarque y Desembarque la agencia indica si hay cambio de puerto y elige el nuevo puesto de control, de cualquier sector desde el 18/11/2026 (antes, solo del mismo). La revisa UCVMM del sector del primer puesto y la finaliza el puesto nuevo; el primero la puede consultar.
 - Una solicitud admite hasta 30 pasajeros.
 - Nacionalidad restringida:
   - En todos los trámites y rangos se le pide la Visa (14/11/2026), además de lo que pida el trámite: en Embarque y Cambio de nave, al marino y al pasajero, también la Visa Especial de Marino. El formulario y el expediente lo señalan.

@@ -72,7 +72,9 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
   const { tripulantes } = fichas;
   // «Subir y bajar» (la operación de Técnico desde el 2026-11-18): la Carta de Responsabilidad de cada tripulante.
   const subirYBajar = !!tipo && conCartaSubirYBajar(tipo, cabecera.subir_y_bajar, cabecera.operacion);
-  const documentos = useDocumentosFormulario(tipo, tripulantes, paisesPorCodigo, precarga, subirYBajar);
+  // La operación de Técnico decide la carta de garantía o el contrato (2026-11-18).
+  const operacion = tipo?.pide_operacion ? cabecera.operacion : "";
+  const documentos = useDocumentosFormulario(tipo, tripulantes, paisesPorCodigo, precarga, subirYBajar, operacion);
   const { faltantes } = documentos;
 
   const hoy = fechaISOLocal();

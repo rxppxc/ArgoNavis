@@ -1,7 +1,9 @@
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Literal
 
-CondicionDocumento = Literal["siempre", "nacionalidad_restringida", "solo_extranjeros", "subir_y_bajar"]
+CondicionDocumento = Literal[
+    "siempre", "nacionalidad_restringida", "solo_extranjeros", "subir_y_bajar", "embarque_o_desembarque",
+]
 
 
 # ── Documento dentro del checklist de un trámite ─────────────────────────────

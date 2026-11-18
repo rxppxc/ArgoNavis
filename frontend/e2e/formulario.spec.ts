@@ -123,7 +123,7 @@ test("el formulario cuida los documentos al quitar un tripulante o cambiar de tr
   });
 });
 
-test("el cambio de puerto ofrece solo los puestos del mismo sector", async ({ browser }) => {
+test("el cambio de puerto ofrece todos los demás puestos, también los del otro sector (2026-11-18)", async ({ browser }) => {
   const agencia = await entrar(browser, CUENTAS.agencia);
   await agencia.goto("/new");
   await agencia.getByRole("button", { name: /^Embarque/ }).click();
@@ -141,12 +141,13 @@ test("el cambio de puerto ofrece solo los puestos del mismo sector", async ({ br
   await expect(nuevo).toBeEnabled();
   const opciones = await nuevo.locator("option").allTextContents();
   expect(opciones).toContain(PUESTO_MISMO_SECTOR);
-  expect(opciones, "del otro sector va una solicitud nueva").not.toContain(PUESTO_OTRO_SECTOR);
+  expect(opciones, "también los del otro sector (2026-11-18)").toContain(PUESTO_OTRO_SECTOR);
   expect(opciones).not.toContain(PUESTO);
-  await nuevo.selectOption({ label: PUESTO_MISMO_SECTOR });
-  await expect(agencia.getByText(/si el nuevo puerto no está en la lista, presenta una nueva solicitud/)).toBeVisible();
+  await nuevo.selectOption({ label: PUESTO_OTRO_SECTOR });
+  await expect(agencia.getByText(/La autorización vale para el nuevo puesto de control/)).toBeVisible();
   expect(await agencia.locator("body").innerHTML(), "a la agencia no se le nombran los sectores")
     .not.toMatch(/UCVMM|Sector (Pacífico|Atlántico)/i);
+  await nuevo.selectOption({ label: PUESTO_MISMO_SECTOR });
 
   // Si el primer puesto pasa a ser el elegido como nuevo, el nuevo se quita.
   await puesto.selectOption({ label: PUESTO_MISMO_SECTOR });
@@ -188,7 +189,10 @@ test("«Subir y bajar» del trámite de Técnico pide la Carta de Responsabilida
   await expect(cartas, "una por tripulante, en su tarjeta").toHaveCount(2);
   await expect(tarjeta(agencia, 0).getByLabel("Adjuntar Carta de Responsabilidad (Form. No. 7) de Hans")).toHaveCount(1);
   await expect(agencia.getByText(/cada tripulante adjunta la Carta de Responsabilidad/)).toBeVisible();
-  await expect(resumen, "lo demás se sigue pidiendo, más las dos Cartas").toHaveText(`Faltan ${conEmbarque + 2} documentos por adjuntar`);
+  // Lo demás se sigue pidiendo, más las dos Cartas; la garantía o el contrato pasa a ser solo la carta de garantía.
+  await expect(resumen).toHaveText(`Faltan ${conEmbarque + 2} documentos por adjuntar`);
+  await expect(agencia.getByLabel("Adjuntar Carta de garantía de la agencia contratante", { exact: true })).toHaveCount(1);
+  await expect(agencia.getByLabel("Adjuntar Carta de garantía de la agencia contratante o contrato")).toHaveCount(0);
 
   await test.step("con Desembarque deja de pedirse", async () => {
     await operacion.selectOption("desembarque");
@@ -212,14 +216,17 @@ test("el trámite de Técnico pide la operación: Embarque, Desembarque o Subir 
   await agencia.getByRole("button", { name: "Enviar solicitud" }).click();
   await expect(agencia.getByText("Elige la operación: Embarque, Desembarque o Subir y bajar.")).toBeVisible();
 
-  await test.step("elegida, deja de faltar; Embarque y Desembarque piden lo mismo", async () => {
+  await test.step("elegida, deja de faltar; Embarque y Desembarque piden la garantía o el contrato", async () => {
     const resumen = agencia.getByText(/^Faltan? \d+ documentos? por adjuntar$/);
-    const antes = await resumen.textContent();
+    const garantiaOContrato = agencia.getByLabel("Adjuntar Carta de garantía de la agencia contratante o contrato");
+    await expect(garantiaOContrato, "sin operación, todavía no").toHaveCount(0);
     await operacion.selectOption("embarque");
     await expect(datos).toContainText(`${faltanAntes - 1}`);
-    await expect(resumen).toHaveText(antes ?? "");
+    await expect(garantiaOContrato, "una por solicitud").toHaveCount(1);
+    const conEmbarque = await resumen.textContent();
     await operacion.selectOption("desembarque");
-    await expect(resumen).toHaveText(antes ?? "");
+    await expect(resumen).toHaveText(conEmbarque ?? "");
+    await expect(garantiaOContrato).toHaveCount(1);
   });
 
   await test.step("otro trámite no la muestra, y al volver empieza otra vez sin elegir", async () => {

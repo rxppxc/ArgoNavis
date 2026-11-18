@@ -35,6 +35,8 @@ CREMA    = color_pdf(identidad.CREMA)
 ROJO     = color_pdf(COLOR_DENEGADA)
 
 CONCEPTO = "Recargo por atención fuera del horario laboral"
+# Cómo se paga (pedido del usuario del 2026-11-18). El sistema no registra el pago.
+METODOS_DE_PAGO = f"Efectivo, tarjeta o cheque a favor del {identidad.INSTITUCION}."
 DIAS = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
 
 
@@ -316,11 +318,24 @@ def generar_pdf_boleta(d: DatosPdfBoleta) -> bytes:
         ("LEFTPADDING", (0, 0), (-1, -1), 7),
         ("RIGHTPADDING", (0, 0), (-1, -1), 7),
     ]))
+    # ── Métodos de pago (2026-11-18) ──
+    pago = Table([[Paragraph("MÉTODOS DE PAGO", e_etiqueta), Paragraph(texto_pdf(METODOS_DE_PAGO), e_valor)]],
+                 colWidths=[34 * mm, ancho - 34 * mm])
+    pago.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("BOX", (0, 0), (-1, -1), 0.6, BORDE),
+        ("BACKGROUND", (0, 0), (-1, -1), FONDO),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("LEFTPADDING", (0, 0), (-1, -1), 7),
+    ]))
     historia += [
         cobro,
         Spacer(1, 2 * mm),
         Paragraph(f"La solicitud se aprobó fuera del horario laboral ({texto_pdf(TEXTO_HORARIO)}).", e_nota),
-        Spacer(1, 16 * mm),
+        Spacer(1, 3 * mm),
+        pago,
+        Spacer(1, 14 * mm),
     ]
 
     # ── Firmas ──

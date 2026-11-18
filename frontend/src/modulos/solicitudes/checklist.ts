@@ -56,16 +56,18 @@ export function conCartaSubirYBajar(
 
 /** Casillas que la solicitud debe cubrir, ya resueltas las condiciones.
  *  `subirYBajar`: si se pide la Carta de Responsabilidad de cada tripulante
- *  (`conCartaSubirYBajar`).
+ *  (`conCartaSubirYBajar`). `operacion`: la del trámite de Técnico (2026-11-18), «» sin
+ *  elegir o en los demás; con Embarque o Desembarque se pide la garantía o el contrato.
  *  Espeja ServicioTramite.construir_casillas del backend: si cambias uno,
  *  cambia el otro. */
 export function construirCasillas(
-  tipo: TipoTramite, tripulantes: TripulanteChecklist[], subirYBajar = false,
+  tipo: TipoTramite, tripulantes: TripulanteChecklist[], subirYBajar = false, operacion = "",
 ): CasillaFormulario[] {
   const resultado: CasillaFormulario[] = [];
 
   for (const d of [...tipo.documentos].sort((a, b) => a.orden - b.orden)) {
     if (d.condicion === "subir_y_bajar" && !subirYBajar) continue;
+    if (d.condicion === "embarque_o_desembarque" && operacion !== "embarque" && operacion !== "desembarque") continue;
     if (d.alcance === "solicitud") {
       if (d.condicion === "nacionalidad_restringida" && !tripulantes.some((t) => t.restringida)) continue;
       if (d.condicion === "solo_extranjeros" && tripulantes.every((t) => t.es_panameno)) continue;

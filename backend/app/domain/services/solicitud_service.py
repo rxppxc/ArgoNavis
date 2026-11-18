@@ -533,10 +533,9 @@ class ServicioSolicitud:
     async def _validar_cambio_de_puerto(
         self, puesto: PuestoControl, puesto_destino_id: int | None,
     ) -> PuestoControl | None:
-        """El nuevo puesto de un cambio de puerto (2026-11-13): activo, distinto del
-        primero y del mismo sector (el sector decide quién revisa). Si el nuevo
-        puerto es del otro sector, va una solicitud nueva y esta vence sola. El
-        mensaje no nombra los sectores: lo lee la agencia."""
+        """El nuevo puesto de un cambio de puerto (2026-11-13): activo y distinto del
+        primero, de cualquier sector desde el 2026-11-18 (antes, del mismo). La revisa
+        UCVMM del sector del primer puesto y la finaliza el nuevo."""
         if puesto_destino_id is None:
             return None
         destino = await self.repo_catalogos.buscar_puesto(puesto_destino_id)
@@ -546,12 +545,6 @@ class ServicioSolicitud:
         if destino.id == puesto.id:
             raise _error(status.HTTP_400_BAD_REQUEST,
                          "El cambio de puerto tiene que ser a otro puesto de control.")
-        if destino.sector_id != puesto.sector_id:
-            raise _error(
-                status.HTTP_400_BAD_REQUEST,
-                f"No se puede cambiar de {puesto.nombre} a {destino.nombre} en la misma solicitud: presenta una "
-                "nueva solicitud para ese puerto.",
-            )
         return destino
 
     async def _validar_formulario(
@@ -691,10 +684,14 @@ class ServicioSolicitud:
 
     def _exigir_checklist(
         self, tipo: TipoTramite, tripulantes: list[_TripulanteResuelto], cubiertas: set[tuple[int, int | None]],
-        subir_y_bajar: bool,
+        datos: _DatosFormularioSolicitud,
     ) -> list[CasillaChecklist]:
-        """400 si falta un documento exigible; si no, las casillas exigidas (la foto que se guarda)."""
-        resultado = self.tramites.evaluar(tipo, [t.para_checklist() for t in tripulantes], cubiertas, subir_y_bajar)
+        """400 si falta un documento exigible; si no, las casillas exigidas (la foto que se guarda).
+        Las condiciones del formulario: la Carta de «Subir y bajar» y la operación de Técnico."""
+        resultado = self.tramites.evaluar(
+            tipo, [t.para_checklist() for t in tripulantes], cubiertas,
+            self.con_carta_subir_y_bajar(tipo, datos), datos.operacion if tipo.pide_operacion else None,
+        )
         if not resultado.completo:
             raise _error(
                 status.HTTP_400_BAD_REQUEST,
@@ -834,8 +831,7 @@ class ServicioSolicitud:
         asignadas = self._resolver_asignaciones(tipo, datos.asignaciones, len(tripulantes))
         self._limitar_adicionales(sum(1 for td, _ in asignadas if td is None))
         requeridas = self._exigir_checklist(
-            tipo, tripulantes, {(td.documento_id, indice) for td, indice in asignadas if td is not None},
-            self.con_carta_subir_y_bajar(tipo, datos),
+            tipo, tripulantes, {(td.documento_id, indice) for td, indice in asignadas if td is not None}, datos,
         )
 
         # Los archivos se validan y escriben antes de registrar la solicitud:
@@ -925,7 +921,7 @@ class ServicioSolicitud:
                 continue
             indice = None if documento.tripulante_id is None else indice_por_id.get(documento.tripulante_id)
             cubiertas.add((documento.documento_id, indice))
-        requeridas = self._exigir_checklist(tipo, tripulantes, cubiertas, self.con_carta_subir_y_bajar(tipo, datos))
+        requeridas = self._exigir_checklist(tipo, tripulantes, cubiertas, datos)
 
         carpeta = almacenamiento.carpeta_solicitud(s.id)
         nuevos = await almacenamiento.guardar_archivos(carpeta, archivos)

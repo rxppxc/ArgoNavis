@@ -640,3 +640,29 @@ Pedido del usuario: «la opción de subir y bajar solo va en el trámite de auto
   - `test_sectores.py`: UCVMM sin estadísticas. Las pruebas de estadísticas pasan al supervisor de sector.
   - El espejo `subir_y_bajar.json`.
   - E2E: `formulario.spec.ts` y `estadisticas.spec.ts`.
+
+## Carta de garantía en Técnico, cambio de puerto a cualquier sector y métodos de pago en la boleta (2026-11-18, migración `b5e1c8d4f207`)
+
+Pedido del usuario:
+- en el trámite de Técnico, con Embarque o Desembarque, «carta de garantía de la agencia contratante o contrato»; con «Subir y bajar», «carta de garantía»;
+- en la boleta, «métodos de pago (efectivo, tarjeta o cheque a favor del Servicio Nacional de Migración)»;
+- en el cambio de puerto, quitar el filtro: «que se pueda cambiar el puesto de uno del Pacífico a uno del Atlántico».
+
+Decisiones del usuario: con «Subir y bajar», la carta de garantía y también la Carta Form. 7 de cada tripulante; una carta por solicitud, no por tripulante; y el nombre «… de la agencia contratante».
+
+- **Documentos nuevos** (una por solicitud, al final del checklist de Técnico):
+  - `DOC-GARANTIA-O-CONTRATO`, «Carta de garantía de la agencia contratante o contrato» (cualquiera de los dos, en una casilla), con la condición nueva `embarque_o_desembarque`;
+  - `DOC-CARTA-GARANTIA`, «Carta de garantía de la agencia contratante», con `subir_y_bajar`.
+  - Caben en el tope de 2 documentos de la solicitud (`MAX_DOCUMENTOS_DE_LA_SOLICITUD`): el Formulario No. 3 y una de las dos.
+- **La condición `embarque_o_desembarque`** se evalúa con la operación. `construir_casillas` y `construirCasillas` reciben la operación; sin elegir, no se pide ninguna de las dos garantías.
+- **Cambio de puerto:**
+  - `_validar_cambio_de_puerto` ya no exige el mismo sector, y `puestosParaCambio` ofrece todos los demás puestos.
+  - Se quitó el aviso «si el nuevo puerto no está en la lista, presenta una nueva solicitud».
+  - Las opciones siguen sin nombrar los sectores, porque las lee la agencia.
+  - La revisa UCVMM del sector del primer puesto (el sector sale siempre de `puesto_control_id`) y la finaliza el puesto nuevo. UCVMM del otro sector no la ve.
+- **Boleta:** una fila «MÉTODOS DE PAGO» bajo el total, también en las anuladas. El sistema sigue sin registrar el pago.
+- **Pruebas:**
+  - `test_documento_ucvmm.py`: la garantía según la operación, en otros trámites no, y la corrección de «Subir y bajar» a Embarque.
+  - `test_cambio_de_puerto.py`: a otro sector, y de punta a punta con el puesto del Atlántico.
+  - `test_boletas.py`: los métodos de pago, capturando los párrafos del PDF.
+  - Los casos nuevos del espejo del checklist y el E2E `formulario.spec.ts`.

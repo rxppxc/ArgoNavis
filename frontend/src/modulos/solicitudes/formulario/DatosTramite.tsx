@@ -33,7 +33,7 @@ export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos,
   const paraCambio = puestosParaCambio(puestos, cabecera.puesto_control_id);
   const destino = puestos.find((p) => String(p.id) === cabecera.puesto_destino_id);
 
-  /** Otro puesto elegido: el del cambio se quita si ya no es de su sector (o es el mismo). */
+  /** Otro puesto elegido: el del cambio se quita si pasa a ser el mismo. */
   function elegirPuesto(id: string) {
     onCambiar("puesto_control_id", id);
     if (cabecera.puesto_destino_id && !puestosParaCambio(puestos, id).some((p) => String(p.id) === cabecera.puesto_destino_id)) {
@@ -191,9 +191,7 @@ export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos,
           {conCambio && (
             <p className={styles.cambioPuertoAviso}>
               La autorización vale para el nuevo puesto de control
-              {destino ? <> (<strong>{destino.nombre}</strong>)</> : null}, donde se finaliza. Solo aparecen los puestos
-              a los que se puede cambiar: si el nuevo puerto no está en la lista, presenta una nueva solicitud para ese
-              puerto; esta vencerá sola.
+              {destino ? <> (<strong>{destino.nombre}</strong>)</> : null}, donde se finaliza.
             </p>
           )}
         </div>

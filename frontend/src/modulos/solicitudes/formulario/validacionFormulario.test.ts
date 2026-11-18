@@ -147,9 +147,9 @@ describe("cambio de puerto (2026-11-13)", () => {
     { id: 4, nombre: "Vacamonte", sector_id: 10 },
   ];
 
-  it("solo los puestos del mismo sector, sin el elegido", () => {
-    expect(puestosParaCambio(puestos, "1").map((p) => p.nombre)).toEqual(["Rodman", "Vacamonte"]);
-    expect(puestosParaCambio(puestos, "3")).toEqual([]);
+  it("todos los demás puestos, también los del otro sector (2026-11-18), sin el elegido", () => {
+    expect(puestosParaCambio(puestos, "1").map((p) => p.nombre)).toEqual(["Rodman", "Cristóbal", "Vacamonte"]);
+    expect(puestosParaCambio(puestos, "3").map((p) => p.nombre)).toEqual(["Balboa", "Rodman", "Vacamonte"]);
     expect(puestosParaCambio(puestos, "")).toEqual([]);
   });
 

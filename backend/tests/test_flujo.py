@@ -588,8 +588,9 @@ async def test_negar(cliente, escenario: Escenario):
     datos = cabecera("F3-TECNICO", e.puesto_a["id"], tripulantes=[tripulante("Ana", "ESP", rango="tecnico")], asignaciones=[
         {"documento_codigo": "DOC-GENERALES-PASAPORTE", "indice_tripulante": 0},
         {"documento_codigo": "DOC-BOLETO-AEREO", "indice_tripulante": 0},
+        {"documento_codigo": "DOC-GARANTIA-O-CONTRATO"},   # con Embarque, la garantía o el contrato (2026-11-18)
     ])
-    r = await enviar(cliente, e.nav_b, datos, [pdf("pasaporte"), pdf("boleto")])
+    r = await enviar(cliente, e.nav_b, datos, [pdf("pasaporte"), pdf("boleto"), pdf("garantia")])
     assert r.status_code == 201, "un técnico no porta seamanbook: Generales y boleto"
     sid = r.json()["id"]
     r = await cliente.post(f"/solicitudes/{sid}/negar", json={"motivo": "Documentación falsa"}, headers=e.revisor.headers)

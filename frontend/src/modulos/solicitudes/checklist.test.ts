@@ -13,13 +13,15 @@ interface CasoChecklist extends Caso {
   tripulantes: { nombre: string; es_panameno: boolean; rango: RangoMarino; restringida: boolean }[];
   esperado: [string, number | null][];
   opcionales?: [string, number | null][];
-  /** La respuesta a «¿Subir y bajar?» de la solicitud (2026-11-16); sin el campo, «No». */
+  /** Si se pide la Carta de «Subir y bajar» (2026-11-16); sin el campo, no. */
   subir_y_bajar?: boolean;
+  /** La operación del trámite de Técnico (2026-11-18); sin el campo, sin elegir. */
+  operacion?: string;
 }
 
 describe("construirCasillas (espejo de construir_casillas)", () => {
   it.each(leerEspejo<CasoChecklist[]>("checklist.json"))("$caso", ({
-    documentos, tripulantes, esperado, opcionales = [], subir_y_bajar = false,
+    documentos, tripulantes, esperado, opcionales = [], subir_y_bajar = false, operacion = "",
   }) => {
     const tipo = tramiteDePrueba({
       documentos: documentos.map((d, i) => ({
@@ -27,7 +29,8 @@ describe("construirCasillas (espejo de construir_casillas)", () => {
       })),
     });
     const claves = tripulantes.map((_, i) => `n${i}`);
-    const casillas = construirCasillas(tipo, tripulantes.map((t, i) => ({ ...t, clave: claves[i] })), subir_y_bajar);
+    const casillas = construirCasillas(tipo, tripulantes.map((t, i) => ({ ...t, clave: claves[i] })), subir_y_bajar,
+      operacion);
     const pares = casillas.map((c) => [c.documento_codigo, c.clave_tripulante === null ? null : claves.indexOf(c.clave_tripulante)]);
     expect(pares).toEqual(esperado);
     expect(pares.filter((_, i) => !casillas[i].obligatoria)).toEqual(opcionales);

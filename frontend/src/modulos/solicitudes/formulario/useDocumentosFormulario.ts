@@ -41,8 +41,10 @@ export function useDocumentosFormulario(
   tripulantes: FichaTripulante[],
   paisesPorCodigo: Map<string, Pais>,
   precarga: Precarga | null,
-  /** La respuesta a «¿Subir y bajar?» (2026-11-16), solo si el trámite la pregunta. */
+  /** Si se pide la Carta de «Subir y bajar» (`conCartaSubirYBajar`). */
   subirYBajar: boolean,
+  /** La operación del trámite de Técnico (2026-11-18): decide la garantía o el contrato. */
+  operacion: string,
 ): DocumentosFormulario {
   const { mostrar } = useNotificacion();
   const [nuevos, setNuevos] = useState<Record<string, File>>({});
@@ -64,8 +66,9 @@ export function useDocumentosFormulario(
         restringida: paisesPorCodigo.get(t.nacionalidad)?.nacionalidad_restringida ?? false,
       })),
       subirYBajar,
+      operacion,
     );
-  }, [tipo, tripulantes, paisesPorCodigo, subirYBajar]);
+  }, [tipo, tripulantes, paisesPorCodigo, subirYBajar, operacion]);
 
   const faltantes = useMemo(
     // Las opcionales nunca faltan (el boleto de Desembarque de los técnicos, 2026-11-11).

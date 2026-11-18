@@ -369,3 +369,25 @@ async def test_la_boleta_lleva_la_operacion_y_los_dias(cliente, esc, monkeypatch
     assert r.status_code == 200 and r.content[:5] == b"%PDF-"
     datos = armados[-1]
     assert datos.elecciones == [esperado] and datos.subir_y_bajar is None
+
+
+async def test_la_boleta_dice_los_metodos_de_pago(monkeypatch):
+    """Pedido del usuario del 2026-11-18: efectivo, tarjeta o cheque a favor del Servicio
+    Nacional de Migración. Los párrafos del PDF, tal como se escriben (su texto va cifrado
+    con la fuente)."""
+    from app.informes import boleta_recargo_pdf as modulo
+
+    escritos: list[str] = []
+    original = modulo.Paragraph
+
+    def capturar(texto, *args, **kwargs):
+        escritos.append(str(texto))
+        return original(texto, *args, **kwargs)
+
+    monkeypatch.setattr(modulo, "Paragraph", capturar)
+    for datos in (_datos_pdf(), replace(_datos_pdf(), anulada_en=panama(2026, 11, 15, 11, 0), motivo_anulacion="Mal")):
+        escritos.clear()
+        modulo.generar_pdf_boleta(datos)
+        texto = " ".join(escritos)
+        assert "MÉTODOS DE PAGO" in texto
+        assert "Efectivo, tarjeta o cheque a favor del Servicio Nacional de Migración" in texto

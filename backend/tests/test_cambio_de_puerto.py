@@ -1,10 +1,10 @@
 """Cambio de puerto dentro de la solicitud (pedido del usuario del 2026-11-13).
 
 El trámite «Cambio de Puerto» dejó de existir: en Embarque y Desembarque la agencia
-indica el nuevo puesto de control, que tiene que ser del mismo sector que el
-primero (si no, presenta otra solicitud y esta vence sola). La revisa UCVMM del
-sector del primer puesto; la ve en su bandeja, recibe el aviso y la finaliza el
-puesto nuevo; el primero solo la consulta (el expediente y la consulta histórica).
+indica el nuevo puesto de control, de cualquier sector desde el 2026-11-18 (antes,
+solo del mismo). La revisa UCVMM del sector del primer puesto; la ve en su bandeja,
+recibe el aviso y la finaliza el puesto nuevo; el primero solo la consulta (el
+expediente y la consulta histórica).
 """
 import secrets
 
@@ -68,10 +68,12 @@ async def test_el_formulario_recibe_el_sector_de_cada_puesto(cliente, e):
     assert all("sector_nombre" not in p for p in r.json()), "a la agencia no se le nombran los sectores"
 
 
-async def test_solo_a_otro_puesto_del_mismo_sector(cliente, e, admin):
+async def test_a_otro_puesto_de_cualquier_sector(cliente, e, admin):
+    """Desde el 2026-11-18, también a un puesto del otro sector (pedido del usuario: de uno del
+    Pacífico a uno del Atlántico). Del 13 al 18, solo del mismo sector."""
     r = await _enviar(cliente, e, e["otro_sector"]["id"])
-    assert r.status_code == 400 and "nueva solicitud" in r.json()["detail"], r.text
-    assert "Sector" not in r.json()["detail"] and "UCVMM" not in r.json()["detail"], "lo lee la agencia"
+    assert r.status_code == 201, r.text
+    assert r.json()["puesto_destino_id"] == e["otro_sector"]["id"]
 
     r = await _enviar(cliente, e, e["origen"]["id"])
     assert r.status_code == 400 and "otro puesto" in r.json()["detail"], r.text
@@ -189,3 +191,29 @@ async def test_al_corregir_se_puede_quitar_el_cambio(cliente, e):
     r = await enviar(cliente, e["naviera"], correccion, [], metodo="PUT", ruta=f"/solicitudes/{s['id']}")
     assert r.status_code == 200, r.text
     assert r.json()["puesto_destino_id"] is None and r.json()["puesto_destino_nombre"] is None
+
+
+async def test_al_otro_sector_la_revisa_el_primero_y_la_finaliza_el_nuevo(cliente, e, admin):
+    """Un cambio del Pacífico al Atlántico: la revisa UCVMM del sector del primer puesto (la del
+    Atlántico no la ve) y la finaliza el puesto nuevo, del otro sector."""
+    del_otro = await crear_actor("Puesto de Control", correo="cristobal.cp@prueba.pa", prefijo="puerto")
+    r = await cliente.put(f"/admin/puestos/{e['otro_sector']['id']}/usuarios", json={"usuario_ids": [del_otro.id]},
+                          headers=admin.headers)
+    assert r.status_code == 200, r.text
+    r = await _enviar(cliente, e, e["otro_sector"]["id"])
+    assert r.status_code == 201, r.text
+    sid = r.json()["id"]
+
+    atlantico = await crear_actor("UCVMM", prefijo="revisor", sectores=(ATLANTICO,))
+    assert (await cliente.get(f"/solicitudes/{sid}", headers=atlantico.headers)).status_code == 403
+    await verificar_impedimentos(cliente, e["revisor"], sid)
+    r = await cliente.post(f"/solicitudes/{sid}/aprobar", json={}, headers=e["revisor"].headers)
+    assert r.status_code == 200, r.text
+
+    r = await cliente.get("/solicitudes/puerto", params={"por_pagina": 100}, headers=del_otro.headers)
+    assert sid in {x["id"] for x in r.json()["items"]}
+    await verificar_impedimentos(cliente, del_otro, sid, ruta="impedimentos-puesto")
+    r = await cliente.post(f"/solicitudes/{sid}/finalizar", json={"comentario": "Sin novedad en Cristóbal."},
+                           headers=del_otro.headers)
+    assert r.status_code == 200 and r.json()["estado"] == "finalized", r.text
+    assert r.json()["puesto_finalizacion_id"] == e["otro_sector"]["id"]

@@ -81,6 +81,10 @@ FORM3 = ("DOC-FORMULARIO-3", "solicitud", "siempre", None)           # en todos 
 # Con «Subir y bajar», la Carta Form. 7 de cada tripulante: en Embarque y Desembarque del
 # 2026-11-16 al 18; desde entonces, solo en el trámite de Técnico (su operación «Subir y bajar»).
 CARTA_SUBIR_BAJAR = ("DOC-FORM7-RESPONSABILIDAD", "marino", "subir_y_bajar", None)
+# 2026-11-18, en el trámite de Técnico, una por solicitud: con Embarque o Desembarque, la carta de
+# garantía de la agencia contratante o el contrato; con «Subir y bajar», la carta de garantía.
+GARANTIA_O_CONTRATO = ("DOC-GARANTIA-O-CONTRATO", "solicitud", "embarque_o_desembarque", None)
+CARTA_GARANTIA = ("DOC-CARTA-GARANTIA", "solicitud", "subir_y_bajar", None)
 # En Embarque el boleto es solo del militar (2026-11-11). Los técnicos van por su trámite
 # desde el 2026-11-13; sus filas de Embarque y Desembarque se borraron el 2026-11-14.
 TECNICOS = ("superintendente", "supernumerario", "tecnico")
@@ -126,7 +130,8 @@ DOCUMENTO = {
         "rangos": {"tecnico", "superintendente", "supernumerario"},
         # El Form. 3 pide la Carta Form. 7; desde el 2026-10-30, estos rangos presentan Generales y boleto.
         # La «Visa» de los restringidos, a cualquiera de sus rangos, y la Carta con «Subir y bajar».
-        "documentos": {FORM3, GENERALES, BOLETO, VISA_RESTRINGIDOS, CARTA_SUBIR_BAJAR},
+        "documentos": {FORM3, GENERALES, BOLETO, VISA_RESTRINGIDOS, CARTA_SUBIR_BAJAR, GARANTIA_O_CONTRATO,
+                       CARTA_GARANTIA},
     },
     "F3-CAMBIO-NAVE": {
         "campos": [], "vigencia": True, "aviso_custodia": False,
@@ -160,7 +165,7 @@ def _aplica(documento: tuple, t: dict, subir_y_bajar: bool = False) -> bool:
 
 
 def _asignaciones(codigo_tramite: str, tripulantes: list[dict], *, sin: set[str] = frozenset(),
-                  subir_y_bajar: bool = False):
+                  subir_y_bajar: bool = False, operacion: str | None = None):
     """Asignaciones y archivos que el documento exige para estos tripulantes."""
     asignaciones, archivos = [], []
     for documento in sorted(DOCUMENTO[codigo_tramite]["documentos"]):
@@ -171,6 +176,8 @@ def _asignaciones(codigo_tramite: str, tripulantes: list[dict], *, sin: set[str]
             if condicion == "nacionalidad_restringida" and not any(t["nacionalidad"] == "CUB" for t in tripulantes):
                 continue
             if condicion == "subir_y_bajar" and not subir_y_bajar:
+                continue
+            if condicion == "embarque_o_desembarque" and operacion not in ("embarque", "desembarque"):
                 continue
             asignaciones.append({"documento_codigo": codigo})
             archivos.append(pdf(codigo))
@@ -191,8 +198,9 @@ def _rango(codigo_tramite: str) -> str:
 def _datos(codigo_tramite: str, puesto_id: int, tripulantes: list[dict], **extra) -> tuple[dict, list]:
     campos = {c: VALORES[c] for c in DOCUMENTO[codigo_tramite]["campos"]}
     subir_y_bajar = extra.get("subir_y_bajar", False) or extra.get("operacion") == "subir_y_bajar"
+    operacion = extra.get("operacion", "embarque") if DOCUMENTO[codigo_tramite].get("operacion") else None
     asignaciones, archivos = _asignaciones(codigo_tramite, tripulantes, sin=extra.pop("sin", frozenset()),
-                                           subir_y_bajar=subir_y_bajar)
+                                           subir_y_bajar=subir_y_bajar, operacion=operacion)
     datos = cabecera(codigo_tramite, puesto_id, tripulantes=tripulantes, asignaciones=asignaciones, **campos)
     datos.update(extra)
     return datos, archivos
@@ -785,8 +793,12 @@ async def test_corregir_a_otra_operacion_quita_la_carta(cliente, agencia):
     correccion, _ = _datos("F3-TECNICO", puesto_id, [ficha], operacion="embarque")
     correccion.pop("codigo_tramite")
     correccion["asignaciones"] = []
-    correccion["documentos_conservados"] = [d["id"] for d in s["documentos"] if d["documento_codigo"] != CARTA_FORM7]
-    r = await enviar(cliente, naviera, correccion, [], metodo="PUT", ruta=f"/solicitudes/{s['id']}")
+    # Con Embarque se pide la garantía o el contrato en lugar de la carta de garantía (2026-11-18).
+    correccion["asignaciones"] = [{"documento_codigo": "DOC-GARANTIA-O-CONTRATO"}]
+    correccion["documentos_conservados"] = [d["id"] for d in s["documentos"]
+                                            if d["documento_codigo"] not in (CARTA_FORM7, "DOC-CARTA-GARANTIA")]
+    r = await enviar(cliente, naviera, correccion, [pdf("garantia-o-contrato")], metodo="PUT",
+                     ruta=f"/solicitudes/{s['id']}")
     assert r.status_code == 200, r.text
     corregida = r.json()
     assert corregida["operacion"] == "embarque"
@@ -996,3 +1008,58 @@ async def test_los_dias_del_sellado_en_la_bandeja_la_correccion_y_el_pdf(cliente
         ctx = await svc.contexto(await RepositorioUsuario(sesion).buscar_por_id(naviera.id))
         armado = await svc.preparar_pdf(ctx, await svc.obtener(ctx, s["id"]))
     assert armado.dias_sellado == "15 días" and armado.operacion is None
+
+
+# ── 2026-11-18: la carta de garantía del trámite de Técnico, según la operación ──
+
+GARANTIA_O_CONTRATO_ = "DOC-GARANTIA-O-CONTRATO"
+CARTA_GARANTIA_ = "DOC-CARTA-GARANTIA"
+
+
+def _de_la_solicitud(salida: dict) -> set[str]:
+    return {c["documento_codigo"] for c in salida["checklist"] if c["tripulante_id"] is None}
+
+
+@pytest.mark.parametrize("operacion", ["embarque", "desembarque"])
+async def test_embarque_o_desembarque_pide_garantia_o_contrato(cliente, agencia, operacion):
+    """Pedido del usuario del 2026-11-18: con Embarque o Desembarque, una por solicitud, la carta
+    de garantía de la agencia contratante o el contrato (cualquiera de los dos, en una casilla)."""
+    naviera, puesto_id = agencia
+    tripulantes = [_tecnico("Hans"), tripulante("Ivo", "DEU", rango="superintendente")]
+    datos, archivos = _datos("F3-TECNICO", puesto_id, tripulantes, operacion=operacion, sin={GARANTIA_O_CONTRATO_})
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 400, r.text
+    assert "Carta de garantía de la agencia contratante o contrato" in r.json()["detail"], r.text
+
+    datos, archivos = _datos("F3-TECNICO", puesto_id, tripulantes, operacion=operacion)
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 201, r.text
+    assert _de_la_solicitud(r.json()) == {"DOC-FORMULARIO-3", GARANTIA_O_CONTRATO_}, "una sola, para todos"
+    assert CARTA_FORM7 not in {c["documento_codigo"] for c in r.json()["checklist"]}
+
+
+async def test_subir_y_bajar_pide_la_carta_de_garantia_y_la_form7(cliente, agencia):
+    """Con «Subir y bajar», la carta de garantía (una por solicitud) y, como antes, la Carta de
+    Responsabilidad (Form. No. 7) de cada tripulante: se piden las dos (decisión del usuario)."""
+    naviera, puesto_id = agencia
+    tripulantes = [_tecnico("Hans"), tripulante("Ivo", "DEU", rango="superintendente")]
+    datos, archivos = _datos("F3-TECNICO", puesto_id, tripulantes, operacion="subir_y_bajar", sin={CARTA_GARANTIA_})
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 400 and "Carta de garantía de la agencia contratante" in r.json()["detail"], r.text
+    assert "o contrato" not in r.json()["detail"], "con «Subir y bajar», solo la carta"
+
+    datos, archivos = _datos("F3-TECNICO", puesto_id, tripulantes, operacion="subir_y_bajar")
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 201, r.text
+    s = r.json()
+    assert _de_la_solicitud(s) == {"DOC-FORMULARIO-3", CARTA_GARANTIA_}
+    assert all(CARTA_FORM7 in _del_pasajero(s, i) for i in range(2))
+
+
+async def test_la_garantia_no_se_pide_en_otros_tramites(cliente, agencia):
+    naviera, puesto_id = agencia
+    datos, archivos = _datos("F3-EMBARQUE", puesto_id, [tripulante("Ana", "PHL")], operacion="embarque")
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 201, r.text
+    codigos = {c["documento_codigo"] for c in r.json()["checklist"]}
+    assert not codigos & {GARANTIA_O_CONTRATO_, CARTA_GARANTIA_}

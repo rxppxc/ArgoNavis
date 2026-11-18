@@ -40,6 +40,9 @@ class CondicionDocumento(str, enum.Enum):
     # tripulante. En Embarque y Desembarque del 2026-11-16 al 18; desde entonces, con la
     # operación «Subir y bajar» del trámite de Técnico (ServicioSolicitud.con_carta_subir_y_bajar).
     SUBIR_Y_BAJAR            = "subir_y_bajar"
+    # Solo con la operación Embarque o Desembarque del trámite de Técnico (2026-11-18): la
+    # carta de garantía de la agencia contratante o el contrato, una por solicitud.
+    EMBARQUE_O_DESEMBARQUE   = "embarque_o_desembarque"
 
 
 class TipoTramite(Base):
