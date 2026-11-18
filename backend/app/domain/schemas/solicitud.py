@@ -9,6 +9,10 @@ from app.domain.models.boleta import LARGO_MOTIVO_ANULACION, LARGO_NUMERO_OFICIO
 RangoMarino = Literal["marino", "pasajero", "militar", "tecnico", "supernumerario", "superintendente"]
 Sexo        = Literal["M", "F", "X"]
 Estado      = Literal["review", "returned", "approved", "denied", "finalized", "expired"]
+# La del trámite de Técnico (2026-11-18). Espejo: OperacionTecnico (models/solicitud.py).
+Operacion   = Literal["embarque", "desembarque", "subir_y_bajar"]
+# Los días del sellado de Shore Pass (2026-11-18). Espejo: DIAS_SELLADO (models/solicitud.py).
+DiasSellado = Literal[5, 15]
 
 # Tope genérico de archivos por envío: evita listas absurdas antes de llegar al
 # servicio. El tope real de tripulantes es MAX_TRIPULANTES (30, en
@@ -86,6 +90,12 @@ class _DatosFormularioSolicitud(BaseModel):
     # «¿Subir y bajar?» (2026-11-16): solo en los trámites que lo ofrecen; en los demás
     # se descarta. Con «Sí», cada pasajero adjunta la Carta de Responsabilidad.
     subir_y_bajar:     bool        = False
+    # Embarque, Desembarque o Subir y bajar (2026-11-18): obligatoria en los trámites que
+    # la piden (el de Técnico); en los demás se descarta.
+    operacion:         Operacion | None = None
+    # 5 o 15 días (2026-11-18): obligatorios en los trámites que los piden (Shore Pass); en
+    # los demás se descartan.
+    dias_sellado:      DiasSellado | None = None
     fecha_operacion:   date | None = None
 
     nombre_buque: str | None = Field(default=None, max_length=255)
@@ -110,6 +120,12 @@ class _DatosFormularioSolicitud(BaseModel):
     @classmethod
     def _vacio_a_none(cls, v: str | None) -> str | None:
         return _texto_o_nada(v)
+
+    @field_validator("operacion", "dias_sellado", mode="before")
+    @classmethod
+    def _sin_elegir(cls, v):
+        """«Selecciona…» llega vacío: es un valor sin elegir, no uno inválido."""
+        return None if v == "" else v
 
 
 class DatosCrearSolicitud(_DatosFormularioSolicitud):
@@ -379,6 +395,10 @@ class SalidaSolicitudResumen(BaseModel):
     puesto_nombre:        str
     # Cambio de puerto (2026-11-13): el nuevo puesto, que es el que la finaliza.
     puesto_destino_nombre: str | None = None
+    # La del trámite de Técnico (2026-11-18): Embarque, Desembarque o Subir y bajar.
+    operacion:            Operacion | None = None
+    # Los días del sellado de Shore Pass (2026-11-18): 5 o 15.
+    dias_sellado:         DiasSellado | None = None
     # El sector de UCVMM del puesto (2026-11-10). Solo para el SNM: a la agencia le llega None.
     sector_nombre:        str | None = None
     nombre_buque:         str | None = None
@@ -433,6 +453,10 @@ class SalidaSolicitud(SalidaSolicitudResumen):
     # «¿Subir y bajar?» (2026-11-16): la respuesta y si el trámite hace la pregunta.
     subir_y_bajar:          bool = False
     permite_subir_y_bajar:  bool = False
+    # Si el trámite pide la operación (2026-11-18: el de Técnico).
+    pide_operacion:         bool = False
+    # Si el trámite pide los días del sellado (2026-11-18: Shore Pass).
+    pide_dias_sellado:      bool = False
     bandera:            str | None = None
     bandera_nombre:     str | None = None
     nombre_puerto:      str | None = None

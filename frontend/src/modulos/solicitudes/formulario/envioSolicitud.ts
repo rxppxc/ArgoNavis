@@ -5,7 +5,8 @@
  * envioSolicitud.test.ts.
  */
 import type {
-  AsignacionArchivo, DatosFormularioSolicitud, DocumentoSolicitud, RangoMarino, SolicitudDetalle, TripulanteEntrada,
+  AsignacionArchivo, DatosFormularioSolicitud, DiasSellado, DocumentoSolicitud, RangoMarino, SolicitudDetalle,
+  TripulanteEntrada,
 } from "../../../api/solicitudes";
 import { claveCasilla, type CasillaFormulario } from "../checklist";
 import type { AdicionalNuevo } from "./DocumentosAdicionales";
@@ -45,6 +46,8 @@ export function desdeSolicitud(s: SolicitudDetalle): Precarga {
     cambio_puerto: s.puesto_destino_id ? "si" : "no",
     puesto_destino_id: s.puesto_destino_id ? String(s.puesto_destino_id) : "",
     subir_y_bajar: s.subir_y_bajar ? "si" : "no",
+    operacion: s.operacion ?? "",
+    dias_sellado: s.dias_sellado ? String(s.dias_sellado) : "",
     fecha_operacion: s.fecha_operacion,
     nombre_buque: s.nombre_buque ?? "",
     imo: s.imo ?? "",
@@ -119,6 +122,8 @@ export function armarEnvio(
     puesto_destino_id: cabecera.cambio_puerto === "si" && cabecera.puesto_destino_id
       ? Number(cabecera.puesto_destino_id) : null,
     subir_y_bajar: cabecera.subir_y_bajar === "si",
+    operacion: cabecera.operacion || null,
+    dias_sellado: cabecera.dias_sellado ? (Number(cabecera.dias_sellado) as DiasSellado) : null,
     fecha_operacion: cabecera.fecha_operacion || null,
     nombre_buque: texto(cabecera.nombre_buque),
     imo,

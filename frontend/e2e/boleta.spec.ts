@@ -22,7 +22,12 @@ async function abrirSembrada(pagina: Page, bandeja: "revision" | "supervision" |
 
 test("boleta de recargo: se genera con el oficio, se anula como en un talonario y la agencia no la ve", async ({ browser }) => {
   const ucvmm = await entrar(browser, CUENTAS.ucvmm);
+  // La operación del trámite de Técnico (2026-11-18): junto a su nombre en el pase y en el expediente.
+  await ucvmm.goto("/dashboard?bandeja=revision&estado=todas");
+  await expect(ucvmm.getByRole("link", { name: new RegExp(NUMERO_RECARGO) })).toContainText("· Subir y bajar");
   await abrirSembrada(ucvmm, "revision");
+  await expect(ucvmm.locator("dt", { hasText: /^Operación$/ }).locator("xpath=following-sibling::dd"))
+    .toHaveText("Subir y bajar");
   const panel = ucvmm.getByRole("region", { name: PANEL });
   await expect(panel.getByText("Recargo por atención fuera del horario laboral:")).toBeVisible();
   await expect(panel.getByText("Sin boleta vigente.")).toBeVisible();

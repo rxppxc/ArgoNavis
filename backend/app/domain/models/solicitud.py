@@ -11,7 +11,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
-    BigInteger, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, Numeric, String, Text,
+    BigInteger, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, Numeric, SmallInteger, String, Text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -57,6 +57,34 @@ def vigencia_minima_pasaporte(operacion: date) -> date:
     return date(anio, mes, min(operacion.day, calendar.monthrange(anio, mes)[1]))
 
 
+class OperacionTecnico(str, enum.Enum):
+    """La operación del trámite de Técnico, Superintendente o Supernumerario (pedido
+    del usuario del 2026-11-18): se elige en el formulario (TipoTramite.pide_operacion)
+    y solo se registra: no cambia los documentos. Espejo: OPERACIONES (tiposSolicitudes.ts)."""
+    EMBARQUE      = "embarque"
+    DESEMBARQUE   = "desembarque"
+    SUBIR_Y_BAJAR = "subir_y_bajar"
+
+
+# Cómo se lee en el PDF de la autorización y en la boleta (en el orden del formulario).
+ETIQUETA_OPERACION = {
+    OperacionTecnico.EMBARQUE.value:      "Embarque",
+    OperacionTecnico.DESEMBARQUE.value:   "Desembarque",
+    OperacionTecnico.SUBIR_Y_BAJAR.value: "Subir y bajar",
+}
+
+
+# Los días del sellado de Shore Pass (pedido del usuario del 2026-11-18): se eligen en el
+# formulario (TipoTramite.pide_dias_sellado) y solo se registran: no cambian los documentos
+# ni la vigencia de la autorización. Espejo: DIAS_SELLADO (tiposSolicitudes.ts).
+DIAS_SELLADO = (5, 15)
+
+
+def texto_dias(dias: int) -> str:
+    """Cómo se leen en el PDF de la autorización y en la boleta: «15 días»."""
+    return f"{dias} días"
+
+
 class TipoEventoSolicitud(str, enum.Enum):
     """Hitos del historial de una solicitud."""
     CREADA       = "creada"
@@ -85,6 +113,8 @@ class Solicitud(Base):
     __tablename__ = "solicitudes"
     __table_args__ = (
         CheckConstraint(f"estado IN ({_valores(EstadoSolicitud)})", name="ck_solicitudes_estado"),
+        CheckConstraint(f"operacion IN ({_valores(OperacionTecnico)})", name="ck_solicitudes_operacion"),
+        CheckConstraint(f"dias_sellado IN {DIAS_SELLADO}", name="ck_solicitudes_dias_sellado"),
     )
 
     id:     Mapped[int]        = mapped_column(Integer, primary_key=True, index=True)
@@ -108,6 +138,12 @@ class Solicitud(Base):
     # «¿Subir y bajar?» (2026-11-16), solo en los trámites que lo ofrecen (Embarque y
     # Desembarque). Con «Sí», cada pasajero adjunta la Carta de Responsabilidad.
     subir_y_bajar:         Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Embarque, Desembarque o Subir y bajar (OperacionTecnico, 2026-11-18), solo en los
+    # trámites que la piden (el de Técnico). Nulo en los demás y en las de antes.
+    operacion:             Mapped[str | None] = mapped_column(String(20))
+    # Los días del sellado de Shore Pass: 5 o 15 (DIAS_SELLADO, 2026-11-18), solo en los
+    # trámites que los piden. Nulo en los demás y en las de antes.
+    dias_sellado:          Mapped[int | None] = mapped_column(SmallInteger)
 
     titulo:               Mapped[str]  = mapped_column(String(255))
     fecha_operacion:      Mapped[date] = mapped_column(Date)

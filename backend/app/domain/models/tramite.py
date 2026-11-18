@@ -61,6 +61,12 @@ class TipoTramite(Base):
     # Si el formulario pregunta «¿Subir y bajar?» (2026-11-16): solo Embarque y Desembarque.
     # Con «Sí», cada pasajero adjunta la Carta de Responsabilidad (condición SUBIR_Y_BAJAR).
     permite_subir_y_bajar:       Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Si el formulario pide la operación: Embarque, Desembarque o Subir y bajar
+    # (2026-11-18, solo el trámite de Técnico). Obligatoria; no cambia los documentos.
+    pide_operacion:              Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Si el formulario pide los días del sellado: 5 o 15 (2026-11-18, solo Shore Pass).
+    # Obligatorios; no cambian los documentos ni la vigencia.
+    pide_dias_sellado:           Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     # Si el trámite valida la vigencia (hoy, los 8): el pasaporte con al menos 3 meses
     # a partir de la operación; el seamanbook vencido solo se señala (2026-11-13).

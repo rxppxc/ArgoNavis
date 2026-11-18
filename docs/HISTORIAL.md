@@ -599,3 +599,20 @@ Pedido del usuario:
 **Lo que encontró:** una base migrada desde cero no tenía `CHAT_CONSULTA` en el tipo de la bitácora. Ese valor lo dejó una función de chat ya retirada, que lo agregaba fuera de las migraciones: solo lo tenían las bases viejas, y el ORM lo conserva para leer sus registros. Sin arreglarlo, cada instalación nueva habría quedado en 503. Lo agrega la revisión `c4e8a2f6d915` (`IF NOT EXISTS`: en las bases viejas no hace nada).
 
 **Pruebas:** `tests/test_esquema.py`, con 7 pruebas. `test_la_base_migrada_tiene_todo_lo_que_usa_el_codigo` falla también si un modelo cambia sin su migración.
+
+## La operación de Técnico y los días del sellado de Shore Pass (2026-11-18, migraciones `b8f3d6a1c472` y `d2a7c5e9f831`)
+
+Pedido del usuario: en la Autorización de Técnico, Superintendente o Supernumerario, «un select que se seleccione si es embarque, desembarque, subir y bajar». Decisiones del usuario: **los documentos no cambian** (solo se registra); se ve en el expediente, el PDF de la autorización, la boleta de recargo y el pase de la bandeja; y el select **empieza sin elegir** y es obligatorio.
+
+- **Catálogo y datos:** `tipos_tramite.pide_operacion` (hoy, solo F3-TECNICO) y `solicitudes.operacion` (`embarque`, `desembarque` o `subir_y_bajar`, con la restricción `ck_solicitudes_operacion`). Nula en los demás trámites y en las solicitudes de antes.
+- **Formulario:** «Operación *», en «Datos del trámite», después del puesto de control. Sin elegir, el backend responde 400 («Faltan datos obligatorios del formulario: Operación…», `validar_campos_cabecera`) y el formulario lo cuenta entre los datos que faltan (`validarFormulario`). Un valor que no existe responde 422. Al cambiar a otro trámite se borra; al corregir una devuelta, viene la suya.
+- **Dónde se ve:** el pase de la bandeja («Autorización de Técnico… · Subir y bajar»), «Datos del trámite» del expediente, la línea «OPERACIÓN» del PDF de la autorización y, en la boleta, una fila de casillas bajo el tipo de operación (las de antes, sin la fila).
+- **No es el «¿Subir y bajar?» de Embarque y Desembarque:** ese pide la Carta Form. 7 de cada pasajero; este no pide nada más.
+- **Pruebas:** en `test_documento_ucvmm.py`, obligatoria y con los mismos documentos en las tres, un valor inválido, descartada en otro trámite, y en la bandeja, la corrección y el PDF; en `test_boletas.py`, la fila de la boleta; en Vitest, la validación y el envío; en el E2E, el formulario (`formulario.spec.ts`) y el pase y el expediente de la solicitud sembrada (`boleta.spec.ts`, que ahora es de «Subir y bajar»). `tests/ayudas.py` manda `operacion` en la cabecera de todas las pruebas: los demás trámites la descartan.
+
+**Los días del sellado de Shore Pass** (segundo pedido del mismo día: «que se pueda seleccionar si el sellado de shore pass es de 5 o 15 días»). Decisiones del usuario: lo mismo que la operación de Técnico. Solo se registran (no cambian los documentos ni la vigencia de la autorización), se ven en los mismos cuatro lugares y el select empieza sin elegir.
+- `tipos_tramite.pide_dias_sellado` (hoy, solo F3-SHORE-PASS) y `solicitudes.dias_sellado` (5 o 15, con `ck_solicitudes_dias_sellado`).
+- «Días del sellado *», en «Datos del trámite». Sin elegir, 400 («Días del sellado (5 o 15)»); otro valor, 422.
+- Se leen «15 días» en el pase de la bandeja, el expediente, el PDF de la autorización («DÍAS DEL SELLADO») y la boleta.
+- La boleta recibe ahora las dos en `elecciones` (rótulo, opciones, elegida): cada una es una fila de casillas.
+- **Pruebas:** las mismas que la operación, en `test_documento_ucvmm.py`, `test_boletas.py` (parametrizada con las dos), Vitest y `formulario.spec.ts`.

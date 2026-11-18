@@ -87,6 +87,9 @@ def cabecera(codigo: str | None, puesto_id: int, **extra) -> dict:
         "puesto_control_id": puesto_id, "fecha_operacion": MANANA,
         "nombre_buque": "MSC AURORA", "imo": "IMO 9074729", "bandera": "PAN",
         "observaciones": "Cambio de tripulación programado",
+        # La operación del trámite de Técnico y los días del sellado de Shore Pass (2026-11-18),
+        # obligatorios en el suyo; los demás trámites los descartan.
+        "operacion": "embarque", "dias_sellado": 5,
     }
     if codigo:
         datos["codigo_tramite"] = codigo

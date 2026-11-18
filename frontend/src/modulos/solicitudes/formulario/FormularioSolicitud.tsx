@@ -111,13 +111,19 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
       if (!ok) return false;
     }
     setCodigoTramite(codigo);
-    // Un trámite sin cambio de puerto (o sin «¿Subir y bajar?») no se queda con el «Sí» del anterior.
+    // Un trámite sin cambio de puerto (o sin «¿Subir y bajar?», o sin operación) no se queda con lo del anterior.
     const nuevo = tipos.find((t) => t.codigo === codigo);
     if (!nuevo?.permite_cambio_puerto) {
       setCabecera((prev) => ({ ...prev, cambio_puerto: "no", puesto_destino_id: "" }));
     }
     if (!nuevo?.permite_subir_y_bajar) {
       setCabecera((prev) => ({ ...prev, subir_y_bajar: "no" }));
+    }
+    if (!nuevo?.pide_operacion) {
+      setCabecera((prev) => ({ ...prev, operacion: "" }));
+    }
+    if (!nuevo?.pide_dias_sellado) {
+      setCabecera((prev) => ({ ...prev, dias_sellado: "" }));
     }
     documentos.descartarTodos();
     fichas.ajustarRangos(nuevo?.rangos_permitidos ?? null);

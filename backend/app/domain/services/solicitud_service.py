@@ -43,8 +43,8 @@ from app.core.permisos import (
 from app.domain.models.boleta import BoletaRecargo
 from app.domain.models.catalogo import PuestoControl
 from app.domain.models.solicitud import (
-    RANGOS_CON_LIBRETA, CasillaSolicitud, DocumentoSolicitud, EstadoSolicitud, EventoSolicitud, Solicitud,
-    TipoEventoSolicitud, TripulanteSolicitud, vigencia_minima_pasaporte,
+    DIAS_SELLADO, ETIQUETA_OPERACION, RANGOS_CON_LIBRETA, CasillaSolicitud, DocumentoSolicitud, EstadoSolicitud,
+    EventoSolicitud, Solicitud, TipoEventoSolicitud, TripulanteSolicitud, texto_dias, vigencia_minima_pasaporte,
 )
 from app.domain.models.tramite import AlcanceDocumento, TipoTramite, TramiteDocumento
 from app.domain.models.user import Usuario
@@ -727,6 +727,9 @@ class ServicioSolicitud:
         s.puesto_destino_id     = destino.id if destino else None
         s.puesto_destino_nombre = destino.nombre if destino else None
         s.subir_y_bajar        = self._subir_y_bajar(tipo, datos)
+        # La del trámite de Técnico (2026-11-18); los demás trámites la descartan.
+        s.operacion            = datos.operacion if tipo.pide_operacion else None
+        s.dias_sellado         = datos.dias_sellado if tipo.pide_dias_sellado else None   # Shore Pass
         s.fecha_operacion      = datos.fecha_operacion
         s.cantidad_tripulantes = cantidad_tripulantes
         s.nombre_buque         = datos.nombre_buque if tipo.requiere_buque else None
@@ -1226,7 +1229,7 @@ class ServicioSolicitud:
             id=s.id, numero=s.numero, titulo=s.titulo, estado=s.estado,
             tipo_tramite_codigo=s.tipo_tramite.codigo, tipo_tramite_nombre=s.tipo_tramite.nombre,
             agencia_id=s.agencia_id, agencia_nombre=s.agencia_nombre, puesto_nombre=s.puesto_nombre,
-            puesto_destino_nombre=s.puesto_destino_nombre,
+            puesto_destino_nombre=s.puesto_destino_nombre, operacion=s.operacion, dias_sellado=s.dias_sellado,
             # El sector del puesto, para el SNM (la agencia no trabaja con sectores).
             sector_nombre=s.puesto.sector.nombre if interno and s.puesto else None,
             nombre_buque=s.nombre_buque, imo=s.imo, fecha_operacion=s.fecha_operacion,
@@ -1341,6 +1344,7 @@ class ServicioSolicitud:
             valida_vigencia=tipo.valida_vigencia,
             puesto_control_id=s.puesto_control_id, puesto_destino_id=s.puesto_destino_id,
             subir_y_bajar=s.subir_y_bajar, permite_subir_y_bajar=tipo.permite_subir_y_bajar,
+            pide_operacion=tipo.pide_operacion, pide_dias_sellado=tipo.pide_dias_sellado,
             bandera=s.bandera, bandera_nombre=await self._nombre_pais(s.bandera),
             nombre_puerto=s.nombre_puerto, puerto_desembarque=s.puerto_desembarque,
             motivo=s.motivo, clinica_hospital=s.clinica_hospital, observaciones=s.observaciones,
@@ -1467,7 +1471,19 @@ class ServicioSolicitud:
             motivo_anulacion=boleta.motivo_anulacion,
             tipos_operacion=[t.nombre for t in tipos],
             subir_y_bajar=s.subir_y_bajar if s.tipo_tramite.permite_subir_y_bajar else None,
+            elecciones=self._elecciones_boleta(s),
         )
+
+    @staticmethod
+    def _elecciones_boleta(s: Solicitud) -> list[tuple[str, tuple[str, ...], str]]:
+        """La operación del trámite de Técnico y los días del sellado de Shore Pass
+        (2026-11-18), en casillas, con la X en la elegida. Las de antes no las tienen."""
+        elecciones = []
+        if s.operacion:
+            elecciones.append(("OPERACIÓN", tuple(ETIQUETA_OPERACION.values()), ETIQUETA_OPERACION[s.operacion]))
+        if s.dias_sellado:
+            elecciones.append(("DÍAS DEL SELLADO", tuple(texto_dias(d) for d in DIAS_SELLADO), texto_dias(s.dias_sellado)))
+        return elecciones
 
     # ── Autorización (PDF) y verificación pública ────────────────────────────
 
@@ -1525,6 +1541,10 @@ class ServicioSolicitud:
             puesto_control=s.puesto_nombre, puesto_destino=s.puesto_destino_nombre,
             # Solo en los trámites que hacen la pregunta (Embarque y Desembarque, 2026-11-16).
             subir_y_bajar=s.subir_y_bajar if s.tipo_tramite.permite_subir_y_bajar else None,
+            # La operación de Técnico y los días del sellado de Shore Pass (2026-11-18); None en
+            # los demás trámites y en las de antes.
+            operacion=ETIQUETA_OPERACION.get(s.operacion or ""),
+            dias_sellado=texto_dias(s.dias_sellado) if s.dias_sellado else None,
             fecha_operacion=s.fecha_operacion,
             nombre_puerto=s.nombre_puerto, puerto_desembarque=s.puerto_desembarque,
             clinica_hospital=s.clinica_hospital, motivo=s.motivo,

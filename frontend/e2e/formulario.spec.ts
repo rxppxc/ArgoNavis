@@ -197,6 +197,64 @@ test("«¿Subir y bajar?» pide la Carta de Responsabilidad de cada pasajero (20
   });
 });
 
+test("el trámite de Técnico pide la operación: Embarque, Desembarque o Subir y bajar (2026-11-18)", async ({ browser }) => {
+  const agencia = await entrar(browser, CUENTAS.agencia);
+  await agencia.goto("/new");
+  await agencia.getByRole("button", { name: /^Autorización de Técnico/ }).click();
+
+  const operacion = agencia.getByLabel("Operación *");
+  await expect(operacion, "empieza sin elegir").toHaveValue("");
+  await expect(operacion.locator("option")).toHaveText(["Selecciona…", "Embarque", "Desembarque", "Subir y bajar"]);
+
+  // Obligatoria: cuenta entre los datos que faltan y no deja enviar sin ella.
+  const datos = agencia.getByRole("link", { name: /Datos del trámite/ });
+  const faltanAntes = Number(/Faltan? (\d+) datos?/.exec((await datos.textContent()) ?? "")?.[1]);
+  await agencia.getByRole("button", { name: "Enviar solicitud" }).click();
+  await expect(agencia.getByText("Elige la operación: Embarque, Desembarque o Subir y bajar.")).toBeVisible();
+
+  await test.step("no cambia los documentos (decisión del usuario)", async () => {
+    const resumen = agencia.getByText(/^Faltan? \d+ documentos? por adjuntar$/);
+    const antes = await resumen.textContent();
+    await operacion.selectOption("subir_y_bajar");
+    await expect(datos).toContainText(`${faltanAntes - 1}`);
+    await expect(resumen).toHaveText(antes ?? "");
+    await expect(agencia.getByLabel(/^Adjuntar Carta de Responsabilidad/)).toHaveCount(0);
+  });
+
+  await test.step("otro trámite no la muestra, y al volver empieza otra vez sin elegir", async () => {
+    await agencia.getByRole("button", { name: "Cambiar", exact: true }).click();
+    await agencia.getByRole("button", { name: /^Embarque/ }).click();
+    await expect(agencia.getByLabel("Operación *")).toHaveCount(0);
+    await agencia.getByRole("button", { name: "Cambiar", exact: true }).click();
+    await agencia.getByRole("button", { name: /^Autorización de Técnico/ }).click();
+    await expect(agencia.getByLabel("Operación *")).toHaveValue("");
+  });
+});
+
+test("Shore Pass pide los días del sellado: 5 o 15 (2026-11-18)", async ({ browser }) => {
+  const agencia = await entrar(browser, CUENTAS.agencia);
+  await agencia.goto("/new");
+  await agencia.getByRole("button", { name: /^Sellado de Shore Pass/ }).click();
+
+  const dias = agencia.getByLabel("Días del sellado *");
+  await expect(dias, "empieza sin elegir").toHaveValue("");
+  await expect(dias.locator("option")).toHaveText(["Selecciona…", "5 días", "15 días"]);
+  await agencia.getByRole("button", { name: "Enviar solicitud" }).click();
+  await expect(agencia.getByText("Elige los días del sellado: 5 o 15.")).toBeVisible();
+
+  // Solo se registran: no cambian los documentos (decisión del usuario).
+  const resumen = agencia.getByText(/^Faltan? \d+ documentos? por adjuntar$/);
+  const antes = await resumen.textContent();
+  await dias.selectOption("15");
+  await expect(resumen).toHaveText(antes ?? "");
+
+  await test.step("otro trámite no los muestra", async () => {
+    await agencia.getByRole("button", { name: "Cambiar", exact: true }).click();
+    await agencia.getByRole("button", { name: /^Embarque/ }).click();
+    await expect(agencia.getByLabel("Días del sellado *")).toHaveCount(0);
+  });
+});
+
 test("el pasaporte con 3 meses de vigencia; el seamanbook vencido solo avisa", async ({ browser }) => {
   const agencia = await entrar(browser, CUENTAS.agencia);
   await agencia.goto("/new");

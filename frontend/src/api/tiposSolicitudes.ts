@@ -6,6 +6,14 @@ export type EstadoSolicitud = "review" | "returned" | "approved" | "denied" | "f
 /** «pasajero» (2026-11-13): un Marino sin libreta. */
 export type RangoMarino = "marino" | "pasajero" | "militar" | "tecnico" | "supernumerario" | "superintendente";
 export type Sexo = "M" | "F" | "X";
+/** La operación del trámite de Técnico, Superintendente o Supernumerario (2026-11-18):
+ *  obligatoria ahí, no cambia los documentos. Espejo de OperacionTecnico (models/solicitud.py). */
+export const OPERACIONES = ["embarque", "desembarque", "subir_y_bajar"] as const;
+export type Operacion = (typeof OPERACIONES)[number];
+/** Los días del sellado de Shore Pass (2026-11-18): obligatorios ahí; no cambian los documentos
+ *  ni la vigencia. Espejo de DIAS_SELLADO (models/solicitud.py). */
+export const DIAS_SELLADO = [5, 15] as const;
+export type DiasSellado = (typeof DIAS_SELLADO)[number];
 /** «supervision»: solo lectura, las de sus sectores o las de los dos (2026-11-10). */
 export type Bandeja = "agencia" | "revision" | "puerto" | "supervision";
 
@@ -39,6 +47,10 @@ export interface DatosFormularioSolicitud {
   puesto_destino_id: number | null;
   /** «¿Subir y bajar?» (2026-11-16): el servidor lo descarta si el trámite no lo pregunta. */
   subir_y_bajar: boolean;
+  /** La del trámite de Técnico (2026-11-18); el servidor la descarta en los demás. */
+  operacion: Operacion | null;
+  /** Los de Shore Pass (2026-11-18); el servidor los descarta en los demás. */
+  dias_sellado: DiasSellado | null;
   fecha_operacion: string | null;
   nombre_buque: string | null;
   imo: string | null;
@@ -72,6 +84,10 @@ export interface SolicitudResumen {
   puesto_nombre: string;
   /** Cambio de puerto (2026-11-13): el nuevo puesto, donde vale y se finaliza. */
   puesto_destino_nombre: string | null;
+  /** La del trámite de Técnico (2026-11-18): null en los demás y en las de antes. */
+  operacion: Operacion | null;
+  /** Los días del sellado de Shore Pass (2026-11-18): null en los demás y en las de antes. */
+  dias_sellado: DiasSellado | null;
   /** El sector de UCVMM del puesto (2026-11-10). Solo para el SNM: a la agencia le llega null. */
   sector_nombre: string | null;
   nombre_buque: string | null;
@@ -256,6 +272,10 @@ export interface SolicitudDetalle extends SolicitudResumen {
   /** «¿Subir y bajar?» (2026-11-16): la respuesta y si el trámite hace la pregunta. */
   subir_y_bajar: boolean;
   permite_subir_y_bajar: boolean;
+  /** Si el trámite pide la operación (2026-11-18: el de Técnico). */
+  pide_operacion: boolean;
+  /** Si el trámite pide los días del sellado (2026-11-18: Shore Pass). */
+  pide_dias_sellado: boolean;
   bandera: string | null;
   bandera_nombre: string | null;
   nombre_puerto: string | null;

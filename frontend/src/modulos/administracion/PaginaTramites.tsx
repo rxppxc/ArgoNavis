@@ -55,6 +55,8 @@ export default function PaginaTramites() {
                 t.requiere_clinica && "Clínica u hospital",
                 t.requiere_motivo && "Motivo",
                 t.permite_subir_y_bajar && "¿Subir y bajar? (Sí / No)",
+                t.pide_operacion && "Operación (Embarque, Desembarque o Subir y bajar)",
+                t.pide_dias_sellado && "Días del sellado (5 o 15)",
                 t.permite_cambio_puerto && "Cambio de puerto (opcional)",
               ].filter(Boolean) as string[];
 

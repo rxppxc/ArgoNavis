@@ -138,6 +138,7 @@ async def sembrar() -> None:
             numero=NUMERO_RECARGO, agencia_id=agencia.id, agencia_nombre=AGENCIA, creada_por_id=agencia_id,
             tipo_tramite_id=tecnico, puesto_control_id=rodman.id, puesto_nombre=PUESTO_MISMO_SECTOR,
             titulo="Técnicos del MSC E2E", nombre_buque="MSC E2E", imo="9074729", fecha_operacion=operacion,
+            operacion="subir_y_bajar",   # la del trámite de Técnico (2026-11-18)
             # created_at igual al envío, como en la realidad: si queda en «ahora», el tiempo de
             # respuesta de las estadísticas sale negativo (2026-11-17).
             cantidad_tripulantes=0, estado="approved", enviada_en=aprobada - timedelta(hours=3),

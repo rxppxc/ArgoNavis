@@ -1,7 +1,7 @@
 /** Validación del formulario de solicitud en el navegador. Espeja las reglas
  *  del backend (que igual vuelve a validar todo) para avisar antes de enviar. */
 import type { Pais, PuestoMini } from "../../../api/catalogos";
-import type { TripulanteEntrada } from "../../../api/solicitudes";
+import type { Operacion, TripulanteEntrada } from "../../../api/solicitudes";
 import type { TipoTramite } from "../../../api/tramites";
 import { ETIQUETA_RANGO, RANGOS_CON_LIBRETA, formatearFecha, normalizarImo } from "../presentacion";
 
@@ -12,6 +12,10 @@ export interface CabeceraFormulario {
   puesto_destino_id: string;
   /** ¿Subir y bajar? (2026-11-16): con «si», cada pasajero adjunta la Carta de Responsabilidad. */
   subir_y_bajar: "no" | "si";
+  /** La del trámite de Técnico (2026-11-18): empieza sin elegir («»). */
+  operacion: "" | Operacion;
+  /** Los de Shore Pass (2026-11-18): «5», «15» o sin elegir («»). */
+  dias_sellado: string;
   fecha_operacion: string;
   nombre_buque: string;
   imo: string;
@@ -28,7 +32,8 @@ export interface FichaTripulante extends TripulanteEntrada {
 }
 
 export const CABECERA_VACIA: CabeceraFormulario = {
-  puesto_control_id: "", cambio_puerto: "no", puesto_destino_id: "", subir_y_bajar: "no", fecha_operacion: "",
+  puesto_control_id: "", cambio_puerto: "no", puesto_destino_id: "", subir_y_bajar: "no", operacion: "",
+  dias_sellado: "", fecha_operacion: "",
   nombre_buque: "", imo: "", bandera: "",
   nombre_puerto: "", puerto_desembarque: "", motivo: "", clinica_hospital: "",
   observaciones: "",
@@ -133,6 +138,10 @@ export function validarFormulario(
   if (tipo.requiere_puerto_desembarque && !c.puerto_desembarque.trim()) errores.push("Indica el puerto de desembarque.");
   if (tipo.requiere_motivo && !c.motivo.trim()) errores.push("Indica el motivo.");
   if (tipo.requiere_clinica && !c.clinica_hospital.trim()) errores.push("Indica la clínica u hospital.");
+  // Obligatoria en el trámite de Técnico (2026-11-18); el backend: validar_campos_cabecera.
+  if (tipo.pide_operacion && !c.operacion) errores.push("Elige la operación: Embarque, Desembarque o Subir y bajar.");
+  // Obligatorios en Shore Pass (2026-11-18); el backend: validar_campos_cabecera.
+  if (tipo.pide_dias_sellado && !c.dias_sellado) errores.push("Elige los días del sellado: 5 o 15.");
 
   if (tripulantes.length === 0) errores.push("Registra al menos un pasajero.");
   // Solo pasa al corregir una solicitud enviada antes del tope: el botón no deja agregar más.

@@ -30,7 +30,8 @@ import { PanelRevision } from "./PanelRevision";
 import { pasosSiguientes } from "./pasosSiguientes";
 import { QueSigue } from "./QueSigue";
 import {
-  formatearFecha, formatearFechaHora, puestoAutorizado, TEXTO_HORARIO_LABORAL, textoPuestos, tiempoRestante,
+  ETIQUETA_OPERACION, formatearFecha, formatearFechaHora, puestoAutorizado, TEXTO_HORARIO_LABORAL, textoDias,
+  textoPuestos, tiempoRestante,
 } from "../presentacion";
 import { SeccionTripulantes } from "./SeccionTripulantes";
 import { useVerificacionImpedimentos } from "./useVerificacionImpedimentos";
@@ -385,6 +386,10 @@ function Expediente({ s, onActualizada, volverA, estadoVolver }: {
               <Dato etiqueta="Puesto de Control Migratorio" valor={s.puesto_nombre} />
               {/* Cambio de puerto (2026-11-13): el nuevo puesto, que la finaliza. */}
               <Dato etiqueta="Cambio de puerto a" valor={s.puesto_destino_nombre} />
+              {/* La del trámite de Técnico (2026-11-18); las de antes no la tienen. */}
+              <Dato etiqueta="Operación" valor={s.operacion ? ETIQUETA_OPERACION[s.operacion] : null} />
+              {/* Los días del sellado de Shore Pass (2026-11-18). */}
+              <Dato etiqueta="Días del sellado" valor={s.dias_sellado ? textoDias(s.dias_sellado) : null} />
               {/* «¿Subir y bajar?» (2026-11-16): solo en los trámites que lo preguntan. */}
               {s.permite_subir_y_bajar && <Dato etiqueta="Subir y bajar" valor={s.subir_y_bajar ? "Sí" : "No"} />}
               {/* El sector de UCVMM (2026-11-10): solo le llega al SNM. */}

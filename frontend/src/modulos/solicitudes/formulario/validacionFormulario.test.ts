@@ -167,3 +167,40 @@ describe("cambio de puerto (2026-11-13)", () => {
     expect(validarFormulario(tramiteDePrueba(), cabecera, [ficha()], paises, hoy)).toEqual([]);
   });
 });
+
+describe("la operación del trámite de Técnico (2026-11-18)", () => {
+  const hoy = "2026-10-14";
+  const cabecera: CabeceraFormulario = { ...CABECERA_VACIA, puesto_control_id: "1", fecha_operacion: "2026-10-20" };
+  const tecnico = tramiteDePrueba({ pide_operacion: true });
+
+  it("empieza sin elegir y es obligatoria", () => {
+    expect(CABECERA_VACIA.operacion).toBe("");
+    expect(validarFormulario(tecnico, cabecera, [ficha()], paises, hoy))
+      .toEqual(["Elige la operación: Embarque, Desembarque o Subir y bajar."]);
+    for (const operacion of ["embarque", "desembarque", "subir_y_bajar"] as const) {
+      expect(validarFormulario(tecnico, { ...cabecera, operacion }, [ficha()], paises, hoy)).toEqual([]);
+    }
+  });
+
+  it("un trámite que no la pide no la exige", () => {
+    expect(validarFormulario(tramiteDePrueba(), cabecera, [ficha()], paises, hoy)).toEqual([]);
+  });
+});
+
+describe("los días del sellado de Shore Pass (2026-11-18)", () => {
+  const hoy = "2026-10-14";
+  const cabecera: CabeceraFormulario = { ...CABECERA_VACIA, puesto_control_id: "1", fecha_operacion: "2026-10-20" };
+  const shorePass = tramiteDePrueba({ pide_dias_sellado: true });
+
+  it("empiezan sin elegir y son obligatorios", () => {
+    expect(CABECERA_VACIA.dias_sellado).toBe("");
+    expect(validarFormulario(shorePass, cabecera, [ficha()], paises, hoy)).toEqual(["Elige los días del sellado: 5 o 15."]);
+    for (const dias_sellado of ["5", "15"]) {
+      expect(validarFormulario(shorePass, { ...cabecera, dias_sellado }, [ficha()], paises, hoy)).toEqual([]);
+    }
+  });
+
+  it("un trámite que no los pide no los exige", () => {
+    expect(validarFormulario(tramiteDePrueba(), cabecera, [ficha()], paises, hoy)).toEqual([]);
+  });
+});

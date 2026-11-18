@@ -3,7 +3,8 @@ import type { TipoTramite } from "../../../api/tramites";
 import { SelectorBuscable } from "../../../components/SelectorBuscable";
 import type { OpcionBuscable } from "../../../utils/busqueda";
 import { FechaEnPalabras } from "../FechaEnPalabras";
-import { AYUDA_CAMPOS_TRAMITE, formatearFechaHora } from "../presentacion";
+import { DIAS_SELLADO, OPERACIONES } from "../../../api/tiposSolicitudes";
+import { AYUDA_CAMPOS_TRAMITE, ETIQUETA_OPERACION, formatearFechaHora, textoDias } from "../presentacion";
 import { operacionMaxima, puestosParaCambio, type CabeceraFormulario } from "./validacionFormulario";
 import styles from "./PaginaSolicitud.module.css";
 
@@ -22,8 +23,8 @@ interface Props {
 
 /** Paso 2 del formulario: la agencia y la fecha, el buque, la fecha de la operación y
  *  el puesto, lo que pide el trámite (puerto, clínica, motivo), con las aclaraciones
- *  del Form. 3, «¿Subir y bajar?» (2026-11-16) y al final el cambio de puerto (orden
- *  pedido el 2026-11-13). */
+ *  del Form. 3, la operación del trámite de Técnico (2026-11-18), «¿Subir y bajar?»
+ *  (2026-11-16) y al final el cambio de puerto (orden pedido el 2026-11-13). */
 export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos, opcionesPais, hoy, onCambiar }: Props) {
   const ayuda = AYUDA_CAMPOS_TRAMITE[tipo.codigo];
   // El cambio de puerto, solo en los trámites que lo admiten (Embarque y Desembarque, 2026-11-13).
@@ -114,6 +115,28 @@ export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos,
             <span>Motivo * <em>(Tribunal ACP, compras, otros)</em></span>
             <input type="text" maxLength={2000} value={cabecera.motivo}
               onChange={(e) => onCambiar("motivo", e.target.value)} />
+          </label>
+        )}
+        {/* La operación del trámite de Técnico (pedido del usuario del 2026-11-18): obligatoria, empieza
+            sin elegir y no cambia los documentos. */}
+        {tipo.pide_operacion && (
+          <label className={styles.campo}>
+            <span>Operación *</span>
+            <select value={cabecera.operacion} onChange={(e) => onCambiar("operacion", e.target.value)}>
+              <option value="">Selecciona…</option>
+              {OPERACIONES.map((o) => <option key={o} value={o}>{ETIQUETA_OPERACION[o]}</option>)}
+            </select>
+          </label>
+        )}
+        {/* Los días del sellado de Shore Pass (pedido del usuario del 2026-11-18): obligatorios, empiezan
+            sin elegir y no cambian los documentos ni la vigencia. */}
+        {tipo.pide_dias_sellado && (
+          <label className={styles.campo}>
+            <span>Días del sellado *</span>
+            <select value={cabecera.dias_sellado} onChange={(e) => onCambiar("dias_sellado", e.target.value)}>
+              <option value="">Selecciona…</option>
+              {DIAS_SELLADO.map((d) => <option key={d} value={d}>{textoDias(d)}</option>)}
+            </select>
           </label>
         )}
         {/* «¿Subir y bajar?» (2026-11-16), solo en Embarque y Desembarque: con «Sí», cada pasajero

@@ -43,6 +43,10 @@ class SalidaTipoTramite(BaseModel):
     permite_cambio_puerto:       bool = False
     # El formulario pregunta «¿Subir y bajar?» (2026-11-16: Embarque y Desembarque).
     permite_subir_y_bajar:       bool = False
+    # El formulario pide la operación: Embarque, Desembarque o Subir y bajar (2026-11-18: Técnico).
+    pide_operacion:              bool = False
+    # El formulario pide los días del sellado: 5 o 15 (2026-11-18: Shore Pass).
+    pide_dias_sellado:           bool = False
     valida_vigencia:             bool = False
     # Rangos de tripulante admitidos (nulo = cualquiera).
     rangos_permitidos: list[str] | None = None

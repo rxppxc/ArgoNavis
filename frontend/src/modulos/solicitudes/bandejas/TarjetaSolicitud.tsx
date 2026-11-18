@@ -2,7 +2,10 @@ import { Link } from "react-router-dom";
 import type { Bandeja, SolicitudResumen } from "../../../api/solicitudes";
 import { IconoAlerta, IconoReloj } from "../../../components/Iconos";
 import { InsigniaEstado } from "../InsigniaEstado";
-import { formatearFecha, formatearFechaHora, TEXTO_HORARIO_LABORAL, textoPuestos, tiempoRestante } from "../presentacion";
+import {
+  ETIQUETA_OPERACION, formatearFecha, formatearFechaHora, TEXTO_HORARIO_LABORAL, textoDias, textoPuestos,
+  tiempoRestante,
+} from "../presentacion";
 import styles from "./TarjetaSolicitud.module.css";
 
 /** Fila de las bandejas, como un pase (identidad «pase oficial», 2026-11-11): el
@@ -35,7 +38,12 @@ export function TarjetaSolicitud({ s, vista, volverA, conSector = false }: {
         </div>
 
         <div className={styles.cuerpo}>
-          <span className={styles.titulo}>{s.tipo_tramite_nombre}</span>
+          {/* Con la operación del trámite de Técnico o los días del sellado de Shore Pass al lado (2026-11-18). */}
+          <span className={styles.titulo}>
+            {s.tipo_tramite_nombre}
+            {s.operacion && <> · {ETIQUETA_OPERACION[s.operacion]}</>}
+            {s.dias_sellado && <> · {textoDias(s.dias_sellado)}</>}
+          </span>
           <dl className={styles.datos}>
             {s.nombre_buque && <div><dt>Buque</dt><dd>{s.nombre_buque}</dd></div>}
             {s.imo && <div><dt>IMO</dt><dd className={styles.mono}>{s.imo}</dd></div>}

@@ -232,6 +232,10 @@ class ServicioTramite:
             faltantes.append("Motivo")
         if tipo.requiere_clinica and not datos.get("clinica_hospital"):
             faltantes.append("Clínica u hospital")
+        if tipo.pide_operacion and not datos.get("operacion"):
+            faltantes.append("Operación (Embarque, Desembarque o Subir y bajar)")
+        if tipo.pide_dias_sellado and not datos.get("dias_sellado"):
+            faltantes.append("Días del sellado (5 o 15)")
         return faltantes
 
     def validar_tripulantes(

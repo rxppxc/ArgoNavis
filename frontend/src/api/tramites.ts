@@ -39,6 +39,10 @@ export interface TipoTramite {
   permite_cambio_puerto: boolean;
   /** El formulario pregunta «¿Subir y bajar?» (2026-11-16: Embarque y Desembarque). */
   permite_subir_y_bajar: boolean;
+  /** El formulario pide la operación: Embarque, Desembarque o Subir y bajar (2026-11-18: Técnico). */
+  pide_operacion: boolean;
+  /** El formulario pide los días del sellado: 5 o 15 (2026-11-18: Shore Pass). */
+  pide_dias_sellado: boolean;
   /** Pasaporte con al menos 3 meses de vigencia desde la operación (2026-11-13; el
    *  seamanbook vencido solo se señala). */
   valida_vigencia: boolean;

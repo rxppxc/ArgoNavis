@@ -104,6 +104,10 @@ class DatosPdfAutorizacion:
     puesto_destino:      str | None = None
     # «¿Subir y bajar?» (2026-11-16): None si el trámite no hace la pregunta.
     subir_y_bajar:       bool | None = None
+    # La operación del trámite de Técnico y los días del sellado de Shore Pass, ya en
+    # palabras (2026-11-18): None en los demás.
+    operacion:           str | None = None
+    dias_sellado:        str | None = None
     # Aprobada fuera del horario laboral, con su recargo (2026-11-11).
     fuera_de_horario:       bool = False
     costo_fuera_de_horario: Decimal | None = None
@@ -242,6 +246,8 @@ def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
         ("PUESTO DE CONTROL MIGRATORIO", texto_pdf(d.puesto_control)),
         *([("CAMBIO DE PUERTO A", texto_pdf(d.puesto_destino))] if d.puesto_destino else []),
         *([("SUBIR Y BAJAR", "Sí" if d.subir_y_bajar else "No")] if d.subir_y_bajar is not None else []),
+        *([("OPERACIÓN", texto_pdf(d.operacion))] if d.operacion else []),
+        *([("DÍAS DEL SELLADO", texto_pdf(d.dias_sellado))] if d.dias_sellado else []),
         ("BUQUE", texto_pdf(d.nombre_buque)),
         ("IMO", texto_pdf(d.imo)),
         ("BANDERA", texto_pdf(d.bandera)),

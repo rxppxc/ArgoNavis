@@ -1,5 +1,7 @@
 /** Textos y formatos compartidos por las pantallas de solicitudes. */
-import type { EstadoSolicitud, EventoSolicitud, RangoMarino, Sexo, TripulanteSolicitud } from "../../api/solicitudes";
+import type {
+  EstadoSolicitud, EventoSolicitud, Operacion, RangoMarino, Sexo, TripulanteSolicitud,
+} from "../../api/solicitudes";
 import { dosCifras } from "../../utils/fechas";
 import { HORA_FIN_LABORAL, HORA_INICIO_LABORAL } from "../administracion/estadisticas/calculos";
 
@@ -22,6 +24,19 @@ export const ETIQUETA_RANGO: Record<RangoMarino, string> = {
 };
 
 export const TODOS_LOS_RANGOS = Object.keys(ETIQUETA_RANGO) as RangoMarino[];
+
+/** La operación del trámite de Técnico (2026-11-18), en el orden del formulario. Espejo de
+ *  ETIQUETA_OPERACION (models/solicitud.py), que la escribe en el PDF y en la boleta. */
+export const ETIQUETA_OPERACION: Record<Operacion, string> = {
+  embarque:      "Embarque",
+  desembarque:   "Desembarque",
+  subir_y_bajar: "Subir y bajar",
+};
+
+/** Los días del sellado de Shore Pass (2026-11-18): «15 días», como texto_dias (models/solicitud.py). */
+export function textoDias(dias: number): string {
+  return `${dias} días`;
+}
 
 export const ETIQUETA_SEXO: Record<Sexo, string> = {
   M: "Masculino",

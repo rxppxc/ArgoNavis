@@ -164,3 +164,28 @@ describe("subir y bajar (2026-11-16)", () => {
     expect(armarEnvio(CABECERA_VACIA, [], SIN_DOCUMENTOS).datos.subir_y_bajar).toBe(false);
   });
 });
+
+describe("la operación del trámite de Técnico (2026-11-18)", () => {
+  it("la precarga trae la de la devuelta; las de antes vienen sin elegir", () => {
+    expect(desdeSolicitud(solicitudDePrueba({ operacion: "subir_y_bajar" })).cabecera.operacion).toBe("subir_y_bajar");
+    expect(desdeSolicitud(solicitudDePrueba({ operacion: null })).cabecera.operacion).toBe("");
+  });
+
+  it("viaja la elegida; sin elegir, null", () => {
+    expect(armarEnvio({ ...CABECERA_VACIA, operacion: "desembarque" }, [], SIN_DOCUMENTOS).datos.operacion)
+      .toBe("desembarque");
+    expect(armarEnvio(CABECERA_VACIA, [], SIN_DOCUMENTOS).datos.operacion).toBeNull();
+  });
+});
+
+describe("los días del sellado de Shore Pass (2026-11-18)", () => {
+  it("la precarga trae los de la devuelta; las de antes vienen sin elegir", () => {
+    expect(desdeSolicitud(solicitudDePrueba({ dias_sellado: 15 })).cabecera.dias_sellado).toBe("15");
+    expect(desdeSolicitud(solicitudDePrueba({ dias_sellado: null })).cabecera.dias_sellado).toBe("");
+  });
+
+  it("viajan como número; sin elegir, null", () => {
+    expect(armarEnvio({ ...CABECERA_VACIA, dias_sellado: "15" }, [], SIN_DOCUMENTOS).datos.dias_sellado).toBe(15);
+    expect(armarEnvio(CABECERA_VACIA, [], SIN_DOCUMENTOS).datos.dias_sellado).toBeNull();
+  });
+});

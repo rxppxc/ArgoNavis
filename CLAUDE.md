@@ -252,6 +252,7 @@ El sistema cubre el ciclo completo de las Autorizaciones Marítimas: la agencia 
 - supervisión y consulta histórica;
 - el recargo por atención fuera del horario laboral y su boleta, con el tipo de operación en casillas (2026-11-16);
 - «¿Subir y bajar?» en Embarque y Desembarque, con la Carta Form. 7 de cada pasajero, y la ocupación fuera del formulario (2026-11-16);
+- la operación del trámite de Técnico (Embarque, Desembarque o Subir y bajar) y los días del sellado de Shore Pass (5 o 15) (2026-11-18);
 - estadísticas con exportación a Excel, PDF y CSV;
 - la verificación pública del PDF por el QR;
 - la identidad «pase oficial».
@@ -351,7 +352,7 @@ Cada una salió de un problema real. El detalle está en el historial.
     - los permisos se consultan en cada pedido (a veces dos veces);
     - el expediente vuelve a leer el catálogo (trámites, documentos y países) y carga `creada_por` con su rol y su agencia.
     Juntar la verificación del token con la carga del usuario y cachear el catálogo por proceso ahorraría entre 10 y 20 %. Correr `tests/carga.py` antes y después.
-17. **Documentación de la DTI, juego 0.7:** `docs/` no tiene todavía la identidad «pase oficial» ni los cambios del 2026-11-11 (documentos de los técnicos, nombre neutro para la agencia, costo fuera del horario y consulta histórica), del 2026-11-13 (cambio de puerto, Formulario No. 3 en todos los trámites, cabecera de la agencia, rango Pasajero, pasaporte con 3 meses) del 2026-11-14 (la Visa de los restringidos, los panameños, Shore Pass, quien finalizó y el PDF por el QR) y del 2026-11-16 (la boleta de recargo con el tipo de operación, el alcance del supervisor general, «¿Subir y bajar?» con la Carta Form. 7 y la ocupación fuera del formulario), ni el rediseño visual «B + C» del 2026-11-17 (las capturas de los manuales quedaron con el diseño anterior).
+17. **Documentación de la DTI, juego 0.7:** `docs/` no tiene todavía la identidad «pase oficial» ni los cambios del 2026-11-11 (documentos de los técnicos, nombre neutro para la agencia, costo fuera del horario y consulta histórica), del 2026-11-13 (cambio de puerto, Formulario No. 3 en todos los trámites, cabecera de la agencia, rango Pasajero, pasaporte con 3 meses) del 2026-11-14 (la Visa de los restringidos, los panameños, Shore Pass, quien finalizó y el PDF por el QR) y del 2026-11-16 (la boleta de recargo con el tipo de operación, el alcance del supervisor general, «¿Subir y bajar?» con la Carta Form. 7 y la ocupación fuera del formulario), ni el rediseño visual «B + C» del 2026-11-17 (las capturas de los manuales quedaron con el diseño anterior), ni la operación del trámite de Técnico y los días del sellado de Shore Pass del 2026-11-18.
 18. **Recargo fuera del horario, con UCVMM:**
     - La boleta (2026-11-16) es un **borrador**: UCVMM tiene un modelo en papel, que el usuario pasará para copiarlo tal cual (`informes/boleta_recargo_pdf.py`).
     - El sistema no registra el pago ni dice dónde se paga (desde el 2026-11-11).
@@ -444,6 +445,17 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
   - Al corregir una devuelta se borra: podría quedar pegada a otra persona si la agencia cambia a alguien en la misma ficha.
   - Un navegador con la versión anterior que la mande no falla: se ignora.
 - `tipos_tramite.rangos_permitidos` limita los rangos del trámite (nulo = cualquiera): F3-TECNICO (sus tres rangos, por el nombre del trámite en el Form. 3), Embarque y Desembarque (Marino, Pasajero y Militar, 2026-11-13) y Shore Pass (solo Marino, 2026-11-14). Lo valida `ServicioTramite.validar_tripulantes` y lo espeja `validacionFormulario.ts`. Con un solo rango, el formulario lo trae elegido y lo dice bajo el campo y en la tarjeta del trámite.
+- **La operación del trámite de Técnico** (pedido del usuario del 2026-11-18, migración `b8f3d6a1c472`): Embarque, Desembarque o Subir y bajar.
+  - Un select obligatorio que empieza en «Selecciona…» (`tipos_tramite.pide_operacion`; la respuesta, en `solicitudes.operacion`, con CHECK).
+  - **Solo se registra: no cambia los documentos** (decisión del usuario). Su «Subir y bajar» no es el de Embarque y Desembarque: no pide la Carta Form. 7.
+  - La muestran el pase de la bandeja (junto al nombre del trámite), el expediente, el PDF de la autorización y la boleta (en casillas, con la X en la elegida).
+  - En los demás trámites se descarta, como «¿Subir y bajar?»; las solicitudes de antes quedan sin ella y no la muestran.
+  - Los valores: `OperacionTecnico` y `ETIQUETA_OPERACION` (`models/solicitud.py`), espejados en `OPERACIONES` (`tiposSolicitudes.ts`) y `ETIQUETA_OPERACION` (`presentacion.ts`).
+- **Los días del sellado de Shore Pass** (pedido del usuario del 2026-11-18, migración `d2a7c5e9f831`): 5 o 15, con las mismas reglas que la operación de Técnico.
+  - Un select obligatorio que empieza en «Selecciona…» (`tipos_tramite.pide_dias_sellado`; la respuesta, en `solicitudes.dias_sellado`, con CHECK).
+  - **Solo se registran:** no cambian los documentos ni la vigencia de la autorización, que sigue con `DIAS_GRACIA_FINALIZACION` (decisión del usuario).
+  - Se ven en los mismos cuatro lugares. En la boleta, las dos van por `elecciones` (rótulo, opciones, elegida): una elección nueva de un trámite se suma ahí.
+  - Los valores: `DIAS_SELLADO` y `texto_dias` (`models/solicitud.py`), espejados en `DIAS_SELLADO` (`tiposSolicitudes.ts`) y `textoDias` (`presentacion.ts`).
 - Las aclaraciones del instructivo del Form. 3 para el buque y el puerto ("nueva nave a embarcar", etc.) viven en `AYUDA_CAMPOS_TRAMITE` (`modulos/solicitudes/presentacion.ts`).
 - `tipos_tramite.descripcion` (revisión `a3d9c6e1f584`) es una línea con cuándo se usa el trámite, para las tarjetas del paso 1.
   - Primera versión del 2026-10-19, apoyada en los documentos que pide cada trámite (el boleto aéreo del Desembarque, la cita del consulado de la Renovación): **falta validarla con UCVMM**.

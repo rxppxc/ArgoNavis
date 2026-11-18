@@ -75,6 +75,12 @@ async def test_pdf_de_la_boleta():
     # Un trámite que no pregunta «¿Subir y bajar?» va sin esa línea.
     sin_pregunta = generar_pdf_boleta(replace(_datos_pdf(), tipo_tramite="Cambio de Nave", subir_y_bajar=None))
     assert sin_pregunta[:5] == b"%PDF-" and len(sin_pregunta) < len(vigente)
+    # El de Técnico lleva la operación en casillas (2026-11-18) en lugar de «¿Subir y bajar?».
+    con_operacion = generar_pdf_boleta(replace(
+        _datos_pdf(), tipo_tramite="Autorización de Técnico, Superintendente o Supernumerario", subir_y_bajar=None,
+        elecciones=[("OPERACIÓN", ("Embarque", "Desembarque", "Subir y bajar"), "Subir y bajar")],
+    ))
+    assert con_operacion[:5] == b"%PDF-" and len(con_operacion) > len(sin_pregunta)
 
 
 # ── Reglas, rutas y bitácora ─────────────────────────────────────────────────
@@ -129,7 +135,8 @@ async def esc(cliente) -> Escenario:
     )
 
 
-async def _solicitud(e: Escenario, *, recargo: bool = True, codigo: str = "F3-EMBARQUE") -> tuple[int, str]:
+async def _solicitud(e: Escenario, *, recargo: bool = True, codigo: str = "F3-EMBARQUE",
+                     operacion: str | None = None, dias_sellado: int | None = None) -> tuple[int, str]:
     """Una solicitud aprobada el último sábado a las 10:00 (fuera del horario), con el
     recargo de B/.20.00 o sin él. Devuelve (id, número)."""
     aprobada = _ultimo_sabado_a_las_10()
@@ -142,7 +149,8 @@ async def _solicitud(e: Escenario, *, recargo: bool = True, codigo: str = "F3-EM
             titulo=f"Boleta {e.sufijo}", nombre_buque="MSC PRUEBA", imo="9074729",
             fecha_operacion=datetime.now(ZONA_PANAMA).date() + timedelta(days=5), cantidad_tripulantes=0,
             estado="approved", enviada_en=aprobada - timedelta(days=1), aprobada_en=aprobada,
-            costo_fuera_de_horario=Decimal("20.00") if recargo else None,
+            costo_fuera_de_horario=Decimal("20.00") if recargo else None, operacion=operacion,
+            dias_sellado=dias_sellado,
             vigente_hasta=datetime.now(ZONA_PANAMA) + timedelta(days=10),
             codigo_verificacion=secrets.token_urlsafe(24),
         )
@@ -325,7 +333,7 @@ async def test_pdf_de_la_boleta_por_la_api(cliente, esc, monkeypatch):
         activos = (await sesion.execute(select(TipoTramite.nombre).where(TipoTramite.activo.is_(True))
                                         .order_by(TipoTramite.orden, TipoTramite.nombre))).scalars().all()
     assert datos.tipos_operacion == list(activos) and datos.tipo_tramite == "Embarque"
-    assert datos.subir_y_bajar is False
+    assert datos.subir_y_bajar is False and datos.elecciones == []
     [registro] = await _bitacora(AccionAuditoria.BOLETA_DESCARGADA, sid)
     assert registro["numero_oficio"] == oficio and registro["anulada"] is False
 
@@ -335,3 +343,29 @@ async def test_pdf_de_la_boleta_por_la_api(cliente, esc, monkeypatch):
     assert armados[-1].anulada_en is not None and armados[-1].motivo_anulacion == "Prueba de anulada"
     r = await cliente.get(f"/solicitudes/{sid}/boletas/999999/boleta.pdf", headers=esc.revisor.headers)
     assert r.status_code == 404
+
+
+@pytest.mark.parametrize(("codigo", "elegido", "esperado"), [
+    ("F3-TECNICO", {"operacion": "subir_y_bajar"},
+     ("OPERACIÓN", ("Embarque", "Desembarque", "Subir y bajar"), "Subir y bajar")),
+    ("F3-SHORE-PASS", {"dias_sellado": 15}, ("DÍAS DEL SELLADO", ("5 días", "15 días"), "15 días")),
+])
+async def test_la_boleta_lleva_la_operacion_y_los_dias(cliente, esc, monkeypatch, codigo, elegido, esperado):
+    """La operación del trámite de Técnico y los días del sellado de Shore Pass (2026-11-18)
+    van en casillas, con la X en la elegida; esos trámites no preguntan «¿Subir y bajar?»."""
+    from app.api.v1 import solicitudes as rutas
+    from app.informes.boleta_recargo_pdf import generar_pdf_boleta
+
+    armados = []
+
+    def capturar(datos):
+        armados.append(datos)
+        return generar_pdf_boleta(datos)
+
+    monkeypatch.setattr(rutas, "generar_pdf_boleta", capturar)
+    sid, _ = await _solicitud(esc, codigo=codigo, **elegido)
+    boleta_id = (await _generar(cliente, esc.revisor, sid, f"OP-{codigo}-{esc.sufijo}")).json()["boletas"][0]["id"]
+    r = await cliente.get(f"/solicitudes/{sid}/boletas/{boleta_id}/boleta.pdf", headers=esc.revisor.headers)
+    assert r.status_code == 200 and r.content[:5] == b"%PDF-"
+    datos = armados[-1]
+    assert datos.elecciones == [esperado] and datos.subir_y_bajar is None

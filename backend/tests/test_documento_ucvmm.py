@@ -109,12 +109,12 @@ DOCUMENTO = {
         "documentos": {FORM3, GENERALES, CARTA, LISTA, LIBRETA, CITA, BOLETO, VISA_RESTRINGIDOS},
     },
     "F3-SHORE-PASS": {
-        "campos": ["motivo"], "vigencia": True, "aviso_custodia": True,
+        "campos": ["motivo"], "vigencia": True, "aviso_custodia": True, "dias_sellado": True,
         "rangos": {"marino"},   # 2026-11-14: solo el rango Marino
         "documentos": {FORM3, GENERALES, LISTA, LIBRETA, BOLETO, VISA_RESTRINGIDOS},
     },
     "F3-TECNICO": {
-        "campos": [], "vigencia": True, "aviso_custodia": False,
+        "campos": [], "vigencia": True, "aviso_custodia": False, "operacion": True,
         "rangos": {"tecnico", "superintendente", "supernumerario"},
         # El Form. 3 pide la Carta Form. 7; desde el 2026-10-30, estos rangos presentan Generales y boleto.
         "documentos": {FORM3, GENERALES, BOLETO, VISA_RESTRINGIDOS},
@@ -227,6 +227,8 @@ async def test_catalogo_igual_al_documento(cliente, agencia):
         assert tipo["aviso_custodia"] == esperado["aviso_custodia"], codigo
         assert tipo["permite_cambio_puerto"] == esperado.get("cambio_puerto", False), codigo
         assert tipo["permite_subir_y_bajar"] == esperado.get("subir_y_bajar", False), codigo
+        assert tipo["pide_operacion"] == esperado.get("operacion", False), codigo
+        assert tipo["pide_dias_sellado"] == esperado.get("dias_sellado", False), codigo
 
 
 @pytest.mark.parametrize("codigo", sorted(DOCUMENTO))
@@ -794,3 +796,167 @@ async def test_el_pdf_dice_subir_y_bajar(cliente, agencia):
             ctx = await svc.contexto(await RepositorioUsuario(sesion).buscar_por_id(naviera.id))
             armado = await svc.preparar_pdf(ctx, await svc.obtener(ctx, sid))
         assert armado.subir_y_bajar is en_el_pdf, codigo
+
+
+# ── 2026-11-18: la operación del trámite de Técnico ─────────────────────────
+
+OPERACIONES = ("embarque", "desembarque", "subir_y_bajar")
+
+
+def _tecnico(nombre: str = "Hans", **extra) -> dict:
+    return tripulante(nombre, "DEU", rango="tecnico", **extra)
+
+
+async def test_el_tramite_de_tecnico_pide_la_operacion(cliente, agencia):
+    """Embarque, Desembarque o Subir y bajar (pedido del usuario del 2026-11-18): es
+    obligatoria y no cambia los documentos (decisión del usuario)."""
+    naviera, puesto_id = agencia
+    datos, archivos = _datos("F3-TECNICO", puesto_id, [_tecnico()], operacion=None)
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 400 and "Operación" in r.json()["detail"], r.text
+
+    checklists = set()
+    for operacion in OPERACIONES:
+        datos, archivos = _datos("F3-TECNICO", puesto_id, [_tecnico()], operacion=operacion)
+        r = await enviar(cliente, naviera, datos, archivos)
+        assert r.status_code == 201, (operacion, r.text)
+        s = r.json()
+        assert s["operacion"] == operacion and s["pide_operacion"] is True, operacion
+        checklists.add(frozenset((c["documento_codigo"], c["tripulante_id"] is None) for c in s["checklist"]))
+    assert len(checklists) == 1, "las tres piden los mismos documentos"
+
+
+async def test_una_operacion_que_no_existe(cliente, agencia):
+    naviera, puesto_id = agencia
+    datos, archivos = _datos("F3-TECNICO", puesto_id, [_tecnico()], operacion="transbordo")
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 422 and "operación" in r.json()["detail"], r.text
+
+
+async def test_la_operacion_se_ignora_en_otros_tramites(cliente, agencia):
+    """Un trámite que no la pide la descarta (resto de otro trámite elegido antes), como
+    «¿Subir y bajar?» y el cambio de puerto."""
+    naviera, puesto_id = agencia
+    datos, archivos = _datos("F3-EMBARQUE", puesto_id, [tripulante("Ana", "PHL")], operacion="desembarque")
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 201, r.text
+    assert r.json()["operacion"] is None and r.json()["pide_operacion"] is False
+
+
+async def test_la_operacion_en_la_bandeja_la_correccion_y_el_pdf(cliente, agencia):
+    """Se ve en la tarjeta de la bandeja; una devuelta se corrige con otra; y el PDF de la
+    autorización la dice."""
+    from app.domain.repositories.user_repository import RepositorioUsuario
+    from app.domain.services.solicitud_service import ServicioSolicitud
+    from app.infrastructure.database import SesionLocal
+
+    naviera, puesto_id = agencia
+    datos, archivos = _datos("F3-TECNICO", puesto_id, [_tecnico()], operacion="embarque")
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 201, r.text
+    s = r.json()
+    r = await cliente.get("/solicitudes/agencia", params={"texto": s["numero"]}, headers=naviera.headers)
+    [fila] = [f for f in r.json()["items"] if f["id"] == s["id"]]
+    assert fila["operacion"] == "embarque"
+
+    revisor = await crear_actor("UCVMM", prefijo="revisor")
+    r = await cliente.post(f"/solicitudes/{s['id']}/devolver", json={"motivo": "Revisar la operación"},
+                           headers=revisor.headers)
+    assert r.status_code == 200, r.text
+    t = s["tripulantes"][0]
+    ficha = _tecnico(pasaporte=t["pasaporte"])
+    ficha["id"] = t["id"]
+    correccion, _ = _datos("F3-TECNICO", puesto_id, [ficha], operacion=None)
+    correccion.pop("codigo_tramite")
+    correccion["asignaciones"] = []
+    correccion["documentos_conservados"] = [d["id"] for d in s["documentos"]]
+    ruta = f"/solicitudes/{s['id']}"
+    r = await enviar(cliente, naviera, correccion, [], metodo="PUT", ruta=ruta)
+    assert r.status_code == 400 and "Operación" in r.json()["detail"], r.text
+    correccion["operacion"] = "subir_y_bajar"
+    r = await enviar(cliente, naviera, correccion, [], metodo="PUT", ruta=ruta)
+    assert r.status_code == 200, r.text
+    assert r.json()["operacion"] == "subir_y_bajar"
+
+    await verificar_impedimentos(cliente, revisor, s["id"])
+    r = await cliente.post(f"/solicitudes/{s['id']}/aprobar", json={}, headers=revisor.headers)
+    assert r.status_code == 200, r.text
+    async with SesionLocal() as sesion:
+        svc = ServicioSolicitud(sesion)
+        ctx = await svc.contexto(await RepositorioUsuario(sesion).buscar_por_id(naviera.id))
+        armado = await svc.preparar_pdf(ctx, await svc.obtener(ctx, s["id"]))
+    assert armado.operacion == "Subir y bajar" and armado.subir_y_bajar is None
+
+
+# ── 2026-11-18: los días del sellado de Shore Pass ──────────────────────────
+
+async def test_shore_pass_pide_los_dias_del_sellado(cliente, agencia):
+    """5 o 15 días (pedido del usuario del 2026-11-18): obligatorio y solo se registra:
+    no cambia los documentos ni la vigencia de la autorización (decisión del usuario)."""
+    naviera, puesto_id = agencia
+    datos, archivos = _datos("F3-SHORE-PASS", puesto_id, [tripulante("Ana", "PHL")], dias_sellado=None)
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 400 and "Días del sellado" in r.json()["detail"], r.text
+
+    checklists = set()
+    for dias in (5, 15):
+        datos, archivos = _datos("F3-SHORE-PASS", puesto_id, [tripulante("Ana", "PHL")], dias_sellado=dias)
+        r = await enviar(cliente, naviera, datos, archivos)
+        assert r.status_code == 201, (dias, r.text)
+        s = r.json()
+        assert s["dias_sellado"] == dias and s["pide_dias_sellado"] is True, dias
+        checklists.add(frozenset((c["documento_codigo"], c["tripulante_id"] is None) for c in s["checklist"]))
+    assert len(checklists) == 1, "los mismos documentos con 5 y con 15"
+
+
+async def test_dias_del_sellado_que_no_existen(cliente, agencia):
+    naviera, puesto_id = agencia
+    datos, archivos = _datos("F3-SHORE-PASS", puesto_id, [tripulante("Ana", "PHL")], dias_sellado=10)
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 422 and "días del sellado" in r.json()["detail"], r.text
+
+
+async def test_los_dias_del_sellado_se_ignoran_en_otros_tramites(cliente, agencia):
+    naviera, puesto_id = agencia
+    datos, archivos = _datos("F3-EMBARQUE", puesto_id, [tripulante("Ana", "PHL")], dias_sellado=15)
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 201, r.text
+    assert r.json()["dias_sellado"] is None and r.json()["pide_dias_sellado"] is False
+
+
+async def test_los_dias_del_sellado_en_la_bandeja_la_correccion_y_el_pdf(cliente, agencia):
+    from app.domain.repositories.user_repository import RepositorioUsuario
+    from app.domain.services.solicitud_service import ServicioSolicitud
+    from app.infrastructure.database import SesionLocal
+
+    naviera, puesto_id = agencia
+    datos, archivos = _datos("F3-SHORE-PASS", puesto_id, [tripulante("Ana", "PHL")], dias_sellado=5)
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 201, r.text
+    s = r.json()
+    r = await cliente.get("/solicitudes/agencia", params={"texto": s["numero"]}, headers=naviera.headers)
+    [fila] = [f for f in r.json()["items"] if f["id"] == s["id"]]
+    assert fila["dias_sellado"] == 5
+
+    revisor = await crear_actor("UCVMM", prefijo="revisor")
+    r = await cliente.post(f"/solicitudes/{s['id']}/devolver", json={"motivo": "Son 15 días"}, headers=revisor.headers)
+    assert r.status_code == 200, r.text
+    t = s["tripulantes"][0]
+    ficha = tripulante("Ana", "PHL", pasaporte=t["pasaporte"], libreta_marino=t["libreta_marino"])
+    ficha["id"] = t["id"]
+    correccion, _ = _datos("F3-SHORE-PASS", puesto_id, [ficha], dias_sellado=15)
+    correccion.pop("codigo_tramite")
+    correccion["asignaciones"] = []
+    correccion["documentos_conservados"] = [d["id"] for d in s["documentos"]]
+    r = await enviar(cliente, naviera, correccion, [], metodo="PUT", ruta=f"/solicitudes/{s['id']}")
+    assert r.status_code == 200, r.text
+    assert r.json()["dias_sellado"] == 15
+
+    await verificar_impedimentos(cliente, revisor, s["id"])
+    r = await cliente.post(f"/solicitudes/{s['id']}/aprobar", json={}, headers=revisor.headers)
+    assert r.status_code == 200, r.text
+    async with SesionLocal() as sesion:
+        svc = ServicioSolicitud(sesion)
+        ctx = await svc.contexto(await RepositorioUsuario(sesion).buscar_por_id(naviera.id))
+        armado = await svc.preparar_pdf(ctx, await svc.obtener(ctx, s["id"]))
+    assert armado.dias_sellado == "15 días" and armado.operacion is None

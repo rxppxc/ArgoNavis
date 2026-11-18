@@ -8,7 +8,7 @@ export function tramiteDePrueba(cambios: Partial<TipoTramite> = {}): TipoTramite
     id: 1, codigo: "T", nombre: "Trámite de prueba",
     requiere_buque: false, requiere_puerto: false, requiere_puerto_desembarque: false,
     requiere_motivo: false, requiere_clinica: false, permite_cambio_puerto: false, permite_subir_y_bajar: false,
-    valida_vigencia: true, rangos_permitidos: null,
+    pide_operacion: false, pide_dias_sellado: false, valida_vigencia: true, rangos_permitidos: null,
     aviso_custodia: false, descripcion: null, nota: null, orden: 1, activo: true, documentos: [],
     ...cambios,
   };
@@ -43,7 +43,8 @@ export function solicitudDePrueba(cambios: Partial<SolicitudDetalle> = {}): Soli
   return {
     id: 1, numero: "PRUEBA-0001", titulo: "Trámite de prueba", estado: "returned",
     tipo_tramite_codigo: "T", tipo_tramite_nombre: "Trámite de prueba",
-    agencia_id: 1, agencia_nombre: "Agencia de prueba", puesto_nombre: "Puesto de prueba", puesto_destino_nombre: null, sector_nombre: null,
+    agencia_id: 1, agencia_nombre: "Agencia de prueba", puesto_nombre: "Puesto de prueba", puesto_destino_nombre: null, operacion: null, dias_sellado: null,
+    sector_nombre: null,
     nombre_buque: null, imo: null, fecha_operacion: "2026-11-02", cantidad_tripulantes: 0,
     creada_por: null, created_at: "2026-10-20T15:00:00Z", enviada_en: "2026-10-20T15:00:00Z",
     plazo_correccion: "2026-10-23T15:00:00Z", vigente_hasta: null, aprobada_en: null, negada_en: null,
@@ -53,6 +54,7 @@ export function solicitudDePrueba(cambios: Partial<SolicitudDetalle> = {}): Soli
     requiere_buque: false, requiere_puerto: false, requiere_puerto_desembarque: false,
     requiere_motivo: false, requiere_clinica: false, valida_vigencia: true,
     puesto_control_id: 1, puesto_destino_id: null, subir_y_bajar: false, permite_subir_y_bajar: false,
+    pide_operacion: false, pide_dias_sellado: false,
     bandera: null, bandera_nombre: null, nombre_puerto: null, puerto_desembarque: null,
     motivo: null, clinica_hospital: null, observaciones: null,
     impedimentos_verificados: false, comentario_impedimentos: null,

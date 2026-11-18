@@ -60,6 +60,10 @@ class DatosPdfBoleta:
     tipos_operacion:  list[str] = field(default_factory=list)
     # «¿Subir y bajar?»: None si el trámite no hace la pregunta.
     subir_y_bajar:    bool | None = None
+    # Lo que la agencia eligió en el formulario, también en casillas (2026-11-18): la operación
+    # del trámite de Técnico y los días del sellado de Shore Pass. Cada una es (rótulo,
+    # opciones, elegida); una fila por cada una.
+    elecciones: list[tuple[str, tuple[str, ...], str]] = field(default_factory=list)
 
 
 def casillas_operacion(tipos: list[str], elegido: str) -> list[tuple[str, bool]]:
@@ -242,6 +246,14 @@ def generar_pdf_boleta(d: DatosPdfBoleta) -> bytes:
                           colWidths=[30 * mm, 6 * mm, 16 * mm, 6 * mm, 16 * mm], hAlign="LEFT")
         respuesta.setStyle(TableStyle(sin_bordes))
         contenido.append([respuesta])
+    for rotulo, opciones_eleccion, elegida in d.elecciones:
+        celdas, anchos = [Paragraph(rotulo, e_etiqueta)], [30 * mm]
+        for texto in opciones_eleccion:
+            celdas += opcion(texto, texto == elegida)
+            anchos += [6 * mm, 30 * mm]
+        fila = Table([celdas], colWidths=anchos, hAlign="LEFT")
+        fila.setStyle(TableStyle(sin_bordes))
+        contenido.append([fila])
     operacion = Table(contenido, colWidths=[ancho])
     operacion.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 0.6, BORDE),
@@ -250,7 +262,7 @@ def generar_pdf_boleta(d: DatosPdfBoleta) -> bytes:
         ("RIGHTPADDING", (0, 0), (-1, -1), 7),
         ("TOPPADDING", (0, 0), (-1, -1), 4),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-        *([("LINEABOVE", (0, 2), (-1, 2), 0.4, BORDE)] if d.subir_y_bajar is not None else []),
+        *([("LINEABOVE", (0, 2), (-1, -1), 0.4, BORDE)] if len(contenido) > 2 else []),
     ]))
     historia += [operacion, Spacer(1, 3 * mm)]
 
