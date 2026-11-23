@@ -814,3 +814,7 @@ Los 10 documentos de `docs/`, al día con lo del 10 al 22/11/2026 (esquema `d7f3
   - El BPMN 01 pedía «pasaporte y seamanbook vigentes» (desde el 13/11, el pasaporte con 3 meses).
   - El 07 y el 08 decían que Docker corre un solo proceso (son 2 desde el 08/11).
 - **Armado:** se unieron las secciones seguidas de la misma orientación (03, 04, 08 y 09), que dejaban páginas casi vacías, y cada imagen va con su pie. Son 173 páginas.
+
+## Lo que encontró la CI del commit general (2026-11-23)
+- **mypy en Linux:** en la CI revisa como Linux y fallaba en el código que solo existe en Windows (`registro.py`) y en `python-magic`, que en Linux trae tipos y en Windows no (python-magic-bin). Ahora `mypy.ini` revisa siempre como Linux, lo de Windows va bajo `sys.platform == "win32"` y `magic` se carga con `importlib`.
+- **Consulta histórica:** lo escrito en «Buscar» o «Tripulante» se busca 350 ms después. Una pestaña (o cualquier filtro) pulsada antes dejaba la búsqueda, la URL y el «Volver» del expediente con el texto anterior; en la CI, más rápida, el E2E caía ahí («Volver» devolvía «gomez, juan» en vez de «Pérez Gómez»). Ahora el cambio de un filtro lleva lo escrito (`filtrosConCambio`, con su prueba en `consultaHistorica.test.ts`).

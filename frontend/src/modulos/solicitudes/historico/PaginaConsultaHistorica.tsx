@@ -24,8 +24,8 @@ import { usePermisos } from "../../../hooks/usePermisos";
 import { mensajeDeError } from "../../../utils/errores";
 import { estadoParaVolver, pasajeroDelEstado } from "../../../utils/volver";
 import {
-  FILTROS_VACIOS, anioDelRango, aniosDisponibles, consultaDeFiltros, filtrosDeUrl, hayFiltros, motivoExpiracion,
-  paginaDeUrl, primerosEncontrados, rangoDeAnio, sinOpcionesDesconocidas, ultimaPagina, urlDeFiltros,
+  FILTROS_VACIOS, anioDelRango, aniosDisponibles, consultaDeFiltros, filtrosConCambio, filtrosDeUrl, hayFiltros,
+  motivoExpiracion, paginaDeUrl, primerosEncontrados, rangoDeAnio, sinOpcionesDesconocidas, ultimaPagina, urlDeFiltros,
   type FiltrosHistorico, type PestanaHistorico,
 } from "./consultaHistorica";
 import { FechaEnPalabras } from "../FechaEnPalabras";
@@ -180,7 +180,8 @@ export default function PaginaConsultaHistorica() {
     .filter(Boolean).length;
 
   function cambiar(parcial: Partial<FiltrosHistorico>) {
-    setFiltros((f) => ({ ...f, ...parcial }));
+    // Con lo escrito que todavía no se buscó: si no, la URL y el «Volver» seguían con el texto anterior.
+    setFiltros((f) => filtrosConCambio(f, escrito, parcial));
     setPagina(1);
   }
 

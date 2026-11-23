@@ -1,9 +1,27 @@
 import { describe, expect, it } from "vitest";
 import {
-  FILTROS_VACIOS, anioDelRango, aniosDisponibles, consultaDeFiltros, filtrosDeUrl, hayFiltros, motivoExpiracion,
-  paginaDeUrl, primerosEncontrados, rangoDeAnio, sinOpcionesDesconocidas, ultimaPagina, urlDeFiltros,
+  FILTROS_VACIOS, anioDelRango, aniosDisponibles, consultaDeFiltros, filtrosConCambio, filtrosDeUrl, hayFiltros,
+  motivoExpiracion, paginaDeUrl, primerosEncontrados, rangoDeAnio, sinOpcionesDesconocidas, ultimaPagina, urlDeFiltros,
   type FiltrosHistorico,
 } from "./consultaHistorica";
+
+describe("cambiar un filtro con algo escrito que todavía no se buscó (2026-11-23)", () => {
+  // Lo escrito se busca 350 ms después. Una pestaña pulsada antes dejaba la búsqueda, la URL
+  // y el «Volver» del expediente con el tripulante anterior (la CI, más rápida, caía ahí).
+  const aplicados: FiltrosHistorico = { ...FILTROS_VACIOS, texto: "ESTRELLA", pasajero: "gomez, juan", estado: "autorizadas" };
+
+  it("lo escrito entra con el cambio, sin esperar", () => {
+    const escrito = { texto: "ESTRELLA", pasajero: "Pérez Gómez" };
+    expect(filtrosConCambio(aplicados, escrito, { estado: "finalized" }))
+      .toEqual({ ...aplicados, pasajero: "Pérez Gómez", estado: "finalized" });
+  });
+
+  it("y el resto de los filtros queda como estaba", () => {
+    const conAgencia = { ...aplicados, agencia: "3", desde: "2026-01-01" };
+    expect(filtrosConCambio(conAgencia, { texto: "MSC", pasajero: "gomez, juan" }, { puesto: "7" }))
+      .toEqual({ ...conAgencia, texto: "MSC", puesto: "7" });
+  });
+});
 
 const LLENOS: FiltrosHistorico = {
   texto: "ESTRELLA", pasajero: "Ana Rios", agencia: "3", puesto: "7", tramite: "2", estado: "finalized",

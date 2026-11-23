@@ -31,7 +31,16 @@ export const FILTROS_VACIOS: FiltrosHistorico = {
   fecha: "envio", desde: "", hasta: "", fueraDeHorario: false,
 };
 
-const PESTANAS: PestanaHistorico[] = ["autorizadas", "review", "returned", "approved", "denied", "finalized", "expired"];
+/** Un filtro que cambia (una pestaña, un select, las fechas) lleva también lo que se escribió
+ *  y todavía no se buscó: lo escrito se busca 350 ms después, y una pestaña pulsada antes dejaba
+ *  la búsqueda, la URL y el «Volver» del expediente con el texto anterior (2026-11-23). */
+export function filtrosConCambio(
+  filtros: FiltrosHistorico, escrito: Pick<FiltrosHistorico, "texto" | "pasajero">, parcial: Partial<FiltrosHistorico>,
+): FiltrosHistorico {
+  return { ...filtros, texto: escrito.texto, pasajero: escrito.pasajero, ...parcial };
+}
+
+const PESTANAS: PestanaHistorico[] =["autorizadas", "review", "returned", "approved", "denied", "finalized", "expired"];
 const TOPE_TEXTO = 100;   // el max_length de ConsultaHistorica en el backend
 
 function fechaValida(valor: string | null): string {
