@@ -28,7 +28,7 @@ from app.domain.schemas.solicitud import (
     ConsultaBandeja, ConsultaHistorica, DatosAnularBoleta, DatosAprobacion, DatosBoleta, DatosCorregirSolicitud,
     DatosCrearSolicitud, DatosFinalizar, DatosImpedimentos, DatosMotivo, PaginaSolicitudes,
     SalidaEstadisticasSolicitudes,
-    SalidaOpcionesHistorico, SalidaSolicitud,
+    SalidaOpcionesHistorico, SalidaRegistro, SalidaSolicitud,
 )
 from app.domain.services.notificacion_service import ServicioNotificacion
 from app.domain.services.acceso import ContextoAcceso
@@ -41,6 +41,7 @@ from app.informes.historico_excel import generar_archivo as generar_excel_histor
 from app.infrastructure import almacenamiento
 from app.infrastructure.cola_correos import despachar_correos, encolar_avisos
 from app.infrastructure.database import obtener_sesion_bd
+from app.infrastructure.emision import autorizacion_emitida, emitir
 from app.infrastructure.trabajo_pesado import en_hilo_con_tope
 
 enrutador = APIRouter(prefix="/solicitudes", tags=["solicitudes"])
@@ -361,6 +362,7 @@ async def obtener_documento(
         sesion, request, ctx.usuario,
         AccionAuditoria.DOCUMENTO_DESCARGADO if descargar else AccionAuditoria.DOCUMENTO_VISTO, s,
         documento_id=documento.id, nombre=documento.nombre_original,
+        **({"retirado": True} if documento.retirado_en else {}),
     )
     return FileResponse(
         ruta,
@@ -381,14 +383,17 @@ async def descargar_autorizacion(
     svc:     ServicioSolicitud = Depends(_servicio),
     sesion:  AsyncSession   = Depends(obtener_sesion_bd, scope="function"),
 ):
-    """PDF de la autorización aprobada, verificable con su código QR. El
-    personal del SNM recibe la copia interna (con el nombre de quien aprobó)."""
+    """PDF de la autorización aprobada, verificable con su código QR: la agencia recibe el
+    que se emitió (2026-11-22); el personal del SNM, la copia interna (con el nombre de
+    quien aprobó), que se arma cada vez."""
     s = await svc.obtener(ctx, solicitud_id)
     datos = await svc.preparar_pdf(ctx, s)
     # La conexión vuelve al pool mientras se arma el PDF (con turno, trabajo_pesado.py);
     # la bitácora la vuelve a pedir después. Los objetos siguen sirviendo: expire_on_commit=False.
     await sesion.commit()
-    contenido = await en_hilo_con_tope(generar_pdf_autorizacion, datos)
+    contenido = None if datos.copia_interna else await autorizacion_emitida(s.id)
+    if contenido is None:
+        contenido = await en_hilo_con_tope(generar_pdf_autorizacion, datos)
 
     await _auditar(sesion, request, ctx.usuario, AccionAuditoria.AUTORIZACION_DESCARGADA, s,
                    copia_interna=datos.copia_interna)
@@ -400,6 +405,43 @@ async def descargar_autorizacion(
             "Content-Disposition": f'attachment; filename="{nombre}"',
             "Cache-Control": "no-store",
         },
+    )
+
+
+# ── Historial completo (2026-11-22) ──────────────────────────────────────────
+
+@enrutador.get("/{solicitud_id}/registro", response_model=SalidaRegistro)
+async def obtener_registro(
+    solicitud_id: int,
+    request: Request,
+    ctx:     ContextoAcceso = Depends(_contexto),
+    svc:     ServicioSolicitud = Depends(_servicio),
+    sesion:  AsyncSession   = Depends(obtener_sesion_bd, scope="function"),
+):
+    """Lo que la agencia había enviado antes de cada corrección y todos los archivos con
+    su huella, también los retirados y las autorizaciones emitidas. Solo el SNM que la revisa."""
+    s, registro = await svc.registro(ctx, solicitud_id)
+    await _auditar(sesion, request, ctx.usuario, AccionAuditoria.SOLICITUD_CONSULTADA, s, historial_completo=True)
+    return registro
+
+
+@enrutador.get("/{solicitud_id}/emitidos/{emitido_id}")
+async def obtener_emitido(
+    solicitud_id: int,
+    emitido_id:   int,
+    request:   Request,
+    descargar: bool = Query(default=False, description="Descarga (true) o vista previa (false)."),
+    ctx:     ContextoAcceso = Depends(_contexto),
+    svc:     ServicioSolicitud = Depends(_servicio),
+    sesion:  AsyncSession   = Depends(obtener_sesion_bd, scope="function"),
+):
+    """El PDF de la autorización tal como se emitió, al aprobar o al finalizar."""
+    s, emitido, ruta = await svc.obtener_emitido(ctx, solicitud_id, emitido_id)
+    await _auditar(sesion, request, ctx.usuario, AccionAuditoria.AUTORIZACION_DESCARGADA, s, emitida=emitido.tipo)
+    return FileResponse(
+        ruta, media_type="application/pdf", filename=svc.nombre_emitido(s, emitido),
+        content_disposition_type="attachment" if descargar else "inline",
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
     )
 
 
@@ -439,6 +481,7 @@ async def aprobar_solicitud(
     s = await svc.aprobar(ctx, solicitud_id, datos.observacion)
     await _auditar(sesion, request, ctx.usuario, AccionAuditoria.SOLICITUD_APROBADA, s, observacion=datos.observacion)
     await _programar(sesion, background_tasks, await ServicioNotificacion(sesion).aprobada(s))
+    background_tasks.add_task(emitir, s.id)   # la autorización, tal como se emite: después del commit y de los avisos
     return await svc.construir_detalle(ctx, s)
 
 
@@ -505,6 +548,7 @@ async def finalizar_solicitud(
     solicitud_id: int,
     datos:   DatosFinalizar,
     request: Request,
+    background_tasks: BackgroundTasks,
     ctx:     ContextoAcceso = Depends(_contexto),
     svc:     ServicioSolicitud = Depends(_servicio),
     sesion:  AsyncSession   = Depends(obtener_sesion_bd, scope="function"),
@@ -514,6 +558,7 @@ async def finalizar_solicitud(
     s = await svc.finalizar(ctx, solicitud_id, datos.comentario, datos.puesto_finalizacion_id)
     await _auditar(sesion, request, ctx.usuario, AccionAuditoria.SOLICITUD_FINALIZADA, s,
                    comentario=datos.comentario, puesto_finalizacion=s.puesto_finalizacion_nombre)
+    background_tasks.add_task(emitir, s.id)
     return await svc.construir_detalle(ctx, s)
 
 

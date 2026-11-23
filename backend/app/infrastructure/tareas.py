@@ -1,4 +1,5 @@
-"""Tareas de fondo: vencimientos de solicitudes y limpieza de temporales.
+"""Tareas de fondo: vencimientos de solicitudes, limpieza de temporales y el archivo (las
+autorizaciones que falte emitir y las huellas que falten).
 
 En producción uvicorn corre con varios workers y cada proceso arranca su
 propia tarea. Un advisory lock de PostgreSQL (pg_try_advisory_xact_lock)
@@ -20,7 +21,9 @@ from app.domain.services.notificacion_service import ServicioNotificacion
 from app.domain.services.solicitud_service import ServicioSolicitud
 from app.infrastructure import almacenamiento
 from app.infrastructure.cola_correos import despachar_correos, encolar_avisos
-from app.infrastructure.database import SesionLocal
+from app.infrastructure.database import SesionLocal, motor_bd
+from app.infrastructure.emision import emitir_pendientes
+from app.infrastructure.huellas import completar_huellas
 
 logger        = logging.getLogger(__name__)
 configuracion = obtener_configuracion()
@@ -28,6 +31,7 @@ configuracion = obtener_configuracion()
 # Identifica el candado de esta tarea en pg_advisory_*: cualquier entero fijo
 # sirve mientras ninguna otra tarea use el mismo.
 _LLAVE_VENCIMIENTOS = 7_420_001
+_LLAVE_ARCHIVO      = 7_420_002
 
 
 async def expirar_solicitudes() -> int:
@@ -82,4 +86,32 @@ async def tarea_vencimientos() -> None:
                 logger.info("[vencimientos] %d solicitud(es) expirada(s).", n)
         except Exception:
             logger.exception("[vencimientos] Error en la vuelta; se reintenta en la siguiente")
+        await asyncio.sleep(intervalo)
+
+
+async def cuidar_archivo() -> None:
+    """Emite las autorizaciones que falten y calcula las huellas que falten (2026-11-22). Un
+    solo proceso a la vez: el candado es de la conexión, que no deja abierta una transacción."""
+    async with motor_bd.connect() as conexion:
+        conexion = await conexion.execution_options(isolation_level="AUTOCOMMIT")
+        llave = {"llave": _LLAVE_ARCHIVO}
+        if not (await conexion.execute(text("SELECT pg_try_advisory_lock(:llave)"), llave)).scalar():
+            return   # otro worker está en esta vuelta
+        try:
+            if emitidas := await emitir_pendientes():
+                logger.info("[archivo] %d autorización(es) emitida(s) que faltaban.", emitidas)
+            if huellas := await completar_huellas():
+                logger.info("[archivo] Se calculó la huella de %d documento(s) de antes.", huellas)
+        finally:
+            await conexion.execute(text("SELECT pg_advisory_unlock(:llave)"), llave)
+
+
+async def tarea_archivo() -> None:
+    """Al arrancar y cada VENCIMIENTOS_INTERVALO_MINUTOS. Un error no corta las siguientes vueltas."""
+    intervalo = max(configuracion.VENCIMIENTOS_INTERVALO_MINUTOS, 1) * 60
+    while True:
+        try:
+            await cuidar_archivo()
+        except Exception:
+            logger.exception("[archivo] Error en la vuelta; se reintenta en la siguiente")
         await asyncio.sleep(intervalo)

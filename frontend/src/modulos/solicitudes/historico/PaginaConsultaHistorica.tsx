@@ -1,19 +1,18 @@
 /**
- * Consulta histórica (2026-11-11): todas las solicitudes que ve el personal del
- * SNM, de cualquier año («estoy en 2028 y busco una de 2027»), con filtros que
- * las bandejas no tienen (agencia, puesto, trámite, pasajero, fecha de la
- * operación, fuera del horario) y exportación a Excel.
+ * Consulta histórica (2026-11-11): las solicitudes de cualquier año («estoy en 2028 y
+ * busco una de 2027»), con filtros que las bandejas no tienen (agencia, puesto, trámite,
+ * tripulante, fecha de la operación, fuera del horario) y exportación a Excel. Es de UCVMM,
+ * del supervisor de sector y del Administrador (2026-11-22).
  *
- * El alcance lo pone el servidor: el mismo del expediente (UCVMM y el supervisor
- * de sector, sus sectores; el puesto, sus puestos desde que se aprueban). Los
- * filtros van en la URL (sin sumar entradas al historial): se puede recargar o
- * compartir la misma búsqueda. El pasajero no (2026-11-14): viaja en el estado de la
- * navegación, y la API lo recibe en el cuerpo del pedido, fuera de los logs.
+ * El alcance lo pone el servidor: el mismo del expediente (las que revisó su sector y las
+ * que esperan en él). Los filtros van en la URL (sin sumar entradas al historial): se puede
+ * recargar o compartir la misma búsqueda. El pasajero no (2026-11-14): viaja en el estado de
+ * la navegación, y la API lo recibe en el cuerpo del pedido, fuera de los logs.
  */
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigationType, useSearchParams } from "react-router-dom";
 import {
-  apiSolicitudes, type EstadoSolicitud, type OpcionFiltro, type OpcionesHistorico, type PaginaSolicitudes,
+  apiSolicitudes, type OpcionFiltro, type OpcionesHistorico, type PaginaSolicitudes, type SolicitudResumen,
 } from "../../../api/solicitudes";
 import { EncabezadoPagina } from "../../../components/EncabezadoPagina";
 import { EstadoCarga } from "../../../components/EstadoCarga";
@@ -25,19 +24,22 @@ import { usePermisos } from "../../../hooks/usePermisos";
 import { mensajeDeError } from "../../../utils/errores";
 import { estadoParaVolver, pasajeroDelEstado } from "../../../utils/volver";
 import {
-  FILTROS_VACIOS, anioDelRango, aniosDisponibles, consultaDeFiltros, filtrosDeUrl, hayFiltros, paginaDeUrl,
-  rangoDeAnio, sinOpcionesDesconocidas, ultimaPagina, urlDeFiltros, type FiltrosHistorico,
+  FILTROS_VACIOS, anioDelRango, aniosDisponibles, consultaDeFiltros, filtrosDeUrl, hayFiltros, motivoExpiracion,
+  paginaDeUrl, primerosEncontrados, rangoDeAnio, sinOpcionesDesconocidas, ultimaPagina, urlDeFiltros,
+  type FiltrosHistorico, type PestanaHistorico,
 } from "./consultaHistorica";
 import { FechaEnPalabras } from "../FechaEnPalabras";
 import { InsigniaEstado } from "../InsigniaEstado";
-import { formatearFecha, formatearFechaHora, TEXTO_HORARIO_LABORAL, textoPuestos } from "../presentacion";
+import { cifra } from "../../administracion/estadisticas/calculos";
+import { formatearFecha, formatearFechaHora, TEXTO_HORARIO_LABORAL, textoPuestos, textoSectorCorto } from "../presentacion";
 import panel from "../bandejas/PaginaPanel.module.css";
 import styles from "./ConsultaHistorica.module.css";
 
 const POR_PAGINA = 25;
 
-const PESTANAS: { id: EstadoSolicitud | ""; etiqueta: string }[] = [
+const PESTANAS: { id: PestanaHistorico; etiqueta: string; ayuda?: string }[] = [
   { id: "", etiqueta: "Todas" },
+  { id: "autorizadas", etiqueta: "Autorizadas", ayuda: "Las que se aprobaron: vigentes, finalizadas y vencidas sin finalizar" },
   { id: "review", etiqueta: "En revisión" },
   { id: "returned", etiqueta: "En corrección" },
   { id: "approved", etiqueta: "Aprobadas" },
@@ -50,6 +52,19 @@ interface Resultado {
   clave: string;
   pagina: PaginaSolicitudes | null;
   error: string | null;
+}
+
+/** Los tripulantes que coinciden con lo buscado: hasta tres, y cuántos más. */
+function Encontrados({ lista }: { lista: SolicitudResumen["tripulantes_encontrados"] }) {
+  const { visibles, mas } = primerosEncontrados(lista);
+  return (
+    <>
+      {visibles.map((t, i) => (
+        <span key={i} className={styles.encontrado}>{t.nombre}<small className={styles.mono}>{t.pasaporte}</small></span>
+      ))}
+      {mas > 0 && <small>y {mas} más</small>}
+    </>
+  );
 }
 
 /** Un desplegable de las opciones del servidor; lo desactivado lo dice. */
@@ -159,6 +174,8 @@ export default function PaginaConsultaHistorica() {
   const anios = aniosDisponibles(new Date());
   const anio = anioDelRango(filtros.desde, filtros.hasta, anios);
   const conFiltros = hayFiltros(filtros);
+  // Al buscar un tripulante, cuál de los de cada solicitud es (2026-11-22).
+  const conTripulante = datos?.items.some((s) => s.tripulantes_encontrados) ?? false;
   const plegadosActivos = [filtros.agencia, filtros.puesto, filtros.tramite, filtros.desde || filtros.hasta]
     .filter(Boolean).length;
 
@@ -224,7 +241,7 @@ export default function PaginaConsultaHistorica() {
           </label>
           <label className={styles.campo}>
             <span>Tripulante</span>
-            <input type="search" value={escrito.pasajero} maxLength={100} placeholder="Ej. nombre, apellido o pasaporte"
+            <input type="search" value={escrito.pasajero} maxLength={100} placeholder="Ej. nombre, pasaporte o seamanbook"
               onChange={(e) => setEscrito((v) => ({ ...v, pasajero: e.target.value }))} />
           </label>
         </div>
@@ -296,15 +313,17 @@ export default function PaginaConsultaHistorica() {
         </div>
       </form>
 
-      <div className={panel.pestanas} role="tablist" aria-label="Estado">
+      <div className={`${panel.pestanas} ${styles.pestanas}`} role="tablist" aria-label="Estado">
         {PESTANAS.map((p) => (
           // data-estado: el punto del color de su estado, como en las bandejas (2026-11-17).
           <button key={p.id || "todas"} type="button" role="tab" aria-selected={p.id === filtros.estado}
-            data-estado={p.id || "todas"}
+            data-estado={p.id === "autorizadas" ? undefined : p.id || "todas"} title={p.ayuda}
             className={`${panel.pestana} ${p.id === filtros.estado ? panel.pestanaActiva : ""}`}
             onClick={() => cambiar({ estado: p.id })}>
             {p.etiqueta}
-            <span className={panel.pestanaConteo}>{p.id === "" ? totalTodas : conteos[p.id] ?? 0}</span>
+            <span className={panel.pestanaConteo}>
+              {cifra(p.id === "" ? totalTodas : p.id === "autorizadas" ? datos?.autorizadas ?? 0 : conteos[p.id] ?? 0)}
+            </span>
           </button>
         ))}
       </div>
@@ -326,7 +345,7 @@ export default function PaginaConsultaHistorica() {
       ) : (
         <>
           <p className={styles.resumen} aria-live="polite">
-            {datos.total} solicitud{datos.total === 1 ? "" : "es"}, de la más reciente a la más antigua por{" "}
+            {cifra(datos.total)} solicitud{datos.total === 1 ? "" : "es"}, de la más reciente a la más antigua por{" "}
             {filtros.fecha === "operacion" ? "fecha de la operación" : "fecha de envío"}.
           </p>
           <div className={`${styles.tablaMarco} ${cargando ? panel.listaActualizando : ""}`} aria-busy={cargando}>
@@ -335,6 +354,7 @@ export default function PaginaConsultaHistorica() {
               <thead>
                 <tr>
                   <th scope="col">N.º</th>
+                  {conTripulante && <th scope="col">Tripulante</th>}
                   <th scope="col">Estado</th>
                   <th scope="col">Trámite</th>
                   <th scope="col">Agencia naviera</th>
@@ -350,8 +370,10 @@ export default function PaginaConsultaHistorica() {
                     <td data-etiqueta="N.º">
                       <Link to={`/solicitudes/${s.id}`} state={estadoParaVolver(pathname, search, { pasajero: filtros.pasajero })} className={styles.numero}>{s.numero ?? `#${s.id}`}</Link>
                     </td>
+                    {conTripulante && <td data-etiqueta="Tripulante"><Encontrados lista={s.tripulantes_encontrados} /></td>}
                     <td data-etiqueta="Estado">
                       <InsigniaEstado estado={s.estado} />
+                      {motivoExpiracion(s) && <small>{motivoExpiracion(s)}</small>}
                       {s.fuera_de_horario && (
                         <span className={styles.chipHorario} title={`Aprobada fuera del horario laboral (${TEXTO_HORARIO_LABORAL})`}>
                           <IconoReloj tamano={11} /> Fuera del horario
@@ -363,7 +385,7 @@ export default function PaginaConsultaHistorica() {
                     <td data-etiqueta="Agencia naviera">{s.agencia_nombre}</td>
                     <td data-etiqueta="Puesto">
                       {textoPuestos(s)}
-                      {veLosDos && s.sector_nombre && <small>{s.sector_nombre}</small>}
+                      {(veLosDos || s.sector_actual_nombre) && s.sector_nombre && <small>{textoSectorCorto(s)}</small>}
                     </td>
                     <td data-etiqueta="Buque">
                       {s.nombre_buque ?? "—"}

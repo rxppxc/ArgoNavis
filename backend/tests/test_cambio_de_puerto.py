@@ -3,19 +3,21 @@
 El trámite «Cambio de Puerto» dejó de existir: en Embarque y Desembarque la agencia
 indica el nuevo puesto de control, de cualquier sector desde el 2026-11-18 (antes,
 solo del mismo). La revisa UCVMM del sector del primer puesto; la ve en su bandeja,
-recibe el aviso y la finaliza el puesto nuevo; el primero solo la consulta (el
-expediente y la consulta histórica).
+recibe el aviso y la finaliza el puesto nuevo. El primero no la ve desde el
+2026-11-22 (antes podía consultarla).
 """
 import secrets
 
 import pytest
+from sqlalchemy import insert
 
+from app.domain.models.catalogo import usuarios_puestos
 from app.informes.autorizacion_pdf import generar_pdf_autorizacion
 from app.domain.repositories.user_repository import RepositorioUsuario
 from app.domain.services.notificacion_service import ServicioNotificacion
 from app.domain.services.solicitud_service import ServicioSolicitud
 from app.infrastructure.database import SesionLocal
-from ayudas import cabecera, enviar, pdf, tripulante, verificar_impedimentos
+from ayudas import cabecera, cuerpo_impedimentos, enviar, pdf, rol_mixto, tripulante, verificar_impedimentos
 from conftest import ATLANTICO, PACIFICO, crear_actor, id_sector
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
@@ -125,16 +127,32 @@ async def test_la_finaliza_el_puesto_nuevo(cliente, e, admin):
     r = await cliente.get("/pendientes", headers=e["del_origen"].headers)
     assert next(p for p in r.json()["pendientes"] if p["clave"] == "por_finalizar")["cantidad"] == 0
 
-    # El primero la consulta, pero no la finaliza.
-    r = await cliente.get(f"/solicitudes/{sid}", headers=e["del_origen"].headers)
-    assert r.status_code == 200 and r.json()["acciones"]["finalizar"] is False
-    r = await cliente.post(f"/solicitudes/{sid}/impedimentos-puesto",
-                           json={"tripulantes": [{"tripulante_id": t["id"], "con_impedimento": False}
-                                                 for t in r.json()["tripulantes"]]},
-                           headers=e["del_origen"].headers)
-    assert r.status_code == 403 and e["destino"]["nombre"] in r.json()["detail"], r.text
-    r = await cliente.post("/solicitudes/historico", json={"texto": s["numero"]}, headers=e["del_origen"].headers)
-    assert [x["id"] for x in r.json()["items"]] == [sid], "y la encuentra en la consulta histórica"
+    # El primero ya no la ve (2026-11-22; antes la consultaba): ni el expediente, ni los
+    # archivos, ni la boleta. Si llega alguien con el PDF, el QR dice a qué puesto fue.
+    detalle = (await cliente.get(f"/solicitudes/{sid}", headers=e["del_destino"].headers)).json()
+    for metodo, ruta, cuerpo in (
+        ("GET", f"/solicitudes/{sid}", None),
+        ("GET", f"/solicitudes/{sid}/documentos/{detalle['documentos'][0]['id']}", None),
+        ("GET", f"/solicitudes/{sid}/autorizacion.pdf", None),
+        ("POST", f"/solicitudes/{sid}/impedimentos-puesto", cuerpo_impedimentos(detalle)),
+        ("POST", f"/solicitudes/{sid}/finalizar", {"comentario": "No es mía"}),
+        ("POST", f"/solicitudes/{sid}/boletas", {"numero_oficio": "SNM-1"}),
+        ("POST", "/solicitudes/historico", {"texto": s["numero"]}),
+    ):
+        r = await cliente.request(metodo, ruta, json=cuerpo, headers=e["del_origen"].headers)
+        assert r.status_code == 403, (ruta, r.text)
+
+    # Un rol que además revisa otro sector: por el primer puesto tampoco la ve; por el nuevo, sí. Lo
+    # mismo en la consulta histórica (en SQL) que en el expediente.
+    for puesto, la_ve in ((e["origen"], False), (e["destino"], True)):
+        mixto = await crear_actor(await rol_mixto(), prefijo="mixto", sectores=(ATLANTICO,))
+        async with SesionLocal() as sesion:
+            await sesion.execute(insert(usuarios_puestos).values(usuario_id=mixto.id, puesto_id=puesto["id"]))
+            await sesion.commit()
+        r = await cliente.get(f"/solicitudes/{sid}", headers=mixto.headers)
+        assert (r.status_code == 200) is la_ve, puesto["nombre"]
+        r = await cliente.post("/solicitudes/historico", json={"texto": s["numero"]}, headers=mixto.headers)
+        assert (sid in {x["id"] for x in r.json()["items"]}) is la_ve, puesto["nombre"]
 
     # El PDF y la verificación del QR dicen el cambio.
     async with SesionLocal() as sesion:

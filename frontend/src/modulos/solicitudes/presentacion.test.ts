@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { leerEspejo, type Caso } from "../../pruebas/espejo";
 import { tripulanteDePrueba } from "../../pruebas/datos";
-import { ETIQUETA_EVENTO, fechaEnPalabras, normalizarImo, TEXTO_HORARIO_LABORAL, tituloColumnaRango } from "./presentacion";
+import {
+  ETIQUETA_EVENTO, fechaEnPalabras, normalizarImo, TEXTO_HORARIO_LABORAL, textoSector, textoSectorCorto,
+  tituloColumnaRango,
+} from "./presentacion";
 
 describe("tituloColumnaRango (la ocupación salió del formulario el 2026-11-16)", () => {
   it("dice la ocupación solo si algún pasajero la tiene (una solicitud de antes)", () => {
@@ -48,5 +51,17 @@ describe("fechaEnPalabras", () => {
     expect(fechaEnPalabras(null)).toBe("");
     expect(fechaEnPalabras("2026-02-31")).toBe("");
     expect(fechaEnPalabras("13/11/2026")).toBe("");
+  });
+});
+
+describe("textoSector (2026-11-22)", () => {
+  it("es el que la revisó y, si el puesto cambió de sector, también el de hoy", () => {
+    expect(textoSector({ sector_nombre: "Sector Pacífico", sector_actual_nombre: null })).toBe("Sector Pacífico");
+    expect(textoSector({ sector_nombre: "Sector Pacífico", sector_actual_nombre: "Sector Atlántico" }))
+      .toBe("Sector Pacífico, que la revisó. Hoy el puesto es del Sector Atlántico");
+    expect(textoSector({ sector_nombre: null, sector_actual_nombre: null })).toBeNull();
+    expect(textoSectorCorto({ sector_nombre: "Sector Pacífico", sector_actual_nombre: null })).toBe("Sector Pacífico");
+    expect(textoSectorCorto({ sector_nombre: "Sector Pacífico", sector_actual_nombre: "Sector Atlántico" }))
+      .toBe("Sector Pacífico (hoy, Sector Atlántico)");
   });
 });

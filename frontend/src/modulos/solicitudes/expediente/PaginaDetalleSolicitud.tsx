@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import {
-  apiSolicitudes, type DocumentoSolicitud, type SolicitudDetalle, type TripulanteSolicitud,
+  apiSolicitudes, type ArchivoVisible, type SolicitudDetalle, type TripulanteSolicitud,
 } from "../../../api/solicitudes";
 import { EstadoCarga } from "../../../components/EstadoCarga";
 import { MarcoPagina } from "../../../components/MarcoPagina";
@@ -29,9 +29,10 @@ import { PanelPuerto } from "./PanelPuerto";
 import { PanelRevision } from "./PanelRevision";
 import { pasosSiguientes } from "./pasosSiguientes";
 import { QueSigue } from "./QueSigue";
+import { RegistroExpediente } from "./RegistroExpediente";
 import {
   ETIQUETA_OPERACION, formatearFecha, formatearFechaHora, puestoAutorizado, TEXTO_HORARIO_LABORAL, textoDias,
-  textoPuestos, tiempoRestante,
+  textoPuestos, textoSector, tiempoRestante,
 } from "../presentacion";
 import { SeccionTripulantes } from "./SeccionTripulantes";
 import { useVerificacionImpedimentos } from "./useVerificacionImpedimentos";
@@ -304,7 +305,7 @@ function Expediente({ s, onActualizada, volverA, estadoVolver }: {
   const verificacion = useVerificacionImpedimentos(s, onActualizada, "ucvmm");
   const verificacionPuesto = useVerificacionImpedimentos(s, onActualizada, "puesto");
   const verificacionTabla = s.acciones.revisar ? verificacion : s.acciones.finalizar ? verificacionPuesto : null;
-  const [vistaPrevia, setVistaPrevia] = useState<DocumentoSolicitud | null>(null);
+  const [vistaPrevia, setVistaPrevia] = useState<ArchivoVisible | null>(null);
   const [documentacionDe, setDocumentacionDe] = useState<TripulanteSolicitud | null>(null);
   const [descargando, setDescargando] = useState(false);
 
@@ -354,7 +355,9 @@ function Expediente({ s, onActualizada, volverA, estadoVolver }: {
           )}
           {s.acciones.descargar_autorizacion && (
             // Para el puesto de control la acción principal es finalizar (en su panel): la descarga queda secundaria.
-            <button type="button" className={s.acciones.finalizar ? styles.btnConsultar : styles.btnPrimario}
+            // También la de una vencida, que es solo una constancia para el SNM (2026-11-22).
+            <button type="button"
+              className={s.acciones.finalizar || s.estado === "expired" ? styles.btnConsultar : styles.btnPrimario}
               onClick={descargarPdf} disabled={descargando}>
               <IconoDescargar tamano={15} /> {descargando ? "Generando…" : "Descargar autorización (PDF)"}
             </button>
@@ -395,8 +398,8 @@ function Expediente({ s, onActualizada, volverA, estadoVolver }: {
               {(s.permite_subir_y_bajar || s.subir_y_bajar) && (
                 <Dato etiqueta="Subir y bajar" valor={s.subir_y_bajar ? "Sí" : "No"} />
               )}
-              {/* El sector de UCVMM (2026-11-10): solo le llega al SNM. */}
-              {s.sector_nombre && <Dato etiqueta="Sector" valor={s.sector_nombre} />}
+              {/* El sector de UCVMM que la revisó (2026-11-22): solo le llega al SNM. */}
+              <Dato etiqueta="Sector" valor={textoSector(s)} />
               <Dato etiqueta="Fecha de la operación" valor={formatearFecha(s.fecha_operacion)} />
               <Dato etiqueta="Buque" valor={s.nombre_buque} />
               <Dato etiqueta="IMO" valor={s.imo} />
@@ -423,6 +426,8 @@ function Expediente({ s, onActualizada, volverA, estadoVolver }: {
               <DocumentosSolicitud solicitud={s} onVer={setVistaPrevia} />
             </section>
           )}
+          {/* Las versiones anteriores y los archivos con su huella (2026-11-22): el SNM que la revisa. */}
+          {s.acciones.ver_registro && <RegistroExpediente s={s} onVer={setVistaPrevia} />}
           {/* El pie del documento: una línea de lectura mecánica, como la de un pasaporte (decorativa). */}
           <p className={styles.mrz} aria-hidden="true">{lineasMecanicas(s).join("\n")}</p>
         </div>

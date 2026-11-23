@@ -118,8 +118,9 @@ export function SeccionSectores({ sectores, usuarios, rolesCandidatos, onCambio 
   return (
     <>
       <p className={styles.descripcion}>
-        UCVMM y los supervisores de sector ven solo las solicitudes de los puestos de su sector. El supervisor general
-        y el Administrador ven las de los dos. El aviso de cada solicitud nueva va al correo del sector.
+        UCVMM y los supervisores de sector ven solo las solicitudes de su sector: las de sus puestos y las que ya
+        revisaron, aunque el puesto cambie. El Administrador ve las de los dos, y el supervisor general, las del trámite
+        de Técnico de los dos. El aviso de cada solicitud nueva va al correo del sector.
       </p>
       <div className={styles.lista}>
         {sectores.map((s) => (

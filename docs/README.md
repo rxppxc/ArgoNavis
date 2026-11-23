@@ -34,7 +34,16 @@ Línea base técnica y funcional de ARGO NAVIS (antes «NAVIS»), módulo **Auto
 
 Para conocer el sistema sin entrar en lo técnico, empieza por el 09: explica en lenguaje sencillo qué hace cada papel (agencia, UCVMM, puesto de control y administración), con capturas. Para la línea base, se sugiere empezar por el 00 (procesos y mapa general) y terminar con el 08, que reúne los riesgos, los pendientes y la lista de puntos a validar con UCVMM.
 
-Cada documento trae portada institucional, una página de control (datos, revisión y firmas, historial de versiones y convenciones) y un índice. Si editas un documento, actualiza el índice en Word: clic derecho sobre él → **Actualizar campo**.
+## Manuales de usuario
+
+Para quien usa el sistema, uno por papel: cortos, por tareas y con capturas marcadas (datos ficticios). Se reparten en PDF; el Word queda para ajustar textos. El de la agencia no nombra unidades internas del SNM, como el sistema.
+
+| Papel | Archivo | Versión |
+|---|---|---|
+| Agencia naviera | [Manual-agencia-naviera.pdf](manuales/Manual-agencia-naviera.pdf) · [Word](manuales/Manual-agencia-naviera.docx) | 1.0 (19/11/2026), 5 páginas |
+| UCVMM, puesto de control y supervisores | En preparación | — |
+
+Cada documento de la línea base trae portada institucional, una página de control (datos, revisión y firmas, historial de versiones y convenciones) y un índice. Si editas un documento, actualiza el índice en Word: clic derecho sobre él → **Actualizar campo**.
 
 ## Diagramas
 

@@ -57,7 +57,7 @@ domain/models/   → ORM (SQLAlchemy 2). Tablas + relaciones.
 domain/schemas/  → contratos (Pydantic). Entrada/salida HTTP.
 informes/        → los archivos que arma el sistema: PDF de la autorización, estadísticas (Excel, PDF, CSV), histórico.
 core/            → transversal y sin BD: config, contraseñas y JWT, LDAP, correo, rate limit, horario, identidad, texto.
-infrastructure/  → engine BD y sesión, almacenamiento de documentos, tareas de fondo, trabajos pesados.
+infrastructure/  → engine BD y sesión, almacenamiento y revisión de documentos, tareas de fondo, trabajos pesados.
 main.py          → arma la aplicación: ciclo de vida, middlewares, rutas, salud y el frontend compilado.
 ```
 `core/` no importa de `api/` ni de `infrastructure/` (auditoría del 2026-11-14). La identidad (nombre de la institución, paleta, logos) vive en `core/identidad.py`: la usan los correos, los informes y los textos de la agencia.
@@ -80,6 +80,7 @@ utils/              → funciones sin React (fechas, texto sin tildes, archivos,
 1. **Nunca** usar f-string para construir filtros LDAP. Usar `escape_filter_chars()`.
 2. **Nunca** servir archivos sin validar que la ruta resuelta esté dentro de la raíz permitida (`.resolve().relative_to(raiz)`). Las rutas de la BD son **relativas** a `STORAGE_PATH` (`ruta_relativa` / `ruta_segura` en `almacenamiento.py`, revisión `b5c2e8f4a713`): no vuelvas a guardarlas absolutas, que se rompen al mover o renombrar la carpeta.
 3. **Nunca** confiar en el `content_type` que envía el cliente — usar `python-magic` sobre el contenido.
+    - Y **nunca** abrir en el backend un archivo subido con una librería que lo interprete (oletools, olefile, openpyxl, un parser de XML…): leen partes enteras sin tope, y un .docx de 40 KB llenaba la memoria del contenedor (2026-11-22). Los de Office se recorren de a trozos, con tope, en `infrastructure/revision_office.py`.
 4. **Nunca** loguear tokens, contraseñas ni el DN LDAP completo.
 5. **Nunca** loguear queries SQL en producción (`echo=False` cuando `APP_ENV=production`).
 6. **Nunca** versionar `.env`. Está en `.gitignore`. Si el usuario lo va a versionar, avisar.
@@ -87,9 +88,9 @@ utils/              → funciones sin React (fechas, texto sin tildes, archivos,
 8. JWT se verifica contra BD en cada request — esto es **a propósito** para revocación inmediata: el estado de la cuenta y `users.sesiones_validas_desde` contra el `iat` del token (cerrar sesión, cambiar o restablecer la contraseña y desactivar la cuenta invalidan los tokens ya emitidos). No lo conviertas en caché sin pensar el trade-off.
 9. Rate limit en `/auth/login`, `/auth/cambiar-contrasena`, `/verificacion/{codigo}` y su `/autorizacion.pdf` (los únicos endpoints públicos, con el login) — si agregas otro endpoint público, agrégalo, y súmalo a la lista de `test_solo_estas_rutas_responden_sin_sesion` (`tests/test_seguridad.py`), que falla con cualquier ruta sin token que no esté ahí.
 10. Los documentos del expediente solo se sirven con sesión, validando acceso a la solicitud (`ServicioSolicitud.obtener_documento`) y dejando DOCUMENTO_VISTO/DESCARGADO en la bitácora. **Nunca** vuelvas a exponer archivos por token o enlace público.
-    - La única excepción es el **PDF de la autorización**, que no es un documento del expediente: lo arma el sistema. Desde el 2026-11-14 quien escanea el QR lo ve sin sesión (`GET /verificacion/{codigo}/autorizacion.pdf`, decisión del usuario). Es la copia de la agencia, sin nombres de funcionarios ni nada interno. Se ve mientras la autorización valga y hasta `DIAS_PDF_PUBLICO` días después de la operación, con tope por IP y en la bitácora (ver «Cambios del 2026-11-14» en docs/HISTORIAL.md). No le agregues lo interno, y no abras así ningún otro archivo.
+    - La única excepción es el **PDF de la autorización**, que no es un documento del expediente: lo arma el sistema. Desde el 2026-11-14 quien escanea el QR lo ve sin sesión (`GET /verificacion/{codigo}/autorizacion.pdf`, decisión del usuario). Es la copia de la agencia tal como se emitió, sin nombres de funcionarios ni nada interno. Se ve mientras la autorización valga y hasta `DIAS_PDF_PUBLICO` días después de la operación, con tope por IP y en la bitácora (ver «Cambios del 2026-11-14» en docs/HISTORIAL.md). No le agregues lo interno, y no abras así ningún otro archivo.
 11. Separación de funciones: nadie revisa (impedimentos, aprobar, devolver, negar) una solicitud que creó o que es de su agencia. No la quites "para probar": usa dos cuentas.
-    - Y cada sector de UCVMM ve y revisa solo las solicitudes de los puestos de su sector (2026-11-10). No lo abras "para probar": asigna el usuario a los dos sectores.
+    - Y cada sector de UCVMM ve y revisa solo las solicitudes de su sector (2026-11-10): las de sus puestos y, ya revisadas, las que revisó él (2026-11-22). No lo abras "para probar": asigna el usuario a los dos sectores.
 12. El login responde lo mismo si el usuario no existe y si la contraseña está mal (`ErrorAcceso` en `auth_service.py`); el motivo real va solo a la bitácora. No vuelvas a distinguirlos: revela qué cuentas existen en el AD.
     - Al AD solo se le pregunta por cuentas del AD **registradas y activas en ARGO NAVIS** (`ServicioAutenticacion._login_ad`). No vuelvas a consultarlo antes de esa comprobación: ARGO NAVIS serviría para probar contraseñas de cualquier cuenta del SNM (con la correcta respondía "no tienes acceso") y para bloquearlas.
     - El freno de las cuentas del AD vive en la BD (`users.intentos_fallidos` / `bloqueado_hasta`, las columnas del bloqueo de las locales) y la fila queda bloqueada durante el login (`RepositorioUsuario.buscar_para_login`, FOR UPDATE). No lo pases a memoria: con varios workers o pedidos en paralelo, al AD le llegarían más intentos (`test_freno_del_ad_con_intentos_en_paralelo`).
@@ -105,10 +106,15 @@ utils/              → funciones sin React (fechas, texto sin tildes, archivos,
 19. La aplicación entra a PostgreSQL con **su propia cuenta** (`DATABASE_URL`, en Docker `argonavis_app`), no con la dueña de las tablas ni con un superusuario (2026-11-08):
     - La crea y la pone al día `infrastructure/permisos_bd.py` después de cada migración, con la dueña (`MIGRACIONES_DATABASE_URL`, que el entrypoint borra antes de levantar uvicorn).
     - Lee y escribe filas, pero no crea ni cambia tablas ni ejecuta programas del servidor (`COPY ... TO PROGRAM`).
-    - `audit_logs` y `solicitud_eventos` son **solo para agregar** (sin UPDATE ni DELETE): la bitácora y el historial no se pueden tapar desde la aplicación. Las FK con `ON DELETE SET NULL` las aplica PostgreSQL con la dueña, así que borrar un usuario funciona igual.
-    - `boletas_recargo` (2026-11-16) va **sin borrar** (`TABLAS_SIN_BORRAR`: sin DELETE ni TRUNCATE): una boleta se anula, nunca se borra.
+    - `audit_logs`, `solicitud_eventos` y, desde el 2026-11-22, `solicitud_versiones` y `documentos_emitidos` son **solo para agregar** (sin UPDATE ni DELETE): la bitácora y el historial no se pueden tapar desde la aplicación. Las FK con `ON DELETE SET NULL` las aplica PostgreSQL con la dueña, así que borrar un usuario funciona igual.
+    - `boletas_recargo` (2026-11-16) y `solicitud_documentos` (2026-11-22) van **sin borrar** (`TABLAS_SIN_BORRAR`: sin DELETE ni TRUNCATE): una boleta se anula y un documento se retira, nunca se borran.
     - No conectes la aplicación como dueña ni le des UPDATE o DELETE sobre esas tablas. Una tabla nueva que necesite otro trato va en `TABLAS_SOLO_AGREGAR`, `TABLAS_SIN_BORRAR` o `TABLAS_SIN_ACCESO`.
     - Lo prueban `tests/test_permisos_bd.py` y el E2E, cuyo backend entra con una cuenta así (`servidor_e2e.py`).
+20. Los contenedores corren **sin root, sin privilegios y con la imagen de solo lectura** (`x-endurecido` en `docker-compose-prod.yml`, 2026-11-22), y nginx no comparte red con PostgreSQL:
+    - No agregues `cap_add`, `privileged` ni `user: root`, ni quites `read_only`: si algo necesita escribir, dale un volumen o un tmpfs propio.
+    - Los envíos mientras llegan van en **volúmenes** (`/tmp` del backend, `/var/cache/nginx` de nginx), nunca en un tmpfs: cuenta para la memoria del contenedor (256 MB el de nginx) y un envío pesa hasta 345 MB.
+    - nginx escucha en el 8080; el puerto va igual en `nginx.conf`, el Dockerfile, el compose y el chequeo de salud.
+    - Lo prueban `tests/test_contenedores.py`, el trabajo `contenedores` de la CI (levanta la pila) y `verificar-despliegue.sh`.
 
 ### Errores
 - Backend: `HTTPException` con código y `detail` descriptivo. Nunca `except: pass`. Loggear con `logger.warning/.error` con contexto.
@@ -121,7 +127,7 @@ utils/              → funciones sin React (fechas, texto sin tildes, archivos,
 - `obtener_sesion_bd()` ya hace `commit` en éxito y `rollback` en excepción — no hacerlo manualmente en endpoints.
 - Pídela **siempre** como `Depends(obtener_sesion_bd, scope="function")`: con ese scope el commit corre antes de responder y antes de las tareas en segundo plano (correos). Sin el scope, FastAPI la trata como otra dependencia y habría dos sesiones en el mismo request.
 - Transiciones de una solicitud: carga con `RepositorioSolicitud.buscar_por_id(id, bloquear=True)` (SELECT ... FOR UPDATE). La prueba `test_aprobar_y_negar_a_la_vez` falla si se quita.
-- Lo que no se deshace con un rollback (borrar archivos) va en `al_confirmar(sesion, accion)` (`infrastructure/database.py`): corre después del commit y se descarta si hay rollback.
+- Los archivos de una solicitud no se borran (2026-11-22): al corregir se retiran (`retirado_en`). Solo se borra el que nunca llegó a registrarse, tras un error.
 
 ### Frontend strict
 - `tsconfig` con `strict: true`. Si necesitas `any`, justifica el `// any` con un comentario.
@@ -249,7 +255,8 @@ Pedido del usuario: «en el modo claro hay cosas que no se distinguen»; «que c
 ## Estado actual (2026-11-16)
 
 El sistema cubre el ciclo completo de las Autorizaciones Marítimas: la agencia envía, UCVMM revisa por sector y el puesto de control finaliza. Tiene además:
-- supervisión y consulta histórica;
+- supervisión y consulta histórica, también de las autorizaciones de hace muchos años (2026-11-22);
+- el historial completo de cada solicitud: lo que se envió en cada versión, los documentos reemplazados, la huella de cada archivo y la autorización tal como se emitió (2026-11-22);
 - el recargo por atención fuera del horario laboral y su boleta, con el tipo de operación en casillas (2026-11-16);
 - la ocupación fuera del formulario (2026-11-16);
 - la operación del trámite de Técnico (Embarque, Desembarque o Subir y bajar, que pide la Carta Form. 7 de cada tripulante) y los días del sellado de Shore Pass (5 o 15) (2026-11-18);
@@ -272,7 +279,12 @@ Cada una salió de un problema real. El detalle está en el historial.
   - Si cambias una, cambia la otra (`test_la_bandeja_cuenta_las_alertas_como_el_expediente`).
 - La consulta histórica (`_alcance_historico`, en SQL) y el expediente (`puede_ver`) tienen que ver exactamente lo mismo.
   - `test_cada_uno_ve_lo_suyo` lo prueba en las dos direcciones.
-- Una bandeja, consulta o estadística nueva de UCVMM filtra por el sector (`ContextoAcceso`, `domain/services/acceso.py`).
+- El sector de una solicitud es **el que la revisó** y, mientras nadie la ha revisado, el de su puesto (`Solicitud.sector_id`, 2026-11-22). Antes, siempre el de hoy del puesto: moverlo de sector se llevaba todo su historial.
+  - Lo guardan aprobar, devolver y denegar (`sector_revision_id`); corregir lo suelta.
+  - Una bandeja, consulta o estadística nueva de UCVMM filtra con `ctx.alcance_sectores` (`AlcanceSectores`, `solicitud_repository.py`), nunca por los puestos.
+- Lo que se busca va en las columnas `busqueda` de la solicitud y del tripulante (2026-11-22): las calcula PostgreSQL, sin tildes y en minúsculas, con un índice de trigramas (`pg_trgm`).
+  - Una búsqueda nueva usa `_contiene`. **Nada de `ilike` sobre otra columna:** recorre la tabla, y con 10 años de datos tardaba 12 s. Lo prueba `test_la_busqueda_usa_su_indice`.
+  - Un dato nuevo que se busque se suma a `busqueda` con una migración. La expresión de la columna y `_plano` tienen que hacer lo mismo.
 - Las rutas fijas de `/solicitudes` (`/historico/opciones`, `/estadisticas`…) van antes de `/{solicitud_id}` en el enrutador.
 - La consulta histórica y su exportación son POST, con el cuerpo: el pasajero (un dato personal) no va en la URL ni en los logs de acceso.
 
@@ -282,6 +294,9 @@ Cada una salió de un problema real. El detalle está en el historial.
 - Los logs en archivo van uno por día, y el archivo nunca se renombra (`ArchivoDiario`, `core/registro.py`).
   - **No uses `RotatingFileHandler`:** en Windows falla con varios procesos.
   - Tampoco el modo `"a"` de Python: pierde líneas.
+  - En Docker van a un volumen (`registros`), porque la salida de Docker se borra al recrear el contenedor; los accesos de nginx, a `registros_nginx`, con la fecha en el nombre. Los contenedores llevan `TZ=EST5` (hora de Panamá).
+- `vigilar.py` (2026-11-22) avisa por correo cuando algo falla. Corre en el servidor, con el Python 3.9 del sistema y solo la biblioteca estándar: **nada de sintaxis más nueva ni de importar la aplicación** (tiene que avisar aunque el backend no arranque).
+  - Lo que se agregue al sistema y pueda fallar en silencio (una cola, una tarea, un certificado) lleva su chequeo ahí, con su caso en `test_vigilar.py`.
 - Un trabajo de cientos de ms de CPU (PDF, Excel) va por `en_hilo_con_tope` (`infrastructure/trabajo_pesado.py`), no por `asyncio.to_thread`.
   - Suelta antes la conexión (`await sesion.commit()`).
 - Desde la API, la bitácora se anota con `auditar()` o `auditar_admin()` (`api/v1/dependencias.py`), que agregan la IP y el navegador.
@@ -293,8 +308,12 @@ Cada una salió de un problema real. El detalle está en el historial.
 - Las imágenes Docker llevan la versión exacta, también en la CI (`test_dependencias.py`).
 - El respaldo de los documentos es incremental (`backup.sh`, `cp -al`).
   - **No vuelvas al tar de todo:** llena el disco que comparte con PostgreSQL.
-  - Sirve porque los documentos no se modifican.
+  - La copia solo agrega (2026-11-22): los documentos no se modifican ni se borran, así que si uno falta o cambió en el servidor es una pérdida, y la copia conserva el original y lo dice en su registro.
+  - Retención con margen: 14 noches, la primera de los últimos 12 meses y la primera de los últimos 10 años; la base y los documentos, de las mismas noches.
+  - La copia lleva el dueño y los permisos del volumen (uid 10001): sin eso, al restaurar el backend no podría escribir. Lo prueba la CI.
+  - `probar-restauracion.sh` (2026-11-22) carga el último en una base aparte y comprueba los documentos: la base y la copia llevan la misma fecha en el nombre. Los dos guiones se prueban en `test_respaldos.py` (con un `docker` de mentira) y con PostgreSQL real en la CI.
 - Si agregas algo que el despliegue necesite (una variable, un servicio, un puerto), súmale su chequeo a `verificar-despliegue.sh`.
+- `infrastructure/revisar_documentos.py` (2026-11-22) compara cada documento (también los retirados) y cada autorización emitida con su archivo en el disco, y relee los de un día del mes para comprobar su huella. Lo corre `verificar-despliegue.sh`, cada mañana con `vigilar.py`.
 - Los topes del cuerpo (`api/middleware.py`) y los de nginx tienen que coincidir (`test_nginx_tiene_los_mismos_topes_que_el_backend`).
   - Si el catálogo pide más documentos, sube `MAX_DOCUMENTOS_*` y los dos topes.
 - Al arrancar, el backend compara la base con el ORM (`infrastructure/esquema.py`, 2026-11-17). Si le falta una tabla, una columna o un valor de enum:
@@ -341,18 +360,17 @@ Cada una salió de un problema real. El detalle está en el historial.
     - Subirlas cuando se asiente: solas, y probando el envío (pytest y E2E).
 12. **De la reunión del 2026-10-30, para más adelante:** los feriados en el horario laboral (necesitan un catálogo que mantenga el Administrador) y la notificación de Windows de la campana (el navegador pide permiso).
 13. **Validar con UCVMM:** el aviso de custodia al aprobar no es un documento, así que sigue saliendo para todos los rangos; a los no marinos ya no se les pide el Form. No. 6. Confirmar si les aplica.
-14. **Respaldos fuera del servidor** (de la revisión del 2026-10-27). Hoy `backup.sh` es solo para Docker y deja todo en el mismo servidor; se copian con `rsync -aH` (README). Desde el 2026-11-10 es incremental y la restauración está documentada y probada con una base temporal; falta probarla entera en el servidor de pruebas.
+14. **Respaldos fuera del servidor** (de la revisión del 2026-10-27). Hoy `backup.sh` es solo para Docker y deja todo en el mismo servidor; se copian con `rsync -aH` (README). Desde el 2026-11-22 guarda 14 noches, 12 meses y 10 años, pero en ese mismo disco: si se pierde, se pierden con él. Falta probar la restauración entera en el servidor de pruebas.
 15. **De la auditoría del 2026-11-08, para decidir:**
     - Retención de la bitácora (`audit_logs`): es la tabla que más crece (cada documento visto, cada login) y no se purga. Va con la política de retención (punto 7).
-    - Búsqueda por texto de las bandejas y la bitácora: `ILIKE '%…%'` recorre la tabla. Con muchos miles de filas, un índice trigram (`pg_trgm`) la acelera; hoy no hace falta.
-    - Lo mismo la consulta histórica (2026-11-11): busca tripulantes con `ILIKE` y filtra por `fecha_operacion`, que no tiene índice.
+    - Búsqueda por texto de la bitácora: `ILIKE '%…%'` recorre la tabla. Las bandejas y la consulta histórica ya usan un índice de trigramas (2026-11-22).
     - Tope global del login y de la verificación en nginx (`limit_req`): el de slowapi es por proceso. Antes, confirmar si las agencias salen de la VPN con una sola IP (las frenaría a todas juntas).
 16. **Menos consultas por pedido, si crece el uso** (prueba de carga del 2026-11-08). Hoy cada pedido hace 6 consultas solo para saber quién es el usuario:
     - `obtener_id_usuario_actual` y `usuario_actual` leen el mismo usuario dos veces;
     - los permisos se consultan en cada pedido (a veces dos veces);
     - el expediente vuelve a leer el catálogo (trámites, documentos y países) y carga `creada_por` con su rol y su agencia.
     Juntar la verificación del token con la carga del usuario y cachear el catálogo por proceso ahorraría entre 10 y 20 %. Correr `tests/carga.py` antes y después.
-17. **Documentación de la DTI, juego 0.7:** `docs/` no tiene todavía la identidad «pase oficial» ni los cambios del 2026-11-11 (documentos de los técnicos, nombre neutro para la agencia, costo fuera del horario y consulta histórica), del 2026-11-13 (cambio de puerto, Formulario No. 3 en todos los trámites, cabecera de la agencia, rango Pasajero, pasaporte con 3 meses) del 2026-11-14 (la Visa de los restringidos, los panameños, Shore Pass, quien finalizó y el PDF por el QR) y del 2026-11-16 (la boleta de recargo con el tipo de operación, el alcance del supervisor general, «¿Subir y bajar?» con la Carta Form. 7 y la ocupación fuera del formulario), ni el rediseño visual «B + C» del 2026-11-17 (las capturas de los manuales quedaron con el diseño anterior), ni lo del 2026-11-18 (la operación del trámite de Técnico con «Subir y bajar», los días del sellado de Shore Pass, las visas de los restringidos según el trámite y el rango, las estadísticas sin UCVMM y «tripulantes» otra vez).
+17. **Documentación de la DTI, juego 0.7:** `docs/` no tiene todavía la identidad «pase oficial» ni los cambios del 2026-11-11 (documentos de los técnicos, nombre neutro para la agencia, costo fuera del horario y consulta histórica), del 2026-11-13 (cambio de puerto, Formulario No. 3 en todos los trámites, cabecera de la agencia, rango Pasajero, pasaporte con 3 meses) del 2026-11-14 (la Visa de los restringidos, los panameños, Shore Pass, quien finalizó y el PDF por el QR) y del 2026-11-16 (la boleta de recargo con el tipo de operación, el alcance del supervisor general, «¿Subir y bajar?» con la Carta Form. 7 y la ocupación fuera del formulario), ni el rediseño visual «B + C» del 2026-11-17 (las capturas de los manuales quedaron con el diseño anterior), ni lo del 2026-11-18 (la operación del trámite de Técnico con «Subir y bajar», los días del sellado de Shore Pass, las visas de los restringidos según el trámite y el rango, las estadísticas sin UCVMM y «tripulantes» otra vez), ni lo del 2026-11-22 (los contenedores endurecidos, la vigilancia, la consulta de las autorizaciones de hace muchos años, el historial completo y el cambio de puerto que solo ve el puesto nuevo).
 18. **Recargo fuera del horario, con UCVMM:**
     - La boleta (2026-11-16) es un **borrador**: UCVMM tiene un modelo en papel, que el usuario pasará para copiarlo tal cual (`informes/boleta_recargo_pdf.py`).
     - El sistema no registra el pago (desde el 2026-11-11). La boleta dice cómo se paga desde el 2026-11-18: «Efectivo, tarjeta o cheque a favor del Servicio Nacional de Migración» (`METODOS_DE_PAGO`, `boleta_recargo_pdf.py`).
@@ -361,6 +379,16 @@ Cada una salió de un problema real. El detalle está en el historial.
     - Con la DTI: publicar la verificación del QR en internet (plantilla `frontend/nginx-verificacion-publica.conf`, HTTPS, `set_real_ip_from` y `URL_VERIFICACION_PUBLICA`). Mientras tanto, el QR solo funciona dentro de la red del SNM.
     - Con UCVMM: el nombre y la descripción de la Visa de los restringidos (hoy «Visa», «Para el tripulante de nacionalidad restringida.»; se cambian con una migración).
     - Si las agencias van a entrar al sistema desde internet sin VPN (el usuario lo mencionó), es otra decisión con la DTI: hoy todo está pensado para la VPN. Publicar todo pediría al menos HTTPS, el segundo factor de las agencias (punto 8) y un WAF.
+21. **De la auditoría del stack (2026-11-22)**, en el orden acordado con el usuario. El stack se queda (no agregar microservicios, Redis, Celery ni Kubernetes). Hechos el 2026-11-22: los documentos de Office, los contenedores endurecidos con redes separadas, PostgreSQL 15.20, los registros en volúmenes, `vigilar.py` y `probar-restauracion.sh`. El repositorio a privado y a una organización del SNM lo deja el usuario para el final; hasta el push no corre la CI, que es la primera vez que esos contenedores arrancan.
+    - **Antes de producción** (que será un servidor nuevo): HTTPS y TLS (punto 1); respaldos fuera del servidor y cifrados (14; preguntar a la DTI si la VM entra en el respaldo de vSphere); instalar la vigilancia en cada servidor (`CORREO_ALERTAS` y el cron) y que la DTI consulte `/api/health` desde otro equipo; PostgreSQL 18 ahí (la CI ya prueba el backend con ella; la 15 termina en noviembre de 2027; su imagen cambia la ruta del volumen); correo a dominios externos.
+    - **Después:** subir archivo por archivo, con borrador (hoy, un solo envío de hasta 345 MB); decidir con UCVMM si alcanza con PDF; cookie (2) y segundo factor (8); reemplazar `ldap3` (sin versión estable desde 2021) o un inicio de sesión único; que el backend calcule el checklist y los tipos salgan de OpenAPI; FastAPI (11); retirar el modo Windows de producción; verificador de tipos en Python y cobertura; menos consultas por pedido (16); partir `solicitud_service.py` (4).
+    - **Continuidad:** el proyecto depende de una sola persona y de una cuenta personal de GitHub.
+22. **De la conservación (2026-11-22), para decidir con el SNM.** Hecho: que se encuentren muchos años después, con su historial completo, y respaldos con margen (docs/HISTORIAL.md). Nada se borra. Falta:
+    - **Cuántos años** se conservan (Ley 81, punto 7). Los datos de quien salió de una solicitud al corregirla también se conservan.
+    - Los respaldos, fuera del servidor (14).
+    - Los nombres del trámite, de los documentos y de los países del expediente son los del catálogo de hoy; en las versiones y en la autorización emitida, los de ese día.
+    - Si Legal o Auditoría las van a consultar, un rol de solo lectura. Si un sector necesita ver lo que revisó el otro antes de que el puesto cambiara, es un permiso más.
+    - La exportación a Excel llega a 5000 filas.
 
 ### Flujo actual: Autorizaciones Marítimas (UCVMM)
 
@@ -368,7 +396,7 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
 
 **Roles:**
 - **Naviera** (`T-CREAR-BASICA` + `users.agencia_id`) — envía solicitudes de su agencia (`/new`) y corrige las devueltas dentro del plazo. Cualquier usuario de la agencia ve y corrige las de la agencia. Sin agencia no puede enviar; con la agencia desactivada no entra.
-- **UCVMM** (`T-PROCESAR-PACIFICO` + asignación en `usuarios_sectores`; el rol se llamaba «Sector Pacífico» hasta el 2026-11-10) — revisa las solicitudes de los puestos de **sus sectores** (ver «Sectores, supervisión y pasajeros» en docs/HISTORIAL.md). Sin sector asignado, su bandeja responde 409:
+- **UCVMM** (`T-PROCESAR-PACIFICO` + asignación en `usuarios_sectores`; el rol se llamaba «Sector Pacífico» hasta el 2026-11-10) — revisa las solicitudes de **sus sectores** (ver «Sectores, supervisión y pasajeros» en docs/HISTORIAL.md). Sin sector asignado, su bandeja responde 409:
   - Verifica impedimentos **por tripulante** (`solicitud_tripulantes.con_impedimento`, NULL = sin verificar). Todos marcados es obligatorio para aprobar; con impedimento igual se puede aprobar. El comentario es opcional.
   - Registrada, la verificación queda de solo lectura. Cambiarla es una **corrección**:
     - Exige `motivo_correccion`.
@@ -379,7 +407,8 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
   - Genera y anula la boleta de recargo de las aprobadas fuera del horario de sus sectores (ver «Boleta de recargo» abajo).
 - **Puesto de Control** (`T-FINALIZAR-PUERTO` + asignación en `usuarios_puestos`) — ve las aprobadas de sus puestos, verifica los impedimentos en SIMPLUS (obligatoria desde el 2026-11-06, aparte de la de UCVMM) y las finaliza con comentario obligatorio.
   - El comentario sin finalizar (`POST /solicitudes/{id}/comentarios`) se retiró el 2026-10-20: no tenía pantalla. Los eventos `comentario` de antes se siguen mostrando, solo al SNM.
-  - Finaliza siempre en el puesto autorizado (reunión del 2026-10-30; antes podía indicar otro). Con cambio de puerto (2026-11-13), el autorizado es el nuevo; el primero solo la consulta. Desde el 2026-11-18 el nuevo puede ser del otro sector (pedido del usuario: de uno del Pacífico a uno del Atlántico): la revisa UCVMM del sector del primer puesto, como siempre, y la finaliza el nuevo. Si la operación se hace en otro puesto, no se finaliza: vence sola y la agencia presenta una nueva solicitud. Las finalizadas en otro puesto antes del cambio se siguen mostrando así en el expediente, el PDF y la verificación pública.
+  - Finaliza siempre en el puesto autorizado (reunión del 2026-10-30; antes podía indicar otro). Con cambio de puerto (2026-11-13), el autorizado es el nuevo: la ve, la finaliza y genera su boleta. El primero no la ve desde el 2026-11-22 (pedido del usuario; antes podía consultarla): si llega alguien con el PDF, el QR dice a qué puesto fue. Desde el 2026-11-18 el nuevo puede ser del otro sector (pedido del usuario: de uno del Pacífico a uno del Atlántico): la revisa UCVMM del sector del primer puesto, como siempre, y la finaliza el nuevo. Si la operación se hace en otro puesto, no se finaliza: vence sola y la agencia presenta una nueva solicitud. Las finalizadas en otro puesto antes del cambio se siguen mostrando así en el expediente, el PDF y la verificación pública.
+  - Consulta las suyas, de cualquier año, en su bandeja: no tiene la consulta histórica desde el 2026-11-22 (pedido del usuario).
   - El rol se siembra con `es_sistema = false` (el admin puede renombrarlo o borrarlo).
   - Genera y anula la boleta de recargo de las solicitudes que ve.
 - **Supervisor de sector** (`T-SUPERVISAR-SECTOR` + `usuarios_sectores`) y **Supervisor general** (`T-SUPERVISAR-TODO`; UCVMM en Tocumen) — solo lectura (2026-11-10): la bandeja «Supervisión» (`GET /solicitudes/supervision`), los expedientes con sus documentos (cada apertura queda en la bitácora) y el PDF de la autorización (copia interna). Ningún botón de decisión (`revisar` y `finalizar` en falso) y sin campana.
@@ -402,6 +431,13 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
   - El expediente se evalúa contra esa foto, no contra el catálogo de hoy. Es el mismo principio que `nacionalidad_restringida` del tripulante.
   - Un cambio del catálogo no deja incompletas las solicitudes ya enviadas ni los expedientes cerrados. La siguiente corrección sí se valida con las reglas nuevas.
   - Antes de `7e3f1a9c2d64` se evaluaba en vivo, y el cambio de `b9e4d17a3c52` (Carta y Reporte "por tripulante") marcó como faltantes documentos que sí estaban.
+- **Historial completo** (2026-11-22, revisión `d7f3b0c5e849`). Pedido del usuario: no se sabe cuántos años se conservan, «pero debe haber un margen e historial completos».
+  - **Versiones** (`solicitud_versiones`): `corregir()` guarda, antes de cambiar nada, la foto de lo que se había enviado (`version_expediente.py`), quién la envió, quién la devolvió y por qué. Va en pares (rótulo, valor) con los nombres de ese día, para que se lea igual aunque cambien el catálogo o las columnas. Qué cambió lo calcula `comparar`.
+  - **Documentos retirados:** los que la agencia reemplaza o quita se conservan, con el nombre de su tripulante. `Solicitud.documentos` trae solo los vigentes: lo demás del sistema no los ve.
+  - **Huella** (`sha256`): se calcula al recibir el archivo y se comprueba cada vez que se abre. Si no coincide, no se muestra (409) y queda en el log. A los de antes se les calcula una vez (`huellas.py`).
+  - **La autorización emitida** (`documentos_emitidos`, `emision.py`): el PDF de la agencia se arma una vez al aprobar y otra al finalizar, después del commit, y es el que reciben la agencia y el QR. Si falta, la completa la tarea de fondo o la primera descarga; si se dañó, la agencia recibe una armada de nuevo y queda el error en el log. La copia interna del SNM no se emite: se arma cada vez.
+  - **Quién lo ve** (`ContextoAcceso.ve_registro`): el SNM que ve la solicitud antes de aprobarse (UCVMM y el supervisor de su sector, el general en su trámite y el Administrador). La agencia no, porque lleva lo interno; el puesto tampoco, porque la ve desde que se aprueba.
+  - Un archivo o un dato nuevo del expediente que cambie al corregir entra en la foto.
 - `solicitud_documentos.documento_id` nulo = documento adicional (fuera del checklist; máx. 20 por solicitud).
 - Asignar un usuario a una agencia o a un puesto no le da acceso sin el permiso de su rol: la API exige las dos cosas (`ContextoAcceso`). Por eso la pantalla de catálogos ofrece «Mostrar todos los usuarios» a propósito.
 - `valida_vigencia` está activa en **todos** los trámites. Desde el 2026-11-13:
@@ -413,8 +449,9 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
   - Tripulantes con 18 años cumplidos y nacidos desde 1900.
   - Pasaporte y seamanbook vencen después del nacimiento.
 - Formatos del expediente: PDF, Word y Excel (`.pdf .doc .docx .xls .xlsx`, decisión del usuario del 2026-10-15, "de momento"; antes solo PDF). En `infrastructure/almacenamiento.py`, espejo en `utils/archivos.ts`:
-  - El contenido se comprueba por formato: firma `%PDF-`; OLE2 para .doc/.xls; ZIP OOXML con su parte principal para .docx/.xlsx.
-  - Los de Office se rechazan si traen macros: `oletools`, que falla cerrado, y cualquier `vbaProject.bin` dentro de un .docx/.xlsx.
+  - El contenido se comprueba por formato: firma `%PDF-`; para .doc/.xls, OLE2 con su flujo principal (`WordDocument`, `Workbook` o `Book`); para .docx/.xlsx, ZIP OOXML con su parte principal.
+  - Los de Office se rechazan si traen macros (`revision_office.py`, desde el 2026-11-22; antes, `oletools`): el proyecto VBA en un .doc/.xls o en un objeto OLE2 dentro de un .docx/.xlsx, y cualquier `vbaProject.bin`. Falla cerrado.
+  - También si descomprimidos pasan de 50 MB (`MAXIMO_DESCOMPRIMIDO_MB`; se mide lo que ocupan de verdad, no lo que el ZIP declara), si traen más de 2.000 partes o si usan otra compresión que deflate.
   - El MIME que se guarda y con el que se sirve es el del formato verificado (`mime_del_formato`); python-magic queda como control cruzado en el log (2026-11-02: antes un «PDF» con HTML delante quedaba como text/html).
   - La vista previa muestra .docx y .xlsx; .doc y .xls se descargan.
   - Máximo **2 MB por archivo**, en cualquier formato (decisión del usuario del 2026-10-16): `TAMANO_MAXIMO_MB` en `almacenamiento.py`, espejo en `utils/archivos.ts`. Es una constante y no una variable de entorno a propósito, para que backend y frontend no se desalineen. Los documentos ya cargados que pesan más se siguen viendo.
@@ -480,6 +517,7 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
     - Lleva los trámites activos, en su orden, con la X en el de la solicitud. Si el trámite ya está inactivo, como Cambio de Puerto, se suma al final, marcado (`casillas_operacion`).
     - Si el trámite pregunta «¿Subir y bajar?» (o es una de antes que dijo «Sí»), debajo va la respuesta; la operación de Técnico y los días del sellado van en sus propias filas (`elecciones`).
 - La observación de aprobación es interna: no va en el PDF ni en el correo de aprobación. El PDF no tiene sección de observaciones.
+- El PDF se descarga aprobada o finalizada. El de la que se aprobó y venció sin finalizarse lo descarga solo el SNM, con el sello EXPIRADA (2026-11-22, `_hay_pdf`); la agencia y el QR, no.
 - El PDF de la agencia dice "Aprobada por: Servicio Nacional de Migración" (hasta el 2026-11-11, "UCVMM"), sin el nombre del funcionario: tampoco ve esos nombres en el expediente (decisión del usuario del 2026-10-15). El personal del SNM descarga una copia interna con el nombre de quien aprobó (reunión del 2026-10-30, en docs/HISTORIAL.md).
 - `agencia_nombre`, `puesto_nombre` y `puesto_finalizacion_nombre` son una foto (al enviar o al finalizar): renombrar la agencia o el puesto no cambia expedientes viejos.
 - Las solicitudes no se eliminan; un usuario (FK RESTRICT), agencia o puesto con solicitudes no se borra (se desactiva).
@@ -518,7 +556,7 @@ cd backend && venv\Scripts\python -c "from app.main import aplicacion"
 cd backend && venv\Scripts\python -m pytest
 
 :: Backend: lint (la CI lo corre antes de las pruebas)
-cd backend && venv\Scripts\python -m ruff check .
+cd backend && venv\Scripts\python -m ruff check --config ruff.toml . ../vigilar.py
 
 :: Backend: dependencias (se instalan desde el bloqueo; se edita requirements.txt y se regenera)
 cd backend && venv\Scripts\python -m pip install --require-hashes -r requirements.lock

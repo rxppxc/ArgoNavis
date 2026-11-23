@@ -1,10 +1,15 @@
 """Acceso a BD del expediente de las solicitudes: bandejas paginadas por
 alcance (agencia, revisión, puesto), bloqueo de fila para las transiciones,
 vencimientos, estadísticas y las novedades de las notificaciones internas."""
+import re
 from dataclasses import dataclass
 from datetime import date, datetime
 
-from sqlalchemy import Interval, Select, Time, and_, case, cast, extract, func, or_, select
+from sqlalchemy import (
+    ARRAY, Integer, Interval, Select, Time, and_, any_, case, cast, extract, false, func, literal, literal_column, or_,
+    select, update,
+)
+from sqlalchemy.dialects.postgresql import insert as insertar
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -12,24 +17,59 @@ from app.core.horario import FIN_LABORAL, INICIO_LABORAL, ZONA_PANAMA, entre_fec
 from app.domain.models.boleta import BoletaRecargo
 from app.domain.models.catalogo import AgenciaNaviera, PuestoControl
 from app.domain.models.solicitud import (
-    MESES_VIGENCIA_PASAPORTE, RANGOS_CON_LIBRETA, CasillaSolicitud, DocumentoSolicitud, EstadoSolicitud,
-    EventoSolicitud, Solicitud, TipoEventoSolicitud, TripulanteSolicitud,
+    MESES_VIGENCIA_PASAPORTE, RANGOS_CON_LIBRETA, CasillaSolicitud, DocumentoEmitido, DocumentoSolicitud,
+    EstadoSolicitud, EventoSolicitud, Solicitud, TipoEmitido, TipoEventoSolicitud, TripulanteSolicitud, VersionSolicitud,
 )
 from app.domain.models.tramite import TipoTramite
+from app.domain.models.user import Usuario
 
 _ZONA = ZONA_PANAMA.key   # el nombre, para timezone() de PostgreSQL
+
+# Qué autorización se emite en cada estado (2026-11-22): en los demás, ninguna.
+EMITIDO_POR_ESTADO = {
+    EstadoSolicitud.APROBADA.value: TipoEmitido.APROBADA.value,
+    EstadoSolicitud.FINALIZADA.value: TipoEmitido.FINALIZADA.value,
+}
+
+
+@dataclass(frozen=True)
+class AlcanceSectores:
+    """Las solicitudes de unos sectores (UCVMM y la supervisión de sector): las que
+    revisó alguno de ellos y, mientras nadie las ha revisado, las de sus puestos de hoy
+    (2026-11-22). Es `Solicitud.sector_id` en SQL: si cambias uno, cambia el otro."""
+    sectores: frozenset[int] = frozenset()
+    puestos:  frozenset[int] = frozenset()   # los de esos sectores, hoy
+
+    def condicion(self):
+        # Sin sectores no ve nada (IN de una lista vacía no es válido en SQL).
+        return or_(
+            Solicitud.sector_revision_id.in_(sorted(self.sectores) or [-1]),
+            and_(Solicitud.sector_revision_id.is_(None),
+                 Solicitud.puesto_control_id.in_(sorted(self.puestos) or [-1])),
+        )
 
 
 @dataclass(frozen=True)
 class AlcanceSnm:
     """Lo que ve el personal del SNM fuera de sus bandejas (la consulta histórica,
     2026-11-11): lo mismo que ServicioSolicitud.puede_ver, sin la vía de la agencia."""
-    puestos:           frozenset[int] = frozenset()   # todas sus solicitudes (UCVMM, supervisión de sector)
-    # Desde que se aprueban (puesto de control), como primer puesto o como el nuevo de
-    # un cambio de puerto.
+    sectores:          AlcanceSectores | None = None   # UCVMM y supervisión de sector
+    # Desde que se aprueban, las que finalizan esos puestos (con cambio de puerto, el nuevo).
     puestos_aprobadas: frozenset[int] = frozenset()
     # Las de los trámites que ve el supervisor general (2026-11-16), de cualquier puesto.
     supervision_general: bool = False
+
+    def condicion(self):
+        caminos = []
+        if self.sectores is not None:
+            caminos.append(self.sectores.condicion())
+        if self.puestos_aprobadas:
+            caminos.append(and_(puesto_autorizado().in_(sorted(self.puestos_aprobadas)),
+                                Solicitud.aprobada_en.isnot(None)))
+        if self.supervision_general:
+            caminos.append(Solicitud.tipo_tramite_id.in_(
+                select(TipoTramite.id).where(TipoTramite.supervision_general.is_(True))))
+        return or_(*caminos) if caminos else false()
 
 
 def puesto_autorizado():
@@ -42,8 +82,7 @@ def puesto_autorizado():
 class FiltrosBandeja:
     """Alcance (quién ve qué) + filtros de la bandeja."""
     agencia_id:  int | None = None        # bandeja de la agencia (y filtro de la consulta histórica)
-    # Por el puesto elegido, que decide el sector (UCVMM y supervisión; None = todos).
-    puestos_ids: set[int] | None = None
+    sectores:    AlcanceSectores | None = None   # las de los sectores de UCVMM (None = todos)
     # Por el puesto que la finaliza (la bandeja y la campana del puesto; None = todos).
     puestos_autorizados: set[int] | None = None
     solo_aprobadas_alguna_vez: bool = False
@@ -55,9 +94,20 @@ class FiltrosBandeja:
     alcance_snm:      AlcanceSnm | None = None
     puesto_id:        int | None = None
     tipo_tramite_id:  int | None = None
-    pasajero:         str | None = None   # nombre, apellido (o los dos) o pasaporte
+    pasajero:         str | None = None   # nombre, apellido, pasaporte o seamanbook de un tripulante
+    autorizadas:      bool = False        # solo las que se aprobaron alguna vez (una pestaña, 2026-11-22)
     fuera_de_horario: bool = False        # solo las aprobadas fuera del horario
     fecha_por:        str = "envio"       # a qué fecha van desde y hasta: "envio" | "operacion"
+
+
+@dataclass(frozen=True)
+class PaginaBandeja:
+    """Una página de una bandeja. `total`, con todos los filtros; las cantidades de las
+    pestañas (por estado y las autorizadas), sin el de la pestaña elegida."""
+    total:       int
+    conteos:     dict[str, int]
+    autorizadas: int
+    solicitudes: list[Solicitud]
 
 
 def _fecha_panama(columna):
@@ -75,6 +125,24 @@ def _fuera_de_horario(columna):
 
 def _contar_fuera_de_horario(columna):
     return func.count(case((_fuera_de_horario(columna), columna)))
+
+
+def _plano(valor):
+    """Sin tildes y en minúsculas: el cálculo de las columnas `busqueda` (revisión
+    c6e2a9f1d438), aplicado a lo que se busca."""
+    sin_tildes = func.regexp_replace(func.normalize(valor, literal_column("NFD")), r"[\u0300-\u036f]", "", "g")
+    return func.lower(sin_tildes)
+
+
+def _contiene(columna, buscado: str) -> list:
+    """Todas las palabras de lo escrito, en cualquier orden y en cualquier parte del
+    texto, sin distinguir tildes ni mayúsculas (2026-11-22). «%» y «_» van tal cual."""
+    condiciones = []
+    for palabra in re.split(r"[\s,;]+", buscado):
+        if palabra:
+            escapada = re.sub(r"([/%_])", r"/\1", palabra)
+            condiciones.append(columna.like(literal("%") + _plano(escapada) + literal("%"), escape="/"))
+    return condiciones
 
 
 class RepositorioSolicitud:
@@ -121,29 +189,20 @@ class RepositorioSolicitud:
     # ── Bandejas ─────────────────────────────────────────────────────────────
 
     @staticmethod
-    def _condiciones(filtros: FiltrosBandeja, *, con_estado: bool) -> list:
+    def _condiciones(filtros: FiltrosBandeja, *, con_pestana: bool) -> list:
+        """`con_pestana`: también la pestaña elegida (un estado o las autorizadas)."""
         condiciones = []
         if filtros.agencia_id is not None:
             condiciones.append(Solicitud.agencia_id == filtros.agencia_id)
-        if filtros.puestos_ids is not None:
-            # Sin puestos asignados no ve nada (IN de una lista vacía no es válido en SQL).
-            condiciones.append(Solicitud.puesto_control_id.in_(sorted(filtros.puestos_ids) or [-1]))
+        if filtros.sectores is not None:
+            condiciones.append(filtros.sectores.condicion())
         if filtros.puestos_autorizados is not None:
+            # Sin puestos asignados no ve nada (IN de una lista vacía no es válido en SQL).
             condiciones.append(puesto_autorizado().in_(sorted(filtros.puestos_autorizados) or [-1]))
         if filtros.solo_aprobadas_alguna_vez:
             condiciones.append(Solicitud.aprobada_en.isnot(None))
         if filtros.alcance_snm is not None:
-            alcance = filtros.alcance_snm
-            aprobadas = sorted(alcance.puestos_aprobadas) or [-1]
-            caminos = [
-                Solicitud.puesto_control_id.in_(sorted(alcance.puestos) or [-1]),
-                and_(or_(Solicitud.puesto_control_id.in_(aprobadas), Solicitud.puesto_destino_id.in_(aprobadas)),
-                     Solicitud.aprobada_en.isnot(None)),
-            ]
-            if alcance.supervision_general:
-                caminos.append(Solicitud.tipo_tramite_id.in_(
-                    select(TipoTramite.id).where(TipoTramite.supervision_general.is_(True))))
-            condiciones.append(or_(*caminos))
+            condiciones.append(filtros.alcance_snm.condicion())
         if filtros.puesto_id is not None:
             # El elegido o el nuevo de un cambio de puerto.
             condiciones.append(or_(Solicitud.puesto_control_id == filtros.puesto_id,
@@ -151,24 +210,15 @@ class RepositorioSolicitud:
         if filtros.tipo_tramite_id is not None:
             condiciones.append(Solicitud.tipo_tramite_id == filtros.tipo_tramite_id)
         if filtros.pasajero:
-            # Alguno de sus pasajeros, por nombre, apellido, los dos juntos o pasaporte.
-            buscado = filtros.pasajero.strip()
+            # Alguno de sus tripulantes tiene todas las palabras.
             t = TripulanteSolicitud
             condiciones.append(select(t.id).where(
-                t.solicitud_id == Solicitud.id,
-                or_(*(columna.icontains(buscado, autoescape=True)
-                      for columna in (t.nombre, t.apellido, t.nombre + " " + t.apellido, t.pasaporte))),
+                t.solicitud_id == Solicitud.id, *_contiene(t.busqueda, filtros.pasajero),
             ).exists())
         if filtros.fuera_de_horario:
             condiciones.append(and_(Solicitud.aprobada_en.isnot(None), _fuera_de_horario(Solicitud.aprobada_en)))
         if filtros.texto:
-            # autoescape: un «_» o un «%» de lo que se escribe se busca tal cual, no como comodín.
-            texto = filtros.texto.strip()
-            condiciones.append(or_(*(
-                columna.icontains(texto, autoescape=True)
-                for columna in (Solicitud.numero, Solicitud.titulo, Solicitud.nombre_buque, Solicitud.imo,
-                                Solicitud.agencia_nombre, Solicitud.puesto_nombre, Solicitud.puesto_destino_nombre)
-            )))
+            condiciones += _contiene(Solicitud.busqueda, filtros.texto)
         if filtros.fecha_por == "operacion":   # la fecha de la operación ya es un día de Panamá
             if filtros.desde:
                 condiciones.append(Solicitud.fecha_operacion >= filtros.desde)
@@ -176,20 +226,11 @@ class RepositorioSolicitud:
                 condiciones.append(Solicitud.fecha_operacion <= filtros.hasta)
         else:
             condiciones += entre_fechas_panama(Solicitud.enviada_en, filtros.desde, filtros.hasta)
-        if con_estado and filtros.estado:
+        if con_pestana and filtros.estado:
             condiciones.append(Solicitud.estado == filtros.estado)
+        if con_pestana and filtros.autorizadas:
+            condiciones.append(Solicitud.aprobada_en.isnot(None))
         return condiciones
-
-    async def contar_por_estado_en(self, filtros: FiltrosBandeja) -> dict[str, int]:
-        """Cuántas hay en cada estado dentro del alcance (sin filtrar por estado):
-        las pestañas de una bandeja y los pendientes de la campana."""
-        return {
-            estado: total for estado, total in (await self.sesion.execute(
-                select(Solicitud.estado, func.count())
-                .where(*self._condiciones(filtros, con_estado=False))
-                .group_by(Solicitud.estado)
-            )).all()
-        }
 
     async def pendiente_en(self, filtros: FiltrosBandeja, estado: str) -> tuple[int, datetime | None]:
         """Cuántas hay en ese estado dentro del alcance y el plazo más próximo de
@@ -199,29 +240,58 @@ class RepositorioSolicitud:
         columna = Solicitud.plazo_correccion if estado == EstadoSolicitud.EN_CORRECCION.value else Solicitud.vigente_hasta
         cantidad, vence = (await self.sesion.execute(
             select(func.count(), func.min(columna))
-            .where(*self._condiciones(filtros, con_estado=False), Solicitud.estado == estado)
+            .where(*self._condiciones(filtros, con_pestana=False), Solicitud.estado == estado)
         )).one()
         return int(cantidad or 0), vence
 
     async def listar(
         self, filtros: FiltrosBandeja, *, pagina: int, por_pagina: int, orden: str = "recientes",
-    ) -> tuple[int, dict[str, int], list[Solicitud]]:
-        """(total con filtros, conteo por estado sin filtrar estado, página). Sin
-        los tripulantes: lo que la bandeja muestra de ellos sale de `alertas_de`."""
-        conteos = await self.contar_por_estado_en(filtros)
-        condiciones = self._condiciones(filtros, con_estado=True)
-        total = (await self.sesion.execute(
-            select(func.count()).select_from(Solicitud).where(*condiciones)
-        )).scalar() or 0
-
+    ) -> PaginaBandeja:
+        """Una página y las cantidades de sus pestañas. Sin los tripulantes: lo que la
+        bandeja muestra de ellos sale de `alertas_de`."""
+        # Una sola cuenta: de ella sale también el total de la pestaña elegida.
+        filas = (await self.sesion.execute(
+            select(Solicitud.estado, func.count().label("total"), func.count(Solicitud.aprobada_en).label("autorizadas"))
+            .where(*self._condiciones(filtros, con_pestana=False))
+            .group_by(Solicitud.estado)
+        )).all()
         consulta: Select = (
             select(Solicitud)
-            .where(*condiciones)
+            .where(*self._condiciones(filtros, con_pestana=True))
             .order_by(*self._orden(orden))
             .offset((pagina - 1) * por_pagina)
             .limit(por_pagina)
         )
-        return total, conteos, list((await self.sesion.execute(consulta)).scalars().all())
+        return PaginaBandeja(
+            total=sum(f.autorizadas if filtros.autorizadas else f.total
+                      for f in filas if filtros.estado in (None, f.estado)),
+            conteos={f.estado: f.total for f in filas},
+            autorizadas=sum(f.autorizadas for f in filas),
+            solicitudes=list((await self.sesion.execute(consulta)).scalars().all()),
+        )
+
+    async def tripulantes_encontrados(self, ids: list[int], buscado: str) -> dict[int, list[tuple[str, str]]]:
+        """Por solicitud, los tripulantes que coinciden con lo buscado: (nombre, pasaporte)."""
+        if not ids:
+            return {}
+        t = TripulanteSolicitud
+        consulta = (
+            select(t.solicitud_id, t.nombre, t.apellido, t.pasaporte)
+            .where(t.solicitud_id.in_(ids), *_contiene(t.busqueda, buscado))
+            .order_by(t.solicitud_id, t.orden, t.id)
+        )
+        encontrados: dict[int, list[tuple[str, str]]] = {}
+        for solicitud_id, nombre, apellido, pasaporte in (await self.sesion.execute(consulta)).all():
+            encontrados.setdefault(solicitud_id, []).append((f"{nombre} {apellido}".strip(), pasaporte))
+        return encontrados
+
+    async def puestos_revisados_por(self, sectores: frozenset[int]) -> set[int]:
+        """Los puestos de las solicitudes que revisaron esos sectores, aunque ya no sean suyos."""
+        consulta = select(PuestoControl.id).where(select(Solicitud.id).where(
+            Solicitud.puesto_control_id == PuestoControl.id,
+            Solicitud.sector_revision_id.in_(sorted(sectores) or [-1]),
+        ).exists())
+        return set((await self.sesion.execute(consulta)).scalars().all())
 
     @staticmethod
     def _orden(orden: str) -> tuple:
@@ -237,8 +307,8 @@ class RepositorioSolicitud:
         self, filtros: FiltrosBandeja, *, orden: str, limite: int,
     ) -> tuple[int, list[Solicitud]]:
         """(cuántas cumplen los filtros, las primeras `limite` según el orden): la
-        exportación de la consulta histórica. Sin pasajeros ni documentos."""
-        condiciones = self._condiciones(filtros, con_estado=True)
+        exportación de la consulta histórica. Sin tripulantes ni documentos."""
+        condiciones = self._condiciones(filtros, con_pestana=True)
         total = (await self.sesion.execute(
             select(func.count()).select_from(Solicitud).where(*condiciones)
         )).scalar() or 0
@@ -291,7 +361,7 @@ class RepositorioSolicitud:
         """Eventos de cualquiera de las fuentes (alcance de una bandeja + tipos de
         evento), sin los que hizo el propio usuario."""
         return [
-            or_(*[and_(*self._condiciones(f, con_estado=False), EventoSolicitud.tipo.in_(sorted(t))) for f, t in fuentes]),
+            or_(*[and_(*self._condiciones(f, con_pestana=False), EventoSolicitud.tipo.in_(sorted(t))) for f, t in fuentes]),
             or_(EventoSolicitud.usuario_id.is_(None), EventoSolicitud.usuario_id != excluir_usuario_id),
         ]
 
@@ -329,8 +399,10 @@ class RepositorioSolicitud:
         self.sesion.add(solicitud)
         await self.sesion.flush()
 
-    def agregar_registro(self, registro: EventoSolicitud | DocumentoSolicitud | CasillaSolicitud) -> None:
-        """Agrega un evento, un documento o una casilla por su `solicitud_id`,
+    def agregar_registro(
+        self, registro: EventoSolicitud | DocumentoSolicitud | CasillaSolicitud | VersionSolicitud | BoletaRecargo,
+    ) -> None:
+        """Agrega un evento, un documento, una casilla… por su `solicitud_id`,
         sin pasar por las colecciones de la solicitud (que se recargan después)."""
         self.sesion.add(registro)
 
@@ -342,6 +414,93 @@ class RepositorioSolicitud:
         índice único), anulada o no."""
         consulta = select(BoletaRecargo).where(func.lower(BoletaRecargo.numero_oficio) == numero_oficio.lower())
         return (await self.sesion.execute(consulta)).scalar_one_or_none()
+
+    # ── Historial completo (2026-11-22) ──────────────────────────────────────
+
+    async def versiones(self, solicitud_id: int) -> list[VersionSolicitud]:
+        """Lo que se había enviado antes de cada corrección, de la primera a la última."""
+        consulta = (select(VersionSolicitud).where(VersionSolicitud.solicitud_id == solicitud_id)
+                    .order_by(VersionSolicitud.numero))
+        return list((await self.sesion.execute(consulta)).scalars().all())
+
+    async def archivos(self, solicitud_id: int) -> list[tuple[DocumentoSolicitud, str | None]]:
+        """Todos sus documentos, vigentes y retirados, con quién los subió."""
+        consulta = (
+            select(DocumentoSolicitud, Usuario)
+            .outerjoin(Usuario, Usuario.id == DocumentoSolicitud.subido_por_id)
+            .options(selectinload(DocumentoSolicitud.tripulante))
+            .where(DocumentoSolicitud.solicitud_id == solicitud_id)
+            .order_by(DocumentoSolicitud.id)
+        )
+        return [(d, u.full_name if u else None) for d, u in (await self.sesion.execute(consulta)).all()]
+
+    async def documento_retirado(self, solicitud_id: int, documento_id: int) -> DocumentoSolicitud | None:
+        return (await self.sesion.execute(select(DocumentoSolicitud).where(
+            DocumentoSolicitud.id == documento_id, DocumentoSolicitud.solicitud_id == solicitud_id,
+            DocumentoSolicitud.retirado_en.isnot(None),
+        ))).scalar_one_or_none()
+
+    async def emitidos(self, solicitud_id: int) -> list[DocumentoEmitido]:
+        consulta = (select(DocumentoEmitido).where(DocumentoEmitido.solicitud_id == solicitud_id)
+                    .order_by(DocumentoEmitido.emitido_en, DocumentoEmitido.id))
+        return list((await self.sesion.execute(consulta)).scalars().all())
+
+    async def emitido(self, solicitud_id: int, tipo: str) -> DocumentoEmitido | None:
+        return (await self.sesion.execute(select(DocumentoEmitido).where(
+            DocumentoEmitido.solicitud_id == solicitud_id, DocumentoEmitido.tipo == tipo,
+        ))).scalar_one_or_none()
+
+    async def agregar_emitido(self, **valores) -> bool:
+        """False si ya había una: otro proceso la emitió a la vez."""
+        consulta = (insertar(DocumentoEmitido).values(**valores)
+                    .on_conflict_do_nothing(constraint="uq_documentos_emitidos_tipo").returning(DocumentoEmitido.id))
+        return (await self.sesion.execute(consulta)).scalar_one_or_none() is not None
+
+    async def sin_emitir(self, limite: int) -> list[int]:
+        """Las aprobadas y finalizadas a las que les falta la autorización de su estado."""
+        faltan = [
+            and_(Solicitud.estado == estado, ~select(DocumentoEmitido.id).where(
+                DocumentoEmitido.solicitud_id == Solicitud.id, DocumentoEmitido.tipo == tipo).exists())
+            for estado, tipo in EMITIDO_POR_ESTADO.items()
+        ]
+        consulta = (
+            select(Solicitud.id)
+            .where(Solicitud.codigo_verificacion.isnot(None), Solicitud.aprobada_en.isnot(None), or_(*faltan))
+            .order_by(Solicitud.id).limit(limite)
+        )
+        return list((await self.sesion.execute(consulta)).scalars().all())
+
+    async def documentos_sin_huella(self, ultimo_id: int, limite: int) -> list:
+        """(id, ruta) de los que siguen a `ultimo_id` y no tienen huella."""
+        consulta = (select(DocumentoSolicitud.id, DocumentoSolicitud.ruta)
+                    .where(DocumentoSolicitud.id > ultimo_id, DocumentoSolicitud.sha256.is_(None))
+                    .order_by(DocumentoSolicitud.id).limit(limite))
+        return list((await self.sesion.execute(consulta)).all())
+
+    async def poner_huella(self, documento_id: int, sha256: str) -> None:
+        await self.sesion.execute(update(DocumentoSolicitud).values(sha256=sha256).where(
+            DocumentoSolicitud.id == documento_id, DocumentoSolicitud.sha256.is_(None)))
+
+    # ── Los archivos, uno por uno (infrastructure/revisar_documentos.py) ─────
+    # `modelo`: DocumentoSolicitud o DocumentoEmitido, que tienen lo mismo que mirar.
+
+    async def archivos_desde(self, modelo: type, ultimo_id: int, limite: int) -> list:
+        """(id, ruta, tamano, sha256) de los que siguen a `ultimo_id`, en orden."""
+        consulta = (
+            select(modelo.id, modelo.ruta, modelo.tamano, modelo.sha256)
+            .where(modelo.id > ultimo_id).order_by(modelo.id).limit(limite)
+        )
+        return list((await self.sesion.execute(consulta)).all())
+
+    async def archivos_con_su_solicitud(self, modelo: type, ids: list[int]) -> list:
+        """(id, ruta, tamano, sha256, numero, solicitud_id) de los que sigan registrados."""
+        consulta = (
+            select(modelo.id, modelo.ruta, modelo.tamano, modelo.sha256, Solicitud.numero, modelo.solicitud_id)
+            .join(Solicitud, Solicitud.id == modelo.solicitud_id)
+            .where(modelo.id == any_(literal(ids, ARRAY(Integer))))
+            .order_by(modelo.id)
+        )
+        return list((await self.sesion.execute(consulta)).all())
 
     # ── Uso del sistema ──────────────────────────────────────────────────────
 
@@ -374,27 +533,26 @@ class RepositorioSolicitud:
     # ── Estadísticas del flujo ───────────────────────────────────────────────
 
     @staticmethod
-    def _filtro_fechas(desde: date | None, hasta: date | None, puestos_ids: set[int] | None = None) -> list:
+    def _filtro_fechas(desde: date | None, hasta: date | None, sectores: AlcanceSectores | None = None) -> list:
         """Filtra por fecha de creación (inclusive, en hora de Panamá), con el índice
-        de created_at, y por los puestos visibles (los del sector; None = todos)."""
+        de created_at, y por los sectores visibles (None = todos)."""
         filtros = entre_fechas_panama(Solicitud.created_at, desde, hasta)
-        if puestos_ids is not None:
-            # Sin puestos no ve nada (IN de una lista vacía no es válido en SQL).
-            filtros.append(Solicitud.puesto_control_id.in_(sorted(puestos_ids) or [-1]))
+        if sectores is not None:
+            filtros.append(sectores.condicion())
         return filtros
 
     async def contar_por_estado(
-        self, desde: date | None, hasta: date | None, puestos_ids: set[int] | None = None,
+        self, desde: date | None, hasta: date | None, sectores: AlcanceSectores | None = None,
     ) -> dict[str, int]:
         consulta = (
             select(Solicitud.estado, func.count())
-            .where(*self._filtro_fechas(desde, hasta, puestos_ids))
+            .where(*self._filtro_fechas(desde, hasta, sectores))
             .group_by(Solicitud.estado)
         )
         return {estado: total for estado, total in (await self.sesion.execute(consulta)).all()}
 
     async def contar_hitos(
-        self, desde: date | None, hasta: date | None, puestos_ids: set[int] | None = None,
+        self, desde: date | None, hasta: date | None, sectores: AlcanceSectores | None = None,
     ) -> dict[str, float | int | None]:
         """Totales por hito alcanzado (no por estado actual): una solicitud
         aprobada y luego finalizada cuenta como aprobada y como finalizada. Las
@@ -410,7 +568,7 @@ class RepositorioSolicitud:
             func.count(Solicitud.finalizada_en).label("finalizadas"),
             _contar_fuera_de_horario(Solicitud.aprobada_en).label("fuera_horario"),
             horas_resolucion.label("horas"),
-        ).where(*self._filtro_fechas(desde, hasta, puestos_ids))
+        ).where(*self._filtro_fechas(desde, hasta, sectores))
         fila = (await self.sesion.execute(consulta)).one()
         return {
             "recibidas":     fila.recibidas,
@@ -423,7 +581,7 @@ class RepositorioSolicitud:
         }
 
     async def contar_por_tipo(
-        self, desde: date | None, hasta: date | None, puestos_ids: set[int] | None = None,
+        self, desde: date | None, hasta: date | None, sectores: AlcanceSectores | None = None,
     ) -> list:
         consulta = (
             select(
@@ -434,14 +592,14 @@ class RepositorioSolicitud:
                 func.count(Solicitud.expirada_en).label("expiradas"),
             )
             .join(TipoTramite, TipoTramite.id == Solicitud.tipo_tramite_id)
-            .where(*self._filtro_fechas(desde, hasta, puestos_ids))
+            .where(*self._filtro_fechas(desde, hasta, sectores))
             .group_by(TipoTramite.codigo, TipoTramite.nombre, TipoTramite.orden)
             .order_by(TipoTramite.orden)
         )
         return list((await self.sesion.execute(consulta)).all())
 
     async def contar_por_puesto(
-        self, desde: date | None, hasta: date | None, puestos_ids: set[int] | None = None,
+        self, desde: date | None, hasta: date | None, sectores: AlcanceSectores | None = None,
     ) -> list:
         """Por el puesto donde vale la autorización (con cambio de puerto, el nuevo,
         que es el que la finaliza o la deja vencer)."""
@@ -453,14 +611,14 @@ class RepositorioSolicitud:
                 func.count(case((Solicitud.aprobada_en.isnot(None), Solicitud.expirada_en))).label("expiradas"),
             )
             .join(PuestoControl, PuestoControl.id == puesto_autorizado())
-            .where(*self._filtro_fechas(desde, hasta, puestos_ids))
+            .where(*self._filtro_fechas(desde, hasta, sectores))
             .group_by(PuestoControl.nombre)
             .order_by(func.count(Solicitud.aprobada_en).desc(), PuestoControl.nombre)
         )
         return list((await self.sesion.execute(consulta)).all())
 
     async def serie_diaria(
-        self, desde: date | None = None, hasta: date | None = None, puestos_ids: set[int] | None = None,
+        self, desde: date | None = None, hasta: date | None = None, sectores: AlcanceSectores | None = None,
     ) -> dict[date, dict[str, int]]:
         """Conteo por día (hora de Panamá) de cada hito, sobre las solicitudes
         creadas en el rango `desde`/`hasta` (si se da): cada cifra cuenta el día
@@ -481,7 +639,7 @@ class RepositorioSolicitud:
             consulta = (
                 select(dia.label("dia"), func.count())
                 .where(
-                    *self._filtro_fechas(desde, hasta, puestos_ids),
+                    *self._filtro_fechas(desde, hasta, sectores),
                     columna.isnot(None),
                     *([condicion] if condicion is not None else []),
                 )
@@ -492,7 +650,7 @@ class RepositorioSolicitud:
         return series
 
     async def aprobadas_por_hora(
-        self, desde: date | None, hasta: date | None, puestos_ids: set[int] | None = None,
+        self, desde: date | None, hasta: date | None, sectores: AlcanceSectores | None = None,
     ) -> list:
         """Aprobadas por día de la semana (1 = lunes … 7 = domingo) y hora de la
         aprobación, en hora de Panamá: (dia, hora, total), solo las que tienen alguna."""
@@ -501,13 +659,13 @@ class RepositorioSolicitud:
         hora = extract("hour", local)
         consulta = (
             select(dia.label("dia"), hora.label("hora"), func.count().label("total"))
-            .where(*self._filtro_fechas(desde, hasta, puestos_ids), Solicitud.aprobada_en.isnot(None))
+            .where(*self._filtro_fechas(desde, hasta, sectores), Solicitud.aprobada_en.isnot(None))
             .group_by(dia, hora)
         )
         return list((await self.sesion.execute(consulta)).all())
 
     async def listar_fuera_horario(
-        self, desde: date | None, hasta: date | None, limite: int, puestos_ids: set[int] | None = None,
+        self, desde: date | None, hasta: date | None, limite: int, sectores: AlcanceSectores | None = None,
     ) -> list:
         """Las aprobadas fuera del horario laboral, la más reciente primero:
         (id, número, trámite, puesto autorizado, aprobada_en, quién aprobó). El
@@ -529,7 +687,7 @@ class RepositorioSolicitud:
             )
             .join(TipoTramite, TipoTramite.id == Solicitud.tipo_tramite_id)
             .where(
-                *self._filtro_fechas(desde, hasta, puestos_ids),
+                *self._filtro_fechas(desde, hasta, sectores),
                 Solicitud.aprobada_en.isnot(None),
                 _fuera_de_horario(Solicitud.aprobada_en),
             )

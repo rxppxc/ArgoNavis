@@ -18,7 +18,8 @@ export function MenuCabecera() {
   const ref = useRef<HTMLDivElement>(null);
   const refBoton = useRef<HTMLButtonElement>(null);
   // UCVMM y el supervisor de sector ven las estadísticas de su alcance; el admin las tiene
-  // en su bloque. El supervisor general no tiene estadísticas ni consulta histórica (2026-11-16).
+  // en su bloque. El supervisor general no tiene estadísticas ni consulta histórica (2026-11-16),
+  // y el puesto de control no tiene la consulta desde el 2026-11-22.
   const veEstadisticas = !esAdmin && tieneAlguno(...PERMISOS_ESTADISTICAS);
   // La consulta histórica (2026-11-11); el admin la tiene en su bloque.
   const veHistorico = !esAdmin && tieneAlguno(...PERMISOS_HISTORICO);

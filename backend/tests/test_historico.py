@@ -12,11 +12,11 @@ import pytest
 from sqlalchemy import insert, select
 
 from app.core.horario import ZONA_PANAMA
-from app.domain.models.catalogo import AgenciaNaviera, PuestoControl, usuarios_puestos
+from app.domain.models.catalogo import AgenciaNaviera, PuestoControl, usuarios_puestos, usuarios_sectores
 from app.domain.models.solicitud import Solicitud, TripulanteSolicitud
 from app.domain.models.tramite import TipoTramite
 from app.infrastructure.database import SesionLocal
-from ayudas import panama
+from ayudas import panama, rol_mixto
 from conftest import ATLANTICO, PACIFICO, crear_actor, id_sector
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
@@ -137,16 +137,21 @@ async def test_cada_uno_ve_lo_suyo(cliente, admin, sysadmin, historia):
     # El supervisor general no tiene consulta histórica desde el 2026-11-16.
     general = await crear_actor("Supervisor general", prefijo="general")
     assert (await cliente.post(RUTA, json={"texto": texto}, headers=general.headers)).status_code == 403
-    # El puesto de control: las de sus puestos, desde que se aprueban.
+    # El puesto de control, tampoco desde el 2026-11-22: ve las suyas en su bandeja. Con un rol
+    # que además revise, la consulta le muestra los dos alcances: los de su sector y, desde
+    # que se aprueban, los de sus puestos.
     puesto = await crear_actor("Puesto de Control", prefijo="puesto")
+    mixto = await crear_actor(await rol_mixto(), prefijo="mixto")
     async with SesionLocal() as s:
-        await s.execute(insert(usuarios_puestos).values(usuario_id=puesto.id, puesto_id=historia["puesto_p"]))
-        await s.execute(insert(usuarios_puestos).values(usuario_id=puesto.id, puesto_id=historia["puesto_a"]))
+        for actor in (puesto, mixto):
+            await s.execute(insert(usuarios_puestos).values(usuario_id=actor.id, puesto_id=historia["puesto_p"]))
+        await s.execute(insert(usuarios_sectores).values(usuario_id=mixto.id, sector_id=await id_sector(ATLANTICO)))
         await s.commit()
-    assert set(await _ids(cliente, puesto, texto=texto)) == {ids["marzo25"], ids["fuera"]}, "sin la denegada ni la en revisión"
+    assert (await cliente.post(RUTA, json={"texto": texto}, headers=puesto.headers)).status_code == 403
+    assert set(await _ids(cliente, mixto, texto=texto)) == {ids["julio25"], ids["revision"], ids["marzo25"], ids["fuera"]}
     # Lo que ven aquí es justo lo que pueden abrir, ni más ni menos: `_alcance_historico`
     # (en SQL) y `puede_ver` (el expediente) tienen que coincidir.
-    for actor in (atlantico, sup_pacifico, puesto):
+    for actor in (atlantico, sup_pacifico, mixto):
         vistas = set(await _ids(cliente, actor, texto=texto))
         for sid in ids.values():
             abre = (await cliente.get(f"/solicitudes/{sid}", headers=actor.headers)).status_code == 200

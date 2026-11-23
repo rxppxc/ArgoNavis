@@ -97,6 +97,8 @@ class DatosPdfAutorizacion:
     puesto_finalizacion: str | None
     url_verificacion:    str
     codigo_verificacion: str
+    # Cuándo venció sin finalizarse (2026-11-22): esa solo la descarga el SNM.
+    expirada_en:         datetime | None = None
     copia_interna:       bool = False  # la descarga el personal del SNM
     # Quien finalizó, solo en la copia interna (2026-11-14): la agencia no ve nombres.
     finalizada_por:      str | None = None
@@ -197,6 +199,9 @@ def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
     if d.estado == "finalized":
         lugar = f"EN {d.puesto_finalizacion.upper()} " if d.puesto_finalizacion else "EN PUERTO "
         texto_estado, color_estado = f"FINALIZADA {lugar}EL {_f(d.finalizada_en, True)}", TURQUESA
+    elif d.estado == "expired":
+        # Se aprobó y nadie la finalizó (2026-11-22): consta, pero ya no autoriza nada.
+        texto_estado, color_estado = f"EXPIRADA — NO SE FINALIZÓ ANTES DEL {_f(d.vigente_hasta)}", GRIS
     else:
         texto_estado = "APROBADA" + (f" — VIGENTE HASTA EL {_f(d.vigente_hasta)}" if d.vigente_hasta else "")
         color_estado = VERDE
@@ -274,6 +279,8 @@ def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
         ]
         if d.finalizada_por:
             pares.append(("FINALIZADA POR", texto_pdf(d.finalizada_por)))
+    if d.estado == "expired":
+        pares.append(("FECHA DE EXPIRACIÓN", _f(d.expirada_en, True)))
     if len(pares) % 2:
         pares.append(("", ""))
     filas = []
@@ -295,7 +302,13 @@ def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
     historia.append(datos)
     # Desde el 2026-10-30 no se finaliza en otro puesto: la operación en otro
     # puerto es una solicitud nueva.
-    if d.estado != "finalized":
+    if d.estado == "expired":
+        historia += [
+            Spacer(1, 2 * mm),
+            Paragraph("Esta autorización se aprobó, pero venció sin finalizarse en el puesto de control: no "
+                      "autoriza la operación. Se conserva como constancia.", e_nota),
+        ]
+    elif d.estado != "finalized":
         donde = (f"para el cambio de puerto a {escape(d.puesto_destino)}, donde se finaliza" if d.puesto_destino
                  else "únicamente para el puesto de control indicado")
         historia += [

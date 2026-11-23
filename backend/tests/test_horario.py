@@ -163,6 +163,7 @@ async def test_aprobada_fuera_del_horario_lleva_el_costo(cliente, monkeypatch):
     from app.api.v1 import solicitudes as api_solicitudes
     from app.informes.autorizacion_pdf import generar_pdf_autorizacion
     from app.domain.services import solicitud_service
+    from app.infrastructure import emision
 
     sufijo = secrets.token_hex(3)
     revisor = await crear_actor("UCVMM", prefijo="revisor")
@@ -188,7 +189,7 @@ async def test_aprobada_fuera_del_horario_lleva_el_costo(cliente, monkeypatch):
         return generar_pdf_autorizacion(datos)
 
     monkeypatch.setattr(api_solicitudes, "encolar_avisos", capturar_avisos)
-    monkeypatch.setattr(api_solicitudes, "generar_pdf_autorizacion", capturar_pdf)
+    monkeypatch.setattr(emision, "generar_pdf_autorizacion", capturar_pdf)   # se arma al emitirla (2026-11-22)
 
     async def aprobar_a_las(momento: datetime) -> dict:
         """Aprueba una solicitud nueva con el reloj en `momento`; devuelve lo que ve la agencia."""

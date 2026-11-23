@@ -88,6 +88,23 @@ export function textoPuestos(s: ConPuestos): string {
   return s.puesto_destino_nombre ? `${s.puesto_nombre ?? ""} → ${s.puesto_destino_nombre}` : s.puesto_nombre ?? "";
 }
 
+interface ConSectores {
+  sector_nombre: string | null;
+  sector_actual_nombre: string | null;
+}
+
+/** El sector de UCVMM que la revisó y, si el puesto es hoy de otro, los dos (2026-11-22). */
+export function textoSector(s: ConSectores): string | null {
+  return s.sector_actual_nombre && s.sector_nombre
+    ? `${s.sector_nombre}, que la revisó. Hoy el puesto es del ${s.sector_actual_nombre}`
+    : s.sector_nombre;
+}
+
+/** Lo mismo, corto, para las bandejas y la consulta histórica. */
+export function textoSectorCorto(s: ConSectores): string | null {
+  return s.sector_actual_nombre && s.sector_nombre ? `${s.sector_nombre} (hoy, ${s.sector_actual_nombre})` : s.sector_nombre;
+}
+
 /** El horario laboral, como lo dicen el correo y el PDF (TEXTO_HORARIO, core/horario.py). */
 export const TEXTO_HORARIO_LABORAL =
   `lunes a viernes, de ${dosCifras(HORA_INICIO_LABORAL)}:00 a ${dosCifras(HORA_FIN_LABORAL)}:00`;

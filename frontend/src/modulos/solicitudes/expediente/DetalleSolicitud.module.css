@@ -222,6 +222,25 @@
 .btnIcono { composes: boton icono chico from "../../../components/Botones.module.css"; }
 .btnIconoVer { composes: boton icono chico iconoConsultar from "../../../components/Botones.module.css"; }
 
+/* ─── Historial completo (2026-11-22): versiones y archivos con su huella ─── */
+.registro { margin-top: 14px; }
+.registroTitulo {
+  margin: 16px 0 8px; color: var(--text);
+  font: 700 .78rem/1.3 var(--letra-titulo); font-stretch: var(--ancho-titulo);
+  letter-spacing: .06em; text-transform: uppercase;
+}
+.version { border: 1px solid var(--border-2); border-radius: var(--r-sm); background: var(--card-2); margin-bottom: 8px; }
+.version > summary { padding: 10px 12px; cursor: pointer; color: var(--text); font-weight: 700; font-size: .9rem; }
+.version[open] > summary { border-bottom: 1px solid var(--border-2); }
+.version > :not(summary) { margin-inline: 12px; }
+.version > .grupoTitulo { margin-top: 14px; }
+.version > :last-child { margin-bottom: 12px; }
+.listaCorta { margin-top: 8px; padding-left: 18px; color: var(--text); font-size: .85rem; line-height: 1.5; list-style: disc; }
+.tripulanteVersion { margin-top: 14px; padding-top: 10px; border-top: 1px dashed var(--border-2); }
+.tripulanteVersion .datos { margin-top: 8px; }
+.huella { font-family: var(--letra-mono); font-size: .7rem; line-height: 1.45; overflow-wrap: anywhere; min-width: 150px; }
+.filaIconos { display: flex; gap: 6px; }
+
 /* ─── Historial ─── */
 .historial { list-style: none; display: flex; flex-direction: column; }
 .evento { position: relative; display: flex; gap: 12px; padding-bottom: 14px; }

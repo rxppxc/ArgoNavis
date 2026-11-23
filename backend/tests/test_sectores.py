@@ -120,7 +120,8 @@ async def test_cada_sector_ve_y_revisa_solo_lo_suyo(cliente, admin):
     assert r.status_code == 409 and "sector" in r.json()["detail"]
 
 
-async def test_mover_un_puesto_de_sector_mueve_sus_solicitudes(cliente, admin):
+async def test_mover_un_puesto_de_sector_mueve_las_que_nadie_ha_revisado(cliente, admin):
+    """Las ya revisadas se quedan en el sector que las revisó (test_consulta_de_anios.py)."""
     e = await _escenario(cliente, admin)
     pac = e["ids"][PACIFICO]
     revisor_atl = await crear_actor("UCVMM", prefijo="revisor", sectores=(ATLANTICO,))
@@ -145,7 +146,9 @@ async def test_los_supervisores_ven_sin_decidir(cliente, admin):
         for sid in visibles:
             r = await cliente.get(f"/solicitudes/{sid}", headers=actor.headers)
             assert r.status_code == 200
-            assert not any(r.json()["acciones"].values()), "sin acciones: solo lectura"
+            acciones = r.json()["acciones"]
+            assert acciones.pop("ver_registro"), "el historial completo se lee (2026-11-22)"
+            assert not any(acciones.values()), "sin acciones: solo lectura"
             assert r.json()["sector_nombre"] is not None, "es personal del SNM: ve lo interno"
         r = await cliente.post(f"/solicitudes/{pac}/aprobar", json={"observacion": None}, headers=actor.headers)
         assert r.status_code == 403

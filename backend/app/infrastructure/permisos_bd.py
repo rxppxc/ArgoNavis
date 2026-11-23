@@ -6,11 +6,13 @@ día hubiera una inyección SQL, el atacante quedaría con lo que puede esta
 cuenta, que:
   - lee y escribe filas (SELECT, INSERT, UPDATE, DELETE), pero no crea, cambia
     ni borra tablas, ni ejecuta programas del servidor (COPY ... TO PROGRAM);
-  - solo AGREGA a la bitácora (`audit_logs`) y al historial (`solicitud_eventos`):
-    no puede editarlos ni borrarlos, que es justo lo que se esperaría que
-    intentara alguien que quiere tapar lo que hizo;
-  - no BORRA boletas de recargo (`boletas_recargo`, 2026-11-16): se anulan
-    (UPDATE), como en un talonario, y la anulada queda con su número;
+  - solo AGREGA a la bitácora (`audit_logs`), al historial (`solicitud_eventos`), a lo
+    que se había enviado antes de corregir (`solicitud_versiones`) y a las autorizaciones
+    emitidas (`documentos_emitidos`, 2026-11-22): no puede editarlos ni borrarlos, que es
+    justo lo que se esperaría que intentara alguien que quiere tapar lo que hizo;
+  - no BORRA boletas de recargo (`boletas_recargo`, 2026-11-16), que se anulan (UPDATE)
+    como en un talonario, ni documentos del expediente (`solicitud_documentos`, 2026-11-22),
+    que se retiran;
   - no toca `alembic_version`.
 
 Las migraciones corren con la cuenta dueña (MIGRACIONES_DATABASE_URL) y después
@@ -26,8 +28,8 @@ import psycopg
 from psycopg import sql
 from sqlalchemy.engine import make_url
 
-TABLAS_SOLO_AGREGAR = ("audit_logs", "solicitud_eventos")
-TABLAS_SIN_BORRAR = ("boletas_recargo",)
+TABLAS_SOLO_AGREGAR = ("audit_logs", "solicitud_eventos", "solicitud_versiones", "documentos_emitidos")
+TABLAS_SIN_BORRAR = ("boletas_recargo", "solicitud_documentos")
 TABLAS_SIN_ACCESO = ("alembic_version",)
 
 
@@ -67,7 +69,7 @@ def aplicar(url_duena: str, url_aplicacion: str) -> str:
         for sentencia in sentencias:
             cx.execute(sql.SQL(sentencia).format(rol=rol, base=base))
     verbo = "creada" if accion == "CREATE" else "al día"
-    return f"Cuenta de la aplicación {aplicacion.username}: {verbo}, con lo justo (bitácora e historial solo para agregar, boletas sin borrar)."
+    return f"Cuenta de la aplicación {aplicacion.username}: {verbo}, con lo justo (bitácora, historial, versiones y emitidas solo para agregar; boletas y documentos sin borrar)."
 
 
 def main() -> None:

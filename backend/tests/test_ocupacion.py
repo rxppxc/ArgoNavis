@@ -74,18 +74,13 @@ async def test_un_navegador_con_la_version_anterior_no_falla(cliente, agencia):
 async def test_la_ocupacion_vieja_se_sigue_viendo(cliente, agencia, monkeypatch):
     """En el expediente y en el PDF de la autorización (los datos con que se arma:
     el texto del PDF va comprimido)."""
-    from app.api.v1 import solicitudes as api_solicitudes
     from app.informes.autorizacion_pdf import generar_pdf_autorizacion
+    from app.infrastructure import emision
 
     naviera, puesto_id = agencia
     s = await _enviada_con_ocupacion(cliente, naviera, puesto_id)
     r = await cliente.get(f"/solicitudes/{s['id']}", headers=naviera.headers)
     assert r.json()["tripulantes"][0]["ocupacion"] == "Primer oficial"
-
-    revisor = await crear_actor("UCVMM", prefijo="revisor")
-    await verificar_impedimentos(cliente, revisor, s["id"])
-    r = await cliente.post(f"/solicitudes/{s['id']}/aprobar", json={}, headers=revisor.headers)
-    assert r.status_code == 200, r.text
 
     armados = []
 
@@ -93,7 +88,11 @@ async def test_la_ocupacion_vieja_se_sigue_viendo(cliente, agencia, monkeypatch)
         armados.append(datos)
         return generar_pdf_autorizacion(datos)
 
-    monkeypatch.setattr(api_solicitudes, "generar_pdf_autorizacion", capturar)
+    monkeypatch.setattr(emision, "generar_pdf_autorizacion", capturar)   # se arma al emitirla (2026-11-22)
+    revisor = await crear_actor("UCVMM", prefijo="revisor")
+    await verificar_impedimentos(cliente, revisor, s["id"])
+    r = await cliente.post(f"/solicitudes/{s['id']}/aprobar", json={}, headers=revisor.headers)
+    assert r.status_code == 200, r.text
     r = await cliente.get(f"/solicitudes/{s['id']}/autorizacion.pdf", headers=naviera.headers)
     assert r.status_code == 200 and r.content[:5] == b"%PDF-"
     assert armados[-1].tripulantes[0].ocupacion == "Primer oficial"

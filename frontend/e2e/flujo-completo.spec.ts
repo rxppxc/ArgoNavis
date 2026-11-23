@@ -168,6 +168,26 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     await expect(estado(agencia, "En revisión")).toBeVisible();
   });
 
+  await test.step("UCVMM ve qué cambió y abre el documento reemplazado, con su huella (2026-11-22)", async () => {
+    await ucvmm.goto(`/solicitudes/${id}`);
+    await ucvmm.getByRole("button", { name: "Ver el historial completo" }).click();
+    const historial = ucvmm.getByRole("region", { name: "Historial completo" });
+    const version = historial.getByRole("group").filter({ hasText: "Versión 1" });
+    await version.getByText("Versión 1").click();
+    await expect(version.getByText(/^Documento retirado: Visa Especial de Marino de .+\(Visa Especial de Marino\.pdf\)$/)).toBeVisible();
+    await expect(version.getByText(/^Documento agregado: .+\(Visa corregida\.pdf\)$/)).toBeVisible();
+    await sinTextoDesbordado(ucvmm);   // el motivo de la devolución, también aquí
+    const retirado = historial.getByRole("row").filter({ hasText: /Retirado el/ });
+    await expect(retirado).toContainText(/[0-9a-f]{64}/);
+    await retirado.getByRole("button", { name: /^Ver / }).click();
+    await expect(ucvmm.locator('iframe[src^="blob:"]')).toBeVisible();
+    await ucvmm.keyboard.press("Escape");
+    // La agencia no lo tiene.
+    await agencia.goto(`/solicitudes/${id}`);
+    await expect(estado(agencia, "En revisión")).toBeVisible();
+    await expect(agencia.getByRole("button", { name: "Ver el historial completo" })).toHaveCount(0);
+  });
+
   await test.step("UCVMM verifica de nuevo y aprueba", async () => {
     await ucvmm.goto(`/solicitudes/${id}`);
     await verificarSinImpedimento(ucvmm);
@@ -250,6 +270,15 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     await expect(supervisor).toHaveURL(/\/dashboard$/);
   });
 
+  await test.step("el puesto no tiene la consulta histórica: ve las suyas en su bandeja (2026-11-22)", async () => {
+    const delPuesto = await entrar(browser, CUENTAS.puesto);
+    await delPuesto.getByRole("tab", { name: /^Finalizadas/ }).click();
+    await expect(delPuesto.locator(`a[href="/solicitudes/${id}"]`)).toBeVisible();
+    await expect(delPuesto.getByRole("link", { name: "Consulta histórica" })).toHaveCount(0);
+    await delPuesto.goto("/historico");
+    await expect(delPuesto).toHaveURL(/\/dashboard/);
+  });
+
   await test.step("UCVMM la encuentra en la consulta histórica por el tripulante y la exporta a Excel", async () => {
     await ucvmm.goto("/dashboard");
     await ucvmm.getByRole("link", { name: "Consulta histórica" }).click();
@@ -258,6 +287,16 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     await ucvmm.getByLabel("Año").selectOption(String(new Date().getFullYear()));
     await ucvmm.getByRole("tab", { name: /^Finalizadas/ }).click();
     const fila = ucvmm.locator(`a[href="/solicitudes/${id}"]`);
+    await expect(fila).toBeVisible();
+    // Sin tildes y en otro orden, con qué tripulante es; y entre las autorizadas, las que se
+    // aprobaron alguna vez (2026-11-22).
+    await ucvmm.getByLabel("Tripulante").fill("gomez, juan");
+    await expect(ucvmm.getByRole("row").filter({ has: fila }).getByText(TRIPULANTE)).toBeVisible();
+    await ucvmm.getByRole("tab", { name: /^Autorizadas/ }).click();
+    await expect(ucvmm).toHaveURL(/estado=autorizadas/);
+    await expect(fila).toBeVisible();
+    await ucvmm.getByLabel("Tripulante").fill("Pérez Gómez");
+    await ucvmm.getByRole("tab", { name: /^Finalizadas/ }).click();
     await expect(fila).toBeVisible();
     // Los filtros quedan en la URL, salvo el tripulante (un dato personal): ese viaja en el
     // estado de la navegación, para que no quede en el historial ni en los logs (2026-11-14).
@@ -274,6 +313,21 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     // La URL primero: la tabla de la consulta también dice «Finalizada» y tiene su «Volver».
     await expect(ucvmm).toHaveURL(new RegExp(`/solicitudes/${id}$`));
     await expect(ucvmm.getByText("Autorización marítima · Formulario No. 3")).toBeVisible();
+    // Ya finalizada, sus archivos se abren igual.
+    await ucvmm.getByRole("button", { name: `Ver documentación de ${TRIPULANTE}` }).click();
+    await ucvmm.getByRole("dialog").getByRole("button", { name: /^Ver .+\.pdf$/ }).first().click();
+    await expect(ucvmm.locator('iframe[src^="blob:"]')).toBeVisible();
+    await ucvmm.keyboard.press("Escape");
+    await expect(ucvmm.locator('iframe[src^="blob:"]')).toHaveCount(0);
+    await ucvmm.keyboard.press("Escape");
+    // Y las dos autorizaciones, tal como se emitieron al aprobar y al finalizar.
+    await ucvmm.getByRole("button", { name: "Ver el historial completo" }).click();
+    const emitida = ucvmm.getByRole("row").filter({ hasText: "Autorización aprobada" });
+    await expect(emitida).toContainText(/[0-9a-f]{64}/);
+    await expect(ucvmm.getByRole("row").filter({ hasText: "Autorización finalizada" })).toBeVisible();
+    await emitida.getByRole("button", { name: /^Ver / }).click();
+    await expect(ucvmm.locator('iframe[src^="blob:"]')).toBeVisible();
+    await ucvmm.keyboard.press("Escape");
     await ucvmm.getByRole("link", { name: "Volver" }).click();
     await expect(ucvmm).toHaveURL(busqueda);
     await expect(ucvmm.getByLabel("Tripulante")).toHaveValue("Pérez Gómez");

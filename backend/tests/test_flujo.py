@@ -24,7 +24,7 @@ from app.domain.models.solicitud import (
 from app.domain.repositories.solicitud_repository import RepositorioSolicitud
 from app.domain.services.notificacion_service import ServicioNotificacion
 from app.domain.services.solicitud_service import MAX_TRIPULANTES, ServicioSolicitud
-from app.infrastructure import tareas
+from app.infrastructure import emision, tareas
 from app.infrastructure.database import SesionLocal
 from app.infrastructure.tareas import expirar_solicitudes
 from ayudas import HOY, cabecera, cuerpo_impedimentos, enviar, pdf, tripulante, verificar_impedimentos
@@ -301,9 +301,18 @@ async def test_ciclo_completo(cliente, escenario: Escenario, monkeypatch):
     assert [ev["tipo"] for ev in corregida["eventos"]] == ["creada", "devuelta", "corregida"]
     r = await cliente.get(f"/solicitudes/{sid}", headers=e.revisor.headers)
     assert [ev["tipo"] for ev in r.json()["eventos"]] == ["creada", "impedimentos", "devuelta", "corregida"]
-    assert len(list(carpeta.iterdir())) == 8, "en disco quedan solo los documentos vigentes"
+    assert len(list(carpeta.iterdir())) == 12, "los 11 de antes se conservan (2026-11-22) y se suma la libreta nueva"
 
     # ── Aprobación, PDF y QR ──
+    # El texto del PDF va comprimido y con la fuente incrustada: se miran los datos con que se arma.
+    armados = []
+
+    def capturar(datos):
+        armados.append(datos)
+        return generar_pdf_autorizacion(datos)
+
+    for modulo in (api_solicitudes, api_verificacion, emision):
+        monkeypatch.setattr(modulo, "generar_pdf_autorizacion", capturar)
     await verificar_impedimentos(cliente, e.revisor, sid)
     r = await cliente.post(f"/solicitudes/{sid}/aprobar", json={"observacion": "Presentar custodia en el muelle"}, headers=e.revisor.headers)
     assert r.status_code == 200 and r.json()["estado"] == "approved"
@@ -312,20 +321,15 @@ async def test_ciclo_completo(cliente, escenario: Escenario, monkeypatch):
     assert (vence.date(), vence.time()) == (date.fromisoformat(s["fecha_operacion"]) + timedelta(days=2), time(23, 59, 59))
     assert r.json()["aprobada_por"] == "Revisor Prueba"
 
-    # El texto del PDF va comprimido y con la fuente incrustada: se miran los datos con que se arma.
-    armados = []
-
-    def capturar(datos):
-        armados.append(datos)
-        return generar_pdf_autorizacion(datos)
-
-    monkeypatch.setattr(api_solicitudes, "generar_pdf_autorizacion", capturar)
-    monkeypatch.setattr(api_verificacion, "generar_pdf_autorizacion", capturar)
+    # La de la agencia se arma una vez, al aprobar, y es la que recibe (2026-11-22).
+    [emitida] = armados
+    assert emitida.aprobada_por == "Servicio Nacional de Migración" and not emitida.copia_interna, \
+        "la agencia no ve nombres ni unidades internas"
     r = await cliente.get(f"/solicitudes/{sid}/autorizacion.pdf", headers=e.nav_a2.headers)
     assert r.status_code == 200 and r.content[:5] == b"%PDF-" and r.headers["content-type"] == "application/pdf"
     assert r.headers["content-disposition"] == f'attachment; filename="Autorizacion-{s["numero"]}.pdf"'
-    assert armados[-1].aprobada_por == "Servicio Nacional de Migración" and not armados[-1].copia_interna, \
-        "la agencia no ve nombres ni unidades internas"
+    assert len(armados) == 1
+    de_la_agencia = r.content
     for actor in (e.revisor, e.puerto_a):
         r = await cliente.get(f"/solicitudes/{sid}/autorizacion.pdf", headers=actor.headers)
         assert r.status_code == 200 and r.content[:5] == b"%PDF-"
@@ -346,7 +350,7 @@ async def test_ciclo_completo(cliente, escenario: Escenario, monkeypatch):
     r = await cliente.get(f"/verificacion/{codigo}/autorizacion.pdf")
     assert r.status_code == 200 and r.content[:5] == b"%PDF-" and r.headers["content-type"] == "application/pdf"
     assert r.headers["content-disposition"] == f'inline; filename="Autorizacion-{s["numero"]}.pdf"'
-    assert armados[-1].aprobada_por == "Servicio Nacional de Migración" and not armados[-1].copia_interna
+    assert r.content == de_la_agencia
 
     # ── Puesto de control ──
     r = await cliente.get("/solicitudes/puerto", headers=e.puerto_a.headers)
@@ -374,6 +378,7 @@ async def test_ciclo_completo(cliente, escenario: Escenario, monkeypatch):
     r = await cliente.post(f"/solicitudes/{sid}/finalizar", json={"comentario": "Desembarque realizado sin novedad"},
                            headers=e.puerto_a.headers)
     assert r.status_code == 200 and r.json()["estado"] == "finalized" and r.json()["finalizada_por"] == "Puerto Prueba"
+    assert armados[-1].finalizada_por is None and not armados[-1].copia_interna, "al finalizar se emite la de la agencia"
     assert r.json()["puesto_finalizacion_nombre"] == e.puesto_a["nombre"], "se finaliza en el puesto autorizado"
     r = await cliente.post(f"/solicitudes/{sid}/impedimentos-puesto", json=cuerpo_impedimentos(para_puesto),
                            headers=e.puerto_a.headers)
@@ -382,12 +387,12 @@ async def test_ciclo_completo(cliente, escenario: Escenario, monkeypatch):
     assert r.json()["estado"] == "finalized" and r.json()["valida"]
     assert r.json()["puesto_finalizacion_nombre"] == e.puesto_a["nombre"]
     r = await cliente.get(f"/solicitudes/{sid}/autorizacion.pdf", headers=e.nav_a1.headers)
-    assert r.status_code == 200 and r.content[:5] == b"%PDF-"
-    assert armados[-1].finalizada_por is None, "la agencia no ve quién finalizó"
+    assert r.status_code == 200 and r.content[:5] == b"%PDF-" and r.content != de_la_agencia
+    de_la_agencia = r.content
     r = await cliente.get(f"/solicitudes/{sid}/autorizacion.pdf", headers=e.revisor.headers)
     assert armados[-1].finalizada_por == "Puerto Prueba (Puesto de control)", "la copia interna, sí (2026-11-14)"
     r = await cliente.get(f"/verificacion/{codigo}/autorizacion.pdf")
-    assert r.status_code == 200 and armados[-1].finalizada_por is None and not armados[-1].copia_interna
+    assert r.status_code == 200 and r.content == de_la_agencia, "la agencia no ve quién finalizó"
 
     # ── Lo que ve la agencia: estados y motivos, nada interno del SNM ──
     vista = (await cliente.get(f"/solicitudes/{sid}", headers=e.nav_a1.headers)).json()

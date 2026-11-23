@@ -237,7 +237,7 @@ Pedido del usuario: revisar todo en busca de fallos, saturación y lo que estorb
   - Imagen del backend en dos etapas, sin compiladores (todas las dependencias traen binario para Linux; instalar build-essential detrás del proxy del SNM trancaba el build más de 13 min): la final corre como `argonavis` (uid 10001). Un volumen `documentos` creado antes hay que pasárselo una vez (README → Producción).
   - `UVICORN_WORKERS` (entrypoint, 1 por defecto; el compose pone 2) y `PYTHONUNBUFFERED`.
   - `verificar-despliegue.sh` (raíz): revisión de un despliegue con Docker, solo lectura salvo el freno del login (intentos con un usuario inexistente) y un archivo vacío en el volumen. Si agregas algo que el despliegue necesite (una variable, un servicio, un puerto), súmale su chequeo.
-  - El servidor de pruebas (192.168.10.75, Rocky 9) no llega a Docker Hub (el firewall corta `auth.docker.io`): usa el espejo `mirror.gcr.io` en `/etc/docker/daemon.json` (`registry-mirrors`).
+  - El servidor de pruebas (Rocky 9) no llega a Docker Hub (el firewall corta `auth.docker.io`): usa el espejo `mirror.gcr.io` en `/etc/docker/daemon.json` (`registry-mirrors`).
   - nginx resuelve `backend` en cada petición (`resolver 127.0.0.11` y `proxy_pass $api`): con el nombre fijo lo resolvía una vez al arrancar y, si el backend se recreaba con otra IP, respondía 502 hasta reiniciarlo.
 - **Revisado y sin cambios:** LDAP, bcrypt y el PDF ya corren en hilos; las subidas tienen su propio tope de 300 s en el cliente; temporizadores y escuchas del frontend se limpian; las relaciones del ORM cargan en lote (`selectin`), sin N+1 en las bandejas.
 - **Documentación de la DTI, juego 0.6:** el 06 (configuración, Docker, salud, índices) y el 08 (evidencias y pendientes) pasan a la 0.6; el 00, a la 0.5, por su tabla de versiones. Los demás no cambian. `v06.py` (scratchpad) hace los reemplazos en los generadores, como `v05.py`.
@@ -666,3 +666,107 @@ Decisiones del usuario: con «Subir y bajar», la carta de garantía y también 
   - `test_cambio_de_puerto.py`: a otro sector, y de punta a punta con el puesto del Atlántico.
   - `test_boletas.py`: los métodos de pago, capturando los párrafos del PDF.
   - Los casos nuevos del espejo del checklist y el E2E `formulario.spec.ts`.
+
+## Auditoría del stack y revisión de los documentos de Office (2026-11-22)
+
+Pedido del usuario: «el stack actualmente utilizado, ¿consideras que es el adecuado para este tipo de proyecto? Revisa y haz una auditoría completa a fondo», y después «procedamos con lo urgente y después vamos abarcando los demás puntos».
+
+- **El stack se queda.** Lo que falta y su orden, en CLAUDE.md («Lo que sigue pendiente», punto 21).
+- **Un documento de Office podía tumbar el backend.** `oletools`, que buscaba las macros, leía partes enteras del archivo sin tope. Bastaba una cuenta de agencia. Medido en local:
+  - un .docx de 20 KB con 20 MB en `_rels/.rels`: +518 MB de memoria, y se aceptaba;
+  - un .docx de 400 KB con un objeto OLE2 de 400 MB: +832 MB (el contenedor tiene 1 GB);
+  - un .doc de 408 KB: 8,3 s de CPU, que crece al cuadrado (con los 2 MB que se admiten, minutos; un envío lleva hasta 172 archivos);
+  - al rechazar, a veces dejaba el archivo abierto (en Windows, un 500 en vez del 415).
+- **Por qué no bastaba con un tope antes de analizar:** la librería abre el archivo por varios caminos (ZIP, OLE2, MHTML, XML), y el tamaño que declara un ZIP lo escribe quien lo arma.
+- **`infrastructure/revision_office.py` la reemplaza.** Recorre el archivo de a trozos, sin guardar lo que se descomprime. Con los mismos ataques al máximo (1.500 MB en un .docx de 1,5 MB): 3 MB de memoria y 0,2 s.
+  - **Formato:** en .doc y .xls exige el flujo principal de Word o Excel. Antes bastaba la firma OLE2, y un instalador (.msi) o un correo (.msg) renombrados pasaban. Un .docx con contraseña renombrado a .doc, también.
+  - **Macros:** el nombre del flujo `_VBA_PROJECT` en el directorio OLE2 (va entero, sin comprimir y sin distinguir mayúsculas) o el comienzo del código VBA; en los .docx y .xlsx, además, en cualquier parte que sea OLE2, y `vbaProject.bin`.
+  - **Tamaño:** 50 MB descomprimidos, 2.000 partes y solo deflate. Mide lo que cada parte ocupa de verdad y rechaza la que no mide lo que declara. El mensaje: «ocupa demasiado al abrirse. Guárdalo como PDF e intenta de nuevo.»
+  - Lo rechazado por macros o por tamaño queda en el log.
+- **Paridad comprobada con 26 archivos reales** (Word y Excel de Office 2021, 97 y 95; con objetos incrustados; con clave; complementos de Office con macros, también con el proyecto renombrado; los documentos de `docs/`): detecta los 7 con macros y no rechaza ninguno bueno, igual que la librería.
+- **Dependencias:** salen 11 paquetes del bloqueo (`oletools` y lo que arrastraba: `olefile`, `msoffcrypto-tool`, `pcodedmp`, `cryptography`, `cffi`, `pyparsing`…). Ninguno de los demás cambia de versión.
+- **Pruebas:** `test_revision_office.py` (58). Quitando de a una cada defensa, alguna prueba falla. La suite completa pasa con esas librerías bloqueadas.
+- **Repositorio:** se quitó de este archivo la IP del servidor de pruebas. El historial de git se revisó entero: sin claves ni tokens, solo marcadores de ejemplo.
+
+## Contenedores endurecidos, redes separadas y PostgreSQL 15.20 (2026-11-22)
+
+Punto 1 de la hoja de ruta de la auditoría. El repositorio a privado queda para el final, por decisión del usuario.
+
+- **Los tres contenedores** (`x-endurecido` en `docker-compose-prod.yml`): sin root, `cap_drop: ALL`, `no-new-privileges` y la imagen de solo lectura.
+  - PostgreSQL corre con el usuario 70 desde que arranca (antes, root hasta el `gosu`); nginx, con el 101 (antes, el maestro era root). El backend ya corría con el 10001.
+  - nginx escucha en el 8080, porque el 80 es solo de root; Docker lo publica en el 80. Con `absolute_redirect off`, para que una redirección no agregue el 8080.
+  - Lo que escriben: los volúmenes de siempre, dos nuevos para los envíos mientras llegan (`temporales_backend` en `/tmp` y `temporales_nginx` en `/var/cache/nginx`) y tmpfs chicos para el socket y el pid.
+- **Redes:** PostgreSQL y el backend en `datos`; nginx, solo con el backend. `datos` ocupa un /28 (`RED_DATOS`): Docker le daría un /16 de 172.x, que puede coincidir con una red del SNM o de la VPN.
+- **PostgreSQL 15.20** (del 12/11/2026): corrige 43 vulnerabilidades. Sus notas piden reconstruir índices GIN, `pg_trgm` GiST o de `bpchar` sin largo; el esquema no tiene ninguno.
+- **CI:** el trabajo `contenedores` construye la pila y la levanta sobre una base de la versión anterior arrancada como root, después de un reinicio y desde cero, y corre `verificar-despliegue.sh --solo-la-pila`.
+- **Verificación:** las imágenes oficiales se leyeron por dentro (usuarios, dueños de las carpetas y guiones de arranque), el compose se validó con el cliente de Docker y los chequeos nuevos se probaron con herramientas de mentira, en los casos buenos y malos. **No se levantó ningún contenedor en el equipo de desarrollo** (no tiene virtualización): la primera vez que corre de verdad es en la CI.
+- **README:** el `chown` del volumen viejo va con `docker run`; con `docker compose run` ya no tiene permiso.
+- **Pruebas:** `test_contenedores.py` (12).
+
+## Registros, vigilancia y prueba de restauración (2026-11-22)
+
+Puntos 2, 3 (en parte) y 4 de la hoja de ruta de la auditoría.
+
+- **Registros que sobreviven al despliegue.** Docker borra su salida cada vez que recrea el contenedor. El backend escribe además un archivo por día en el volumen `registros` (`LOG_CARPETA`, que ya existía para Windows) y nginx, sus accesos en `registros_nginx`, con la fecha en el nombre (`map $time_iso8601 $dia`), así que no hay que rotarlos. Se guardan `LOG_DIAS` (90). Los dos contenedores llevan la hora de Panamá (`TZ=EST5`).
+  - Con una variable en el nombre, nginx no escribe si la raíz de la petición no existe: por eso `root` va también en el `server`.
+- **`vigilar.py`:** avisa por correo cuando algo falla. Hasta ahora nadie se enteraba: había que correr `verificar-despliegue.sh` a mano.
+  - Cada 5 minutos: contenedores, aplicación, base, correos fallidos o atascados, procesos caídos, rachas de errores, respaldos, discos, memoria y reloj. Avisa a la segunda falla seguida, recuerda una vez al día y avisa cuando se resuelve; si el correo no sale, lo reintenta.
+  - Cada mañana (`--diario`): `verificar-despliegue.sh --diario`, sin la prueba del freno del login, que llenaría la bitácora. Los lunes manda el resultado siempre y prueba el respaldo. También borra los accesos viejos de nginx.
+  - Corre en el servidor, con el Python 3.9 del sistema y la biblioteca estándar: tiene que avisar aunque Docker esté caído.
+  - Falta poner `CORREO_ALERTAS` y las dos líneas del cron en cada servidor. Si el servidor entero se apaga, tiene que verlo el monitoreo de la DTI.
+- **`probar-restauracion.sh`:** carga el último respaldo en una base aparte y comprueba los datos y cada documento. `backup.sh` no tenía pruebas; ahora las tiene, con un `docker` de mentira, y en la CI los dos corren con PostgreSQL real.
+- **PostgreSQL 18 en la CI:** el backend se prueba con la 15.20 y con la 18.7, la del servidor nuevo. Si la 18 falla, se ve pero no deja el push en rojo.
+- **Queda del punto 3:** copiar los respaldos a otro equipo, cifrados. Depende de la DTI: si las VM de producción entran en el respaldo de vSphere, puede que ya esté resuelto.
+- **Pruebas:** `test_vigilar.py` (35; también se corrió con un Python 3.9 real), `test_respaldos.py` (12) y los casos nuevos de `test_contenedores.py` y `test_dependencias.py`.
+
+## Consultar las autorizaciones muchos años después (2026-11-22, revisión `c6e2a9f1d438`)
+
+Pedido del usuario: «necesitamos que las solicitudes se puedan consultar, las aprobadas y finalizadas, inclusive muchos años después». Sobre la propuesta respondió: que salgan también las aprobadas que vencieron sin finalizarse; la consulta histórica, solo de UCVMM y del supervisor de sector; «el sector que revisó, aunque que se indique que fueron procesadas antes en y el cambio a hoy»; y «además de la información, los archivos también deben verse, revisa todo eso a fondo».
+
+- **Lo que ya estaba bien:** nada borra solicitudes, documentos ni bitácora; los nombres de la agencia, del puesto y de los funcionarios son una foto; los archivos se abren en cualquier estado, con permiso.
+- **«Autorizadas»**, una pestaña de la consulta histórica (y un filtro del Excel): las que se aprobaron alguna vez (`aprobada_en`), vigentes, finalizadas y vencidas sin finalizar. «Aprobadas» es el estado de hoy y dura unos días: de hace años daba cero. Cada expirada dice si se llegó a aprobar.
+- **La búsqueda** no distingue tildes, admite las palabras en cualquier orden y busca también el seamanbook; antes tenía que ser el texto exacto y seguido. Al buscar un tripulante, la lista dice cuál es. Es la misma de las bandejas.
+- **Velocidad**, con 10 años simulados (200.000 solicitudes y un millón de tripulantes) en PostgreSQL 17.10:
+
+  | Búsqueda | Antes | Ahora |
+  |---|---|---|
+  | Un pasaporte | 12,7 s | 0,04 s |
+  | Nombre y apellido | 11,8 s | 0,03 s |
+  | Un número | 3,3 s | 0,06 s |
+  | Un IMO | 2,7 s | 0,03 s |
+  | Un apellido común (20.000 resultados) | — | 0,2 s |
+  | Dos letras (100.000 resultados) | — | 0,4 a 1,4 s |
+
+  - Columnas `busqueda` calculadas por PostgreSQL, con un índice de trigramas (`pg_trgm`). Con esos datos, los índices ocupan 135 MB y la migración tarda menos de 2 minutos.
+  - Las pestañas y el total de una bandeja salen de una sola cuenta (antes, dos).
+  - En la pantalla, las ocho pestañas van como fichas: con cantidades grandes no caben en una fila.
+  - Los índices GIN se crean ya con PostgreSQL 15.20, que corrigió sus fallas de `VACUUM`. Una base de desarrollo en 17.10 o anterior conviene reindexarla al subirla.
+- **El sector que la revisó la conserva** (`sector_revision_id`), aunque el puesto cambie de sector. Antes, mover un puesto se llevaba todo su historial al otro. Vale para la consulta, las bandejas, los expedientes con sus archivos, las boletas y las estadísticas. El expediente dice «Sector Pacífico, que la revisó. Hoy el puesto es del Sector Atlántico», y el filtro por puesto sigue ofreciendo los que cambiaron. Las que están en revisión pasan al sector nuevo, como antes. Las que ya existían quedaron con el sector de hoy de su puesto.
+- **Quién la tiene:** UCVMM, el supervisor de sector y el Administrador. El puesto de control ya no: consulta las suyas en su bandeja, como la agencia (ahí se busca por número, buque, IMO o agencia, sin rango de fechas ni tripulante). Con cambio de puerto, el primer puesto solo la encontraba ahí; ya no la ve (abajo).
+- **Los archivos:**
+  - Se comprobó que se ven y se descargan en los seis estados, con los permisos de cada rol.
+  - `infrastructure/revisar_documentos.py` compara cada documento registrado con su archivo (que esté y que mida lo mismo). Lo corre `verificar-despliegue.sh`, cada mañana con `vigilar.py`: un archivo que se pierde sin que nadie lo note salía de los respaldos a los 14 días.
+  - El PDF de la que se aprobó y venció lo descarga el SNM, con el sello EXPIRADA y sin la vigencia. La agencia y el QR, no.
+- **Quedó para decidir**, y se hizo ese mismo día (sección siguiente): los documentos que la agencia reemplaza al corregir se borraban para siempre, los archivos no llevaban huella y el PDF se armaba cada vez.
+- **Pruebas:** `test_consulta_de_anios.py` (22) y `test_revisar_documentos.py` (8), la migración con una dueña que no es superusuario (`test_migraciones.py`), los casos nuevos de Vitest y el E2E. Quitando de a una las 33 reglas nuevas, alguna prueba falla.
+
+## El historial completo de una solicitud (2026-11-22, revisión `d7f3b0c5e849`)
+
+Respuestas del usuario: «1. El puesto no debe tener acceso a consulta histórica; 2. ya no debe verla y debe aparecerle al nuevo puesto; 3. sí (conservar lo reemplazado y el PDF como se emitió, con huella); 4. aún no se sabe, pero debe haber un margen e historial completos».
+
+- **Cambio de puerto:** la ve, la finaliza y genera su boleta solo el puesto nuevo. El primero no la abre ni con el enlace (antes la consultaba): no tiene nada que hacer con ella, y si llega alguien con el PDF, el QR dice a qué puesto fue.
+- **Al corregir se conserva lo enviado.** Antes se borraban los documentos reemplazados, los tripulantes que salían, sus datos y la verificación de impedimentos.
+  - `solicitud_versiones`: la foto de lo que se había enviado, con los nombres de ese día, quién la envió, quién la devolvió y por qué. En pares (rótulo, valor), para que se lea igual aunque cambien las columnas o el catálogo.
+  - Los documentos que salen quedan retirados (`retirado_en`), con el nombre de su tripulante. La llave del tripulante pasa de CASCADE a SET NULL.
+  - El registro dice qué cambió la agencia («Buque: AURORA → AURORA II», «Tripulante quitado: …»): le sirve a UCVMM para revisar una corregida.
+  - Las correcciones de antes no se pueden recuperar: la pantalla lo dice.
+- **La huella (SHA-256)** de cada archivo, calculada al recibirlo. Se comprueba al abrirlo: si no coincide, no se muestra y queda en el log. A los de antes se les calcula una vez, en segundo plano.
+- **La autorización, tal como se emitió** (`documentos_emitidos`, `emision.py`): se arma una vez al aprobar y otra al finalizar, después del commit, y es la que reciben la agencia y el QR. Antes se armaba en cada descarga, con el formato de ese día. Pesa unos 150 KB.
+  - Si el proceso se cae entre aprobar y emitir, la completa la tarea de fondo (`cuidar_archivo`, un solo proceso a la vez) o la primera descarga. Dos a la vez dejan una sola.
+  - Si el archivo se dañó, la agencia recibe una armada de nuevo (no se queda sin su autorización), queda el error en el log y el registro no muestra otra cosa que la emitida.
+- **La pantalla:** «Historial completo» en el expediente, para el SNM que la ve antes de aprobarse. Se pide al abrirlo. La vista previa abre también los retirados y las emitidas (`obtenerArchivo`).
+- **En la base:** la cuenta de la aplicación solo agrega a las dos tablas nuevas y no puede borrar documentos.
+- **Se quitó `al_confirmar`:** ya no se borra ningún archivo registrado.
+- **Respaldos con margen:** 14 noches, la primera de los últimos 12 meses y la primera de los últimos 10 años. La base se cuenta ahora por noches y no por la fecha del archivo, para que siempre esté junto a sus documentos. La copia de los documentos solo agrega: lo que se pierde o cambia en el servidor no la contagia, y lo dice en su registro.
+- **Revisión diaria:** también los retirados y las emitidas, y relee los de un día del mes para comprobar su huella (en 31 días, todos).
+- **Pruebas:** `test_historial_completo.py` (15), los casos nuevos de `test_revisar_documentos.py`, `test_respaldos.py`, `test_permisos_bd.py`, `test_migraciones.py` y `test_cambio_de_puerto.py`, `registro.test.ts` y el E2E. Quitando de a una 49 reglas, falla alguna prueba en 47; las otras dos las frena otra barrera. La CI comprobará con contenedores de verdad que la copia conserva el dueño y que se recupera lo perdido.

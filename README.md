@@ -20,7 +20,7 @@ Nació como una herramienta de *storage* (transferencias de archivos con enlace 
 
 ### Requisitos
 - Python 3.12+ y Node.js 22+
-- PostgreSQL (la base de `DATABASE_URL` creada)
+- PostgreSQL 15 o más nueva, con la base de `DATABASE_URL` creada en UTF-8 (usa `pg_trgm`, que viene incluida)
 - Acceso a un servidor LDAP / Active Directory (las cuentas locales no lo necesitan)
 
 ### Primera vez
@@ -45,7 +45,7 @@ npm ci
 **De dónde salen las librerías.** Con la aplicación instalada, nada se descarga de internet: el frontend lleva sus librerías empaquetadas (sin CDN ni fuentes web, y la CSP solo deja cargar lo del propio servidor) y el backend solo habla con PostgreSQL, el Active Directory y el servidor de correo. Las librerías se descargan una sola vez, al instalar, y siempre las mismas:
 - Python: `requirements.lock`, con la versión exacta y el hash de cada una (también las que arrastran las de `requirements.txt`), para Linux y Windows. Si PyPI entregara otro archivo, pip se detiene. Para cambiar una, se edita `requirements.txt` y se regenera el bloqueo con el comando que trae al principio; `tests/test_dependencias.py` falla si los dos no coinciden.
 - Node: `package-lock.json`, también con hashes (`npm ci`, nunca `npm install` en un servidor).
-- Docker: imágenes base con la versión exacta (`python:3.12.16-slim-trixie`, `node:24.22.2-alpine3.24`, `nginx:1.31.8-alpine`, `postgres:15.19-alpine3.24`). Para actualizarlas, se cambia la etiqueta (y la de PostgreSQL también en `.github/workflows/ci.yml`).
+- Docker: imágenes base con la versión exacta (`python:3.12.16-slim-trixie`, `node:24.22.2-alpine3.24`, `nginx:1.31.8-alpine`, `postgres:15.20-alpine3.24`). Para actualizarlas, se cambia la etiqueta (y la de PostgreSQL también en `.github/workflows/ci.yml`).
 
 ### Desarrollo (dos terminales)
 ```bat
@@ -89,10 +89,18 @@ docker compose -f docker-compose-prod.yml up -d --build
 
 El backend corre con `UVICORN_WORKERS` procesos (2 por defecto) y con un usuario sin privilegios (`argonavis`, uid 10001), sin las herramientas de compilación en la imagen. A PostgreSQL entra con su propia cuenta (`argonavis_app`), que no puede cambiar tablas y solo agrega a la bitácora: la crea el backend al arrancar con la clave de `POSTGRES_APP_PASSWORD`, que **hay que agregar al `.env`** (`openssl rand -hex 24`); sin ella, el compose no levanta. Si el firewall no deja llegar a Docker Hub (`auth.docker.io`), usa un espejo: `{ "registry-mirrors": ["https://mirror.gcr.io"] }` en `/etc/docker/daemon.json` y `sudo systemctl restart docker`. El volumen `documentos` de una instalación anterior al 08/11/2026 se creó cuando el contenedor corría como root: pásaselo al usuario una vez, antes de levantar la versión nueva (si no, las subidas fallan por permisos):
 ```bash
-docker compose -f docker-compose-prod.yml run --rm --no-deps --user root --entrypoint chown backend -R 10001:10001 /app/storage/documentos
+docker run --rm --user root --entrypoint chown -v argonavis_documentos:/app/storage/documentos argonavis-backend:latest -R 10001:10001 /app/storage/documentos
 ```
 
-Después de cada despliegue, `sudo bash verificar-despliegue.sh` revisa sin cambiar nada los contenedores (y su memoria contra su límite), la salud, las cabeceras de seguridad, los puertos, el esquema, los topes de la base, el Active Directory, el correo, los respaldos, el reloj y los errores del log, y termina con «todo bien» o con la lista de fallas.
+> **Contenedores endurecidos** (desde el 22/11/2026). Si alguien logra ejecutar algo dentro de uno, que no le sirva de nada:
+> - **Sin root:** PostgreSQL corre con el usuario 70, el backend con el 10001 y nginx con el 101, desde que arrancan. Por eso nginx escucha en el 8080 dentro del contenedor; Docker lo publica en el 80, como siempre.
+> - **Sin privilegios del sistema** (`cap_drop: ALL`) ni forma de conseguirlos (`no-new-privileges`).
+> - **Con la imagen de solo lectura.** Lo que cada uno escribe va aparte: los datos y los documentos en sus volúmenes, y los envíos mientras llegan, en `temporales_nginx` y `temporales_backend`. Esos dos van en el disco y no en un tmpfs, que contaría para la memoria del contenedor (un envío pesa hasta 345 MB).
+> - **Redes separadas:** PostgreSQL y el backend comparten la red `datos`; nginx no está en ella, así que no alcanza la base. La red `datos` ocupa un rango chico, `172.31.255.240/28`: si coincide con una red del SNM o de la VPN, se cambia con `RED_DATOS` en el `.env` (y hay que bajar la pila una vez: `docker compose -f docker-compose-prod.yml down` y `up -d`).
+>
+> Los datos de una instalación anterior sirven sin tocarlos. Lo revisan `verificar-despliegue.sh` en cada servidor y la integración continua, que construye esta misma pila y la levanta tres veces: sobre una base ya existente, después de un reinicio y desde cero.
+
+Después de cada despliegue, `sudo bash verificar-despliegue.sh` revisa sin cambiar nada los contenedores (y su memoria contra su límite), la salud, las cabeceras de seguridad, los puertos, el esquema, los topes de la base, que cada archivo siga en el disco y sea el original, el Active Directory, el correo, los respaldos, el reloj y los errores del log, y termina con «todo bien» o con la lista de fallas.
 
 > **Recursos de cada contenedor** (desde el 10/11/2026). Cada uno tiene un tope de memoria y de procesos, y el backend además de CPU. Sin topes, uno que se desboca se lleva a los demás: sin memoria, el kernel mata al proceso más grande de la VM, que suele ser PostgreSQL. Con ellos, Docker corta solo dentro del contenedor que se pasó y se levanta solo (uvicorn levanta sus procesos; los contenedores tienen `restart: always`). Se ajustan en el `.env`:
 >
@@ -105,14 +113,31 @@ Después de cada despliegue, `sudo bash verificar-despliegue.sh` revisa sin camb
 >
 > La suma de los topes debería dejar unos 500 MB libres para el sistema: con los valores por defecto (2,25 GB), una VM de 3 GB o más. `verificar-despliegue.sh` muestra el uso de cada contenedor contra su tope, avisa si alguno pasa del 80 % o si Docker lo cortó, y si se cayó algún proceso de uvicorn en las últimas 24 h.
 
+> **Registros** (desde el 22/11/2026). Además de la salida de Docker (`docker logs`), que se borra cada vez que un despliegue recrea el contenedor, quedan en volúmenes, un archivo por día, con la hora de Panamá, durante `LOG_DIAS` días (90):
+> - **El backend:** `docker exec argonavis_backend ls /app/registros`. Para un error reportado con su código: `docker exec argonavis_backend sh -c "grep -A20 <código> /app/registros/argonavis-*.log"`.
+> - **Los accesos de nginx** (quién pidió qué y desde dónde, también sin sesión): `docker exec argonavis_frontend ls /var/log/argonavis`.
+
+> **Vigilancia** (`vigilar.py`, desde el 22/11/2026). Avisa por correo cuando algo falla. Corre en el servidor y no en un contenedor: si el backend o Docker se caen, igual avisa. Usa el Python del sistema, sin instalar nada, y el mismo correo de la aplicación.
+> - **Cada 5 minutos** mira los contenedores, la aplicación, la base, los correos que no salen, los respaldos, el disco, la memoria, el reloj y las rachas de errores. Avisa a la segunda falla seguida (en un despliegue los contenedores se reinician), no repite mientras sigue igual, lo recuerda una vez al día y avisa cuando se resuelve.
+> - **Cada mañana** corre `verificar-despliegue.sh --diario` y manda el resultado si algo falla. **Los lunes** lo manda siempre, para saber que la vigilancia sigue viva, y además prueba que el último respaldo se puede restaurar.
+>
+> Para instalarla, una sola vez: los destinatarios en `CORREO_ALERTAS` del `.env`, `sudo python3 -I vigilar.py --probar` para comprobar que el correo llega, y en el cron de root (`sudo crontab -e`):
+> ```
+> */5 * * * * python3 -I /home/vperez/argonavis/vigilar.py >> /var/log/argonavis-vigilancia.log 2>&1
+> 0 7 * * *   python3 -I /home/vperez/argonavis/vigilar.py --diario >> /var/log/argonavis-vigilancia.log 2>&1
+> ```
+> **Lo que no puede ver:** si se apaga el servidor entero, nadie avisa desde adentro. Para eso, el monitoreo de la DTI tiene que consultar `http://<servidor>/api/health` desde otro equipo (responde 200 si todo está bien y 503 si no).
+
 > **Respaldos** (`backup.sh`, cron de root a las 2 AM; la línea del cron está en el script). Cada noche:
 > 1. **La base:** `pg_dump` comprimido en `DIR_BACKUPS/argonavis_bd_FECHA.sql.gz`. PostgreSQL lo saca de una foto consistente sin frenar a nadie: el sistema sigue funcionando mientras tanto.
-> 2. **Los documentos:** una copia por día en `DIR_BACKUPS/documentos/FECHA/`, en la que solo se copian los archivos nuevos; los que ya estaban en la copia anterior se enlazan (*hard link*) y no ocupan espacio otra vez. Cada copia se ve completa. Sirve porque un documento nunca se modifica: reemplazarlo es guardar otro.
-> 3. **Retención:** las últimas `RETENER_DIAS` (14) de cada uno.
+> 2. **Los documentos:** una copia por día en `DIR_BACKUPS/documentos/FECHA/`, en la que solo se copian los archivos nuevos; los que ya estaban en la copia anterior se enlazan (*hard link*) y no ocupan espacio otra vez. Cada copia se ve completa. Un documento nunca se modifica ni se borra (22/11/2026): si uno falta o cambió en el servidor, la copia conserva el original y lo dice en su registro.
+> 3. **Retención, con margen** (todavía no se sabe cuántos años se conservan): las últimas `RETENER_DIAS` noches (14), la primera de los últimos `RETENER_MESES` meses (12) y la primera de los últimos `RETENER_ANIOS` años (10). La base y los documentos, de las mismas noches.
 >
 > Corre con la prioridad más baja de CPU y de disco, para no frenar a quien trabaje a esa hora (los puestos operan de noche). Hasta el 10/11/2026 empaquetaba todos los documentos en un `.tar.gz` cada noche y guardaba 14: ocupaban 14 veces lo que pesan los documentos y cada noche tardaba más. Esos `.tar.gz` se borran solos a los 14 días.
 >
-> **Restaurar** (probado el 10/11/2026 con una base temporal; conviene probarlo una vez en el servidor de pruebas): con la base y los documentos **de la misma noche** (los documentos se copian después de la base, así que están todos los que ella nombra), y el backend detenido. En una VM nueva, primero `docker compose -f docker-compose-prod.yml up -d` una vez: crea la base y la cuenta de la aplicación, a la que el respaldo le devuelve sus permisos.
+> **¿Sirve el respaldo?** `sudo bash probar-restauracion.sh` carga el último en una base aparte, comprueba que traiga datos y que cada documento esté en la copia de esa noche con su tamaño, y la borra. No toca la base de verdad. La vigilancia lo corre los lunes y la integración continua, en cada push.
+>
+> **Restaurar:** con la base y los documentos **de la misma noche** (los documentos se copian después de la base, así que están todos los que ella nombra), y el backend detenido. En una VM nueva, primero `docker compose -f docker-compose-prod.yml up -d` una vez: crea la base y la cuenta de la aplicación, a la que el respaldo le devuelve sus permisos.
 > ```bash
 > docker compose -f docker-compose-prod.yml stop backend
 > # La base: se borra y se vuelve a crear vacía antes de cargar el respaldo.
@@ -122,9 +147,13 @@ Después de cada despliegue, `sudo bash verificar-despliegue.sh` revisa sin camb
 > sudo cp -a ~/backups/documentos/<FECHA>/. "$(docker volume inspect argonavis_documentos --format '{{ .Mountpoint }}')/"
 > docker compose -f docker-compose-prod.yml start backend   # al arrancar, vuelve a dar los permisos de la cuenta de la app
 > ```
+> **Un documento suelto** (si la revisión de cada mañana avisa que falta o está incompleto): se copia del respaldo, con la ruta que dice el aviso. Está en la última copia, que conserva el original.
+> ```bash
+> sudo cp -a ~/backups/documentos/<FECHA>/<ruta> "$(docker volume inspect argonavis_documentos --format '{{ .Mountpoint }}')/<ruta>"
+> ```
 > Los respaldos quedan en el mismo servidor: si se pierde el disco, se pierden con él. Cópialos a otra máquina con `rsync -aH --delete ~/backups/ usuario@otro-servidor:/ruta/argonavis/` (la `H` conserva los enlaces: sin ella, cada copia de los documentos ocuparía todo).
 
-**Windows**: `APP_ENV=production` y `LOG_CARPETA=logs` en `backend\.env`, `migrate.bat`, compilar el frontend (`npm run build`) y `start-backend-prod.bat` (sirve también `frontend/dist`). Si se olvida `migrate.bat`, el backend lo dice al arrancar («La base de datos no está al día con el código: le falta…») y, hasta correrlo y volver a levantarlo, la API responde 503 con el motivo y `/api/health`, «base de datos sin migrar» (en desarrollo, lo mismo: cuando lleguen migraciones nuevas, `migrate.bat`). Con `LOG_CARPETA`, los logs quedan en `backend\logs\argonavis-AAAA-MM-DD.log`, uno por día, y se borran a los `LOG_DIAS` días (30); sin ella, solo se ven en la consola y se pierden al cerrarla. En Docker no hace falta: Docker guarda y rota la salida.
+**Windows**: `APP_ENV=production` y `LOG_CARPETA=logs` en `backend\.env`, `migrate.bat`, compilar el frontend (`npm run build`) y `start-backend-prod.bat` (sirve también `frontend/dist`). Si se olvida `migrate.bat`, el backend lo dice al arrancar («La base de datos no está al día con el código: le falta…») y, hasta correrlo y volver a levantarlo, la API responde 503 con el motivo y `/api/health`, «base de datos sin migrar» (en desarrollo, lo mismo: cuando lleguen migraciones nuevas, `migrate.bat`). Con `LOG_CARPETA`, los logs quedan en `backend\logs\argonavis-AAAA-MM-DD.log`, uno por día, y se borran a los `LOG_DIAS` días (30); sin ella, solo se ven en la consola y se pierden al cerrarla.
 
 > **Al actualizar en Windows**, antes de `migrate.bat`: `venv\Scripts\python -m pip install --require-hashes -r requirements.lock` en `backend` y `npm ci` en `frontend` (luego `npm run build`). Docker lo hace solo al reconstruir. Desde el 27/10/2026 el backend usa PyJWT en lugar de python-jose: sin ese paso no arranca (`No module named 'jwt'`). Desde el 10/11/2026 usa también XlsxWriter (exportar las estadísticas a Excel): sin él, la exportación a Excel responde 500 (el PDF y el CSV siguen). Lo viejo se puede quitar después: `venv\Scripts\python -m pip uninstall python-jose ecdsa rsa`. Las sesiones abiertas siguen valiendo.
 
@@ -198,6 +227,7 @@ ArgoNavis/
 │  │  └─ infrastructure/
 │  │     ├─ database.py        # motor async y sesión por request
 │  │     ├─ almacenamiento.py  # validación y guardado de documentos (carpeta por solicitud)
+│  │     ├─ revision_office.py # Word y Excel: formato, macros y tamaño, sin abrirlos con una librería
 │  │     ├─ tareas.py          # vencimientos, con un solo ejecutor entre workers
 │  │     └─ asignar_rol.py     # nombra el primer SysAdmin desde la consola
 │  ├─ alembic/versions/        # el esquema completo vive aquí
@@ -229,10 +259,10 @@ ArgoNavis/
 | Rol | Permiso | Qué hace |
 |---|---|---|
 | **Naviera** (usuario de una agencia) | `T-CREAR-BASICA` | Envía solicitudes de su agencia y las corrige cuando UCVMM las devuelve. Todos los usuarios de la agencia comparten sus solicitudes. |
-| **UCVMM** | `T-PROCESAR-PACIFICO` + sector asignado | Revisa las solicitudes de los puestos de su sector (Pacífico o Atlántico): verifica impedimentos pasajero por pasajero (obligatorio para aprobar), aprueba, devuelve a corrección o deniega. No ve las del otro sector. |
-| **Supervisor de sector** | `T-SUPERVISAR-SECTOR` + sector asignado | Solo lectura: ve las solicitudes de su sector (expedientes, documentos, autorizaciones y estadísticas), sin decidir nada. |
+| **UCVMM** | `T-PROCESAR-PACIFICO` + sector asignado | Revisa las solicitudes de su sector (Pacífico o Atlántico): verifica impedimentos tripulante por tripulante (obligatorio para aprobar), aprueba, devuelve a corrección o deniega. No ve las del otro sector. Tiene la consulta histórica. |
+| **Supervisor de sector** | `T-SUPERVISAR-SECTOR` + sector asignado | Solo lectura: ve las solicitudes de su sector (expedientes, documentos, autorizaciones, estadísticas y consulta histórica), sin decidir nada. |
 | **Supervisor general** (UCVMM en Tocumen) | `T-SUPERVISAR-TODO` | Solo lectura del trámite de Técnico, Superintendente o Supernumerario, de los dos sectores (16/11/2026). Sin estadísticas ni consulta histórica. |
-| **Puesto de Control** | `T-FINALIZAR-PUERTO` + puestos asignados | Ve las aprobadas de sus puestos, verifica impedimentos pasajero por pasajero (obligatorio para finalizar, aparte de la de UCVMM) y las finaliza con un comentario. Se finaliza en el puesto autorizado: si la operación se hace en otro, la agencia presenta una nueva solicitud. |
+| **Puesto de Control** | `T-FINALIZAR-PUERTO` + puestos asignados | Ve las aprobadas de sus puestos, de cualquier año, en su bandeja; verifica impedimentos tripulante por tripulante (obligatorio para finalizar, aparte de la de UCVMM) y las finaliza con un comentario. Se finaliza en el puesto autorizado: si la operación se hace en otro, la agencia presenta una nueva solicitud. |
 | **Administrador** | todos los `T-*` | Acceso total: bandejas y expedientes de los dos sectores, catálogo de trámites, agencias, puestos, sectores, nacionalidades restringidas, estadísticas, bitácora, usuarios y roles. |
 | **SysAdmin** | ninguno | Rol técnico: usuarios, roles (con los permisos fijos del sistema) y bitácora. No ve solicitudes ni expedientes. |
 
@@ -259,7 +289,7 @@ Administrador y SysAdmin se reconocen por el nombre del rol (`rol_personalizado.
   - Sellado de Shore Pass (14/11/2026): solo el rango Marino.
 - Subir y bajar (16/11/2026): en Embarque y Desembarque la agencia responde «¿Subir y bajar?» (Sí / No). Con «Sí», cada pasajero adjunta además la Carta de Responsabilidad (Form. No. 7).
 - La ocupación del pasajero ya no se pide (16/11/2026). Las solicitudes de antes la siguen mostrando.
-- Cambio de puerto (13/11/2026): no es un trámite aparte. En Embarque y Desembarque la agencia indica si hay cambio de puerto y elige el nuevo puesto de control, de cualquier sector desde el 18/11/2026 (antes, solo del mismo). La revisa UCVMM del sector del primer puesto y la finaliza el puesto nuevo; el primero la puede consultar.
+- Cambio de puerto (13/11/2026): no es un trámite aparte. En Embarque y Desembarque la agencia indica si hay cambio de puerto y elige el nuevo puesto de control, de cualquier sector desde el 18/11/2026 (antes, solo del mismo). La revisa UCVMM del sector del primer puesto y la ve y la finaliza el puesto nuevo; el primero no la ve desde el 22/11/2026.
 - Una solicitud admite hasta 30 pasajeros.
 - Nacionalidad restringida:
   - En todos los trámites y rangos se le pide la Visa (14/11/2026), además de lo que pida el trámite: en Embarque y Cambio de nave, al marino y al pasajero, también la Visa Especial de Marino. El formulario y el expediente lo señalan.
@@ -282,14 +312,20 @@ Administrador y SysAdmin se reconocen por el nombre del rol (`rol_personalizado.
   - El recargo se guarda en la solicitud al aprobar: cambiar el monto no toca lo ya aprobado.
   - **Boleta de recargo (16/11/2026):** UCVMM, el supervisor de sector o el puesto de control la generan desde el expediente con el número de oficio, que no se repite. Una mal hecha se anula con motivo y se genera otra, como en un talonario. La agencia no la ve: la imprime el SNM y se la entrega. El formato de hoy es un borrador.
 - **Estadísticas exportables:** Excel, PDF o CSV del periodo elegido, con el escudo del SNM, el logo de ARGO NAVIS, quién lo generó y «Uso interno del SNM» (`GET /api/v1/solicitudes/estadisticas/exportar`).
-- **Consulta histórica (11/11/2026):** el personal del SNM busca solicitudes de cualquier año en «Consulta histórica» (menú, o el botón de las bandejas).
-  - Filtros: texto, pasajero (nombre o pasaporte), agencia, puesto, trámite, estado, fecha de envío o de la operación (con un atajo por año) y «solo aprobadas fuera del horario».
-  - Cada uno ve lo mismo que en los expedientes: UCVMM y el supervisor de sector, su sector; el puesto de control, sus puestos desde que se aprueban.
-  - Exporta a Excel lo que cumple los filtros, hasta 5000 filas (`POST /api/v1/solicitudes/historico` y `/historico/exportar`: los filtros van en el cuerpo, para que el pasajero no quede en la URL ni en los logs).
+- **Consulta histórica (11/11/2026):** UCVMM, el supervisor de sector y el Administrador buscan solicitudes de cualquier año en «Consulta histórica» (menú, o el botón de las bandejas). El puesto de control no la tiene desde el 22/11/2026: consulta las suyas en su bandeja, como cada agencia.
+  - Filtros: texto, tripulante (nombre, pasaporte o seamanbook), agencia, puesto, trámite, estado, fecha de envío o de la operación (con un atajo por año) y «solo aprobadas fuera del horario».
+  - **«Autorizadas» (22/11/2026):** las que se aprobaron alguna vez: vigentes, finalizadas y vencidas sin finalizar. El estado «Aprobada» dura unos días.
+  - La búsqueda no distingue tildes ni mayúsculas y admite las palabras en cualquier orden («nunez jose» encuentra a José Ángel Núñez). Al buscar un tripulante, dice cuál es.
+  - Cada uno ve lo mismo que en los expedientes, y los archivos se abren en cualquier estado. El PDF de una que venció sin finalizarse lo descarga el SNM, con el sello EXPIRADA.
+  - Exporta a Excel lo que cumple los filtros, hasta 5000 filas (`POST /api/v1/solicitudes/historico` y `/historico/exportar`: los filtros van en el cuerpo, para que el tripulante no quede en la URL ni en los logs).
+- **Historial completo (22/11/2026):** en el expediente, para UCVMM, los supervisores y el Administrador.
+  - Al corregir una devuelta se guarda lo que la agencia había enviado, quién la devolvió y por qué, y qué cambió. Los documentos que reemplaza se conservan.
+  - Cada archivo lleva su huella (SHA-256), que se comprueba al abrirlo: si alguien lo cambió, no se muestra.
+  - El PDF de la autorización se guarda tal como se emitió, al aprobar y al finalizar: es el que reciben la agencia y quien escanea el QR.
+  - En la base, la aplicación no puede borrar documentos ni tocar lo guardado.
 - **Notificaciones internas:** la campana de la cabecera muestra lo que le toca hacer a cada rol (por revisar, por corregir, por finalizar) y las novedades de sus solicitudes. Consulta `GET /api/v1/pendientes` cada minuto con la pestaña a la vista.
 - **Separación de funciones:** nadie revisa una solicitud que creó o que es de su propia agencia.
-- **Sectores:** cada puesto de control es del Sector Pacífico o del Atlántico (Catálogos → Sectores). UCVMM y el supervisor de sector ven solo las solicitudes de los puestos de su sector; el aviso de cada solicitud nueva va al correo de su sector.
-- **Pasajeros:** en pantalla, en los correos y en el PDF se dice «pasajeros»; en el código, la API y la base de datos sigue `tripulantes`.
+- **Sectores:** cada puesto de control es del Sector Pacífico o del Atlántico (Catálogos → Sectores). UCVMM y el supervisor de sector ven solo las solicitudes de su sector; el aviso de cada solicitud nueva va al correo de su sector. Una ya revisada se queda en el sector que la revisó aunque el puesto cambie (22/11/2026): el expediente dice los dos.
 - Cada transición bloquea la fila de la solicitud: dos revisores no pueden aprobar y negar la misma a la vez.
 - Las solicitudes no se borran. Un usuario, agencia o puesto con solicitudes se desactiva en lugar de eliminarse.
 - El QR del PDF lleva a `/verificar/{codigo}`, una página pública que solo muestra lo necesario para verificar la autorización (pasaportes enmascarados).
@@ -299,7 +335,7 @@ Administrador y SysAdmin se reconocen por el nombre del rol (`rol_personalizado.
 **Documentos del expediente:** se ven y descargan solo con sesión y acceso a la solicitud (`GET /api/v1/solicitudes/{id}/documentos/{doc}`). Cada vista y cada descarga queda en la bitácora con el usuario. **Se aceptan PDF, Word y Excel** (.pdf, .doc, .docx, .xls y .xlsx). Al subirse se validan:
 - la extensión y el tamaño;
 - que el contenido sea de verdad de ese formato (un archivo renombrado no pasa);
-- que los de Word y Excel no traigan macros;
+- que los de Word y Excel no traigan macros y que abiertos no ocupen más de 50 MB;
 - el tipo real del contenido.
 
 La vista previa muestra PDF, .docx y .xlsx; los .doc y .xls del formato viejo se descargan.
@@ -323,7 +359,7 @@ La vista previa muestra PDF, .docx y .xlsx; los .doc y .xls del formato viejo se
 
 ### Seguridad
 Las agencias entran por la VPN, pero no son del SNM: ARGO NAVIS las trata como usuarios no confiables.
-- **Archivos:** PDF, Word y Excel de hasta 2 MB cada uno, comprobados por su contenido; los de Office con macros se rechazan. La vista previa del Word va en un marco aislado (sin scripts, sin enlaces, sin acceso a la sesión).
+- **Archivos:** PDF, Word y Excel de hasta 2 MB cada uno, comprobados por su contenido; los de Office con macros se rechazan. El backend no los abre con una librería: los recorre de a trozos, con tope de memoria y de tamaño, así que uno muy comprimido no lo puede tumbar. La vista previa del Word va en un marco aislado (sin scripts, sin enlaces, sin acceso a la sesión).
 - **Navegador:** Content-Security-Policy (solo código propio de ARGO NAVIS), `X-Frame-Options: DENY` y `nosniff`, en nginx y en el backend cuando sirve el frontend.
 - **Topes:** login por IP (10 por minuto), por cuenta y por hora los envíos (`LIMITE_ENVIOS_POR_HORA`, 30), las exportaciones de las estadísticas (`LIMITE_EXPORTACIONES_POR_HORA`, 30) y las descargas del PDF (`LIMITE_PDF_POR_HORA`, 120), y 2 MB por archivo, en cualquier formato. Se cuentan en memoria, por proceso: con varios workers, cada uno lleva su cuenta.
 - **Tamaño de cada petición:** 1 MB en la API y, al crear o corregir una solicitud (todos los archivos van juntos), 345 MB: lo más que pesa un envío válido (30 pasajeros × 5 documentos + 2 de la solicitud + 20 adicionales, de 2 MB). nginx y el backend cortan lo que pase de ahí sin leerlo; antes nginx aceptaba 200 MB en cualquier ruta, también en el login, y el backend los leía enteros antes de comprobar la sesión.

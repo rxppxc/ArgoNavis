@@ -44,7 +44,7 @@ ESTADOS: dict[str, tuple[str, str]] = {
 # (encabezado, ancho, tipo de celda)
 _COLUMNAS: tuple[tuple[str, int, str], ...] = (
     ("N.º", 17, "texto"),
-    ("Estado", 13, "texto"),
+    ("Estado", 18, "texto"),
     ("Trámite", 26, "texto"),
     ("Agencia naviera", 26, "texto"),
     ("Puesto", 22, "texto"),
@@ -91,6 +91,7 @@ class FiltrosAplicados:
     puesto:           str | None = None
     tramite:          str | None = None
     estado:           str | None = None
+    autorizadas:      bool = False
     fuera_de_horario: bool = False
     fecha:            str = "envio"     # "envio" | "operacion"
     desde:            date | None = None
@@ -106,6 +107,13 @@ class DatosHistorico:
     generado_por: str
     generado_en:  datetime              # con zona horaria
     ordenadas_por: str = field(default="fecha de envío")
+
+
+def etiqueta_estado(s: FilaHistorico) -> str:
+    """La del estado; de una expirada, si se llegó a aprobar (2026-11-22)."""
+    if s.estado == "expired":
+        return f"Expirada ({'aprobada, sin finalizar' if s.aprobada_en else 'sin corregir'})"
+    return ESTADOS[s.estado][0] if s.estado in ESTADOS else s.estado
 
 
 def describir_filtros(f: FiltrosAplicados) -> str:
@@ -127,6 +135,8 @@ def describir_filtros(f: FiltrosAplicados) -> str:
         partes.append(f"Tripulante: «{f.pasajero}»")
     if f.texto:
         partes.append(f"Texto: «{f.texto}»")
+    if f.autorizadas:
+        partes.append("Solo autorizadas")
     if f.fuera_de_horario:
         partes.append("Solo aprobadas fuera del horario")
     return " · ".join(partes) or "Sin filtros: todas las solicitudes"
@@ -162,9 +172,9 @@ def generar(d: DatosHistorico) -> bytes:
         h.write_string(_FILA_ENCABEZADO + 1, 1, "Ninguna solicitud coincide con los filtros.",
                        x.f(italic=True, font_color=GRIS))
     for i, s in enumerate(d.filas, start=1):
-        etiqueta, color = ESTADOS.get(s.estado, (s.estado, GRIS))
+        color = ESTADOS.get(s.estado, (s.estado, GRIS))[1]
         valores: list[Any] = [
-            s.numero, etiqueta, s.tramite, s.agencia, s.puesto, s.sector, s.buque, s.imo,
+            s.numero, etiqueta_estado(s), s.tramite, s.agencia, s.puesto, s.sector, s.buque, s.imo,
             s.fecha_operacion, s.pasajeros, s.enviada_en, s.aprobada_en, s.finalizada_en,
             "Sí" if s.fuera_de_horario else None, s.costo,
         ]

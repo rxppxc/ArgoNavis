@@ -50,16 +50,16 @@ async def test_la_cuenta_de_la_aplicacion_tiene_lo_justo(rol_app):
         atributos = cx.execute(
             "SELECT rolsuper, rolcreatedb, rolcreaterole FROM pg_roles WHERE rolname = current_user").fetchone()
         assert atributos == (False, False, False)
-        for tabla in ("solicitudes", "solicitud_tripulantes", "users", "correos_salida", "solicitud_documentos"):
+        for tabla in ("solicitudes", "solicitud_tripulantes", "users", "correos_salida"):
             assert all(_puede(cx, tabla, p) for p in ("SELECT", "INSERT", "UPDATE", "DELETE")), tabla
-        for tabla in ("audit_logs", "solicitud_eventos"):
+        # La bitácora, el historial y, desde el 2026-11-22, las versiones y lo emitido.
+        for tabla in ("audit_logs", "solicitud_eventos", "solicitud_versiones", "documentos_emitidos"):
             assert _puede(cx, tabla, "SELECT") and _puede(cx, tabla, "INSERT"), tabla
-            assert not any(_puede(cx, tabla, p) for p in ("UPDATE", "DELETE", "TRUNCATE")), \
-                f"{tabla}: la bitácora y el historial solo se agregan"
-        # Las boletas de recargo (2026-11-16) se anulan (UPDATE), nunca se borran.
-        assert all(_puede(cx, "boletas_recargo", p) for p in ("SELECT", "INSERT", "UPDATE"))
-        assert not any(_puede(cx, "boletas_recargo", p) for p in ("DELETE", "TRUNCATE")), \
-            "las boletas se anulan, no se borran"
+            assert not any(_puede(cx, tabla, p) for p in ("UPDATE", "DELETE", "TRUNCATE")), f"{tabla}: solo se agrega"
+        # Las boletas de recargo (2026-11-16) se anulan y los documentos se retiran (2026-11-22): UPDATE, nunca DELETE.
+        for tabla in ("boletas_recargo", "solicitud_documentos"):
+            assert all(_puede(cx, tabla, p) for p in ("SELECT", "INSERT", "UPDATE")), tabla
+            assert not any(_puede(cx, tabla, p) for p in ("DELETE", "TRUNCATE")), f"{tabla}: no se borra"
         assert not _puede(cx, "alembic_version", "SELECT")
 
         marca = f"permisos.{secrets.token_hex(3)}"

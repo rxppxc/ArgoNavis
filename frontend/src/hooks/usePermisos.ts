@@ -20,9 +20,10 @@ export const PERMISOS_PERSONAL_SNM = [
   "T-PROCESAR-PACIFICO", "T-SUPERVISAR-SECTOR", "T-SUPERVISAR-TODO", "T-FINALIZAR-PUERTO",
 ];
 
-/** La consulta histórica (2026-11-11): el personal del SNM menos el supervisor general,
- *  que no la tiene desde el 2026-11-16. Espejo de ContextoAcceso.ve_historico. */
-export const PERMISOS_HISTORICO = ["T-PROCESAR-PACIFICO", "T-SUPERVISAR-SECTOR", "T-FINALIZAR-PUERTO"];
+/** La consulta histórica (2026-11-11): UCVMM, el supervisor de sector y el Administrador. El
+ *  supervisor general no la tiene desde el 2026-11-16 ni el puesto de control desde el
+ *  2026-11-22. Espejo de ContextoAcceso.ve_historico. */
+export const PERMISOS_HISTORICO = ["T-PROCESAR-PACIFICO", "T-SUPERVISAR-SECTOR"];
 
 /** Las estadísticas de su alcance: el supervisor de sector (y el Administrador). UCVMM no,
  *  desde el 2026-11-18; el supervisor general tampoco, desde el 2026-11-16. Espejo de

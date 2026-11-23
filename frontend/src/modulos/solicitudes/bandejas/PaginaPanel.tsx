@@ -2,7 +2,7 @@
  * Panel principal — bandejas de Autorizaciones Marítimas según el rol:
  *
  *  - **Mi agencia** (Naviera): las solicitudes de su agencia naviera.
- *  - **Revisión** (UCVMM): la cola de los puestos de su sector (Pacífico o Atlántico).
+ *  - **Revisión** (UCVMM): la cola de su sector (Pacífico o Atlántico).
  *  - **Supervisión** (supervisores, 2026-11-10): las de su sector, o las de los dos,
  *    en solo lectura.
  *  - **Puesto de control**: las autorizaciones aprobadas de sus puestos.
@@ -33,7 +33,7 @@ type FiltroEstado = EstadoSolicitud | "todas";
 const POR_PAGINA = 20;
 
 const VISTAS: Record<Bandeja, { etiqueta: string; subtitulo: string }> = {
-  revision:    { etiqueta: "Revisión UCVMM",    subtitulo: "Solicitudes de los puestos de tu sector" },
+  revision:    { etiqueta: "Revisión UCVMM",    subtitulo: "Solicitudes de tu sector" },
   supervision: { etiqueta: "Supervisión",       subtitulo: "Solicitudes de tu sector, en solo lectura" },
   puerto:      { etiqueta: "Puesto de control", subtitulo: "Autorizaciones aprobadas de tus puestos" },
   agencia:     { etiqueta: "Mi agencia",        subtitulo: "Solicitudes de autorización marítima de tu agencia" },
@@ -106,7 +106,7 @@ function Panel({ bandejaPedida, estadoPedido }: { bandejaPedida: Bandeja | null;
   const supervisa    = !esAdmin && (tiene("T-SUPERVISAR-SECTOR") || tiene("T-SUPERVISAR-TODO"));
   const esPuerto     = esAdmin || tiene("T-FINALIZAR-PUERTO");
   // La consulta histórica (2026-11-11): para buscar en cualquier año, con más filtros. El
-  // supervisor general no la tiene (2026-11-16).
+  // supervisor general (2026-11-16) y el puesto de control (2026-11-22) no la tienen.
   const veHistorico  = tieneAlguno(...PERMISOS_HISTORICO);
   // Las solicitudes son de una agencia: sin agencia el backend no deja enviar y
   // "Mi agencia" saldría vacía (le pasaba al Administrador, que tiene todos los permisos).

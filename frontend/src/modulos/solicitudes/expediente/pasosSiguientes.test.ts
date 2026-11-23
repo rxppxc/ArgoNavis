@@ -3,6 +3,7 @@ import type { AccionesSolicitud } from "../../../api/solicitudes";
 import { pasosSiguientes, type EntradaPasos } from "./pasosSiguientes";
 
 const NINGUNA: AccionesSolicitud = {
+  ver_registro: false,
   corregir: false, revisar: false, finalizar: false, descargar_autorizacion: false, conflicto_revision: false,
   generar_boleta: false, anular_boleta: false,
 };

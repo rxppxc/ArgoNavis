@@ -1,5 +1,4 @@
-"""Endurecimiento: login sin enumeración de usuarios, subidas que no dejan rastro
-y efectos fuera de la BD (borrar archivos) solo cuando la transacción se confirma."""
+"""Endurecimiento: login sin enumeración de usuarios y subidas que no dejan rastro."""
 import asyncio
 import io
 import time
@@ -8,13 +7,11 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi import HTTPException, UploadFile
 
-from sqlalchemy import text
-
 from app.core.config import obtener_configuracion
 from app.core.ldap import servicio_ldap
 from app.domain.models.user import EstadoUsuario, Usuario
 from app.infrastructure import almacenamiento
-from app.infrastructure.database import SesionLocal, al_confirmar
+from app.infrastructure.database import SesionLocal
 from ayudas import login
 from conftest import crear_actor
 
@@ -147,20 +144,6 @@ def test_nombre_de_archivo_largo_se_recorta():
 
 
 @asincrona
-async def test_al_confirmar_solo_corre_si_hay_commit():
-    hechas: list[str] = []
-    async with SesionLocal() as s:
-        al_confirmar(s, lambda: hechas.append("revertida"))
-        await s.execute(text("select 1"))
-        await s.rollback()
-        # Lo descartado por el rollback no se dispara con un commit posterior.
-        al_confirmar(s, lambda: hechas.append("confirmada"))
-        await s.execute(text("select 1"))
-        await s.commit()
-    assert hechas == ["confirmada"]
-
-
-@asincrona
 async def test_word_y_excel_se_validan_por_su_contenido(tmp_path):
     """Además de PDF se aceptan Word y Excel, pero el contenido tiene que ser
     de verdad de ese formato: un archivo renombrado no pasa."""
@@ -195,26 +178,6 @@ async def test_un_pdf_con_html_delante_se_guarda_y_sirve_como_pdf(tmp_path, monk
     assert almacenamiento.mime_del_formato(guardado.nombre_almacenado) == "application/pdf"
     assert almacenamiento.mime_del_formato("abc.docx").endswith("wordprocessingml.document")
     assert almacenamiento.mime_del_formato("abc.html") == "application/octet-stream"
-
-
-@asincrona
-async def test_office_con_macros_se_rechaza(tmp_path, monkeypatch):
-    from ayudas import docx
-
-    nombre, contenido, _ = docx("con-macros", "word/vbaProject.bin")
-    with pytest.raises(HTTPException) as error:
-        await almacenamiento.guardar_archivos(tmp_path / "a", [_subida(nombre, contenido)])
-    assert error.value.status_code == 415 and "macros" in error.value.detail
-
-    # .doc (formato binario OLE2): lo decide oletools
-    ole2 = bytes.fromhex("D0CF11E0A1B11AE1") + b"\0" * 512
-    monkeypatch.setattr(almacenamiento, "_tiene_macros_sync", lambda ruta: True)
-    with pytest.raises(HTTPException) as error:
-        await almacenamiento.guardar_archivos(tmp_path / "b", [_subida("viejo.doc", ole2)])
-    assert error.value.status_code == 415 and "macros" in error.value.detail
-    monkeypatch.setattr(almacenamiento, "_tiene_macros_sync", lambda ruta: False)
-    [guardado] = await almacenamiento.guardar_archivos(tmp_path / "c", [_subida("viejo.doc", ole2)])
-    assert guardado.tipo_mime == "application/msword"
 
 
 @asincrona

@@ -11,11 +11,13 @@
 import re
 from pathlib import Path
 
+import yaml
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 
 BACKEND = Path(__file__).resolve().parent.parent
 RAIZ = BACKEND.parent
+CI = RAIZ / ".github" / "workflows" / "ci.yml"
 
 
 def _bloqueo() -> dict[str, tuple[str, list[str]]]:
@@ -70,9 +72,22 @@ def _imagenes() -> list[tuple[str, str]]:
         for imagen in re.findall(r"^FROM (\S+)", texto, re.M):
             m = re.fullmatch(r"\$\{(\w+)\}", imagen)
             encontradas.append((ruta.name, argumentos[m.group(1)] if m else imagen))
-    for ruta in (RAIZ / "docker-compose-prod.yml", RAIZ / ".github" / "workflows" / "ci.yml"):
-        for imagen in re.findall(r"^\s+image:\s*(\S+)", ruta.read_text(encoding="utf-8"), re.M):
-            encontradas.append((ruta.name, imagen))
+    for imagen in re.findall(r"^\s+image:\s*(\S+)", (RAIZ / "docker-compose-prod.yml").read_text(encoding="utf-8"), re.M):
+        encontradas.append(("docker-compose-prod.yml", imagen))
+    for imagenes in _postgres_de_la_ci().values():
+        encontradas += [("ci.yml", imagen) for imagen in imagenes]
+    return encontradas
+
+
+def _postgres_de_la_ci() -> dict[str, set[str]]:
+    """{trabajo: imágenes de PostgreSQL con las que corre}, con las de su matriz."""
+    trabajos = yaml.safe_load(CI.read_text(encoding="utf-8"))["jobs"]
+    encontradas = {}
+    for nombre, trabajo in trabajos.items():
+        imagen = trabajo.get("services", {}).get("postgres", {}).get("image")
+        if imagen:
+            variantes = trabajo.get("strategy", {}).get("matrix", {}).get("postgres", [""])
+            encontradas[nombre] = {imagen.replace("${{ matrix.postgres }}", v) for v in variantes}
     return encontradas
 
 
@@ -81,12 +96,15 @@ def test_las_imagenes_base_tienen_version_exacta():
         if imagen.startswith("argonavis-"):
             continue   # las que construye el propio proyecto
         etiqueta = imagen.split(":", 1)[1] if ":" in imagen else "latest"
-        # Al menos mayor.menor (15.19, 1.31.8, 3.12.16…): «alpine», «15» o «3.12-slim» cambian solas.
+        # Al menos mayor.menor (15.20, 1.31.8, 3.12.16…): «alpine», «15» o «3.12-slim» cambian solas.
         assert re.match(r"^\d+\.\d+", etiqueta) and not re.fullmatch(r"\d+\.\d+-slim", etiqueta), \
             f"{archivo}: {imagen} no tiene una versión exacta"
-    postgres = {imagen for _, imagen in _imagenes() if imagen.startswith("postgres:")}
-    assert len(postgres) == 1, f"la integración continua y producción usan otro PostgreSQL: {postgres}"
+    [produccion] = [i for archivo, i in _imagenes() if archivo == "docker-compose-prod.yml" and i.startswith("postgres:")]
+    for trabajo, imagenes in _postgres_de_la_ci().items():
+        assert produccion in imagenes, f"el trabajo {trabajo} no prueba con el PostgreSQL de producción ({produccion})"
+    # El backend, además, con el del servidor nuevo: la 15 se queda sin soporte en noviembre de 2027.
+    assert any(i.startswith("postgres:18.") for i in _postgres_de_la_ci()["backend"])
     # El nginx -t de la integración continua, con el nginx de producción.
-    ci = (RAIZ / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    ci = CI.read_text(encoding="utf-8")
     nginx = {imagen for _, imagen in _imagenes() if imagen.startswith("nginx:")} | set(re.findall(r"\bnginx:\d\S*", ci))
     assert len(nginx) == 1, f"la integración continua prueba nginx.conf con otro nginx: {nginx}"

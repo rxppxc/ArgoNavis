@@ -10,13 +10,13 @@ Excel) comprobado por extensión y por contenido, tamaño máximo, sin macros
 el cliente.
 """
 import asyncio
+import hashlib
 import logging
 import re
 import secrets
 import shutil
 import time
 import unicodedata
-import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,6 +24,7 @@ import aiofiles
 from fastapi import HTTPException, UploadFile, status
 
 from app.core.config import obtener_configuracion
+from app.infrastructure.revision_office import Problema, revisar_office
 
 try:
     import magic  # type: ignore
@@ -31,13 +32,6 @@ try:
 except Exception:  # pragma: no cover — libmagic no disponible
     magic = None  # type: ignore
     _MAGIC_DISPONIBLE = False
-
-try:
-    from oletools.olevba import VBA_Parser  # type: ignore
-    _OLETOOLS_DISPONIBLE = True
-except Exception:  # pragma: no cover — oletools no disponible
-    VBA_Parser = None  # type: ignore
-    _OLETOOLS_DISPONIBLE = False
 
 logger        = logging.getLogger(__name__)
 configuracion = obtener_configuracion()
@@ -60,7 +54,7 @@ _LARGO_MAXIMO_NOMBRE = 200
 
 # Formatos del expediente: PDF, Word y Excel (decisión del usuario, 2026-10-15:
 # "de momento", además de PDF). El contenido se comprueba según el formato en
-# _verificar_contenido y los de Office, además, sin macros.
+# _verificar_contenido; los de Office, además, sin macros (revision_office.py).
 _MIME_POR_EXTENSION = {
     ".pdf":  "application/pdf",
     ".doc":  "application/msword",
@@ -75,8 +69,6 @@ _MIME_GENERICOS = {
     "application/zip", "application/octet-stream", "application/x-ole-storage",
     "application/CDFV2", "application/vnd.ms-office",
 }
-_FIRMA_OLE2 = bytes.fromhex("D0CF11E0A1B11AE1")     # .doc y .xls (formato binario de Office)
-_PARTE_OOXML = {".docx": "word/document.xml", ".xlsx": "xl/workbook.xml"}
 _NOMBRE_FORMATO = {
     ".pdf": "un PDF válido", ".doc": "un documento de Word válido", ".docx": "un documento de Word válido",
     ".xls": "un libro de Excel válido", ".xlsx": "un libro de Excel válido",
@@ -91,6 +83,7 @@ class ArchivoGuardado:
     ruta:              str
     tipo_mime:         str
     tamano:            int
+    sha256:            str
 
 
 def raiz_documentos() -> Path:
@@ -150,9 +143,9 @@ def ruta_segura(ruta: str) -> Path | None:
 
 
 def borrar_archivo(ruta: str) -> None:
-    """Borra un documento del storage. No lanza: se usa en limpiezas (tras un
-    error o al confirmar una corrección) y un archivo que no se pudo borrar
-    (p. ej. abierto en Windows) solo queda en el log."""
+    """Borra un archivo que nunca llegó a registrarse (tras un error). Los documentos de un
+    expediente no se borran (2026-11-22). No lanza: un archivo que no se pudo borrar (p. ej.
+    abierto en Windows) solo queda en el log."""
     archivo = ruta_segura(ruta)
     if archivo:
         try:
@@ -210,48 +203,6 @@ def mime_del_formato(nombre_almacenado: str) -> str:
     return _MIME_POR_EXTENSION.get(Path(nombre_almacenado).suffix.lower(), "application/octet-stream")
 
 
-def _tiene_macros_sync(ruta: Path) -> bool:
-    """Analiza un archivo Office en busca de macros VBA. Síncrono y
-    potencialmente lento — llamar siempre vía asyncio.to_thread()."""
-    if zipfile.is_zipfile(ruta):
-        # Un .docx/.xlsx legítimo nunca trae proyecto de macros: se rechaza
-        # aunque esté dañado y oletools no logre analizarlo.
-        with zipfile.ZipFile(ruta) as archivo:
-            if any(parte.lower().endswith("vbaproject.bin") for parte in archivo.namelist()):
-                return True
-    parser = VBA_Parser(str(ruta))
-    try:
-        return parser.detect_vba_macros()
-    finally:
-        parser.close()
-
-
-async def _verificar_sin_macros(ruta: Path, ext: str, nombre_original: str) -> None:
-    """Rechaza documentos de Office con macros. Falla cerrado: si oletools no
-    está o no puede analizar el archivo, se rechaza igual."""
-    if ext == ".pdf":
-        return
-    if not _OLETOOLS_DISPONIBLE:
-        logger.error("[macros] oletools no disponible — rechazando '%s' por precaución.", nombre_original)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="No se pudo validar el archivo de forma segura. Contacta al administrador.",
-        )
-    try:
-        tiene_macros = await asyncio.to_thread(_tiene_macros_sync, ruta)
-    except Exception as exc:
-        logger.warning("[macros] No se pudo analizar '%s': %s", nombre_original, exc)
-        raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail=f"No se pudo validar '{nombre_original}' de forma segura: el archivo podría estar dañado.",
-        ) from exc
-    if tiene_macros:
-        raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail=f"'{nombre_original}' contiene macros y no está permitido. Guárdalo sin macros e intenta de nuevo.",
-        )
-
-
 def _validar_extension(nombre_archivo: str) -> str:
     ext = Path(nombre_archivo).suffix.lower()
     if ext not in EXTENSIONES_PERMITIDAS:
@@ -262,50 +213,87 @@ def _validar_extension(nombre_archivo: str) -> str:
     return ext
 
 
-def _contenido_valido(ruta: Path, ext: str) -> bool:
-    """El contenido corresponde de verdad al formato: un archivo de otro tipo
-    renombrado (p. ej. un .exe con extensión .docx) no pasa."""
+def _es_pdf(ruta: Path) -> bool:
     with open(ruta, "rb") as f:
-        inicio = f.read(1024)
-    if ext == ".pdf":
-        return b"%PDF-" in inicio                    # firma en el primer kilobyte
-    if ext in (".doc", ".xls"):
-        return inicio.startswith(_FIRMA_OLE2)        # contenedor OLE2
-    # .docx / .xlsx: ZIP con la estructura OOXML de su tipo (solo se lee el índice).
+        return b"%PDF-" in f.read(1024)   # firma en el primer kilobyte
+
+
+def _motivo_del_rechazo(problema: Problema, ext: str) -> str:
+    """Cómo sigue el mensaje, después del nombre del archivo."""
+    if problema is Problema.MACROS:
+        return "contiene macros y no está permitido. Guárdalo sin macros e intenta de nuevo."
+    if problema is Problema.INFLADO:
+        return "ocupa demasiado al abrirse. Guárdalo como PDF e intenta de nuevo."
+    return f"no es {_NOMBRE_FORMATO[ext]}."
+
+
+async def _verificar_contenido(ruta: Path, ext: str, nombre_original: str) -> None:
+    """El contenido corresponde de verdad al formato: un archivo de otro tipo
+    renombrado (p. ej. un .exe con extensión .docx) no pasa. Los de Office, además,
+    sin macros. Falla cerrado: lo que no se puede revisar se rechaza."""
     try:
-        with zipfile.ZipFile(ruta) as archivo:
-            partes = set(archivo.namelist())
-    except zipfile.BadZipFile:
-        return False
-    return "[Content_Types].xml" in partes and _PARTE_OOXML[ext] in partes
-
-
-def _verificar_contenido(ruta: Path, ext: str, nombre_original: str) -> None:
-    if not _contenido_valido(ruta, ext):
+        if ext == ".pdf":
+            problema = None if await asyncio.to_thread(_es_pdf, ruta) else Problema.FORMATO
+        else:
+            problema = await asyncio.to_thread(revisar_office, ruta, ext)
+    except Exception as exc:
+        logger.warning("[archivos] No se pudo revisar '%s': %s", nombre_original, exc)
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail=f"'{nombre_original}' no es {_NOMBRE_FORMATO[ext]}.",
-        )
+            detail=f"No se pudo validar '{nombre_original}' de forma segura: el archivo podría estar dañado.",
+        ) from exc
+    if problema is None:
+        return
+    if problema is not Problema.FORMATO:
+        logger.warning("[archivos] Se rechazó '%s': %s.", nombre_original, problema.value)
+    raise HTTPException(
+        status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+        detail=f"'{nombre_original}' {_motivo_del_rechazo(problema, ext)}",
+    )
 
 
-async def _escribir(subida: UploadFile, ruta: Path, nombre_original: str) -> int:
-    """Copia el archivo subido a `ruta` por fragmentos y devuelve su tamaño.
+async def _escribir(subida: UploadFile, ruta: Path, nombre_original: str) -> tuple[int, str]:
+    """Copia el archivo subido a `ruta` por fragmentos y devuelve su tamaño y su huella.
     413 si supera TAMANO_MAXIMO_MB. El error se lanza ya cerrado el archivo:
     en Windows no se puede borrar un archivo abierto."""
     max_bytes = TAMANO_MAXIMO_BYTES
-    tamano = 0
+    tamano, huella = 0, hashlib.sha256()
     async with aiofiles.open(ruta, "wb") as f:
         while fragmento := await subida.read(TAMANO_CHUNK):
             tamano += len(fragmento)
             if tamano > max_bytes:
                 break
+            huella.update(fragmento)
             await f.write(fragmento)
     if tamano > max_bytes:
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail=f"El archivo '{nombre_original}' pesa más de {TAMANO_MAXIMO_MB} MB, el máximo permitido por archivo.",
         )
-    return tamano
+    return tamano, huella.hexdigest()
+
+
+def huella_de(ruta: Path) -> str:
+    """El SHA-256 del archivo. Lee el disco: va en un hilo."""
+    with open(ruta, "rb") as f:
+        return hashlib.file_digest(f, "sha256").hexdigest()
+
+
+def guardar_autorizacion(solicitud_id: int, tipo: str, contenido: bytes) -> tuple[str, str]:
+    """Escribe el PDF emitido en la carpeta de la solicitud y devuelve (ruta relativa,
+    huella). Con otro nombre mientras se escribe: uno a medias nunca parece bueno."""
+    carpeta = carpeta_solicitud(solicitud_id)
+    carpeta.mkdir(parents=True, exist_ok=True)
+    _verificar_espacio_libre(carpeta)
+    archivo = carpeta / f"autorizacion-{tipo}-{secrets.token_hex(8)}.pdf"
+    parcial = archivo.with_suffix(".parcial")
+    try:
+        parcial.write_bytes(contenido)
+        parcial.rename(archivo)
+    except OSError:
+        parcial.unlink(missing_ok=True)
+        raise
+    return ruta_relativa(archivo), hashlib.sha256(contenido).hexdigest()
 
 
 def _verificar_espacio_libre(carpeta: Path) -> None:
@@ -345,15 +333,15 @@ async def guardar_archivos(destino: Path, archivos_subidos: list[UploadFile]) ->
             ruta_archivo      = destino / nombre_almacenado
             escritos.append(ruta_archivo)
 
-            tamano = await _escribir(subida, ruta_archivo, nombre_original)
-            await asyncio.to_thread(_verificar_contenido, ruta_archivo, ext, nombre_original)
-            await _verificar_sin_macros(ruta_archivo, ext, nombre_original)
+            tamano, sha256 = await _escribir(subida, ruta_archivo, nombre_original)
+            await _verificar_contenido(ruta_archivo, ext, nombre_original)
             guardados.append(ArchivoGuardado(
                 nombre_original=nombre_original,
                 nombre_almacenado=nombre_almacenado,
                 ruta=str(ruta_archivo),
                 tipo_mime=await asyncio.to_thread(_detectar_mime, ruta_archivo, ext),   # libmagic lee el archivo
                 tamano=tamano,
+                sha256=sha256,
             ))
     except Exception:
         for ruta in escritos:

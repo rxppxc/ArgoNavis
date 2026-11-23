@@ -88,8 +88,11 @@ export interface SolicitudResumen {
   operacion: Operacion | null;
   /** Los días del sellado de Shore Pass (2026-11-18): null en los demás y en las de antes. */
   dias_sellado: DiasSellado | null;
-  /** El sector de UCVMM del puesto (2026-11-10). Solo para el SNM: a la agencia le llega null. */
+  /** El sector de UCVMM que la revisó o, sin revisar, el del puesto (2026-11-22). Solo para
+   *  el SNM: a la agencia le llega null. */
   sector_nombre: string | null;
+  /** El sector de hoy del puesto, si cambió desde que se revisó. Solo para el SNM. */
+  sector_actual_nombre: string | null;
   nombre_buque: string | null;
   imo: string | null;
   fecha_operacion: string;
@@ -111,6 +114,8 @@ export interface SolicitudResumen {
   fuera_de_horario: boolean | null;
   /** «B/.20.00»; null si no tiene costo (dentro del horario o aprobada antes del cambio). */
   costo_fuera_de_horario: string | null;
+  /** Al buscar un tripulante en la consulta histórica, los que coinciden (2026-11-22). Null en lo demás. */
+  tripulantes_encontrados: { nombre: string; pasaporte: string }[] | null;
 }
 
 export interface PaginaSolicitudes {
@@ -119,6 +124,8 @@ export interface PaginaSolicitudes {
   por_pagina: number;
   /** Cantidad por estado con los mismos filtros, sin el de estado. */
   conteos: Partial<Record<EstadoSolicitud, number>>;
+  /** Las que se aprobaron alguna vez, con los mismos filtros (2026-11-22). */
+  autorizadas: number;
   items: SolicitudResumen[];
 }
 
@@ -131,7 +138,7 @@ export interface ConsultaBandeja {
   por_pagina?: number;
 }
 
-/** Filtros de la consulta histórica (2026-11-11): solo para el personal del SNM. */
+/** Filtros de la consulta histórica (2026-11-11): UCVMM, el supervisor de sector y el Administrador. */
 export interface ConsultaHistorica {
   texto?: string;
   pasajero?: string;
@@ -139,6 +146,8 @@ export interface ConsultaHistorica {
   puesto_id?: number;
   tipo_tramite_id?: number;
   estado?: EstadoSolicitud;
+  /** Solo las que se aprobaron alguna vez: vigentes, finalizadas y vencidas sin finalizar (2026-11-22). */
+  autorizadas?: boolean;
   fuera_de_horario?: boolean;
   fecha?: "envio" | "operacion";
   desde?: string;
@@ -240,6 +249,63 @@ export interface AccionesSolicitud {
   /** Boleta de recargo (2026-11-16): generar si no hay una vigente; anular la vigente. */
   generar_boleta: boolean;
   anular_boleta: boolean;
+  /** El historial completo: versiones, documentos retirados y huellas (2026-11-22). */
+  ver_registro: boolean;
+}
+
+/** Un valor con su rótulo: («Buque», «AURORA»). */
+export type ParRotulado = [string, string];
+
+/** Lo que la agencia había enviado antes de una corrección (2026-11-22), con los nombres de
+ *  ese día. Espejo de SalidaVersion. */
+export interface VersionSolicitud {
+  numero: number;
+  enviada_en: string;
+  enviada_por: string | null;
+  devuelta_en: string | null;
+  devuelta_por: string | null;
+  motivo: string | null;
+  corregida_en: string;
+  corregida_por: string | null;
+  datos: ParRotulado[];
+  tripulantes: { id: number; nombre: string; datos: ParRotulado[] }[];
+  /** `documento` null: un adicional. Se abren por su id, también los retirados. */
+  documentos: { id: number; documento: string | null; tripulante: string | null; nombre: string }[];
+  /** Qué cambió la agencia al corregirla, en palabras. */
+  cambios: string[];
+}
+
+/** Un archivo de la solicitud con su huella: un documento (vigente o retirado) o una
+ *  autorización emitida (2026-11-22). Espejo de SalidaArchivo. */
+export interface ArchivoRegistro {
+  clase: "documento" | "emitido";
+  id: number;
+  documento: string;
+  tripulante: string | null;
+  nombre: string;
+  tamano: number;
+  tipo_mime: string;
+  /** Null: de antes, hasta que se le calcula. */
+  sha256: string | null;
+  fecha: string;
+  por: string | null;
+  retirado_en: string | null;
+}
+
+/** El historial completo de una solicitud (2026-11-22): solo lo ve el SNM que la revisa. */
+export interface RegistroSolicitud {
+  versiones: VersionSolicitud[];
+  /** Correcciones de antes, que no guardaron lo que se había enviado. */
+  sin_version: number;
+  archivos: ArchivoRegistro[];
+}
+
+/** Un archivo para la vista previa: un documento del expediente o una autorización emitida. */
+export interface ArchivoVisible {
+  id: number;
+  nombre_original: string;
+  tipo_mime: string | null;
+  emitido?: boolean;
 }
 
 /** Una boleta de recargo por atención fuera del horario laboral (2026-11-16). Solo

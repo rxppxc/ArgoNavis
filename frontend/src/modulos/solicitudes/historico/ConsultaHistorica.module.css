@@ -40,6 +40,14 @@
 .casilla { display: inline-flex; align-items: center; gap: 8px; color: var(--text); font-size: .86rem; cursor: pointer; }
 .casilla input { width: 17px; height: 17px; margin: 0; accent-color: var(--acc-purple); cursor: pointer; }
 
+/* Son ocho pestañas y con cantidades grandes: no caben en una fila. Aquí van como fichas con
+   sus cuatro bordes, que se leen igual en dos filas (en el celular siguen en una deslizable). */
+@media (min-width: 641px) {
+  div.pestanas { gap: 8px; border-bottom: 0; }
+  .pestanas > button { padding: 8px 13px; border-bottom: 1px solid var(--border-2); border-radius: var(--r-sm); }
+  .pestanas > button[aria-selected="true"] { border-color: var(--principal); }
+}
+
 .resumen { color: var(--text-2); font-size: .82rem; margin: 0 0 10px; }
 
 /* En el celular, agencia, puesto, trámite y fechas van plegados («Más filtros»):
@@ -72,6 +80,10 @@
 .tabla tbody tr:hover { background: var(--hover); }
 .tabla small { display: block; margin-top: 2px; color: var(--muted); font-size: .74rem; }
 .mono { font-family: var(--letra-mono); }
+/* El tripulante que coincide con lo buscado: el nombre y, debajo, su pasaporte. */
+.encontrado { display: block; font-weight: 600; }
+.encontrado + .encontrado { margin-top: 6px; }
+.encontrado small { font-weight: 400; }
 
 .numero { color: var(--acc-blue); font: 600 .82rem/1.3 var(--letra-mono); white-space: nowrap; }
 .numero:hover { text-decoration: underline; }

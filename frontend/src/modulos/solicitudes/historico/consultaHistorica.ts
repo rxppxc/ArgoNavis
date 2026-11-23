@@ -4,10 +4,14 @@
  * atajo por año. El pasajero no va en la URL (2026-11-14: quedaba en el historial del
  * navegador y en los logs del servidor): viaja en el estado de la navegación.
  */
-import type { ConsultaHistorica, EstadoSolicitud, OpcionesHistorico } from "../../../api/solicitudes";
+import type { ConsultaHistorica, EstadoSolicitud, OpcionesHistorico, SolicitudResumen } from "../../../api/solicitudes";
 
 /** El primer año con solicitudes en ARGO NAVIS (el atajo por año empieza aquí). */
 export const PRIMER_ANIO = 2026;
+
+/** Una pestaña: un estado, "" (todas) o las autorizadas (2026-11-22), que son las que se
+ *  aprobaron alguna vez: vigentes, finalizadas y vencidas sin finalizar. */
+export type PestanaHistorico = EstadoSolicitud | "autorizadas" | "";
 
 export interface FiltrosHistorico {
   texto: string;
@@ -15,7 +19,7 @@ export interface FiltrosHistorico {
   agencia: string;   // id, o "" (todas)
   puesto: string;
   tramite: string;
-  estado: EstadoSolicitud | "";
+  estado: PestanaHistorico;
   fecha: "envio" | "operacion";   // a qué fecha van desde y hasta
   desde: string;     // AAAA-MM-DD, o ""
   hasta: string;
@@ -27,7 +31,7 @@ export const FILTROS_VACIOS: FiltrosHistorico = {
   fecha: "envio", desde: "", hasta: "", fueraDeHorario: false,
 };
 
-const ESTADOS: EstadoSolicitud[] = ["review", "returned", "approved", "denied", "finalized", "expired"];
+const PESTANAS: PestanaHistorico[] = ["autorizadas", "review", "returned", "approved", "denied", "finalized", "expired"];
 const TOPE_TEXTO = 100;   // el max_length de ConsultaHistorica en el backend
 
 function fechaValida(valor: string | null): string {
@@ -41,14 +45,14 @@ function idValido(valor: string | null): string {
 /** Los filtros que trae la URL. Lo que no se entiende se ignora (un enlace viejo
  *  o tocado a mano no rompe la página). */
 export function filtrosDeUrl(p: URLSearchParams): FiltrosHistorico {
-  const estado = p.get("estado") as EstadoSolicitud | null;
+  const estado = p.get("estado") as PestanaHistorico | null;
   return {
     texto: (p.get("texto") ?? "").slice(0, TOPE_TEXTO),
     pasajero: "",   // no va en la URL: un enlace viejo que lo traiga no lo filtra
     agencia: idValido(p.get("agencia")),
     puesto: idValido(p.get("puesto")),
     tramite: idValido(p.get("tramite")),
-    estado: estado && ESTADOS.includes(estado) ? estado : "",
+    estado: estado && PESTANAS.includes(estado) ? estado : "",
     fecha: p.get("fecha") === "operacion" ? "operacion" : "envio",
     desde: fechaValida(p.get("desde")),
     hasta: fechaValida(p.get("hasta")),
@@ -86,7 +90,8 @@ export function consultaDeFiltros(f: FiltrosHistorico, pagina: number, porPagina
     agencia_id: f.agencia ? Number(f.agencia) : undefined,
     puesto_id: f.puesto ? Number(f.puesto) : undefined,
     tipo_tramite_id: f.tramite ? Number(f.tramite) : undefined,
-    estado: f.estado || undefined,
+    estado: f.estado && f.estado !== "autorizadas" ? f.estado : undefined,
+    autorizadas: f.estado === "autorizadas" || undefined,
     fuera_de_horario: f.fueraDeHorario || undefined,
     fecha: f.fecha === "operacion" ? "operacion" : undefined,
     desde: f.desde || undefined,
@@ -94,6 +99,20 @@ export function consultaDeFiltros(f: FiltrosHistorico, pagina: number, porPagina
     pagina,
     por_pagina: porPagina,
   };
+}
+
+/** De una expirada, si se llegó a aprobar; de las demás, nada (2026-11-22). */
+export function motivoExpiracion(s: Pick<SolicitudResumen, "estado" | "aprobada_en">): string | null {
+  if (s.estado !== "expired") return null;
+  return s.aprobada_en ? "Aprobada; venció sin finalizarse" : "No se corrigió a tiempo";
+}
+
+const ENCONTRADOS_VISIBLES = 3;
+
+/** Los tripulantes que coinciden con lo buscado: los primeros y cuántos más (2026-11-22). */
+export function primerosEncontrados<T>(encontrados: T[] | null): { visibles: T[]; mas: number } {
+  const visibles = (encontrados ?? []).slice(0, ENCONTRADOS_VISIBLES);
+  return { visibles, mas: (encontrados ?? []).length - visibles.length };
 }
 
 /** Si algo acota la consulta (la fecha «por» sola no acota: sin desde ni hasta). */

@@ -1,7 +1,6 @@
 import logging
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator
 
-from sqlalchemy import event
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
@@ -72,29 +71,3 @@ async def obtener_sesion_bd() -> AsyncIterator[AsyncSession]:
         except Exception:
             await sesion.rollback()
             raise
-
-
-def al_confirmar(sesion: AsyncSession, accion: Callable[[], None]) -> None:
-    """Ejecuta `accion` solo cuando la transacción de la sesión se confirme
-    (no si se revierte). Para efectos fuera de la BD que no se deshacen, como
-    borrar archivos: hacerlo antes del commit dejaba registros apuntando a
-    archivos que ya no existían si el commit fallaba. Un error en `accion` solo
-    queda en el log: el commit ya ocurrió y la respuesta no debe fallar."""
-    pendiente = True
-
-    def ejecutar(_sesion) -> None:
-        nonlocal pendiente
-        if not pendiente:
-            return
-        pendiente = False
-        try:
-            accion()
-        except Exception:
-            logger.exception("[bd] Falló una acción posterior al commit.")
-
-    def descartar(_sesion) -> None:
-        nonlocal pendiente
-        pendiente = False
-
-    event.listen(sesion.sync_session, "after_commit", ejecutar)
-    event.listen(sesion.sync_session, "after_rollback", descartar)

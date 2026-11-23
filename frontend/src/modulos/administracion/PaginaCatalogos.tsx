@@ -91,8 +91,8 @@ function TarjetaCatalogo({
     if (otroSector) {
       const ok = await confirmar({
         titulo: "Cambiar de sector",
-        mensaje: `"${entidad.nombre}" pasa a ${otroSector.nombre}: sus solicitudes, también las que están en `
-          + `revisión, las verán y revisarán los funcionarios de ese sector.`,
+        mensaje: `"${entidad.nombre}" pasa a ${otroSector.nombre}: las solicitudes en revisión y las que lleguen `
+          + `las verán y revisarán los funcionarios de ese sector. Las ya revisadas se quedan en el sector que las revisó.`,
         textoOk: "Cambiar de sector",
       });
       if (!ok) return;

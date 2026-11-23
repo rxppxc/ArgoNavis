@@ -24,7 +24,7 @@ from app.domain.models import rol, tramite, catalogo, solicitud, correo, boleta 
 from app.infrastructure.cola_correos import tarea_correos
 from app.infrastructure.database import motor_bd
 from app.infrastructure.esquema import revisar_esquema
-from app.infrastructure.tareas import tarea_vencimientos
+from app.infrastructure.tareas import tarea_archivo, tarea_vencimientos
 
 configurar_registro()
 logger        = logging.getLogger(__name__)
@@ -36,8 +36,9 @@ _FRONTEND_DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
 @asynccontextmanager
 async def ciclo_vida(app: FastAPI):
     """Ciclo de vida de la aplicación: deja corriendo en segundo plano la tarea
-    que expira las solicitudes con plazos vencidos (infrastructure/tareas.py) y
-    la que reintenta los correos pendientes (infrastructure/cola_correos.py).
+    que expira las solicitudes con plazos vencidos y la que cuida el archivo
+    (infrastructure/tareas.py), y la que reintenta los correos pendientes
+    (infrastructure/cola_correos.py).
     El esquema de BD lo maneja Alembic (`alembic upgrade head`: migrate.bat, o el
     entrypoint del contenedor antes de levantar uvicorn). Si a la base le falta algo
     que el código usa, lo dice el log, la API responde 503 con el motivo y las tareas
@@ -50,6 +51,7 @@ async def ciclo_vida(app: FastAPI):
     app.state.esquema_faltante = await revisar_esquema(motor_bd)
     tareas = [] if app.state.esquema_faltante else [
         asyncio.create_task(tarea_vencimientos()), asyncio.create_task(tarea_correos()),
+        asyncio.create_task(tarea_archivo()),
     ]
     yield
     for tarea in tareas:

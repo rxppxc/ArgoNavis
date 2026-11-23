@@ -18,7 +18,7 @@
  *   el render falla) muestra un botón para descargar el archivo.
  */
 import { useEffect, useState } from "react";
-import { apiSolicitudes } from "../api/solicitudes";
+import { apiSolicitudes, type ArchivoVisible } from "../api/solicitudes";
 import { infoTipo } from "../utils/tipoArchivo";
 import { useAtraparFoco } from "../hooks/useAtraparFoco";
 import { mensajeDeError } from "../utils/errores";
@@ -30,7 +30,8 @@ import styles from "./ModalPreview.module.css";
 
 interface Props {
   solicitudId: number;
-  documento:   { id: number; nombre_original: string; tipo_mime: string | null };
+  /** Un documento del expediente o una autorización emitida (2026-11-22). */
+  documento:   ArchivoVisible;
   onCerrar:    () => void;
 }
 
@@ -93,7 +94,7 @@ export function ModalPreview({ solicitudId, documento, onCerrar }: Props) {
 
     (async () => {
       try {
-        const blob = await apiSolicitudes.obtenerDocumento(solicitudId, documento.id);
+        const blob = await apiSolicitudes.obtenerArchivo(solicitudId, { id: documento.id, emitido: documento.emitido });
         if (cancelado) return;
         if (categoria === "imagen" || categoria === "pdf") {
           // El PDF va al marco siempre como PDF: con el tipo que trajera la
@@ -137,12 +138,12 @@ export function ModalPreview({ solicitudId, documento, onCerrar }: Props) {
       cancelado = true;
       if (urlCreada) URL.revokeObjectURL(urlCreada);
     };
-  }, [solicitudId, documento.id, categoria, previsualizable]);
+  }, [solicitudId, documento.id, documento.emitido, categoria, previsualizable]);
 
   async function descargar() {
     setDescargando(true);
     try {
-      await apiSolicitudes.descargarDocumento(solicitudId, documento);
+      await apiSolicitudes.descargarArchivo(solicitudId, documento);
     } catch (e) {
       mostrar(mensajeDeError(e, "No se pudo descargar el documento."), "error");
     } finally {

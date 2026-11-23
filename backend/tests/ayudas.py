@@ -2,6 +2,7 @@
 import io
 import json
 import secrets
+import struct
 import zipfile
 from datetime import datetime, timedelta
 from app.core.horario import ZONA_PANAMA
@@ -19,6 +20,22 @@ def panama(*partes: int) -> datetime:
 
 async def login(cliente, usuario: str, clave: str):
     return await cliente.post("/auth/login", json={"username": usuario, "password": clave})
+
+
+async def rol_mixto() -> str:
+    """Un rol propio que revisa y, además, finaliza en el puesto."""
+    from sqlalchemy import select
+    from app.domain.models.rol import Permiso, Rol, RolPermiso
+    from app.infrastructure.database import SesionLocal
+
+    nombre = f"Mixto {secrets.token_hex(3)}"
+    async with SesionLocal() as s:
+        permisos = (await s.execute(select(Permiso.id).where(
+            Permiso.codigo.in_(("T-PROCESAR-PACIFICO", "T-FINALIZAR-PUERTO"))))).scalars().all()
+        assert len(permisos) == 2
+        s.add(Rol(nombre=nombre, permisos=[RolPermiso(permiso_id=p) for p in permisos]))
+        await s.commit()
+    return nombre
 
 
 def cuerpo_impedimentos(detalle: dict, con_impedimento: set[str] = frozenset(),
@@ -67,6 +84,32 @@ def docx(nombre: str, *extra: str) -> tuple[str, bytes, str]:
 
 def xlsx(nombre: str) -> tuple[str, bytes, str]:
     return (f"{nombre}.xlsx", _ooxml("xl/workbook.xml"), MIME_XLSX)
+
+
+def ole2(*nombres: str, tamano: int = 0) -> bytes:
+    """Un contenedor OLE2 (.doc, .xls) mínimo: la cabecera, el directorio con una entrada
+    por nombre y la tabla de sectores. Con `tamano`, cada entrada dice ocupar esos bytes
+    desde el principio del archivo."""
+    sector, ninguno, fin, de_la_tabla = 512, 0xFFFFFFFF, 0xFFFFFFFE, 0xFFFFFFFD
+
+    def entrada(nombre: str, tipo: int) -> bytes:
+        en_utf16 = nombre.encode("utf-16-le")
+        inicio, ocupa = (fin, 0) if tipo == 5 else (0, tamano)
+        return (en_utf16.ljust(64, bytes(1))
+                + struct.pack("<HBBIII", len(en_utf16) + 2, tipo, 1, ninguno, ninguno, ninguno)
+                + bytes(36) + struct.pack("<IQ", inicio, ocupa))
+
+    directorio = entrada("Root Entry", 5) + b"".join(entrada(n, 2) for n in nombres)
+    directorio = directorio.ljust(-(-len(directorio) // sector) * sector, bytes(1))
+    n_dir = len(directorio) // sector
+    n_tabla = n_dir // 127 + 1
+    cadena = [*range(1, n_dir), fin, *[de_la_tabla] * n_tabla]
+    cadena += [ninguno] * (n_tabla * 128 - len(cadena))
+    cabecera = (bytes.fromhex("D0CF11E0A1B11AE1") + bytes(16)
+                + struct.pack("<HHHHH", 0x3E, 3, 0xFFFE, 9, 6) + bytes(10)
+                + struct.pack("<IIIIIIII", n_tabla, 0, 0, 4096, fin, 0, fin, 0)
+                + struct.pack("<109I", *(n_dir + n if n < n_tabla else ninguno for n in range(109))))
+    return cabecera + directorio + struct.pack(f"<{len(cadena)}I", *cadena)
 
 
 def tripulante(nombre: str, nacionalidad: str = "PHL", rango: str = "marino", **extra) -> dict:

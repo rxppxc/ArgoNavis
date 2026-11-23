@@ -240,11 +240,12 @@ class ConsultaHistorica(BaseModel):
     Van en el cuerpo del pedido (POST, 2026-11-14), para que el pasajero buscado no
     quede en los logs; la exportación a Excel usa los mismos."""
     texto:            str | None = Field(default=None, max_length=100)   # número, buque, IMO, agencia, puesto
-    pasajero:         str | None = Field(default=None, max_length=100)   # nombre, apellido o pasaporte
+    pasajero:         str | None = Field(default=None, max_length=100)   # nombre, pasaporte o seamanbook
     agencia_id:       int | None = Field(default=None, ge=1)
     puesto_id:        int | None = Field(default=None, ge=1)
     tipo_tramite_id:  int | None = Field(default=None, ge=1)
     estado:           Estado | None = None
+    autorizadas:      bool = False   # solo las que se aprobaron alguna vez (2026-11-22)
     fuera_de_horario: bool = False
     fecha:            Literal["envio", "operacion"] = "envio"   # a qué fecha van desde y hasta
     desde:            date | None = None
@@ -273,7 +274,7 @@ class OpcionFiltro(BaseModel):
 class SalidaOpcionesHistorico(BaseModel):
     """Los filtros de la consulta histórica, con lo desactivado (una solicitud
     vieja puede ser de un puesto que ya no existe). Los puestos, solo los del
-    alcance de quien consulta."""
+    alcance de quien consulta, también los que cambiaron de sector."""
     agencias: list[OpcionFiltro]
     puestos:  list[OpcionFiltro]
     tramites: list[OpcionFiltro]
@@ -367,6 +368,49 @@ class AccionesSolicitud(BaseModel):
     # Boleta de recargo (2026-11-16): generar si no hay una vigente; anular la vigente.
     generar_boleta:         bool = False
     anular_boleta:          bool = False
+    # El historial completo: versiones, documentos retirados y huellas (2026-11-22).
+    ver_registro:           bool = False
+
+
+class SalidaVersion(BaseModel):
+    """Lo que la agencia había enviado antes de una corrección (2026-11-22): la foto, con
+    los nombres de ese día, quién la devolvió y por qué, y qué cambió al corregirla."""
+    numero:        int
+    enviada_en:    datetime
+    enviada_por:   str | None = None
+    devuelta_en:   datetime | None = None
+    devuelta_por:  str | None = None
+    motivo:        str | None = None
+    corregida_en:  datetime
+    corregida_por: str | None = None
+    datos:         list[tuple[str, str]]          # (rótulo, valor)
+    tripulantes:   list[dict]                     # id, nombre y datos (rótulo, valor)
+    documentos:    list[dict]                     # id, documento, tripulante y nombre del archivo
+    cambios:       list[str]
+
+
+class SalidaArchivo(BaseModel):
+    """Un archivo de la solicitud con su huella: un documento (vigente o retirado) o una
+    autorización emitida (2026-11-22)."""
+    clase:       Literal["documento", "emitido"]
+    id:          int
+    documento:   str                    # qué es: «Libreta de marino», «Autorización aprobada»…
+    tripulante:  str | None = None
+    nombre:      str                    # el del archivo
+    tamano:      int
+    tipo_mime:   str
+    sha256:      str | None = None      # None: de antes, hasta que se le calcula
+    fecha:       datetime               # subido o emitido
+    por:         str | None = None
+    retirado_en: datetime | None = None
+
+
+class SalidaRegistro(BaseModel):
+    """El historial completo de una solicitud (2026-11-22)."""
+    versiones:   list[SalidaVersion]
+    # Correcciones de antes del 2026-11-22, que no guardaron lo que se había enviado.
+    sin_version: int
+    archivos:    list[SalidaArchivo]
 
 
 class SalidaBoleta(BaseModel):
@@ -380,6 +424,12 @@ class SalidaBoleta(BaseModel):
     anulada_por:      str | None = None
     motivo_anulacion: str | None = None
     vigente:          bool
+
+
+class SalidaTripulanteEncontrado(BaseModel):
+    """Un tripulante que coincide con lo buscado en la consulta histórica (2026-11-22)."""
+    nombre:    str
+    pasaporte: str
 
 
 class SalidaSolicitudResumen(BaseModel):
@@ -399,8 +449,11 @@ class SalidaSolicitudResumen(BaseModel):
     operacion:            Operacion | None = None
     # Los días del sellado de Shore Pass (2026-11-18): 5 o 15.
     dias_sellado:         DiasSellado | None = None
-    # El sector de UCVMM del puesto (2026-11-10). Solo para el SNM: a la agencia le llega None.
+    # El sector de UCVMM que la revisó o, sin revisar, el del puesto (2026-11-22; antes,
+    # siempre el del puesto). Solo para el SNM: a la agencia le llega None.
     sector_nombre:        str | None = None
+    # El sector de hoy del puesto, si cambió desde que se revisó. Solo para el SNM.
+    sector_actual_nombre: str | None = None
     nombre_buque:         str | None = None
     imo:                  str | None = None
     fecha_operacion:      date
@@ -424,6 +477,8 @@ class SalidaSolicitudResumen(BaseModel):
     # ("B/.20.00"; None si no tiene).
     fuera_de_horario:               bool | None = None
     costo_fuera_de_horario:         str | None = None
+    # Al buscar un tripulante en la consulta histórica, los que coinciden (2026-11-22). None en lo demás.
+    tripulantes_encontrados:        list[SalidaTripulanteEncontrado] | None = None
 
 
 class PaginaSolicitudes(BaseModel):
@@ -433,6 +488,9 @@ class PaginaSolicitudes(BaseModel):
     # Cantidad por estado con los mismos filtros (sin el de estado): son los
     # números de las pestañas de la bandeja.
     conteos:    dict[str, int] = Field(default_factory=dict)
+    # Con los mismos filtros, las que se aprobaron alguna vez: vigentes, finalizadas y
+    # vencidas sin finalizar (2026-11-22).
+    autorizadas: int = 0
     items:      list[SalidaSolicitudResumen] = Field(default_factory=list)
 
 

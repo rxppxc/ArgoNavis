@@ -11,8 +11,10 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
-    BigInteger, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, Numeric, SmallInteger, String, Text,
+    BigInteger, Boolean, CheckConstraint, Date, DateTime, FetchedValue, ForeignKey, Index, Integer, Numeric,
+    SmallInteger, String, Text, UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -115,6 +117,7 @@ class Solicitud(Base):
         CheckConstraint(f"estado IN ({_valores(EstadoSolicitud)})", name="ck_solicitudes_estado"),
         CheckConstraint(f"operacion IN ({_valores(OperacionTecnico)})", name="ck_solicitudes_operacion"),
         CheckConstraint(f"dias_sellado IN {DIAS_SELLADO}", name="ck_solicitudes_dias_sellado"),
+        Index("ix_solicitudes_sector_revision", "sector_revision_id", "puesto_control_id"),
     )
 
     id:     Mapped[int]        = mapped_column(Integer, primary_key=True, index=True)
@@ -128,9 +131,9 @@ class Solicitud(Base):
     tipo_tramite_id:   Mapped[int] = mapped_column(ForeignKey("tipos_tramite.id", ondelete="RESTRICT"), index=True)
     puesto_control_id: Mapped[int] = mapped_column(ForeignKey("puestos_control.id", ondelete="RESTRICT"), index=True)
     puesto_nombre:     Mapped[str] = mapped_column(String(200))
-    # Cambio de puerto (2026-11-13): el nuevo puesto, del mismo sector que el primero
-    # (el sector, y con él UCVMM, sale siempre de `puesto_control_id`). Nulo = sin
-    # cambio. Con cambio, lo ve y lo finaliza el nuevo; el primero puede consultarla.
+    # Cambio de puerto (2026-11-13): el nuevo puesto, de cualquier sector desde el
+    # 2026-11-18 (la revisa UCVMM del sector de `puesto_control_id`). Nulo = sin
+    # cambio. Con cambio, la ve y la finaliza el nuevo; el primero, no (2026-11-22).
     puesto_destino_id:     Mapped[int | None] = mapped_column(
         ForeignKey("puestos_control.id", ondelete="RESTRICT", name="fk_solicitudes_puesto_destino"), index=True,
     )
@@ -146,7 +149,7 @@ class Solicitud(Base):
     dias_sellado:          Mapped[int | None] = mapped_column(SmallInteger)
 
     titulo:               Mapped[str]  = mapped_column(String(255))
-    fecha_operacion:      Mapped[date] = mapped_column(Date)
+    fecha_operacion:      Mapped[date] = mapped_column(Date, index=True)
     cantidad_tripulantes: Mapped[int]  = mapped_column(Integer)
 
     # Buque — `bandera` es el código de país (catálogo `paises`)
@@ -166,6 +169,11 @@ class Solicitud(Base):
                                                      server_default=EstadoSolicitud.EN_REVISION.value, index=True)
     enviada_en:     Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)   # último envío a revisión
     veces_devuelta: Mapped[int]      = mapped_column(Integer, default=0, server_default="0")
+    # El sector de UCVMM que la revisó (aprobó, devolvió o denegó, 2026-11-22): la conserva
+    # aunque el puesto cambie de sector. Nulo mientras nadie la ha revisado.
+    sector_revision_id: Mapped[int | None] = mapped_column(
+        ForeignKey("sectores.id", ondelete="RESTRICT", name="fk_solicitudes_sector_revision"),
+    )
 
     impedimentos_verificados:        Mapped[bool]            = mapped_column(Boolean, default=False, server_default="false")
     comentario_impedimentos:         Mapped[str | None]      = mapped_column(Text)
@@ -205,6 +213,10 @@ class Solicitud(Base):
 
     expirada_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
 
+    # Lo que se busca de la solicitud (número, título, buque, IMO, agencia y puestos), sin
+    # tildes y en minúsculas. La calcula PostgreSQL (c6e2a9f1d438): no se escribe ni se carga.
+    busqueda: Mapped[str] = mapped_column(Text, FetchedValue(), server_onupdate=FetchedValue(), deferred=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -217,6 +229,7 @@ class Solicitud(Base):
     puesto_destino: Mapped["PuestoControl | None"] = relationship(  # noqa: F821
         "PuestoControl", foreign_keys=[puesto_destino_id], lazy="selectin",
     )
+    sector_revision: Mapped["Sector | None"] = relationship("Sector", lazy="selectin")  # noqa: F821
     agencia:      Mapped["AgenciaNaviera"] = relationship("AgenciaNaviera", lazy="selectin")  # noqa: F821
 
     # `passive_deletes`: las FK hijas son ON DELETE CASCADE en la BD, así que al
@@ -225,9 +238,11 @@ class Solicitud(Base):
         back_populates="solicitud", cascade="all, delete-orphan", passive_deletes=True,
         order_by="TripulanteSolicitud.orden",
     )
+    # Los vigentes: los que una corrección retiró se conservan aparte (2026-11-22). De solo
+    # lectura: se agregan por `solicitud_id` y se retiran con `retirado_en`, nunca se borran.
     documentos: Mapped[list["DocumentoSolicitud"]] = relationship(
-        back_populates="solicitud", cascade="all, delete-orphan", passive_deletes=True,
-        order_by="DocumentoSolicitud.id",
+        primaryjoin="and_(DocumentoSolicitud.solicitud_id == Solicitud.id, DocumentoSolicitud.retirado_en.is_(None))",
+        order_by="DocumentoSolicitud.id", viewonly=True,
     )
     # Sin delete-orphan: los eventos se agregan por `solicitud_id` sin pasar por
     # la colección, y nunca se quitan sueltos (el historial no se edita).
@@ -259,6 +274,16 @@ class Solicitud(Base):
     @property
     def puesto_autorizado(self) -> "PuestoControl | None":  # noqa: F821
         return self.puesto_destino if self.puesto_destino_id else self.puesto
+
+    # El sector de UCVMM al que pertenece: el que la revisó o, mientras nadie la ha
+    # revisado, el de su puesto. En SQL, AlcanceSectores (solicitud_repository.py).
+    @property
+    def sector_id(self) -> int:
+        return self.sector_revision_id or self.puesto.sector_id
+
+    @property
+    def sector(self) -> "Sector":  # noqa: F821
+        return self.sector_revision or self.puesto.sector
 
 
 class TripulanteSolicitud(Base):
@@ -297,13 +322,14 @@ class TripulanteSolicitud(Base):
     con_impedimento_puesto: Mapped[bool | None] = mapped_column(Boolean)
     orden:            Mapped[int]         = mapped_column(Integer, default=0, server_default="0")
     created_at:       Mapped[datetime]    = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Nombre, apellido, pasaporte y seamanbook para buscar, como `Solicitud.busqueda`.
+    busqueda:         Mapped[str]         = mapped_column(Text, FetchedValue(), server_onupdate=FetchedValue(), deferred=True)
 
     solicitud: Mapped["Solicitud"] = relationship(back_populates="tripulantes")
-    # Sin delete-orphan: un documento de alcance "solicitud" no tiene
-    # tripulante, y con delete-orphan SQLAlchemy lo trataría como huérfano.
-    # Al borrar el tripulante, la BD borra sus documentos (FK ON DELETE CASCADE).
+    # Sin cascada de borrado: si la agencia lo quita al corregir, sus documentos se conservan
+    # retirados, con su nombre, y la BD los deja sin dueño (FK ON DELETE SET NULL).
     documentos: Mapped[list["DocumentoSolicitud"]] = relationship(
-        back_populates="tripulante", cascade="all", passive_deletes=True,
+        back_populates="tripulante", cascade="save-update, merge", passive_deletes=True,
     )
     # Igual que los documentos: sin delete-orphan (hay casillas de la solicitud,
     # sin tripulante). La relación ordena los borrados: casillas antes que el tripulante.
@@ -325,12 +351,13 @@ class TripulanteSolicitud(Base):
 class DocumentoSolicitud(Base):
     """Un archivo del expediente. `documento_id` es la casilla del checklist
     que cubre (nulo = documento adicional); `tripulante_id` solo va cuando el
-    documento es de alcance "marino"."""
+    documento es de alcance "marino". Nunca se borra: el que la agencia reemplaza o
+    quita al corregir queda retirado (2026-11-22)."""
     __tablename__ = "solicitud_documentos"
 
     id:                Mapped[int]        = mapped_column(Integer, primary_key=True, index=True)
     solicitud_id:      Mapped[int]        = mapped_column(ForeignKey("solicitudes.id", ondelete="CASCADE"), index=True)
-    tripulante_id:     Mapped[int | None] = mapped_column(ForeignKey("solicitud_tripulantes.id", ondelete="CASCADE"), index=True)
+    tripulante_id:     Mapped[int | None] = mapped_column(ForeignKey("solicitud_tripulantes.id", ondelete="SET NULL"), index=True)
     documento_id:      Mapped[int | None] = mapped_column(ForeignKey("documentos_requeridos.id", ondelete="RESTRICT"), index=True)
     nombre_original:   Mapped[str]        = mapped_column(String(500))
     nombre_almacenado: Mapped[str]        = mapped_column(String(500))
@@ -339,10 +366,59 @@ class DocumentoSolicitud(Base):
     tamano:            Mapped[int]        = mapped_column(BigInteger)
     subido_por_id:     Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
     created_at:        Mapped[datetime]   = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # La huella del archivo, para comprobar que no cambió. Nula en los de antes hasta que se
+    # les calcula (infrastructure/huellas.py).
+    sha256:            Mapped[str | None] = mapped_column(String(64))
+    # Cuándo dejó de ser parte del expediente y de qué tripulante era (pudo salir también él).
+    retirado_en:       Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    tripulante_nombre: Mapped[str | None] = mapped_column(String(301))
 
-    solicitud:  Mapped["Solicitud"]                  = relationship(back_populates="documentos")
     tripulante: Mapped["TripulanteSolicitud | None"] = relationship(back_populates="documentos")
     documento:  Mapped["DocumentoRequerido | None"]  = relationship("DocumentoRequerido", lazy="selectin", viewonly=True)  # noqa: F821
+
+
+class VersionSolicitud(Base):
+    """Lo que la agencia había enviado antes de una corrección (2026-11-22): la foto
+    (`datos`, domain/services/version_expediente.py), quién la envió, quién la devolvió y por
+    qué. La de hoy es la propia solicitud. Solo se agregan."""
+    __tablename__ = "solicitud_versiones"
+    __table_args__ = (UniqueConstraint("solicitud_id", "numero", name="uq_solicitud_versiones_numero"),)
+
+    id:            Mapped[int]             = mapped_column(Integer, primary_key=True)
+    solicitud_id:  Mapped[int]             = mapped_column(ForeignKey("solicitudes.id", ondelete="CASCADE"))
+    numero:        Mapped[int]             = mapped_column(SmallInteger)
+    enviada_en:    Mapped[datetime]        = mapped_column(DateTime(timezone=True))
+    enviada_por:   Mapped[str | None]      = mapped_column(String(255))
+    devuelta_en:   Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    devuelta_por:  Mapped[str | None]      = mapped_column(String(255))
+    motivo:        Mapped[str | None]      = mapped_column(Text)
+    corregida_en:  Mapped[datetime]        = mapped_column(DateTime(timezone=True))
+    corregida_por: Mapped[str | None]      = mapped_column(String(255))
+    datos:         Mapped[dict]            = mapped_column(JSONB)
+
+
+class TipoEmitido(str, enum.Enum):
+    """Qué autorización es: la que se emite al aprobar y la que se emite al finalizar."""
+    APROBADA   = "aprobada"
+    FINALIZADA = "finalizada"
+
+
+class DocumentoEmitido(Base):
+    """El PDF de la autorización tal como se emitió (2026-11-22): el que reciben la agencia y
+    quien escanea el QR. Uno al aprobar y otro al finalizar, con su huella. Solo se agregan."""
+    __tablename__ = "documentos_emitidos"
+    __table_args__ = (
+        UniqueConstraint("solicitud_id", "tipo", name="uq_documentos_emitidos_tipo"),
+        CheckConstraint(f"tipo IN ({_valores(TipoEmitido)})", name="ck_documentos_emitidos_tipo"),
+    )
+
+    id:           Mapped[int]      = mapped_column(Integer, primary_key=True)
+    solicitud_id: Mapped[int]      = mapped_column(ForeignKey("solicitudes.id", ondelete="CASCADE"))
+    tipo:         Mapped[str]      = mapped_column(String(20))
+    ruta:         Mapped[str]      = mapped_column(String(1000))   # relativa a STORAGE_PATH
+    tamano:       Mapped[int]      = mapped_column(BigInteger)
+    sha256:       Mapped[str]      = mapped_column(String(64))
+    emitido_en:   Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class CasillaSolicitud(Base):

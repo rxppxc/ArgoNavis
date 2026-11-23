@@ -4,14 +4,14 @@ import { IconoAlerta, IconoReloj } from "../../../components/Iconos";
 import { InsigniaEstado } from "../InsigniaEstado";
 import {
   ETIQUETA_OPERACION, formatearFecha, formatearFechaHora, TEXTO_HORARIO_LABORAL, textoDias, textoPuestos,
-  tiempoRestante,
+  textoSectorCorto, tiempoRestante,
 } from "../presentacion";
 import styles from "./TarjetaSolicitud.module.css";
 
 /** Fila de las bandejas, como un pase (identidad «pase oficial», 2026-11-11): el
  *  talón con el número y el sello del estado, y los datos del trámite. Lleva al
- *  expediente. `conSector`: para quien ve los dos sectores (Administrador,
- *  supervisor general), el del puesto. */
+ *  expediente. `conSector`: para quien ve los dos sectores (Administrador, supervisor
+ *  general), el suyo. Si el puesto cambió de sector desde que se revisó, lo dice a todos. */
 export function TarjetaSolicitud({ s, vista, volverA, conSector = false }: {
   s: SolicitudResumen; vista: Bandeja; conSector?: boolean;
   /** La bandeja y la pestaña de donde se abre: el «Volver» del expediente regresa ahí. */
@@ -49,7 +49,7 @@ export function TarjetaSolicitud({ s, vista, volverA, conSector = false }: {
             {s.imo && <div><dt>IMO</dt><dd className={styles.mono}>{s.imo}</dd></div>}
             {/* La agencia solo ve las suyas: su nombre en cada pase sobraba. */}
             {!deAgencia && <div><dt>Agencia</dt><dd>{s.agencia_nombre}</dd></div>}
-            <div><dt>Puesto</dt><dd>{textoPuestos(s)}{conSector && s.sector_nombre && <> · {s.sector_nombre}</>}</dd></div>
+            <div><dt>Puesto</dt><dd>{textoPuestos(s)}{(conSector || s.sector_actual_nombre) && s.sector_nombre && <> · {textoSectorCorto(s)}</>}</dd></div>
             <div><dt>Operación</dt><dd className={styles.mono}>{formatearFecha(s.fecha_operacion)}</dd></div>
             <div><dt>Tripulantes</dt><dd className={styles.mono}>{s.cantidad_tripulantes}</dd></div>
             <div><dt>Enviada</dt><dd>{formatearFechaHora(s.enviada_en)}{!deAgencia && s.creada_por && <> por {s.creada_por}</>}</dd></div>

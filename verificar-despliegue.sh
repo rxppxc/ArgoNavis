@@ -12,6 +12,10 @@
 #
 # Uso, desde la carpeta del repo en el servidor, después de cada despliegue:
 #   sudo bash verificar-despliegue.sh
+# Con --solo-la-pila revisa lo que no depende del servidor (los contenedores, la
+# aplicación, la seguridad y la base): es lo que corre la integración continua, que
+# no tiene Active Directory, correo ni respaldos. Con --diario, todo menos la prueba del
+# freno del login, para no llenar la bitácora: es lo que corre vigilar.py cada mañana.
 # Termina con 0 si no hay fallas (los avisos no cuentan como falla).
 # ════════════════════════════════════════════════════════════════════════════
 set -uo pipefail
@@ -24,7 +28,18 @@ if [ ! -f .env ] || [ ! -f docker-compose-prod.yml ]; then
   echo "Falta .env o docker-compose-prod.yml en $(pwd)"; exit 1
 fi
 
+SOLO_LA_PILA=""; DIARIO=""
+case "${1:-}" in
+  --solo-la-pila) SOLO_LA_PILA=1 ;;
+  --diario)       DIARIO=1 ;;
+esac
+
 FALLAS=0; AVISOS=0
+resultado() {
+  echo
+  if [ "$FALLAS" -eq 0 ]; then echo "Resultado: todo bien ($AVISOS aviso/s)."; else echo "Resultado: $FALLAS falla/s y $AVISOS aviso/s."; fi
+  exit $(( FALLAS > 0 ? 1 : 0 ))
+}
 bien()    { echo "  [OK]    $*"; }
 mal()     { echo "  [FALLA] $*"; FALLAS=$((FALLAS + 1)); }
 aviso()   { echo "  [AVISO] $*"; AVISOS=$((AVISOS + 1)); }
@@ -94,10 +109,12 @@ murieron=$(docker logs --since 24h argonavis_backend 2>&1 | grep -c 'Child proce
 if [ "$murieron" -gt 0 ]; then
   aviso "En 24 h se cayeron $murieron proceso(s) de uvicorn, y uvicorn los levantó (¿límite de memoria?): docker logs --since 24h argonavis_backend 2>&1 | grep -B5 died"
 fi
-if [ "$(systemctl is-enabled docker 2>/dev/null)" = enabled ]; then
-  bien "Docker arranca solo al encender la máquina"
-else
-  mal "Docker no arranca solo al reiniciar la máquina (sudo systemctl enable docker)"
+if [ -z "$SOLO_LA_PILA" ]; then
+  if [ "$(systemctl is-enabled docker 2>/dev/null)" = enabled ]; then
+    bien "Docker arranca solo al encender la máquina"
+  else
+    mal "Docker no arranca solo al reiniciar la máquina (sudo systemctl enable docker)"
+  fi
 fi
 
 # ── Aplicación ───────────────────────────────────────────────────────────────
@@ -156,25 +173,61 @@ else
 fi
 uid=$(docker exec argonavis_backend id -u 2>/dev/null)
 if [ "$uid" = 10001 ]; then bien "El backend corre sin privilegios (uid 10001)"; else mal "El backend corre con uid ${uid:-?} (se esperaba 10001)"; fi
+# Contenedores endurecidos (2026-11-22, docker-compose-prod.yml): lo que dice el proceso
+# principal de cada uno (usuario, privilegios que puede llegar a tener y si puede ganar más).
+for c in argonavis_postgres argonavis_backend argonavis_frontend; do
+  read -r u privilegios sin_ganar <<<"$(docker exec "$c" grep -E '^(Uid|CapBnd|NoNewPrivs):' /proc/1/status 2>/dev/null | awk '{print $2}' | paste -sd ' ' -)"
+  solo_lectura=$(docker inspect -f '{{.HostConfig.ReadonlyRootfs}}' "$c" 2>/dev/null)
+  if [ "${u:-0}" != 0 ] && [ "${privilegios:-}" = 0000000000000000 ] && [ "${sin_ganar:-}" = 1 ] && [ "$solo_lectura" = true ]; then
+    bien "$c: sin root (uid $u), sin privilegios del sistema y con la imagen de solo lectura"
+  else
+    mal "$c sin endurecer: uid ${u:-?}, privilegios ${privilegios:-?}, no-new-privileges ${sin_ganar:-?}, solo lectura ${solo_lectura:-?} (docker-compose-prod.yml)"
+  fi
+done
+if ! docker exec argonavis_frontend nc -z -w 3 backend 8000 2>/dev/null; then
+  mal "nginx no alcanza al backend"
+elif docker exec argonavis_frontend nc -z -w 3 postgres_db 5432 2>/dev/null; then
+  mal "nginx alcanza a PostgreSQL: van en redes separadas (docker-compose-prod.yml)"
+else
+  bien "nginx alcanza al backend y no a PostgreSQL"
+fi
+# Un envío se guarda mientras llega, en nginx y en el backend (los volúmenes temporales_*):
+# 3 MB sin sesión llegan enteros a los dos y se rechazan (401 o 403), sin dejar rastro.
+c=$(head -c 3145728 /dev/zero | codigo -F 'solicitud={}' -F 'archivos=@-;filename=prueba.pdf;type=application/pdf' http://localhost/api/v1/solicitudes)
+case "$c" in 401|403) bien "Los envíos tienen dónde guardarse mientras llegan (sin sesión: $c)";; *) mal "Un envío de 3 MB sin sesión responde $c (se esperaba 401): ¿puede escribir nginx en /var/cache/nginx y el backend en /tmp?";; esac
 if [ "$(docker exec argonavis_backend printenv APP_ENV 2>/dev/null)" = production ]; then bien "APP_ENV=production"; else mal "APP_ENV no es production"; fi
 c=$(codigo http://localhost/api/docs)
 if [ "$c" = 404 ]; then bien "La documentación de la API está oculta"; else aviso "/api/docs responde $c"; fi
 sk=$(env_de SECRET_KEY)
 if [ "${#sk}" -ge 32 ]; then bien "SECRET_KEY de ${#sk} caracteres"; else mal "SECRET_KEY corta (${#sk} caracteres)"; fi
 # Tope del cuerpo (2026-11-10): nginx corta sin leer lo que pase de 1 MB en la API (y
-# de 283 MB al enviar una solicitud). No llega al backend: no deja rastro.
+# de 345 MB al enviar una solicitud). No llega al backend: no deja rastro.
 c=$(head -c 2097152 /dev/zero | codigo -X POST -H 'Content-Type: application/json' --data-binary @- http://localhost/api/v1/auth/login)
 if [ "$c" = 413 ]; then bien "nginx corta las peticiones de más de 1 MB en la API (413)"; else mal "Un cuerpo de 2 MB en el login respondió $c (se esperaba 413): revisa client_max_body_size en nginx.conf"; fi
-frenado=""
-for i in $(seq 1 25); do
-  c=$(codigo -X POST -H 'Content-Type: application/json' \
-      -d '{"username":"verificacion.freno","password":"no-es-una-clave"}' http://localhost/api/v1/auth/login)
-  if [ "$c" = 429 ]; then frenado=$i; break; fi
-done
-if [ -n "$frenado" ]; then
-  bien "El login se frena tras varios intentos (429 al intento $frenado; usuario inexistente, sin tocar el AD)"
+if [ -z "$DIARIO" ]; then
+  frenado=""
+  for i in $(seq 1 25); do
+    c=$(codigo -X POST -H 'Content-Type: application/json' \
+        -d '{"username":"verificacion.freno","password":"no-es-una-clave"}' http://localhost/api/v1/auth/login)
+    if [ "$c" = 429 ]; then frenado=$i; break; fi
+  done
+  if [ -n "$frenado" ]; then
+    bien "El login se frena tras varios intentos (429 al intento $frenado; usuario inexistente, sin tocar el AD)"
+  else
+    mal "El login no se frenó tras 25 intentos"
+  fi
+fi
+# Los registros (2026-11-22), en volúmenes: la salida de Docker se borra al recrear el
+# contenedor. nginx acaba de recibir las peticiones de arriba: su archivo de hoy existe.
+if docker exec argonavis_backend sh -c 'f=/app/registros/.verificacion; touch "$f" && rm -f "$f" && ls /app/registros/argonavis-*.log' >/dev/null 2>&1; then
+  bien "El backend guarda sus registros ($(docker exec argonavis_backend sh -c 'ls /app/registros | wc -l; du -sh /app/registros | cut -f1' | paste -sd ' ' - | sed 's/ / archivo(s), /'))"
 else
-  mal "El login no se frenó tras 25 intentos"
+  mal "El backend no guarda sus registros en /app/registros (volumen registros)"
+fi
+if docker exec argonavis_frontend sh -c 'test -s "/var/log/argonavis/acceso-$(date +%F).log"' 2>/dev/null; then
+  bien "nginx guarda los accesos de cada día"
+else
+  mal "nginx no guarda los accesos en /var/log/argonavis (volumen registros_nginx)"
 fi
 
 # ── Base de datos ────────────────────────────────────────────────────────────
@@ -247,7 +300,16 @@ if docker exec argonavis_backend sh -c 'f=/app/storage/documentos/.verificacion;
 else
   mal "El backend no puede escribir en /app/storage/documentos (¿volumen creado como root? README → Producción)"
 fi
+# Cada documento y cada autorización emitida sigue en el disco y mide lo mismo (2026-11-22), y
+# los de hoy coinciden con su huella: las solicitudes se consultan años después.
+if documentos=$(docker exec argonavis_backend python -m app.infrastructure.revisar_documentos 2>/dev/null); then
+  bien "Archivos de las solicitudes: $documentos"
+else
+  mal "Archivos de las solicitudes: ${documentos:-no se pudieron revisar (docker exec argonavis_backend python -m app.infrastructure.revisar_documentos)}"
+fi
 info "Tamaño de la base: $(psql_bd "select pg_size_pretty(pg_database_size(current_database()))"); conexiones abiertas: $(psql_bd "select count(*) from pg_stat_activity where datname = current_database()")"
+
+if [ -n "$SOLO_LA_PILA" ]; then resultado; fi
 
 # ── Integraciones ────────────────────────────────────────────────────────────
 seccion "Integraciones"
@@ -350,13 +412,29 @@ if [ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" = yes ]; then
 else
   aviso "El reloj no está sincronizado (timedatectl): los plazos y el horario laboral dependen de la hora"
 fi
-errores=$(docker logs --since 24h argonavis_backend 2>&1 | grep -cE ' (ERROR|CRITICAL) |Traceback')
+# De los archivos de hoy y de ayer, que también tienen lo de antes del último despliegue.
+desde=$(TZ=EST5 date -d '24 hours ago' '+%F %T')
+errores=$(for dia in "$(TZ=EST5 date -d yesterday +%F)" "$(TZ=EST5 date +%F)"; do
+  docker exec argonavis_backend cat "/app/registros/argonavis-$dia.log" 2>/dev/null
+done | awk -v desde="$desde" '($3 == "ERROR" || $3 == "CRITICAL") && ($1 " " $2) >= desde' | wc -l)
 if [ "$errores" -eq 0 ]; then
-  bien "Sin errores en el log del backend (últimas 24 h)"
+  bien "Sin errores en el registro del backend (últimas 24 h)"
 else
-  aviso "$errores línea(s) de error en el log del backend (últimas 24 h): docker logs --since 24h argonavis_backend 2>&1 | grep -B2 -A10 -E ' (ERROR|CRITICAL) |Traceback'"
+  aviso "$errores error(es) en el registro del backend (últimas 24 h): docker exec argonavis_backend sh -c \"grep -A10 -E ' (ERROR|CRITICAL) ' /app/registros/argonavis-\$(date +%F).log\""
 fi
 
-echo
-if [ "$FALLAS" -eq 0 ]; then echo "Resultado: todo bien ($AVISOS aviso/s)."; else echo "Resultado: $FALLAS falla/s y $AVISOS aviso/s."; fi
-exit $(( FALLAS > 0 ? 1 : 0 ))
+# ── Vigilancia (2026-11-22) ──────────────────────────────────────────────────
+seccion "Vigilancia"
+if crontab -l 2>/dev/null | grep -v '^[[:space:]]*#' | grep -q 'vigilar.py'; then
+  minutos=$(( ( $(date +%s) - $(stat -c %Y /var/lib/argonavis/vigilancia.json 2>/dev/null || echo 0) ) / 60 ))
+  if [ "$minutos" -le 15 ]; then bien "La vigilancia corre (hace $minutos min)"; else mal "La vigilancia está en el cron de root pero no corre (tail /var/log/argonavis-vigilancia.log)"; fi
+else
+  aviso "Sin vigilancia: nadie se entera si el sistema se cae (instrucciones en vigilar.py)"
+fi
+if [ -n "$(env_de CORREO_ALERTAS)" ]; then
+  info "Los avisos llegan a: $(env_de CORREO_ALERTAS)"
+else
+  aviso "Sin CORREO_ALERTAS en el .env: la vigilancia no le avisa a nadie"
+fi
+
+resultado

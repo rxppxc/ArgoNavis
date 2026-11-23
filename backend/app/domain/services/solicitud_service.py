@@ -17,12 +17,13 @@
   - El puesto de control (T-FINALIZAR-PUERTO + asignación en
     `usuarios_puestos`) ve las aprobadas de sus puestos, verifica los
     impedimentos (obligatoria para finalizar) y las finaliza. Con cambio de
-    puerto (2026-11-13), las finaliza el puesto nuevo (`puesto_autorizado_id`);
-    el primero solo las consulta.
+    puerto (2026-11-13), las ve y las finaliza el puesto nuevo
+    (`puesto_autorizado_id`); el primero no las ve desde el 2026-11-22.
   - Cada transición bloquea la fila (SELECT ... FOR UPDATE): dos usuarios no
     pueden, por ejemplo, aprobar y negar la misma solicitud a la vez.
   - Cada paso queda en `solicitud_eventos` (historial con usuario y hora).
 """
+import asyncio
 import logging
 import secrets
 from dataclasses import dataclass
@@ -43,35 +44,38 @@ from app.core.permisos import (
 from app.domain.models.boleta import BoletaRecargo
 from app.domain.models.catalogo import PuestoControl
 from app.domain.models.solicitud import (
-    DIAS_SELLADO, ETIQUETA_OPERACION, RANGOS_CON_LIBRETA, CasillaSolicitud, DocumentoSolicitud, EstadoSolicitud,
-    EventoSolicitud, OperacionTecnico, Solicitud, TipoEventoSolicitud, TripulanteSolicitud, texto_dias,
-    vigencia_minima_pasaporte,
+    DIAS_SELLADO, ETIQUETA_OPERACION, RANGOS_CON_LIBRETA, CasillaSolicitud, DocumentoEmitido, DocumentoSolicitud,
+    EstadoSolicitud, EventoSolicitud, OperacionTecnico, Solicitud, TipoEmitido, TipoEventoSolicitud,
+    TripulanteSolicitud, VersionSolicitud, texto_dias, vigencia_minima_pasaporte,
 )
 from app.domain.models.tramite import AlcanceDocumento, TipoTramite, TramiteDocumento
 from app.domain.models.user import Usuario
 from app.domain.repositories.catalogo_repository import RepositorioCatalogo
-from app.domain.repositories.solicitud_repository import AlcanceSnm, FiltrosBandeja, RepositorioSolicitud
+from app.domain.repositories.solicitud_repository import (
+    AlcanceSectores, AlcanceSnm, FiltrosBandeja, RepositorioSolicitud,
+)
 from app.domain.repositories.tramite_repository import RepositorioTramite
 from app.domain.schemas.solicitud import (
     AccionesSolicitud, AsignacionArchivo, ConsultaBandeja, ConsultaHistorica, DatosCorregirSolicitud,
     DatosCrearSolicitud, DatosImpedimentos, DatosTripulanteEntrada, FilaEstadisticaPuesto, FilaSector,
     FilaEstadisticaTipo, FilaFueraHorario, FilaPorHora, PaginaSolicitudes,
-    SalidaCasilla,
-    SalidaDocumentoSolicitud, SalidaEstadisticasSolicitudes, SalidaEvento, SalidaSolicitud,
+    SalidaArchivo, SalidaCasilla,
+    SalidaDocumentoSolicitud, SalidaEstadisticasSolicitudes, SalidaEvento, SalidaRegistro, SalidaSolicitud,
     OpcionFiltro, SalidaOpcionesHistorico, SalidaSolicitudResumen, SalidaTripulante,
-    SalidaTripulanteVerificacion, SalidaVerificacion, _DatosFormularioSolicitud, SalidaBoleta,
+    SalidaTripulanteEncontrado, SalidaTripulanteVerificacion, SalidaVerificacion, SalidaVersion,
+    _DatosFormularioSolicitud, SalidaBoleta,
 )
 from app.domain.services.acceso import AlcanceEstadisticas, ContextoAcceso
 from app.domain.services.series import meses_antes, periodos_anio, periodos_dia, periodos_mes, serie
 from app.domain.services.tramite_service import (
     CasillaChecklist, ServicioTramite, TripulanteChecklist, normalizar_imo,
 )
+from app.domain.services.version_expediente import DOCUMENTO_ADICIONAL, comparar, foto
 from app.informes.autorizacion_pdf import DatosPdfAutorizacion, TripulantePdf
 from app.informes.boleta_recargo_pdf import DatosPdfBoleta
 from app.informes.historico_excel import DatosHistorico, FilaHistorico, FiltrosAplicados
 from app.infrastructure import almacenamiento
 from app.infrastructure.almacenamiento import ArchivoGuardado
-from app.infrastructure.database import al_confirmar
 
 logger        = logging.getLogger(__name__)
 configuracion = obtener_configuracion()
@@ -114,6 +118,10 @@ _EVENTOS_INTERNOS = {
     TipoEventoSolicitud.COMENTARIO.value,   # ya no se registran: quedan los de antes
     TipoEventoSolicitud.BOLETA_GENERADA.value,   # la boleta de recargo no la ve la agencia (2026-11-16)
     TipoEventoSolicitud.BOLETA_ANULADA.value,
+}
+_ETIQUETA_EMITIDO = {
+    TipoEmitido.APROBADA.value:   "Autorización aprobada",
+    TipoEmitido.FINALIZADA.value: "Autorización finalizada",
 }
 _SIN_TEXTO_PARA_AGENCIA = {TipoEventoSolicitud.APROBADA.value, TipoEventoSolicitud.FINALIZADA.value}
 # A la agencia no se le nombran las unidades internas (UCVMM, los sectores): ve
@@ -249,14 +257,6 @@ class ServicioSolicitud:
         return ctx.es_admin or (ctx.es_puerto and s.puesto_autorizado_id in ctx.puestos_ids)
 
     @staticmethod
-    def _la_ve_como_puesto(ctx: ContextoAcceso, s: Solicitud) -> bool:
-        """El puesto que la finaliza y, con cambio de puerto, también el primero,
-        que solo la consulta (2026-11-13)."""
-        return ctx.es_admin or (ctx.es_puerto and (
-            s.puesto_control_id in ctx.puestos_ids or s.puesto_destino_id in ctx.puestos_ids
-        ))
-
-    @staticmethod
     def _tiene_conflicto(ctx: ContextoAcceso, s: Solicitud) -> bool:
         """Separación de funciones: nadie revisa lo que creó ni lo de su agencia."""
         return s.creada_por_id == ctx.usuario.id or (
@@ -264,10 +264,10 @@ class ServicioSolicitud:
         )
 
     def puede_ver(self, ctx: ContextoAcceso, s: Solicitud) -> bool:
-        """La ven su agencia y el admin; UCVMM y el supervisor de sector, si es de un
-        puesto de sus sectores; el supervisor general, si es de un trámite que
-        supervisa (el de Técnico, 2026-11-16); el puesto de control, solo las de sus
-        puestos (con cambio de puerto, los dos) y desde que se aprueban. La consulta
+        """La ven su agencia y el admin; UCVMM y el supervisor de sector, si es de
+        sus sectores; el supervisor general, si es de un trámite que
+        supervisa (el de Técnico, 2026-11-16); el puesto de control, solo las que
+        finaliza (con cambio de puerto, el nuevo) y desde que se aprueban. La consulta
         histórica aplica lo mismo en SQL (`_alcance_historico`): si cambias uno,
         cambia el otro."""
         if ctx.ve_todos_los_sectores or ctx.es_de_su_agencia(s):
@@ -276,7 +276,7 @@ class ServicioSolicitud:
             return True
         if ctx.supervisa_tramite(s):
             return True
-        return s.aprobada_en is not None and self._la_ve_como_puesto(ctx, s)
+        return s.aprobada_en is not None and self._es_del_puerto(ctx, s)
 
     def acciones(self, ctx: ContextoAcceso, s: Solicitud) -> AccionesSolicitud:
         ahora      = ahora_utc()
@@ -290,17 +290,23 @@ class ServicioSolicitud:
             corregir=ctx.es_de_su_agencia(s) and s.estado == Estado.EN_CORRECCION.value and en_plazo,
             revisar=revisable and not conflicto,
             finalizar=del_puerto,
-            descargar_autorizacion=(
-                s.estado in (Estado.APROBADA.value, Estado.FINALIZADA.value) and self.puede_ver(ctx, s)
-            ),
+            descargar_autorizacion=self._hay_pdf(ctx, s) and self.puede_ver(ctx, s),
             conflicto_revision=conflicto,
             generar_boleta=gestiona_boleta and not any(b.vigente for b in s.boletas),
             anular_boleta=gestiona_boleta and any(b.vigente for b in s.boletas),
+            ver_registro=ctx.ve_registro(s),
         )
+
+    @staticmethod
+    def _hay_pdf(ctx: ContextoAcceso, s: Solicitud) -> bool:
+        """La autorización en PDF: aprobada o finalizada. La que se aprobó y venció sin
+        finalizarse la ve el SNM, con su sello (2026-11-22); la agencia no."""
+        vencida = s.estado == Estado.EXPIRADA.value and s.aprobada_en is not None
+        return s.estado in (Estado.APROBADA.value, Estado.FINALIZADA.value) or (vencida and ctx.es_personal_snm)
 
     def puede_gestionar_boleta(self, ctx: ContextoAcceso, s: Solicitud) -> bool:
         """Generan y anulan la boleta de recargo (2026-11-16) UCVMM y el supervisor de
-        sector (de sus sectores), el puesto de control (de los puestos que la ven) y el
+        sector (de sus sectores), el puesto de control que la finaliza y el
         Administrador, si la solicitud lleva recargo. La agencia y el supervisor
         general, no."""
         if s.costo_fuera_de_horario is None or s.aprobada_en is None:
@@ -311,7 +317,7 @@ class ServicioSolicitud:
         return (
             ctx.es_admin
             or ((ctx.es_revisor or ctx.es_supervisor_sector) and ctx.en_sus_sectores(s))
-            or (ctx.es_puerto and s.aprobada_en is not None and self._la_ve_como_puesto(ctx, s))
+            or (s.aprobada_en is not None and self._es_del_puerto(ctx, s))
         )
 
     async def obtener(self, ctx: ContextoAcceso, solicitud_id: int, *, bloquear: bool = False) -> Solicitud:
@@ -333,30 +339,49 @@ class ServicioSolicitud:
         self, ctx: ContextoAcceso, solicitud_id: int, documento_id: int,
     ) -> tuple[Solicitud, DocumentoSolicitud, Path]:
         """Un documento del expediente y su ruta en disco (validada dentro de
-        STORAGE_PATH). Lo ve quien puede ver la solicitud."""
+        STORAGE_PATH), si sigue siendo el que se subió. Lo ve quien puede ver la solicitud;
+        uno retirado en una corrección, quien ve el registro (2026-11-22)."""
         s = await self.obtener(ctx, solicitud_id)
         documento = next((d for d in s.documentos if d.id == documento_id), None)
-        if not documento:
+        if documento is None and ctx.ve_registro(s):
+            documento = await self.repo.documento_retirado(s.id, documento_id)
+        if documento is None:
             raise _error(status.HTTP_404_NOT_FOUND, "Documento no encontrado en esta solicitud.")
-        ruta = almacenamiento.ruta_segura(documento.ruta)
-        if not ruta or not ruta.is_file():
-            logger.error("[solicitudes] Falta en disco el documento %s de la solicitud %s.", documento.id, s.id)
+        return s, documento, await self._archivo_intacto(documento.ruta, documento.sha256, f"El documento {documento.id}")
+
+    @staticmethod
+    async def _archivo_intacto(ruta: str, sha256: str | None, que_es: str) -> Path:
+        """La ruta en disco de un archivo, si está y coincide con su huella (2026-11-22):
+        dentro de muchos años, lo que se ve es lo que se subió o se emitió."""
+        archivo = almacenamiento.ruta_segura(ruta)
+        if not archivo or not archivo.is_file():
+            logger.error("[archivos] %s no está en el disco (%s).", que_es, ruta)
             raise _error(status.HTTP_404_NOT_FOUND, "El archivo no está disponible. Avisa al administrador.")
-        return s, documento, ruta
+        if sha256 and await asyncio.to_thread(almacenamiento.huella_de, archivo) != sha256:
+            logger.error("[archivos] %s no coincide con su huella (%s): se dañó o alguien lo cambió.", que_es, ruta)
+            raise _error(status.HTTP_409_CONFLICT,
+                         "El archivo no coincide con el original: se dañó o alguien lo cambió. Avisa al administrador.")
+        return archivo
 
     # ── Bandejas ─────────────────────────────────────────────────────────────
 
     async def _pagina(
         self, ctx: ContextoAcceso, filtros: FiltrosBandeja, consulta: ConsultaBandeja | ConsultaHistorica, orden: str,
     ) -> PaginaSolicitudes:
-        total, conteos, items = await self.repo.listar(
+        pagina = await self.repo.listar(
             filtros, pagina=consulta.pagina, por_pagina=consulta.por_pagina, orden=orden,
         )
-        alertas = await self.repo.alertas_de([s.id for s in items])
+        ids = [s.id for s in pagina.solicitudes]
+        alertas = await self.repo.alertas_de(ids)
+        # Al buscar un tripulante, cuál de ellos es (consulta histórica, 2026-11-22).
+        encontrados = await self.repo.tripulantes_encontrados(ids, filtros.pasajero) if filtros.pasajero else None
         return PaginaSolicitudes(
-            total=total, pagina=consulta.pagina, por_pagina=consulta.por_pagina, conteos=conteos,
-            items=[self.construir_resumen(s, interno=ctx.es_personal_snm, alertas=alertas.get(s.id, (0, False)))
-                   for s in items],
+            total=pagina.total, pagina=consulta.pagina, por_pagina=consulta.por_pagina, conteos=pagina.conteos,
+            autorizadas=pagina.autorizadas,
+            items=[self.construir_resumen(
+                s, interno=ctx.es_personal_snm, alertas=alertas.get(s.id, (0, False)),
+                encontrados=None if encontrados is None else encontrados.get(s.id, []),
+            ) for s in pagina.solicitudes],
         )
 
     @staticmethod
@@ -387,13 +412,13 @@ class ServicioSolicitud:
             )
 
     async def bandeja_revision(self, ctx: ContextoAcceso, consulta: ConsultaBandeja) -> PaginaSolicitudes:
-        """Las solicitudes de los puestos de sus sectores, para UCVMM (el admin,
-        todas). Las pendientes salen en orden de llegada (la más antigua primero)."""
+        """Las solicitudes de sus sectores, para UCVMM (el admin, todas). Las
+        pendientes salen en orden de llegada (la más antigua primero)."""
         if not ctx.puede_revisar:
             raise _error(status.HTTP_403_FORBIDDEN, f"No tienes el permiso requerido: {PERMISO_REVISAR}.")
         self._exigir_sector(ctx)
         orden = "cola" if consulta.estado == Estado.EN_REVISION.value else "recientes"
-        filtros = self._filtros(consulta, puestos_ids=None if ctx.es_admin else ctx.puestos_de_sectores)
+        filtros = self._filtros(consulta, sectores=None if ctx.es_admin else ctx.alcance_sectores)
         return await self._pagina(ctx, filtros, consulta, orden)
 
     async def bandeja_supervision(self, ctx: ContextoAcceso, consulta: ConsultaBandeja) -> PaginaSolicitudes:
@@ -404,7 +429,7 @@ class ServicioSolicitud:
             raise _error(status.HTTP_403_FORBIDDEN, "No tienes permiso para supervisar las solicitudes.")
         self._exigir_sector(ctx)
         alcance = None if ctx.es_admin else AlcanceSnm(
-            puestos=frozenset(ctx.puestos_de_sectores) if ctx.es_supervisor_sector else frozenset(),
+            sectores=ctx.alcance_sectores if ctx.es_supervisor_sector else None,
             supervision_general=ctx.es_supervisor_general,
         )
         filtros = self._filtros(consulta, alcance_snm=alcance)
@@ -427,18 +452,19 @@ class ServicioSolicitud:
     def _alcance_historico(self, ctx: ContextoAcceso) -> AlcanceSnm | None:
         """Lo que ve en la consulta histórica: lo mismo que `puede_ver`, sin la vía
         de la agencia (la consulta es del personal del SNM). None = todas. El
-        supervisor general no la tiene (2026-11-16): con otro permiso que la abra,
-        también le muestra lo que supervisa, como el expediente."""
+        supervisor general (2026-11-16) y el puesto de control (2026-11-22) no la
+        tienen: con otro permiso que la abra, también les muestra lo suyo, como el
+        expediente."""
         if not ctx.ve_historico:
             raise _error(status.HTTP_403_FORBIDDEN,
-                         "La consulta histórica es para UCVMM, los supervisores de sector y el puesto de control.")
+                         "La consulta histórica es para UCVMM y los supervisores de sector.")
         if ctx.ve_todos_los_sectores:
             return None
         de_sector = ctx.es_revisor or ctx.es_supervisor_sector
         if de_sector and not ctx.es_puerto:
             self._exigir_sector(ctx)
         return AlcanceSnm(
-            puestos=frozenset(ctx.puestos_de_sectores) if de_sector else frozenset(),
+            sectores=ctx.alcance_sectores if de_sector else None,
             puestos_aprobadas=frozenset(ctx.puestos_ids) if ctx.es_puerto else frozenset(),
             supervision_general=ctx.es_supervisor_general,
         )
@@ -447,7 +473,8 @@ class ServicioSolicitud:
         return FiltrosBandeja(
             alcance_snm=self._alcance_historico(ctx), agencia_id=consulta.agencia_id,
             puesto_id=consulta.puesto_id, tipo_tramite_id=consulta.tipo_tramite_id, estado=consulta.estado,
-            texto=consulta.texto, pasajero=consulta.pasajero, fuera_de_horario=consulta.fuera_de_horario,
+            texto=consulta.texto, pasajero=consulta.pasajero, autorizadas=consulta.autorizadas,
+            fuera_de_horario=consulta.fuera_de_horario,
             fecha_por=consulta.fecha, desde=consulta.desde, hasta=consulta.hasta,
         )
 
@@ -464,13 +491,19 @@ class ServicioSolicitud:
     async def opciones_historico(self, ctx: ContextoAcceso) -> SalidaOpcionesHistorico:
         alcance = self._alcance_historico(ctx)
         puestos = await self.repo_catalogos.listar_puestos()
+        # Los que ya no son de su sector, pero de los que conserva solicitudes (2026-11-22).
+        de_antes: set[int] = set()
         if alcance is not None and not alcance.supervision_general:
-            visibles = alcance.puestos | alcance.puestos_aprobadas
-            puestos = [p for p in puestos if p.id in visibles]
+            sectores = alcance.sectores or AlcanceSectores()
+            de_hoy = sectores.puestos | alcance.puestos_aprobadas
+            de_antes = await self.repo.puestos_revisados_por(sectores.sectores) - de_hoy
+            puestos = [p for p in puestos if p.id in de_hoy or p.id in de_antes]
         return SalidaOpcionesHistorico(
             agencias=[OpcionFiltro(id=a.id, nombre=a.nombre, activo=a.activo)
                       for a in await self.repo_catalogos.listar_agencias()],
-            puestos=[OpcionFiltro(id=p.id, nombre=p.nombre, activo=p.activo) for p in puestos],
+            puestos=[OpcionFiltro(id=p.id, activo=p.activo,
+                                  nombre=f"{p.nombre} (hoy, {p.sector.nombre})" if p.id in de_antes else p.nombre)
+                     for p in puestos],
             tramites=[OpcionFiltro(id=t.id, nombre=t.nombre, activo=t.activo)
                       for t in await self.repo_tramites.listar_tipos(solo_activos=False)],
         )
@@ -505,7 +538,7 @@ class ServicioSolicitud:
                     numero=s.numero, estado=s.estado, tramite=s.tipo_tramite.nombre, agencia=s.agencia_nombre,
                     puesto=(f"{s.puesto_nombre} → {s.puesto_destino_nombre}" if s.puesto_destino_nombre
                             else s.puesto_nombre),
-                    sector=s.puesto.sector.nombre if s.puesto and s.puesto.sector else None,
+                    sector=s.sector.nombre,
                     buque=s.nombre_buque, imo=s.imo, fecha_operacion=s.fecha_operacion,
                     pasajeros=s.cantidad_tripulantes, enviada_en=s.enviada_en, aprobada_en=s.aprobada_en,
                     finalizada_en=s.finalizada_en,
@@ -520,7 +553,8 @@ class ServicioSolicitud:
                 agencia=agencia.nombre if agencia else (f"#{consulta.agencia_id}" if consulta.agencia_id else None),
                 puesto=puesto.nombre if puesto else (f"#{consulta.puesto_id}" if consulta.puesto_id else None),
                 tramite=tipo.nombre if tipo else (f"#{consulta.tipo_tramite_id}" if consulta.tipo_tramite_id else None),
-                estado=consulta.estado, fuera_de_horario=consulta.fuera_de_horario, fecha=consulta.fecha,
+                estado=consulta.estado, autorizadas=consulta.autorizadas,
+                fuera_de_horario=consulta.fuera_de_horario, fecha=consulta.fecha,
                 desde=consulta.desde, hasta=consulta.hasta,
             ),
             alcance=await self._texto_alcance(ctx),
@@ -786,6 +820,7 @@ class ServicioSolicitud:
             ruta=almacenamiento.ruta_relativa(carpeta / archivo.nombre_almacenado),
             tipo_mime=archivo.tipo_mime,
             tamano=archivo.tamano,
+            sha256=archivo.sha256,
             subido_por_id=usuario.id,
         )
 
@@ -926,10 +961,15 @@ class ServicioSolicitud:
         carpeta = almacenamiento.carpeta_solicitud(s.id)
         nuevos = await almacenamiento.guardar_archivos(carpeta, archivos)
         retirados = [d for d in s.documentos if d.id not in conservados]
-        rutas_retiradas = [d.ruta for d in retirados]
         try:
+            # Lo que se había enviado se conserva (2026-11-22): la foto y los documentos que
+            # salen, con el nombre de su tripulante. Antes se borraban para siempre.
+            ahora = ahora_utc()
+            await self._guardar_version(s, ctx.usuario, ahora)
             for documento in retirados:
-                s.documentos.remove(documento)
+                dueno = existentes.get(documento.tripulante_id) if documento.tripulante_id else None
+                documento.retirado_en = ahora
+                documento.tripulante_nombre = dueno.nombre_completo if dueno else None
             # La corrección se validó con las reglas de hoy: la foto se vuelve a tomar.
             s.casillas.clear()
 
@@ -954,8 +994,9 @@ class ServicioSolicitud:
             anterior = s.estado
             self._aplicar_cabecera(s, tipo, datos, puesto, destino, imo, len(tripulantes))
             s.estado           = Estado.EN_REVISION.value
-            s.enviada_en       = ahora_utc()
+            s.enviada_en       = ahora
             s.plazo_correccion = None
+            s.sector_revision_id = None   # la revisa el sector que tenga el puesto
             s.impedimentos_verificados        = False
             s.comentario_impedimentos         = None
             s.impedimentos_verificados_en     = None
@@ -975,14 +1016,84 @@ class ServicioSolicitud:
             for archivo in nuevos:
                 almacenamiento.borrar_archivo(archivo.ruta)
             raise
-
-        # Los documentos retirados se borran del disco cuando la corrección
-        # quede confirmada en la BD: si el commit fallara, siguen ahí.
-        def borrar_retirados() -> None:
-            for ruta in rutas_retiradas:
-                almacenamiento.borrar_archivo(ruta)
-        al_confirmar(self.sesion, borrar_retirados)
         return await self._recargar(s.id)
+
+    async def _guardar_version(self, s: Solicitud, usuario: Usuario, ahora: datetime) -> None:
+        """La foto de lo que se había enviado, antes de que la corrección lo cambie."""
+        def ultimo(*tipos: TipoEventoSolicitud) -> EventoSolicitud | None:
+            valores = {t.value for t in tipos}
+            return next((ev for ev in reversed(s.eventos) if ev.tipo in valores), None)
+
+        envio, devolucion = ultimo(TipoEventoSolicitud.CREADA, TipoEventoSolicitud.CORREGIDA), ultimo(TipoEventoSolicitud.DEVUELTA)
+        self.repo.agregar_registro(VersionSolicitud(
+            solicitud_id=s.id, numero=len(await self.repo.versiones(s.id)) + 1,
+            enviada_en=s.enviada_en, enviada_por=envio.usuario_nombre if envio else None,
+            devuelta_en=devolucion.creado_en if devolucion else None,
+            devuelta_por=devolucion.usuario_nombre if devolucion else None, motivo=s.motivo_devolucion,
+            corregida_en=ahora, corregida_por=usuario.full_name,
+            datos=foto(s, await self._nombre_pais(s.bandera)),
+        ))
+
+    # ── Historial completo (2026-11-22) ──────────────────────────────────────
+
+    async def _para_registro(self, ctx: ContextoAcceso, solicitud_id: int) -> Solicitud:
+        s = await self.obtener(ctx, solicitud_id)
+        if not ctx.ve_registro(s):
+            raise _error(status.HTTP_403_FORBIDDEN, "El historial completo lo ve el personal de UCVMM que la revisa.")
+        return s
+
+    async def registro(self, ctx: ContextoAcceso, solicitud_id: int) -> tuple[Solicitud, SalidaRegistro]:
+        """Lo que se envió en cada versión y qué cambió, y todos los archivos con su
+        huella: los vigentes, los retirados y las autorizaciones emitidas."""
+        s = await self._para_registro(ctx, solicitud_id)
+        versiones = await self.repo.versiones(s.id)
+        fotos = [v.datos for v in versiones]
+        if versiones:
+            fotos.append(foto(s, await self._nombre_pais(s.bandera)))
+        archivos = [
+            SalidaArchivo(
+                clase="documento", id=d.id, documento=d.documento.nombre if d.documento else DOCUMENTO_ADICIONAL,
+                tripulante=d.tripulante_nombre or (d.tripulante.nombre_completo if d.tripulante else None),
+                nombre=d.nombre_original, tamano=d.tamano, tipo_mime=almacenamiento.mime_del_formato(d.nombre_almacenado),
+                sha256=d.sha256, fecha=d.created_at, por=por, retirado_en=d.retirado_en,
+            )
+            for d, por in await self.repo.archivos(s.id)
+        ] + [
+            SalidaArchivo(
+                clase="emitido", id=x.id, documento=_ETIQUETA_EMITIDO[x.tipo], nombre=self.nombre_emitido(s, x),
+                tamano=x.tamano, tipo_mime="application/pdf", sha256=x.sha256, fecha=x.emitido_en,
+            )
+            for x in await self.repo.emitidos(s.id)
+        ]
+        # Una devuelta sin corregir todavía no guarda su versión.
+        corregidas = (s.veces_devuelta or 0) - (1 if s.estado == Estado.EN_CORRECCION.value else 0)
+        return s, SalidaRegistro(
+            versiones=[
+                SalidaVersion(
+                    numero=v.numero, enviada_en=v.enviada_en, enviada_por=v.enviada_por, devuelta_en=v.devuelta_en,
+                    devuelta_por=v.devuelta_por, motivo=v.motivo, corregida_en=v.corregida_en, corregida_por=v.corregida_por,
+                    datos=v.datos["datos"], tripulantes=v.datos["tripulantes"], documentos=v.datos["documentos"],
+                    cambios=comparar(antes, despues),
+                )
+                for v, antes, despues in zip(versiones, fotos, fotos[1:], strict=False)
+            ],
+            sin_version=max(corregidas - len(versiones), 0),
+            archivos=archivos,
+        )
+
+    @staticmethod
+    def nombre_emitido(s: Solicitud, x: DocumentoEmitido) -> str:
+        return f"Autorizacion-{s.numero or s.id}-{x.tipo}.pdf"
+
+    async def obtener_emitido(
+        self, ctx: ContextoAcceso, solicitud_id: int, emitido_id: int,
+    ) -> tuple[Solicitud, DocumentoEmitido, Path]:
+        """Una autorización tal como se emitió, si sigue intacta."""
+        s = await self._para_registro(ctx, solicitud_id)
+        emitido = next((x for x in await self.repo.emitidos(s.id) if x.id == emitido_id), None)
+        if emitido is None:
+            raise _error(status.HTTP_404_NOT_FOUND, "Autorización no encontrada en esta solicitud.")
+        return s, emitido, await self._archivo_intacto(emitido.ruta, emitido.sha256, f"La autorización emitida {emitido.id}")
 
     # ── UCVMM: revisión ──────────────────────────────────────────────────────
 
@@ -1082,6 +1193,7 @@ class ServicioSolicitud:
 
         anterior = s.estado
         s.estado                 = Estado.APROBADA.value
+        s.sector_revision_id     = s.puesto.sector_id
         s.aprobada_en            = ahora_utc()
         s.aprobada_por_id        = ctx.usuario.id
         s.observacion_aprobacion = observacion
@@ -1097,10 +1209,11 @@ class ServicioSolicitud:
     async def devolver(self, ctx: ContextoAcceso, solicitud_id: int, motivo: str) -> Solicitud:
         s = await self._para_revision(ctx, solicitud_id)
         anterior = s.estado
-        s.estado            = Estado.EN_CORRECCION.value
-        s.motivo_devolucion = motivo
-        s.plazo_correccion  = ahora_utc() + timedelta(days=configuracion.PLAZO_CORRECCION_DIAS)
-        s.veces_devuelta    = (s.veces_devuelta or 0) + 1
+        s.estado             = Estado.EN_CORRECCION.value
+        s.sector_revision_id = s.puesto.sector_id
+        s.motivo_devolucion  = motivo
+        s.plazo_correccion   = ahora_utc() + timedelta(days=configuracion.PLAZO_CORRECCION_DIAS)
+        s.veces_devuelta     = (s.veces_devuelta or 0) + 1
         self._registrar_evento(s, ctx.usuario, TipoEventoSolicitud.DEVUELTA, anterior, s.estado, motivo)
         await self.repo.guardar()
         return await self._recargar(s.id)
@@ -1108,10 +1221,11 @@ class ServicioSolicitud:
     async def negar(self, ctx: ContextoAcceso, solicitud_id: int, motivo: str) -> Solicitud:
         s = await self._para_revision(ctx, solicitud_id)
         anterior = s.estado
-        s.estado          = Estado.NEGADA.value
-        s.negada_en       = ahora_utc()
-        s.negada_por_id   = ctx.usuario.id
-        s.motivo_negacion = motivo
+        s.estado             = Estado.NEGADA.value
+        s.sector_revision_id = s.puesto.sector_id
+        s.negada_en          = ahora_utc()
+        s.negada_por_id      = ctx.usuario.id
+        s.motivo_negacion    = motivo
         self._registrar_evento(s, ctx.usuario, TipoEventoSolicitud.NEGADA, anterior, s.estado, motivo)
         await self.repo.guardar()
         return await self._recargar(s.id)
@@ -1122,7 +1236,7 @@ class ServicioSolicitud:
         s = await self.obtener(ctx, solicitud_id, bloquear=True)
         if not self._es_del_puerto(ctx, s):
             if s.puesto_destino_id is not None:
-                # El primer puesto de un cambio de puerto la ve, pero no la finaliza.
+                # La ve por otro permiso (UCVMM de su sector, también en el primer puesto).
                 raise _error(status.HTTP_403_FORBIDDEN,
                              f"La autorización tiene cambio de puerto: la finaliza {s.puesto_destino_nombre}.")
             raise _error(status.HTTP_403_FORBIDDEN, "La solicitud no corresponde a tus puestos de control.")
@@ -1217,8 +1331,14 @@ class ServicioSolicitud:
 
     def construir_resumen(
         self, s: Solicitud, *, interno: bool, alertas: tuple[int, bool] | None = None,
+        encontrados: list[tuple[str, str]] | None = None,
     ) -> SalidaSolicitudResumen:
-        return SalidaSolicitudResumen(**self._campos_resumen(s, interno=interno, alertas=alertas))
+        return SalidaSolicitudResumen(
+            **self._campos_resumen(s, interno=interno, alertas=alertas),
+            tripulantes_encontrados=None if encontrados is None else [
+                SalidaTripulanteEncontrado(nombre=nombre, pasaporte=pasaporte) for nombre, pasaporte in encontrados
+            ],
+        )
 
     def _campos_resumen(self, s: Solicitud, *, interno: bool, alertas: tuple[int, bool] | None = None) -> dict:
         """`interno`: quien consulta es del SNM. Lo interno no le llega a la agencia.
@@ -1237,8 +1357,10 @@ class ServicioSolicitud:
             tipo_tramite_codigo=s.tipo_tramite.codigo, tipo_tramite_nombre=s.tipo_tramite.nombre,
             agencia_id=s.agencia_id, agencia_nombre=s.agencia_nombre, puesto_nombre=s.puesto_nombre,
             puesto_destino_nombre=s.puesto_destino_nombre, operacion=s.operacion, dias_sellado=s.dias_sellado,
-            # El sector del puesto, para el SNM (la agencia no trabaja con sectores).
-            sector_nombre=s.puesto.sector.nombre if interno and s.puesto else None,
+            # El sector que la revisó (o el del puesto, sin revisar), para el SNM: la agencia
+            # no trabaja con sectores. Si el puesto ya es de otro, también el de hoy (2026-11-22).
+            sector_nombre=s.sector.nombre if interno else None,
+            sector_actual_nombre=s.puesto.sector.nombre if interno and s.puesto.sector_id != s.sector_id else None,
             nombre_buque=s.nombre_buque, imo=s.imo, fecha_operacion=s.fecha_operacion,
             cantidad_tripulantes=s.cantidad_tripulantes,
             creada_por=s.creada_por.full_name if s.creada_por else None,
@@ -1527,13 +1649,17 @@ class ServicioSolicitud:
             return False
         return hoy_panama() <= s.fecha_operacion + timedelta(days=configuracion.DIAS_PDF_PUBLICO)
 
-    async def pdf_publico(self, codigo: str) -> DatosPdfAutorizacion | None:
-        """La copia de la agencia, para quien escanea el QR. None si el código no
+    async def pdf_publico(self, codigo: str) -> tuple[Solicitud | None, DatosPdfAutorizacion | None]:
+        """La copia de la agencia, para quien escanea el QR. (None, None) si el código no
         existe o si ya no se puede ver así (la ruta lleva a la verificación, que
         explica por qué)."""
         s = await self.repo.buscar_por_codigo_verificacion(codigo)
         if not s or not self.pdf_publico_disponible(s):
-            return None
+            return None, None
+        return s, await self._datos_pdf(s, interno=False)
+
+    async def datos_para_emitir(self, s: Solicitud) -> DatosPdfAutorizacion:
+        """La copia de la agencia, para guardarla tal como se emite (infrastructure/emision.py)."""
         return await self._datos_pdf(s, interno=False)
 
     async def _datos_pdf(self, s: Solicitud, *, interno: bool) -> DatosPdfAutorizacion:
@@ -1570,6 +1696,7 @@ class ServicioSolicitud:
             costo_fuera_de_horario=s.costo_fuera_de_horario,
             vigente_hasta=s.vigente_hasta.astimezone(ZONA_PANAMA) if s.vigente_hasta else None,
             finalizada_en=s.finalizada_en.astimezone(ZONA_PANAMA) if s.finalizada_en else None,
+            expirada_en=s.expirada_en.astimezone(ZONA_PANAMA) if s.expirada_en else None,
             puesto_finalizacion=s.puesto_finalizacion_nombre,
             finalizada_por=f"{finalizador} (Puesto de control)" if finalizador else None,
             url_verificacion=self.url_verificacion(s.codigo_verificacion),
@@ -1630,12 +1757,11 @@ class ServicioSolicitud:
             elegido = next((x for x in elegibles if x.id == sector_id), None)
             if elegido is None:
                 raise _error(status.HTTP_403_FORBIDDEN, "No puedes ver las estadísticas de ese sector.")
-            return AlcanceEstadisticas({pu.id for pu in elegido.puestos}, elegido.nombre, elegido.id, opciones,
-                                       ctx.ve_todos_los_sectores)
+            alcance = AlcanceSectores(frozenset({elegido.id}), frozenset(pu.id for pu in elegido.puestos))
+            return AlcanceEstadisticas(alcance, elegido.nombre, elegido.id, opciones, ctx.ve_todos_los_sectores)
         if ctx.ve_todos_los_sectores:
             return AlcanceEstadisticas(None, "Todos los sectores", None, opciones, True)
-        return AlcanceEstadisticas(set(ctx.puestos_de_sectores), " y ".join(n for _, n in opciones), None, opciones,
-                                   False)
+        return AlcanceEstadisticas(ctx.alcance_sectores, " y ".join(n for _, n in opciones), None, opciones, False)
 
     async def estadisticas(
         self, desde: date | None, hasta: date | None, alcance: AlcanceEstadisticas | None = None,
@@ -1643,22 +1769,22 @@ class ServicioSolicitud:
         """Lo que pasó con las solicitudes recibidas en el periodo: por día, por
         mes y por año, más las aprobadas fuera del horario laboral (las 50 más
         recientes) y las aprobadas por día de la semana y hora (el mapa de horas).
-        Solo las de los puestos del alcance (sin alcance, todas)."""
-        puestos = alcance.puestos_ids if alcance else None
-        hitos = await self.repo.contar_hitos(desde, hasta, puestos)
+        Solo las de los sectores del alcance (sin alcance, todas)."""
+        sectores = alcance.filtro if alcance else None
+        hitos = await self.repo.contar_hitos(desde, hasta, sectores)
 
         # La serie se cuenta por día y se agrupa aquí: los últimos días, meses y
         # años del periodo (con «Todo», hasta hoy).
         hoy = hoy_panama()
         fin = min(hasta, hoy) if hasta else hoy
-        diaria = await self.repo.serie_diaria(desde, hasta, puestos)
+        diaria = await self.repo.serie_diaria(desde, hasta, sectores)
         inicio_dias = max(desde or date.min, fin - timedelta(days=DIAS_EN_SERIE - 1))
         inicio_meses = max(desde or date.min, meses_antes(fin, MESES_EN_SERIE - 1))
         inicio_anios = max(desde or min(diaria, default=fin), date(fin.year - ANIOS_EN_SERIE + 1, 1, 1))
 
         return SalidaEstadisticasSolicitudes(
             recibidas=int(hitos["recibidas"] or 0),
-            por_estado=await self.repo.contar_por_estado(desde, hasta, puestos),
+            por_estado=await self.repo.contar_por_estado(desde, hasta, sectores),
             aprobadas=int(hitos["aprobadas"] or 0),
             negadas=int(hitos["negadas"] or 0),
             expiradas=int(hitos["expiradas"] or 0),
@@ -1671,18 +1797,18 @@ class ServicioSolicitud:
             operaciones_fuera_horario=[
                 FilaFueraHorario(id=f.id, numero=f.numero, tipo_tramite=f.tipo_tramite, puesto=f.puesto,
                                  aprobada_en=f.aprobada_en, aprobada_por=f.aprobada_por)
-                for f in await self.repo.listar_fuera_horario(desde, hasta, MAX_FUERA_HORARIO_LISTADAS, puestos)
+                for f in await self.repo.listar_fuera_horario(desde, hasta, MAX_FUERA_HORARIO_LISTADAS, sectores)
             ],
             aprobadas_por_hora=[
                 FilaPorHora(dia=int(f.dia), hora=int(f.hora), total=f.total)
-                for f in await self.repo.aprobadas_por_hora(desde, hasta, puestos)
+                for f in await self.repo.aprobadas_por_hora(desde, hasta, sectores)
             ],
             por_tipo=[
                 FilaEstadisticaTipo(
                     codigo=f.codigo, nombre=f.nombre,
                     recibidas=f.recibidas, aprobadas=f.aprobadas, negadas=f.negadas, expiradas=f.expiradas,
                 )
-                for f in await self.repo.contar_por_tipo(desde, hasta, puestos)
+                for f in await self.repo.contar_por_tipo(desde, hasta, sectores)
             ],
             por_dia=serie(diaria, periodos_dia(inicio_dias, fin), lambda d: d.isoformat()),
             por_mes=serie(diaria, periodos_mes(inicio_meses, fin), lambda d: f"{d.year:04d}-{d.month:02d}"),
@@ -1690,7 +1816,7 @@ class ServicioSolicitud:
             por_puesto=[
                 FilaEstadisticaPuesto(puesto=f.nombre, aprobadas=f.aprobadas, finalizadas=f.finalizadas,
                                       expiradas=f.expiradas)
-                for f in await self.repo.contar_por_puesto(desde, hasta, puestos)
+                for f in await self.repo.contar_por_puesto(desde, hasta, sectores)
             ],
             alcance=alcance.texto if alcance else "Todos los sectores",
             sector_id=alcance.sector_id if alcance else None,

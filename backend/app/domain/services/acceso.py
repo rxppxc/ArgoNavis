@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 
 from app.domain.models.solicitud import Solicitud
 from app.domain.models.user import Usuario
+from app.domain.repositories.solicitud_repository import AlcanceSectores
 
 
 @dataclass
@@ -12,7 +13,8 @@ class ContextoAcceso:
     """Quién es el usuario dentro del flujo (se calcula una vez por request).
 
     Sectores (2026-11-10): UCVMM y los supervisores de sector ven solo las
-    solicitudes de los puestos de sus sectores (`puestos_de_sectores`); el
+    solicitudes de sus sectores (`Solicitud.sector_id`): las de sus puestos y, ya
+    revisadas, las que revisó su sector aunque el puesto haya cambiado (2026-11-22). El
     Administrador, las de todos. El supervisor general (2026-11-16), las de los
     trámites que supervisa (`tipos_tramite.supervision_general`: el de Técnico),
     de los dos sectores."""
@@ -50,16 +52,34 @@ class ContextoAcceso:
 
     @property
     def ve_historico(self) -> bool:
-        """La consulta histórica: UCVMM, el supervisor de sector, el puesto de control
-        y el Administrador. El supervisor general, no (2026-11-16)."""
-        return self.es_admin or self.es_revisor or self.es_puerto or self.es_supervisor_sector
+        """La consulta histórica: UCVMM, el supervisor de sector y el Administrador. El
+        supervisor general, no (2026-11-16); el puesto de control tampoco desde el
+        2026-11-22: consulta las suyas en su bandeja."""
+        return self.es_admin or self.es_revisor or self.es_supervisor_sector
+
+    @property
+    def alcance_sectores(self) -> AlcanceSectores:
+        """Sus sectores, para filtrar en la BD: lo mismo que `en_sus_sectores`."""
+        return AlcanceSectores(frozenset(self.sectores_ids), frozenset(self.puestos_de_sectores))
 
     def en_sus_sectores(self, s: Solicitud) -> bool:
-        return self.ve_todos_los_sectores or s.puesto_control_id in self.puestos_de_sectores
+        return self.ve_todos_los_sectores or s.sector_id in self.sectores_ids
 
     def puede_revisar_esta(self, s: Solicitud) -> bool:
-        """Revisa las de los puestos de sus sectores (el Administrador, todas)."""
-        return self.es_admin or (self.es_revisor and s.puesto_control_id in self.puestos_de_sectores)
+        """Revisa las de sus sectores (el Administrador, todas)."""
+        return self.es_admin or (self.es_revisor and self.en_sus_sectores(s))
+
+    def ve_registro(self, s: Solicitud) -> bool:
+        """El historial completo (2026-11-22): lo que se había enviado antes de cada
+        corrección, los documentos retirados y las huellas. Lo ve el personal del SNM que
+        ve la solicitud antes de aprobarse: UCVMM y el supervisor de su sector, el supervisor
+        general (las de su trámite) y el Administrador. El puesto de control no, porque la
+        ve desde que se aprueba; la agencia tampoco, porque lleva lo interno del SNM."""
+        return (
+            self.ve_todos_los_sectores
+            or ((self.es_revisor or self.es_supervisor_sector) and self.en_sus_sectores(s))
+            or self.supervisa_tramite(s)
+        )
 
     @property
     def es_personal_snm(self) -> bool:
@@ -77,7 +97,7 @@ class AlcanceEstadisticas:
     """De qué solicitudes son las estadísticas de quien consulta (2026-11-10):
     las de sus sectores, o las de todos (Administrador y supervisor general), o
     las del sector que eligió."""
-    puestos_ids: set[int] | None          # None = todas
+    filtro:      AlcanceSectores | None   # None = todas
     texto:       str                      # "Todos los sectores", "Sector Pacífico"…
     sector_id:   int | None               # el sector elegido, si eligió uno
     sectores:    list[tuple[int, str]]    # los que puede elegir

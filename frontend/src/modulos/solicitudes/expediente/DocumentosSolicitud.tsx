@@ -46,7 +46,7 @@ export function DocumentosSolicitud({ solicitud, onVer, tripulanteId }: Props) {
   async function descargar(documento: DocumentoSolicitud) {
     setDescargando(documento.id);
     try {
-      await apiSolicitudes.descargarDocumento(solicitud.id, documento);
+      await apiSolicitudes.descargarArchivo(solicitud.id, documento);
     } catch (e) {
       mostrar(mensajeDeError(e, "No se pudo descargar el documento."), "error");
     } finally {

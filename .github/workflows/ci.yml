@@ -1,9 +1,10 @@
 # Integración continua de ARGO NAVIS (revisión del 2026-10-27).
 #
-#   backend    pytest sobre una BD PostgreSQL temporal (tests/conftest.py)
-#   frontend   tipos, lint, Vitest y build de producción
-#   e2e        el recorrido completo en el navegador (Playwright)
-#   auditoria  vulnerabilidades conocidas en las dependencias
+#   backend      pytest sobre una BD PostgreSQL temporal (tests/conftest.py)
+#   frontend     tipos, lint, Vitest y build de producción
+#   e2e          el recorrido completo en el navegador (Playwright)
+#   contenedores la pila de producción (docker-compose-prod.yml): arranca y pasa la revisión
+#   auditoria    vulnerabilidades conocidas en las dependencias
 #
 # Corre en cada push a main y en los pull request. La auditoría corre además
 # cada lunes, para avisar de vulnerabilidades nuevas aunque no haya cambios.
@@ -36,9 +37,17 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # La de docker-compose-prod.yml y la 18, la del servidor nuevo: la 15 se queda sin
+        # soporte en noviembre de 2027.
+        postgres: [15.20-alpine3.24, 18.7-alpine3.24]
+    # La 18 todavía no está en ningún servidor: si falla, se ve, pero no deja el push en rojo.
+    continue-on-error: ${{ matrix.postgres != '15.20-alpine3.24' }}
     services:
       postgres:
-        image: postgres:15.19-alpine3.24   # la de docker-compose-prod.yml
+        image: postgres:${{ matrix.postgres }}
         env:
           POSTGRES_PASSWORD: postgres
         ports: ["5432:5432"]
@@ -62,7 +71,7 @@ jobs:
           venv/bin/pip install -r requirements-dev.txt
       - name: Lint (ruff, backend/ruff.toml)
         working-directory: backend
-        run: venv/bin/python -m ruff check .
+        run: venv/bin/python -m ruff check --config ruff.toml . ../vigilar.py
       - name: Pruebas
         working-directory: backend
         run: venv/bin/python -m pytest -q
@@ -100,7 +109,7 @@ jobs:
     timeout-minutes: 30
     services:
       postgres:
-        image: postgres:15.19-alpine3.24   # la de docker-compose-prod.yml
+        image: postgres:15.20-alpine3.24   # la de docker-compose-prod.yml
         env:
           POSTGRES_PASSWORD: postgres
         ports: ["5432:5432"]
@@ -142,6 +151,90 @@ jobs:
           name: e2e-test-results
           path: frontend/test-results/
           retention-days: 7
+
+  contenedores:
+    # La pila de producción tal como se despliega (docker-compose-prod.yml): se construye,
+    # arranca y se revisa con el mismo guion que en el servidor. Un permiso o una carpeta
+    # que falte (los contenedores corren sin root y con la imagen de solo lectura) sale
+    # aquí y no al desplegar.
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      COMPOSE_FILE: docker-compose-prod.yml
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configuración de prueba (claves al azar)
+        run: |
+          cat > .env <<FIN
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD=$(openssl rand -hex 24)
+          POSTGRES_DB=argonavis
+          POSTGRES_APP_PASSWORD=$(openssl rand -hex 24)
+          SECRET_KEY=$(openssl rand -hex 32)
+          LDAP_HOST=127.0.0.1
+          LDAP_BASE_DN=DC=prueba
+          LDAP_BIND_USER=prueba
+          LDAP_BIND_PASSWORD=prueba
+          MAIL_HOST=
+          MAIL_FROM=no-reply@prueba.local
+          APP_URL=http://localhost
+          PERMITIR_LOGIN_LOCAL=true
+          FIN
+      - name: Una base como la de un servidor ya instalado (la versión anterior, arrancada como root)
+        run: |
+          docker volume create --label com.docker.compose.project=argonavis --label com.docker.compose.volume=postgres_data argonavis_postgres_data
+          docker run -d --name anterior --env-file .env -v argonavis_postgres_data:/var/lib/postgresql/data postgres:15.19-alpine3.24
+          timeout 90 bash -c 'until docker exec anterior pg_isready -q -h 127.0.0.1 -U postgres -d argonavis; do sleep 1; done'
+          docker exec anterior psql -q -U postgres -d argonavis -c 'CREATE TABLE de_antes AS SELECT 1 AS id'
+          docker stop anterior && docker rm anterior
+      - name: Construir y levantar
+        run: docker compose up -d --build --wait --wait-timeout 300
+      - name: La revisión del servidor
+        run: sudo bash verificar-despliegue.sh --solo-la-pila
+      - name: Los datos de antes siguen, y se entra después de reiniciar
+        run: |
+          test "$(docker compose exec -T postgres_db psql -U postgres -d argonavis -tAc 'SELECT count(*) FROM de_antes')" = 1
+          clave=$(docker compose exec -T backend python -m app.infrastructure.asignar_rol ci.sysadmin SysAdmin --crear-local | sed -n 's/.*se cambia al entrar): //p')
+          test -n "$clave"
+          docker compose restart
+          docker compose up -d --wait --wait-timeout 120
+          curl -fsS -H 'Content-Type: application/json' -d "{\"username\":\"ci.sysadmin\",\"password\":\"$clave\"}" \
+            http://localhost/api/v1/auth/login | grep -q '"access_token"'
+      - name: El respaldo se hace y se puede restaurar
+        run: |
+          en_el_backend() { docker compose exec -T backend sh -c "cd /app/storage/documentos && $1"; }
+          volumen=$(docker volume inspect argonavis_documentos --format '{{ .Mountpoint }}')
+          en_el_backend 'mkdir solicitud-1 && echo uno > solicitud-1/a.pdf'
+          sudo env DIR_BACKUPS=/tmp/respaldos bash backup.sh
+          sudo env DIR_BACKUPS=/tmp/respaldos bash probar-restauracion.sh
+          # Lo copiado es del mismo dueño que en el volumen (uid 10001) y, si se pierde, se recupera
+          # de la copia de otra noche y el backend lo puede usar.
+          copia=$(sudo find /tmp/respaldos/documentos -mindepth 1 -maxdepth 1 -name '20*' | sort | tail -n 1)
+          test "$(sudo find "$copia" -printf '%U ' | tr ' ' '\n' | grep . | sort -u)" = 10001
+          sudo rm -rf "$volumen/solicitud-1"
+          sleep 1
+          sudo env DIR_BACKUPS=/tmp/respaldos bash backup.sh | tee /tmp/respaldo.txt
+          grep -q 'OJO: 1 archivo(s) ya no están en el servidor' /tmp/respaldo.txt
+          copia=$(sudo find /tmp/respaldos/documentos -mindepth 1 -maxdepth 1 -name '20*' | sort | tail -n 1)
+          sudo cp -a "$copia/." "$volumen/"
+          en_el_backend 'grep -q uno solicitud-1/a.pdf && echo dos > solicitud-1/b.pdf && mkdir solicitud-2'
+      - name: La vigilancia mira la pila (aquí solo le falta el respaldo programado)
+        run: |
+          sudo python3 -I vigilar.py > /tmp/vigilancia.txt 2>&1 || true
+          cat /tmp/vigilancia.txt
+          grep -q 'No hay respaldo programado' /tmp/vigilancia.txt
+          ! grep -qE 'Traceback|La aplicación|argonavis_|base de datos|correo|proceso|errores' /tmp/vigilancia.txt
+      - name: Una instalación nueva (volúmenes vacíos)
+        run: |
+          docker compose down -v
+          docker compose up -d --wait --wait-timeout 300
+          curl -fsS http://localhost/api/health
+      - name: Estado y registros si falla
+        if: failure()
+        run: |
+          docker compose ps -a
+          docker compose logs --tail 150
 
   auditoria:
     runs-on: ubuntu-24.04

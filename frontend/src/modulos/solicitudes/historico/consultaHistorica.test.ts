@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  FILTROS_VACIOS, anioDelRango, aniosDisponibles, consultaDeFiltros, filtrosDeUrl, hayFiltros, paginaDeUrl,
-  rangoDeAnio, sinOpcionesDesconocidas, ultimaPagina, urlDeFiltros, type FiltrosHistorico,
+  FILTROS_VACIOS, anioDelRango, aniosDisponibles, consultaDeFiltros, filtrosDeUrl, hayFiltros, motivoExpiracion,
+  paginaDeUrl, primerosEncontrados, rangoDeAnio, sinOpcionesDesconocidas, ultimaPagina, urlDeFiltros,
+  type FiltrosHistorico,
 } from "./consultaHistorica";
 
 const LLENOS: FiltrosHistorico = {
@@ -41,6 +42,36 @@ describe("consultaDeFiltros", () => {
     });
     const vacia = consultaDeFiltros(FILTROS_VACIOS, 1, 25);
     expect(Object.entries(vacia).filter(([, v]) => v !== undefined)).toEqual([["pagina", 1], ["por_pagina", 25]]);
+  });
+});
+
+describe("las autorizadas (2026-11-22)", () => {
+  const autorizadas: FiltrosHistorico = { ...FILTROS_VACIOS, estado: "autorizadas" };
+
+  it("son una pestaña más: no van junto a un estado", () => {
+    expect(urlDeFiltros(autorizadas)).toEqual({ estado: "autorizadas" });
+    expect(filtrosDeUrl(new URLSearchParams("estado=autorizadas"))).toEqual(autorizadas);
+    const consulta = consultaDeFiltros(autorizadas, 1, 25);
+    expect(consulta.autorizadas).toBe(true);
+    expect(consulta.estado).toBeUndefined();
+    expect(consultaDeFiltros(LLENOS, 1, 25).autorizadas).toBeUndefined();
+    expect(hayFiltros(autorizadas)).toBe(true);
+  });
+});
+
+describe("motivoExpiracion", () => {
+  it("dice si la expirada se llegó a aprobar; de las demás, nada", () => {
+    expect(motivoExpiracion({ estado: "expired", aprobada_en: "2026-11-02T15:00:00Z" })).toBe("Aprobada; venció sin finalizarse");
+    expect(motivoExpiracion({ estado: "expired", aprobada_en: null })).toBe("No se corrigió a tiempo");
+    expect(motivoExpiracion({ estado: "finalized", aprobada_en: "2026-11-02T15:00:00Z" })).toBeNull();
+  });
+});
+
+describe("primerosEncontrados", () => {
+  it("muestra hasta tres y cuenta el resto", () => {
+    expect(primerosEncontrados(["A", "B"])).toEqual({ visibles: ["A", "B"], mas: 0 });
+    expect(primerosEncontrados(["A", "B", "C", "D", "E"])).toEqual({ visibles: ["A", "B", "C"], mas: 2 });
+    expect(primerosEncontrados(null)).toEqual({ visibles: [], mas: 0 });
   });
 });
 

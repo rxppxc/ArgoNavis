@@ -54,8 +54,8 @@ export function RutaStats({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** La consulta histórica (2026-11-11): UCVMM, el supervisor de sector y el puesto de
- *  control. El supervisor general no (2026-11-16). */
+/** La consulta histórica (2026-11-11): UCVMM y el supervisor de sector. El supervisor general
+ *  no (2026-11-16) y el puesto de control tampoco (2026-11-22). */
 export function RutaHistorico({ children }: { children: React.ReactNode }) {
   const { tieneAlguno, cargando } = usePermisos();
   return (

@@ -37,12 +37,13 @@ COPY . .
 # - Sin los CR de un clon hecho en Windows antes del .gitattributes: con CRLF, el
 #   contenedor no arranca («bash\r: No such file or directory»).
 # - El bytecode se compila aquí: el usuario de la app no puede escribir en /app.
-# - La carpeta de los documentos es del usuario de la app. Un volumen nuevo la
-#   copia con ese dueño; uno creado antes, cuando el contenedor corría como root,
-#   hay que pasárselo una vez (README → Producción → Docker).
+# - Las carpetas de los documentos y de los registros son del usuario de la app. Un
+#   volumen nuevo las copia con ese dueño; uno creado antes, cuando el contenedor corría
+#   como root, hay que pasárselo una vez (README → Producción → Docker).
 RUN sed -i 's/\r$//' docker-entrypoint.sh && chmod +x docker-entrypoint.sh \
     && python -m compileall -q app alembic \
-    && mkdir -p /app/storage/documentos && chown -R argonavis:argonavis /app/storage
+    && mkdir -p /app/storage/documentos /app/registros \
+    && chown -R argonavis:argonavis /app/storage /app/registros
 USER argonavis
 EXPOSE 8000
 ENTRYPOINT ["./docker-entrypoint.sh"]

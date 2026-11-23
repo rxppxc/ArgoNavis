@@ -1,8 +1,8 @@
 import { clienteApi, guardarComoArchivo } from "./client";
 import type {
-  Bandeja, ConsultaBandeja, ConsultaHistorica, DatosCorregirSolicitud, DatosCrearSolicitud, DocumentoSolicitud,
-  EstadisticasSolicitudes, FormatoExportacion, OpcionesHistorico, PaginaSolicitudes, ResultadoImpedimento,
-  SolicitudDetalle, VerificacionAutorizacion,
+  ArchivoVisible, Bandeja, ConsultaBandeja, ConsultaHistorica, DatosCorregirSolicitud, DatosCrearSolicitud,
+  EstadisticasSolicitudes, FormatoExportacion, OpcionesHistorico, PaginaSolicitudes, RegistroSolicitud,
+  ResultadoImpedimento, SolicitudDetalle, VerificacionAutorizacion,
 } from "./tiposSolicitudes";
 
 export type * from "./tiposSolicitudes";
@@ -97,19 +97,22 @@ export const apiSolicitudes = {
   finalizar: (id: number, comentario: string) =>
     clienteApi.post<SolicitudDetalle>(`/solicitudes/${id}/finalizar`, { comentario }).then((r) => r.data),
 
-  /** Un documento del expediente como blob: exige la sesión (un <a href>
-   *  directo saldría sin la cabecera Authorization). Cada consulta queda en
-   *  la bitácora como vista previa o descarga. */
-  obtenerDocumento: (id: number, documentoId: number, descargar = false) =>
-    clienteApi.get<Blob>(`/solicitudes/${id}/documentos/${documentoId}`, {
+  /** El historial completo (2026-11-22): las versiones anteriores y los archivos con su huella. */
+  registro: (id: number) =>
+    clienteApi.get<RegistroSolicitud>(`/solicitudes/${id}/registro`).then((r) => r.data),
+
+  /** Un archivo como blob (un documento del expediente o una autorización emitida): exige
+   *  la sesión (un <a href> directo saldría sin la cabecera Authorization). Cada consulta
+   *  queda en la bitácora como vista previa o descarga. */
+  obtenerArchivo: (id: number, archivo: Pick<ArchivoVisible, "id" | "emitido">, descargar = false) =>
+    clienteApi.get<Blob>(`/solicitudes/${id}/${archivo.emitido ? "emitidos" : "documentos"}/${archivo.id}`, {
       params: descargar ? { descargar: true } : undefined,
       responseType: "blob",
       timeout: 300_000,
     }).then((r) => r.data),
 
-  async descargarDocumento(id: number, documento: Pick<DocumentoSolicitud, "id" | "nombre_original">): Promise<void> {
-    const blob = await apiSolicitudes.obtenerDocumento(id, documento.id, true);
-    guardarComoArchivo(blob, documento.nombre_original);
+  async descargarArchivo(id: number, archivo: Pick<ArchivoVisible, "id" | "nombre_original" | "emitido">): Promise<void> {
+    guardarComoArchivo(await apiSolicitudes.obtenerArchivo(id, archivo, true), archivo.nombre_original);
   },
 
   /** Boleta de recargo (2026-11-16): con el número de oficio, que no se repite. */

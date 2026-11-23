@@ -2,14 +2,34 @@
 # carpeta donde se despliega (sin esto, Docker los nombra según la carpeta).
 name: argonavis
 
+# Lo mismo para los tres contenedores (2026-11-22). Si alguien logra ejecutar algo dentro
+# de uno, no es root, no tiene privilegios del sistema ni puede conseguirlos, y no puede
+# cambiar lo que trae la imagen. Lo que cada uno sí escribe va en un volumen o en un tmpfs
+# (memoria) de su servicio. Lo revisan tests/test_contenedores.py, la integración continua
+# (que levanta esta misma pila) y verificar-despliegue.sh.
+x-endurecido: &endurecido
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+
 services:
   postgres_db:
+    <<: *endurecido
     # Versión exacta (2026-11-10): «postgres:15-alpine» podía cambiar de versión
     # menor en cada pull. Dentro de la 15 los datos sirven igual; para actualizar,
     # cambia la etiqueta (y la del flujo de CI, .github/workflows/ci.yml).
-    image: postgres:15.19-alpine3.24
+    # 15.20 (2026-11-22): corrige 43 vulnerabilidades; no pide reconstruir ninguno de
+    # nuestros índices (son B-tree de columnas con largo).
+    image: postgres:15.20-alpine3.24
     container_name: argonavis_postgres
     restart: always
+    # El usuario postgres de la imagen Alpine, desde el principio: la imagen lo admite y
+    # así ni el arranque corre como root. Los datos del volumen ya son suyos.
+    user: "70:70"
+    networks: [datos]
+    tmpfs:
+      - /run/postgresql:uid=70,gid=70,mode=3775,size=1m   # el socket
+      - /tmp:size=64m
     # Límites de cada contenedor (revisión de recursos del 2026-11-10). Sin ellos, uno
     # que se desboca se lleva a los demás: sin memoria, el kernel mata al proceso más
     # grande de la VM, que suele ser PostgreSQL. Con ellos, Docker corta solo dentro del
@@ -43,6 +63,8 @@ services:
         max-file: "3"
 
   backend:
+    <<: *endurecido
+    networks: [default, datos]
     build: ./backend
     # Con nombre fijo: así se puede guardar y llevar a un servidor sin internet
     # (empaquetar-sin-internet.sh y docker compose up --no-build).
@@ -63,9 +85,13 @@ services:
     environment:
       - APP_NAME=ARGO NAVIS - SNM
       - APP_ENV=production
-      # Los logs van a la salida de Docker, que los guarda y rota (ver "logging");
-      # LOG_CARPETA no hace falta aquí.
+      # Los logs van a la salida de Docker, que los guarda y rota (ver "logging"), y además
+      # (2026-11-22) a un archivo por día en un volumen: la de Docker se borra cada vez que
+      # un despliegue recrea el contenedor. Con la hora de Panamá (EST5: UTC-5, sin verano).
       - LOG_NIVEL=${LOG_NIVEL:-INFO}
+      - LOG_CARPETA=/app/registros
+      - LOG_DIAS=${LOG_DIAS:-90}
+      - TZ=EST5
       # Procesos de la API. Cada uno abre hasta 15 conexiones a PostgreSQL (BD_POOL +
       # BD_POOL_EXTRA), y el servidor admite 100: con más de 4, bajar BD_POOL_EXTRA.
       - UVICORN_WORKERS=${UVICORN_WORKERS:-2}
@@ -119,6 +145,10 @@ services:
       - LOGIN_AD_MINUTOS_ESPERA=${LOGIN_AD_MINUTOS_ESPERA:-30}
     volumes:
       - documentos:/app/storage/documentos
+      # Los archivos de un envío mientras llegan (hasta 345 MB). En un volumen, o sea en el
+      # disco: en un tmpfs contarían para la memoria del contenedor.
+      - temporales_backend:/tmp
+      - registros:/app/registros
     depends_on:
       postgres_db:
         condition: service_healthy
@@ -136,20 +166,29 @@ services:
         max-file: "3"
 
   frontend:
+    <<: *endurecido
     build: ./frontend
     image: argonavis-frontend:latest
     container_name: argonavis_frontend
     restart: always
     mem_limit: ${FRONTEND_MEMORIA:-256m}
     pids_limit: 200
+    networks: [default]        # sin «datos»: nginx no alcanza a PostgreSQL
+    environment:
+      TZ: EST5                 # la hora de Panamá en los accesos, y el día de cada archivo
     ports:
-      - "80:80"
+      - "80:8080"              # sin root, nginx escucha en el 8080 (frontend/nginx.conf)
+    volumes:
+      - temporales_nginx:/var/cache/nginx   # cada envío, mientras llega (ver temporales_backend)
+      - registros_nginx:/var/log/argonavis  # un archivo de accesos por día (los borra vigilar.py)
+    tmpfs:
+      - /run:uid=101,gid=101,mode=755,size=1m   # nginx.pid
     depends_on:
       - backend
     healthcheck:
       # 127.0.0.1 explícito: "localhost" resuelve primero a ::1 (IPv6) dentro
       # del contenedor y nginx solo escucha en IPv4 → falso "unhealthy".
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -160,6 +199,19 @@ services:
         max-size: "10m"
         max-file: "3"
 
+networks:
+  default: {}                  # nginx y el backend (y la salida del backend al AD y al correo)
+  datos:                       # el backend y PostgreSQL, y nadie más
+    ipam:
+      config:
+        # Chica y a propósito: sin esto Docker toma un /16 de 172.x y, si coincide con una
+        # red del SNM o de la VPN, el servidor deja de alcanzarla.
+        - subnet: ${RED_DATOS:-172.31.255.240/28}
+
 volumes:
   postgres_data:
   documentos:
+  temporales_backend:
+  temporales_nginx:
+  registros:
+  registros_nginx:
