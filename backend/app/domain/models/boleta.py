@@ -12,12 +12,17 @@ de la aplicación no puede borrar filas de esta tabla (permisos_bd.TABLAS_SIN_BO
 """
 from datetime import datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, Numeric, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.infrastructure.database import Base
+
+if TYPE_CHECKING:   # solo para el verificador de tipos: en ejecución, las relaciones van por nombre
+    from app.domain.models.solicitud import Solicitud
+    from app.domain.models.user import Usuario
 
 LARGO_NUMERO_OFICIO    = 40
 LARGO_MOTIVO_ANULACION = 500

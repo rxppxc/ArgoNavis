@@ -484,7 +484,9 @@ class RepositorioSolicitud:
     # ── Los archivos, uno por uno (infrastructure/revisar_documentos.py) ─────
     # `modelo`: DocumentoSolicitud o DocumentoEmitido, que tienen lo mismo que mirar.
 
-    async def archivos_desde(self, modelo: type, ultimo_id: int, limite: int) -> list:
+    async def archivos_desde(
+        self, modelo: type[DocumentoSolicitud] | type[DocumentoEmitido], ultimo_id: int, limite: int,
+    ) -> list:
         """(id, ruta, tamano, sha256) de los que siguen a `ultimo_id`, en orden."""
         consulta = (
             select(modelo.id, modelo.ruta, modelo.tamano, modelo.sha256)
@@ -492,7 +494,9 @@ class RepositorioSolicitud:
         )
         return list((await self.sesion.execute(consulta)).all())
 
-    async def archivos_con_su_solicitud(self, modelo: type, ids: list[int]) -> list:
+    async def archivos_con_su_solicitud(
+        self, modelo: type[DocumentoSolicitud] | type[DocumentoEmitido], ids: list[int],
+    ) -> list:
         """(id, ruta, tamano, sha256, numero, solicitud_id) de los que sigan registrados."""
         consulta = (
             select(modelo.id, modelo.ruta, modelo.tamano, modelo.sha256, Solicitud.numero, modelo.solicitud_id)

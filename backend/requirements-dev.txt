@@ -12,3 +12,7 @@ pip-audit==2.10.1    # vulnerabilidades conocidas: pip-audit -r requirements.loc
 uv==0.13.5           # regenera requirements.lock (el comando, al principio de requirements.txt)
 ruff==0.17.5         # linter: venv\Scripts\python -m ruff check . (lo corre la CI; config en ruff.toml)
 pyyaml==6.0.3        # lee el compose y la CI en test_contenedores.py (ya viene con uvicorn[standard])
+mypy==2.4.1          # verificador de tipos: venv\Scripts\python -m mypy app (lo corre la CI; config en mypy.ini)
+types-aiofiles==25.1.0.20261107   # los tipos de aiofiles, para mypy
+pytest-cov==7.1.0    # cobertura: venv\Scripts\python -m pytest --cov=app (el piso, en .coveragerc)
+coverage==7.17.2

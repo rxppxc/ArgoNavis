@@ -11,7 +11,7 @@
         <bpmn:flowNodeRef>P02</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>P04</bpmn:flowNodeRef>
       </bpmn:lane>
-      <bpmn:lane id="C_UCVMM" name="UCVMM · Sector Pacífico">
+      <bpmn:lane id="C_UCVMM" name="UCVMM · sector del puesto">
         <bpmn:flowNodeRef>P03</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>GDecision</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>FinDenegada</bpmn:flowNodeRef>
@@ -146,8 +146,8 @@
     <bpmn:association id="Asoc_N_P04" sourceRef="P04" targetRef="N_P04" />
     <bpmn:textAnnotation id="N_P05"><bpmn:text>Si vence la vigencia sin finalizarse, P06 la expira.</bpmn:text></bpmn:textAnnotation>
     <bpmn:association id="Asoc_N_P05" sourceRef="P05" targetRef="N_P05" />
-    <bpmn:textAnnotation id="N_P08"><bpmn:text>Nueva o corregida: a UCVMM. Aprobada: a la agencia y al puesto. Devuelta, denegada o expirada: a la agencia.</bpmn:text></bpmn:textAnnotation>
-    <bpmn:textAnnotation id="N_Admin"><bpmn:text>Procesos de soporte (Administrador y SysAdmin): habilitan cuentas, agencias, puestos y nacionalidades restringidas.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:textAnnotation id="N_P08"><bpmn:text>Nueva o corregida: al buzón del sector del puesto (o al de UCVMM). Aprobada: a la agencia y al puesto autorizado. Devuelta, denegada o expirada: a la agencia.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:textAnnotation id="N_Admin"><bpmn:text>Procesos de soporte (Administrador y SysAdmin): habilitan cuentas, agencias, puestos, sectores y nacionalidades restringidas.</bpmn:text></bpmn:textAnnotation>
   </bpmn:process>
   <bpmndi:BPMNDiagram id="Diagrama_MapaGeneral">
     <bpmndi:BPMNPlane id="Plano_MapaGeneral" bpmnElement="Colaboracion_MapaGeneral">
@@ -182,7 +182,7 @@
       <bpmndi:BPMNShape id="N_P01_di" bpmnElement="N_P01"><dc:Bounds x="250" y="182" width="330" height="32" /></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="N_P04_di" bpmnElement="N_P04"><dc:Bounds x="1060" y="100" width="290" height="32" /></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="N_P05_di" bpmnElement="N_P05"><dc:Bounds x="1010" y="382" width="330" height="32" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="N_P08_di" bpmnElement="N_P08"><dc:Bounds x="530" y="722" width="470" height="48" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_P08_di" bpmnElement="N_P08"><dc:Bounds x="530" y="714" width="470" height="64" /></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="N_Admin_di" bpmnElement="N_Admin"><dc:Bounds x="780" y="866" width="470" height="48" /></bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flujo_Inicio_P01_di" bpmnElement="Flujo_Inicio_P01"><di:waypoint x="220" y="130" /><di:waypoint x="250" y="130" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flujo_P01_P02_di" bpmnElement="Flujo_P01_P02"><di:waypoint x="390" y="130" /><di:waypoint x="420" y="130" /></bpmndi:BPMNEdge>

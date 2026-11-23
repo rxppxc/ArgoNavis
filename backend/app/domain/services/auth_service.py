@@ -60,7 +60,9 @@ class ErrorAcceso(HTTPException):
 async def _contrasena_correcta(contrasena: str, password_hash: str | None) -> bool:
     """bcrypt en un hilo: tarda ~0,25 s a propósito y, en el bucle de eventos,
     cada intento de login congelaba todas las peticiones del worker."""
-    return bool(password_hash) and await asyncio.to_thread(verificar_password, contrasena, password_hash)
+    if not password_hash:
+        return False
+    return await asyncio.to_thread(verificar_password, contrasena, password_hash)
 
 
 def _frenado(falta: timedelta, motivo: str) -> ErrorAcceso:

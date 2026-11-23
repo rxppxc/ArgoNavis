@@ -104,7 +104,7 @@ async def refrescar_sesion(
 ):
     """Renueva el token de la sesión en curso, sin pasar de SESION_MAXIMA_HORAS
     desde el login (el nuevo token conserva ese inicio)."""
-    usuario = await RepositorioUsuario(sesion).buscar_por_id(user_id)
+    usuario = await sesion.get(Usuario, user_id)   # el que cargó obtener_id_usuario_actual
     if not usuario:
         raise HTTPException(status_code=401, detail="Usuario no encontrado.")
     inicio = inicio_de_sesion(decodificar_token(credenciales.credentials))
@@ -119,7 +119,7 @@ async def perfil_actual(
     user_id: int = Depends(obtener_id_usuario_actual),
     sesion:  AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
-    usuario = await RepositorioUsuario(sesion).buscar_por_id(user_id)
+    usuario = await sesion.get(Usuario, user_id)   # el que cargó obtener_id_usuario_actual
     return SalidaUsuario.model_validate(usuario)
 
 
@@ -128,7 +128,7 @@ async def permisos_actuales(
     user_id: int = Depends(obtener_id_usuario_actual),
     sesion:  AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ):
-    usuario = (await sesion.execute(select(Usuario).where(Usuario.id == user_id))).scalar_one_or_none()
+    usuario = await sesion.get(Usuario, user_id)   # el que cargó obtener_id_usuario_actual
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
     if usuario.rol_id is None:

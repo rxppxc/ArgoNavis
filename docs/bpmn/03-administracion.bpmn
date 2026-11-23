@@ -60,7 +60,7 @@
       <bpmn:incoming>Flujo_AsignarRoles_CrearAgencias</bpmn:incoming>
       <bpmn:outgoing>Flujo_CrearAgencias_CrearPuestos</bpmn:outgoing>
     </bpmn:userTask>
-    <bpmn:userTask id="CrearPuestos" name="Crear puestos de control y asignar funcionarios">
+    <bpmn:userTask id="CrearPuestos" name="Crear puestos y sectores, y asignar funcionarios">
       <bpmn:incoming>Flujo_CrearAgencias_CrearPuestos</bpmn:incoming>
       <bpmn:outgoing>Flujo_CrearPuestos_Nacionalidades</bpmn:outgoing>
     </bpmn:userTask>

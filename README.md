@@ -60,9 +60,10 @@ Los dos escuchan solo en este equipo. Para probar desde otro (p. ej. el celular)
 ```bat
 cd backend
 venv\Scripts\python -m ruff check .
-venv\Scripts\python -m pytest
+venv\Scripts\python -m mypy app
+venv\Scripts\python -m pytest --cov=app
 ```
-`ruff` revisa el código del backend (`backend/ruff.toml`); la CI lo corre antes de las pruebas. Las pruebas crean una base de datos temporal en el servidor de `DATABASE_URL` (o `TEST_DATABASE_URL`), le aplican las migraciones, recorren el flujo completo por la API y la borran al terminar. No envían correos ni tocan la base de desarrollo.
+`ruff` revisa el código del backend (`backend/ruff.toml`) y `mypy`, los tipos (`backend/mypy.ini`): un valor que puede venir vacío usado como si no, un argumento del tipo equivocado. La CI corre los dos antes de las pruebas, y las pruebas con la cobertura: si baja del piso de `backend/.coveragerc` (93 %; el 22/11/2026 medía 95 %), falla. Las pruebas crean una base de datos temporal en el servidor de `DATABASE_URL` (o `TEST_DATABASE_URL`), le aplican las migraciones, recorren el flujo completo por la API y la borran al terminar. No envían correos ni tocan la base de desarrollo.
 
 ```bat
 cd frontend
@@ -77,7 +78,7 @@ npm run build
 cd frontend
 npm run test:e2e
 ```
-Recorre en el navegador una autorización completa: la agencia la envía, UCVMM la devuelve, la agencia la corrige, UCVMM la aprueba, un tercero verifica el QR, el puesto la finaliza y el Administrador la ve en la bitácora. También prueba el formulario sin enviarlo: cambiar de trámite, quitar un pasajero y los documentos adicionales. Y los sectores: UCVMM del Atlántico no ve una solicitud del Pacífico y el supervisor general tampoco (ve solo el trámite de Técnico). `boleta.spec.ts` genera, descarga y anula la boleta de recargo de una solicitud sembrada, y comprueba que la agencia no la ve. Levanta su propio backend (`backend/tests/servidor_e2e.py`, puerto 8001, con la base temporal `argonavis_e2e`, que borra al terminar) y su propio Vite (puerto 5174): no choca con los de desarrollo. Usa el Chrome instalado; en un equipo sin Chrome, `npx playwright install chromium` y `set PLAYWRIGHT_CHROMIUM=1`. Además prueba con el teclado el enlace «Saltar al contenido» y que los controles tengan nombre (`accesibilidad.spec.ts`), y la sesión con dos pestañas abiertas, adelantando el reloj del navegador (`sesion.spec.ts`).
+Recorre en el navegador una autorización completa: la agencia la envía, UCVMM la devuelve, la agencia la corrige, UCVMM la aprueba, un tercero verifica el QR, el puesto la finaliza y el Administrador la ve en la bitácora. También prueba el formulario sin enviarlo: cambiar de trámite, quitar un pasajero y los documentos adicionales. Y los sectores: UCVMM del Atlántico no ve una solicitud del Pacífico y el supervisor general tampoco (ve solo el trámite de Técnico). `boleta.spec.ts` genera, descarga y anula la boleta de recargo de una solicitud sembrada, y comprueba que la agencia no la ve. Levanta su propio backend (`backend/tests/servidor_e2e.py`, puerto 8001, con la base temporal `argonavis_e2e`, que borra al terminar) y su propio Vite (puerto 5174): no choca con los de desarrollo. Usa el Chrome instalado; en un equipo sin Chrome, `npx playwright install chromium` y `set PLAYWRIGHT_CHROMIUM=1`. Su backend corre con el Python de `backend\venv`; para probar con otro (p. ej. el 3.12 de producción), `set E2E_PYTHON=<ruta del python.exe>`. Además prueba con el teclado el enlace «Saltar al contenido» y que los controles tengan nombre (`accesibilidad.spec.ts`), y la sesión con dos pestañas abiertas, adelantando el reloj del navegador (`sesion.spec.ts`).
 
 En GitHub, `.github/workflows/ci.yml` corre todo lo anterior en cada push a main, más un análisis de vulnerabilidades en las dependencias, que se repite cada lunes. Una vulnerabilidad nueva deja ese análisis en rojo. Para correrlo en el equipo: en `backend`, `venv\Scripts\python -m pip_audit -r requirements.lock --require-hashes` (con `set PYTHONUTF8=1`), y en `frontend`, `npm audit --omit=dev`. Se audita el bloqueo, no `requirements.txt`: así se revisan también las librerías indirectas (el 10/11/2026, eso encontró avisos en pillow y pyasn1, que con `requirements.txt` no se veían).
 

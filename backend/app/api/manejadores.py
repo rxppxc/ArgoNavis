@@ -82,8 +82,9 @@ async def servicio_no_disponible(request: Request, exc: ConnectionError) -> JSON
 def registrar_manejadores(aplicacion: FastAPI) -> None:
     # Starlette busca por la clase de la excepción y luego por sus madres: IntegrityError
     # (409) gana sobre DBAPIError, de la que hereda.
-    aplicacion.add_exception_handler(RateLimitExceeded, demasiadas_solicitudes)
-    aplicacion.add_exception_handler(IntegrityError, conflicto_de_integridad)
-    aplicacion.add_exception_handler(PoolAgotado, sin_conexiones_libres)
-    aplicacion.add_exception_handler(DBAPIError, error_de_base_de_datos)
-    aplicacion.add_exception_handler(ConnectionError, servicio_no_disponible)
+    # Starlette tipa cada manejador con Exception, aunque recibe solo la suya: de ahí los ignore.
+    aplicacion.add_exception_handler(RateLimitExceeded, demasiadas_solicitudes)  # type: ignore[arg-type]
+    aplicacion.add_exception_handler(IntegrityError, conflicto_de_integridad)  # type: ignore[arg-type]
+    aplicacion.add_exception_handler(PoolAgotado, sin_conexiones_libres)  # type: ignore[arg-type]
+    aplicacion.add_exception_handler(DBAPIError, error_de_base_de_datos)  # type: ignore[arg-type]
+    aplicacion.add_exception_handler(ConnectionError, servicio_no_disponible)  # type: ignore[arg-type]

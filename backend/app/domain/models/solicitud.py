@@ -9,6 +9,7 @@ import calendar
 import enum
 from datetime import date, datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     BigInteger, Boolean, CheckConstraint, Date, DateTime, FetchedValue, ForeignKey, Index, Integer, Numeric,
@@ -19,6 +20,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.infrastructure.database import Base
+
+if TYPE_CHECKING:   # solo para el verificador de tipos: en ejecución, las relaciones van por nombre
+    from app.domain.models.boleta import BoletaRecargo
+    from app.domain.models.catalogo import AgenciaNaviera, Pais, PuestoControl, Sector
+    from app.domain.models.tramite import DocumentoRequerido, TipoTramite
+    from app.domain.models.user import Usuario
 
 
 class EstadoSolicitud(str, enum.Enum):

@@ -5,7 +5,10 @@ import { defineConfig } from "@playwright/test";
 // propios para no chocar con los servidores de desarrollo (8000 y 5173).
 const PUERTO_API = 8001;
 const PUERTO_WEB = 5174;
-export const PYTHON = process.platform === "win32" ? "venv\\Scripts\\python" : "venv/bin/python";
+// El Python del backend de prueba: el de backend/venv, o el de E2E_PYTHON (p. ej. un 3.12
+// como el de producción, para probar las dependencias sin tocar el entorno de desarrollo).
+export const PYTHON =
+  process.env.E2E_PYTHON || (process.platform === "win32" ? "venv\\Scripts\\python" : "venv/bin/python");
 
 export default defineConfig({
   testDir: "./e2e",

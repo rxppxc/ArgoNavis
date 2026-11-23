@@ -99,7 +99,7 @@ def aplica_al_rango(td: TramiteDocumento, rango: str) -> bool:
 
 def opcional_para(td: TramiteDocumento, rango: str) -> bool:
     """Si la fila es opcional para un tripulante de ese rango (espejo: `opcionalPara`, checklist.ts)."""
-    return bool(td.rangos_opcional) and rango in td.rangos_opcional
+    return td.rangos_opcional is not None and rango in td.rangos_opcional
 
 
 @dataclass

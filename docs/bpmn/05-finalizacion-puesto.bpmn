@@ -95,11 +95,11 @@
     <bpmn:association id="Asoc_N_Bandeja" sourceRef="Abrir" targetRef="N_Bandeja" />
     <bpmn:textAnnotation id="N_Verificar"><bpmn:text>Obligatoria desde el 06/11/2026, aparte de la de UCVMM. Con impedimento igual se finaliza: lo dice el comentario.</bpmn:text></bpmn:textAnnotation>
     <bpmn:association id="Asoc_N_Verificar" sourceRef="Verificar" targetRef="N_Verificar" />
-    <bpmn:textAnnotation id="N_Puesto"><bpmn:text>Si fue en otro puesto, no se finaliza: vence sola y la agencia presenta una nueva solicitud (desde el 30/10/2026).</bpmn:text></bpmn:textAnnotation>
+    <bpmn:textAnnotation id="N_Puesto"><bpmn:text>El autorizado es el de la solicitud o, con cambio de puerto, el nuevo. Si fue en otro, no se finaliza: vence sola y la agencia presenta una nueva solicitud.</bpmn:text></bpmn:textAnnotation>
     <bpmn:association id="Asoc_N_Puesto" sourceRef="Elegir" targetRef="N_Puesto" />
     <bpmn:textAnnotation id="N_Comentario"><bpmn:text>De 3 a 2000 caracteres.</bpmn:text></bpmn:textAnnotation>
     <bpmn:association id="Asoc_N_Comentario" sourceRef="Comentar" targetRef="N_Comentario" />
-    <bpmn:textAnnotation id="N_Bloqueo"><bpmn:text>Toma el bloqueo de la fila: si ya no está aprobada, venció o falta la verificación de impedimentos, se rechaza.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:textAnnotation id="N_Bloqueo"><bpmn:text>Toma el bloqueo de la fila: si ya no está aprobada, venció o falta la verificación de impedimentos, se rechaza. Después emite el PDF de la agencia, ya finalizada.</bpmn:text></bpmn:textAnnotation>
     <bpmn:association id="Asoc_N_Bloqueo" sourceRef="Registrar" targetRef="N_Bloqueo" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="Diagrama_FinalizacionPuesto">
@@ -123,9 +123,9 @@
       <bpmndi:BPMNShape id="FinFinalizada_di" bpmnElement="FinFinalizada"><dc:Bounds x="1570" y="402.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1528.0" y="442.0" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="N_Bandeja_di" bpmnElement="N_Bandeja"><dc:Bounds x="262" y="228" width="300" height="40" /></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="N_Verificar_di" bpmnElement="N_Verificar"><dc:Bounds x="720" y="40" width="330" height="60" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="N_Puesto_di" bpmnElement="N_Puesto"><dc:Bounds x="1080" y="48" width="380" height="48" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_Puesto_di" bpmnElement="N_Puesto"><dc:Bounds x="1080" y="48" width="380" height="64" /></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="N_Comentario_di" bpmnElement="N_Comentario"><dc:Bounds x="1230" y="236" width="160" height="30" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="N_Bloqueo_di" bpmnElement="N_Bloqueo"><dc:Bounds x="1130" y="480" width="400" height="48" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_Bloqueo_di" bpmnElement="N_Bloqueo"><dc:Bounds x="1130" y="474" width="400" height="64" /></bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flujo_Inicio_Abrir_di" bpmnElement="Flujo_Inicio_Abrir"><di:waypoint x="220" y="170" /><di:waypoint x="250" y="170" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flujo_Abrir_Comprobar_di" bpmnElement="Flujo_Abrir_Comprobar"><di:waypoint x="390" y="170" /><di:waypoint x="405" y="170" /><di:waypoint x="405" y="420" /><di:waypoint x="420" y="420" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flujo_Comprobar_GVigente_di" bpmnElement="Flujo_Comprobar_GVigente"><di:waypoint x="560" y="420" /><di:waypoint x="600" y="420" /></bpmndi:BPMNEdge>
@@ -140,9 +140,9 @@
       <bpmndi:BPMNEdge id="Flujo_Registrar_FinFinalizada_di" bpmnElement="Flujo_Registrar_FinFinalizada"><di:waypoint x="1530" y="420" /><di:waypoint x="1570" y="420" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Asoc_N_Bandeja_di" bpmnElement="Asoc_N_Bandeja"><di:waypoint x="320" y="215" /><di:waypoint x="320" y="228" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Asoc_N_Verificar_di" bpmnElement="Asoc_N_Verificar"><di:waypoint x="950" y="125" /><di:waypoint x="950" y="100" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Asoc_N_Puesto_di" bpmnElement="Asoc_N_Puesto"><di:waypoint x="1120" y="125" /><di:waypoint x="1120" y="96" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_N_Puesto_di" bpmnElement="Asoc_N_Puesto"><di:waypoint x="1120" y="125" /><di:waypoint x="1120" y="112" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Asoc_N_Comentario_di" bpmnElement="Asoc_N_Comentario"><di:waypoint x="1290" y="215" /><di:waypoint x="1290" y="236" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Asoc_N_Bloqueo_di" bpmnElement="Asoc_N_Bloqueo"><di:waypoint x="1460" y="465" /><di:waypoint x="1460" y="480" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_N_Bloqueo_di" bpmnElement="Asoc_N_Bloqueo"><di:waypoint x="1460" y="465" /><di:waypoint x="1460" y="474" /></bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>

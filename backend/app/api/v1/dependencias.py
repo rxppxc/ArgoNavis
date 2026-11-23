@@ -6,15 +6,14 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from app.core.http_utils import obtener_agente, obtener_ip
 from app.core.permisos import es_admin_efectivo, es_sysadmin_efectivo, usuario_tiene_permiso
 from app.core.security import AGENCIA_DESACTIVADA, CABECERA_CAMBIO_CONTRASENA, decodificar_token, esquema_bearer
 from app.domain.models.audit_log import AccionAuditoria
-from app.domain.models.catalogo import AgenciaNaviera
 from app.domain.models.user import EstadoUsuario, Usuario
 from app.domain.repositories.audit_repository import RepositorioAuditoria
-from app.domain.repositories.user_repository import RepositorioUsuario
 from app.infrastructure.database import obtener_sesion_bd
 
 # Rutas que una cuenta con cambio de contraseña pendiente sí puede usar: ver su
@@ -35,7 +34,11 @@ async def obtener_id_usuario_actual(
     invalida el token de inmediato sin esperar al vencimiento.
 
     Una cuenta local con cambio de contraseña pendiente (recién creada o
-    restablecida por el admin) solo puede usar las rutas para cambiarla."""
+    restablecida por el admin) solo puede usar las rutas para cambiarla.
+
+    El usuario se lee aquí una sola vez por pedido, con su rol y su agencia en la misma
+    consulta, y queda en la sesión: las demás dependencias lo toman de ahí con `sesion.get`,
+    sin volver a la base (2026-11-22; antes, dos o tres lecturas más por pedido)."""
     carga   = decodificar_token(credenciales.credentials)
     user_id = carga.get("sub")
     if not user_id:
@@ -45,15 +48,18 @@ async def obtener_id_usuario_actual(
     except (TypeError, ValueError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido.") from None
 
-    fila = (await sesion.execute(
-        select(Usuario.status, Usuario.debe_cambiar_password, Usuario.sesiones_validas_desde,
-               AgenciaNaviera.activo)
-        .outerjoin(AgenciaNaviera, AgenciaNaviera.id == Usuario.agencia_id)
+    usuario = (await sesion.execute(
+        select(Usuario)
+        .options(joinedload(Usuario.rol_personalizado), joinedload(Usuario.agencia))
         .where(Usuario.id == uid)
-    )).one_or_none()
-    if fila is None:
+    )).scalar_one_or_none()
+    if usuario is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="La cuenta ya no existe.")
-    estado, debe_cambiar, validas_desde, agencia_activa = fila
+    # El mapa de identidad de la sesión guarda referencias débiles: sin esta, el usuario se
+    # perdería al volver de aquí y `sesion.get` tendría que leerlo de nuevo.
+    sesion.info["argonavis.usuario_del_pedido"] = usuario
+    estado, debe_cambiar, validas_desde = usuario.status, usuario.debe_cambiar_password, usuario.sesiones_validas_desde
+    agencia_activa = usuario.agencia.activo if usuario.agencia else None
     if validas_desde is not None:
         emitido = carga.get("iat")
         if not isinstance(emitido, (int, float)) or emitido < validas_desde.timestamp():
@@ -85,7 +91,7 @@ async def requerir_admin(
     sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ) -> int:
     """Dependencia: solo administradores."""
-    usuario = (await sesion.execute(select(Usuario).where(Usuario.id == user_id))).scalar_one_or_none()
+    usuario = await sesion.get(Usuario, user_id)
     if not usuario or not es_admin_efectivo(usuario):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -99,7 +105,7 @@ async def requerir_admin_o_sysadmin(
     sesion: AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ) -> int:
     """Dependencia: Administrador o SysAdmin (usuarios, roles, permisos y bitácora)."""
-    usuario = (await sesion.execute(select(Usuario).where(Usuario.id == user_id))).scalar_one_or_none()
+    usuario = await sesion.get(Usuario, user_id)
     if not usuario or not (es_admin_efectivo(usuario) or es_sysadmin_efectivo(usuario)):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -143,7 +149,7 @@ async def usuario_actual(
     user_id: int = Depends(obtener_id_usuario_actual),
     sesion:  AsyncSession = Depends(obtener_sesion_bd, scope="function"),
 ) -> Usuario:
-    usuario = await RepositorioUsuario(sesion).buscar_por_id(user_id)
+    usuario = await sesion.get(Usuario, user_id)   # el que cargó obtener_id_usuario_actual
     if not usuario:
         raise HTTPException(status_code=401, detail="Usuario no encontrado.")
     return usuario
@@ -170,6 +176,6 @@ async def auditar_admin(
     accion: AccionAuditoria, detalle: dict,
 ) -> None:
     """Deja en la bitácora una acción administrativa, con el usuario que la hizo."""
-    admin = await RepositorioUsuario(sesion).buscar_por_id(admin_id)
+    admin = await sesion.get(Usuario, admin_id)
     await auditar(sesion, request, accion, user_id=admin_id, username=admin.username if admin else None,
                   detalle=detalle)

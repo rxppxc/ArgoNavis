@@ -38,7 +38,8 @@ def _usuarios(entidad: Entidad | Sector) -> list[UsuarioAsignado]:
 
 
 def _salida(clase: type[SalidaCatalogoConUsuarios], entidad: Entidad, totales: dict[int, int]) -> SalidaCatalogoConUsuarios:
-    extra = {"sector_id": entidad.sector_id, "sector_nombre": entidad.sector.nombre} if clase is SalidaPuesto else {}
+    extra = ({"sector_id": entidad.sector_id, "sector_nombre": entidad.sector.nombre}
+             if clase is SalidaPuesto and isinstance(entidad, PuestoControl) else {})
     return clase(
         id=entidad.id, nombre=entidad.nombre, correo=entidad.correo, activo=entidad.activo,
         usuarios=_usuarios(entidad), total_solicitudes=totales.get(entidad.id, 0), **extra,

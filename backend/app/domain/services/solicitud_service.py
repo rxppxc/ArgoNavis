@@ -772,6 +772,7 @@ class ServicioSolicitud:
         # La del trámite de Técnico (2026-11-18); los demás trámites la descartan.
         s.operacion            = datos.operacion if tipo.pide_operacion else None
         s.dias_sellado         = datos.dias_sellado if tipo.pide_dias_sellado else None   # Shore Pass
+        assert datos.fecha_operacion is not None   # la exige _validar_formulario
         s.fecha_operacion      = datos.fecha_operacion
         s.cantidad_tripulantes = cantidad_tripulantes
         s.nombre_buque         = datos.nombre_buque if tipo.requiere_buque else None
@@ -987,8 +988,8 @@ class ServicioSolicitud:
             await self.repo.guardar()   # flush: los tripulantes nuevos ya tienen id
 
             for archivo, (td, indice) in zip(nuevos, asignadas, strict=True):
-                tripulante_id = tripulantes_orm[indice].id if indice is not None else None
-                self.repo.agregar_registro(self._documento(s, archivo, carpeta, td, tripulante_id, ctx.usuario))
+                del_tripulante = tripulantes_orm[indice].id if indice is not None else None
+                self.repo.agregar_registro(self._documento(s, archivo, carpeta, td, del_tripulante, ctx.usuario))
             self._registrar_casillas(s, requeridas, tripulantes_orm)
 
             anterior = s.estado
@@ -1001,8 +1002,8 @@ class ServicioSolicitud:
             s.comentario_impedimentos         = None
             s.impedimentos_verificados_en     = None
             s.impedimentos_verificados_por_id = None
-            for t in s.tripulantes:   # la tripulación pudo cambiar: se verifica de nuevo
-                t.con_impedimento = None
+            for tripulante in s.tripulantes:   # la tripulación pudo cambiar: se verifica de nuevo
+                tripulante.con_impedimento = None
 
             resumen = (
                 f"Documentos nuevos: {len(nuevos)}. Documentos retirados: {len(retirados)}. "
@@ -1456,7 +1457,8 @@ class ServicioSolicitud:
                 documento_id=c.documento_id, documento_codigo=c.documento.codigo,
                 documento_nombre=c.documento.nombre,
                 alcance=AlcanceDocumento.SOLICITUD.value if c.tripulante_id is None else AlcanceDocumento.MARINO.value,
-                tripulante_id=c.tripulante_id, tripulante_nombre=nombres.get(c.tripulante_id),
+                tripulante_id=c.tripulante_id,
+                tripulante_nombre=nombres.get(c.tripulante_id) if c.tripulante_id is not None else None,
                 documento_ids=ids, cubierta=bool(ids), obligatoria=c.obligatoria,
             ))
 

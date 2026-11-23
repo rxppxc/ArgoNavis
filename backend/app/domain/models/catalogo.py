@@ -19,12 +19,16 @@
     `aviso_custodia` la aprobación avisa que se debe tramitar la custodia.
 """
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.infrastructure.database import Base
+
+if TYPE_CHECKING:   # solo para el verificador de tipos: en ejecución, las relaciones van por nombre
+    from app.domain.models.user import Usuario
 
 
 usuarios_puestos = Table(

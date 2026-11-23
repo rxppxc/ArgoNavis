@@ -18,6 +18,7 @@ import html
 from dataclasses import dataclass, field
 from email.message import EmailMessage
 from email.utils import formataddr
+from typing import cast
 
 import aiosmtplib
 
@@ -218,7 +219,8 @@ def construir_mensaje(aviso: Aviso, destinatarios: list[str]) -> EmailMessage:
     mensaje.set_content(_texto_plano(aviso))
     mensaje.add_alternative(_construir_html_aviso(aviso), subtype="html")
     if _LOGO_PNG:
-        mensaje.get_payload()[1].add_related(
+        partes = cast(list[EmailMessage], mensaje.get_payload())   # el texto y el HTML
+        partes[1].add_related(
             _LOGO_PNG, maintype="image", subtype="png", cid=f"<{_CID_LOGO}>", disposition="inline",
         )
     return mensaje

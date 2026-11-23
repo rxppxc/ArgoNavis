@@ -5,7 +5,7 @@
   </bpmn:collaboration>
   <bpmn:process id="Proceso_RevisionUCVMM" name="Revisión de UCVMM" isExecutable="false">
     <bpmn:laneSet id="Carriles_Proceso_RevisionUCVMM">
-      <bpmn:lane id="C_UCVMM" name="UCVMM · Sector Pacífico">
+      <bpmn:lane id="C_UCVMM" name="UCVMM · sector del puesto">
         <bpmn:flowNodeRef>Inicio</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Revisar</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Simplus</bpmn:flowNodeRef>
@@ -125,7 +125,7 @@
       <bpmn:incoming>Flujo_Denegar_FinDenegada</bpmn:incoming>
       <bpmn:messageEventDefinition id="Def_FinDenegada" />
     </bpmn:endEvent>
-    <bpmn:serviceTask id="Aprobar" name="Aprobar: vigencia, código del QR y aviso a la agencia y al puesto">
+    <bpmn:serviceTask id="Aprobar" name="Aprobar: vigencia, código del QR, recargo si es fuera del horario y avisos">
       <bpmn:incoming>Flujo_GDecision_Aprobar</bpmn:incoming>
       <bpmn:outgoing>Flujo_Aprobar_FinAprobada</bpmn:outgoing>
     </bpmn:serviceTask>
@@ -166,7 +166,7 @@
     <bpmn:sequenceFlow id="Flujo_GDecision_Aprobar" name="Aprobar" sourceRef="GDecision" targetRef="Aprobar" />
     <bpmn:sequenceFlow id="Flujo_Aprobar_FinAprobada" sourceRef="Aprobar" targetRef="FinAprobada" />
     <bpmn:sequenceFlow id="Flujo_ErrAprobar_FinNoAprobable" sourceRef="ErrAprobar" targetRef="FinNoAprobable" />
-    <bpmn:textAnnotation id="N_Separacion"><bpmn:text>Separación de funciones: nadie revisa lo que creó ni lo de su agencia (tampoco el Administrador).</bpmn:text></bpmn:textAnnotation>
+    <bpmn:textAnnotation id="N_Separacion"><bpmn:text>Separación de funciones: nadie revisa lo que creó ni lo de su agencia (tampoco el Administrador). Cada sector revisa las de sus puestos.</bpmn:text></bpmn:textAnnotation>
     <bpmn:association id="Asoc_N_Separacion" sourceRef="Expediente" targetRef="N_Separacion" />
     <bpmn:textAnnotation id="N_Simplus"><bpmn:text>Fuera de ARGO NAVIS: no hay integración con SIMPLUS; el resultado se marca a mano.</bpmn:text></bpmn:textAnnotation>
     <bpmn:association id="Asoc_N_Simplus" sourceRef="Simplus" targetRef="N_Simplus" />
@@ -178,9 +178,9 @@
     <bpmn:association id="Asoc_N_Impedimento" sourceRef="GImpedimento" targetRef="N_Impedimento" />
     <bpmn:textAnnotation id="N_Concurrencia"><bpmn:text>Si otro funcionario decidió antes, se rechaza (bloqueo de la fila).</bpmn:text></bpmn:textAnnotation>
     <bpmn:association id="Asoc_N_Concurrencia" sourceRef="Decidir" targetRef="N_Concurrencia" />
-    <bpmn:textAnnotation id="N_Plazo"><bpmn:text>Plazo: PLAZO_CORRECCION_DIAS (hoy, 2 días).</bpmn:text></bpmn:textAnnotation>
+    <bpmn:textAnnotation id="N_Plazo"><bpmn:text>Plazo para corregir: 72 horas.</bpmn:text></bpmn:textAnnotation>
     <bpmn:association id="Asoc_N_Plazo" sourceRef="Devolver" targetRef="N_Plazo" />
-    <bpmn:textAnnotation id="N_Vigencia"><bpmn:text>Vigente hasta el fin del día de la operación + 1 día (hora de Panamá). Genera el código del QR del PDF.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:textAnnotation id="N_Vigencia"><bpmn:text>Vigente hasta el fin del día de la operación + 2 días (hora de Panamá). Emite el PDF de la agencia, con el QR; fuera del horario, con el recargo, y el SNM genera su boleta.</bpmn:text></bpmn:textAnnotation>
     <bpmn:association id="Asoc_N_Vigencia" sourceRef="Aprobar" targetRef="N_Vigencia" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="Diagrama_RevisionUCVMM">
@@ -213,14 +213,14 @@
       <bpmndi:BPMNShape id="FinAprobada_di" bpmnElement="FinAprobada"><dc:Bounds x="2420" y="552.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="2378.0" y="592.0" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="ErrAprobar_di" bpmnElement="ErrAprobar"><dc:Bounds x="2282.0" y="597.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="2222" y="618" width="56" height="20" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="FinNoAprobable_di" bpmnElement="FinNoAprobable"><dc:Bounds x="2400" y="672.0" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="2348" y="712" width="140" height="56" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="N_Separacion_di" bpmnElement="N_Separacion"><dc:Bounds x="180" y="655" width="290" height="48" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_Separacion_di" bpmnElement="N_Separacion"><dc:Bounds x="180" y="646" width="235" height="80" /></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="N_Simplus_di" bpmnElement="N_Simplus"><dc:Bounds x="600" y="52" width="330" height="40" /></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="N_Registrar_di" bpmnElement="N_Registrar"><dc:Bounds x="790" y="660" width="280" height="34" /></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="N_Correccion_di" bpmnElement="N_Correccion"><dc:Bounds x="1080" y="540" width="330" height="56" /></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="N_Impedimento_di" bpmnElement="N_Impedimento"><dc:Bounds x="1460" y="285" width="340" height="56" /></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="N_Concurrencia_di" bpmnElement="N_Concurrencia"><dc:Bounds x="1480" y="520" width="350" height="40" /></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="N_Plazo_di" bpmnElement="N_Plazo"><dc:Bounds x="2310" y="408" width="200" height="40" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="N_Vigencia_di" bpmnElement="N_Vigencia"><dc:Bounds x="1960" y="160" width="370" height="56" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="N_Vigencia_di" bpmnElement="N_Vigencia"><dc:Bounds x="1960" y="144" width="370" height="72" /></bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flujo_Inicio_Expediente_di" bpmnElement="Flujo_Inicio_Expediente"><di:waypoint x="220" y="200" /><di:waypoint x="228" y="200" /><di:waypoint x="228" y="570" /><di:waypoint x="240" y="570" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flujo_Expediente_GConflicto_di" bpmnElement="Flujo_Expediente_GConflicto"><di:waypoint x="380" y="570" /><di:waypoint x="420" y="570" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flujo_GConflicto_FinConflicto_di" bpmnElement="Flujo_GConflicto_FinConflicto"><di:waypoint x="445" y="595" /><di:waypoint x="445" y="690" /><di:waypoint x="520" y="690" /><bpmndi:BPMNLabel><dc:Bounds x="452" y="615" width="24" height="20" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
@@ -246,7 +246,7 @@
       <bpmndi:BPMNEdge id="Flujo_GDecision_Aprobar_di" bpmnElement="Flujo_GDecision_Aprobar"><di:waypoint x="2000" y="570" /><di:waypoint x="2230" y="570" /><bpmndi:BPMNLabel><dc:Bounds x="2010" y="548" width="70" height="20" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flujo_Aprobar_FinAprobada_di" bpmnElement="Flujo_Aprobar_FinAprobada"><di:waypoint x="2370" y="570" /><di:waypoint x="2420" y="570" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flujo_ErrAprobar_FinNoAprobable_di" bpmnElement="Flujo_ErrAprobar_FinNoAprobable"><di:waypoint x="2300" y="633" /><di:waypoint x="2300" y="690" /><di:waypoint x="2400" y="690" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Asoc_N_Separacion_di" bpmnElement="Asoc_N_Separacion"><di:waypoint x="310" y="615" /><di:waypoint x="310" y="655" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Asoc_N_Separacion_di" bpmnElement="Asoc_N_Separacion"><di:waypoint x="310" y="615" /><di:waypoint x="310" y="646" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Asoc_N_Simplus_di" bpmnElement="Asoc_N_Simplus"><di:waypoint x="760" y="155" /><di:waypoint x="760" y="92" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Asoc_N_Registrar_di" bpmnElement="Asoc_N_Registrar"><di:waypoint x="930" y="615" /><di:waypoint x="930" y="660" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Asoc_N_Correccion_di" bpmnElement="Asoc_N_Correccion"><di:waypoint x="1190" y="495" /><di:waypoint x="1190" y="540" /></bpmndi:BPMNEdge>

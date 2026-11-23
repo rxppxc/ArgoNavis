@@ -27,10 +27,10 @@ from app.core.config import obtener_configuracion
 from app.infrastructure.revision_office import Problema, revisar_office
 
 try:
-    import magic  # type: ignore
+    import magic
     _MAGIC_DISPONIBLE = True
 except Exception:  # pragma: no cover — libmagic no disponible
-    magic = None  # type: ignore
+    magic = None
     _MAGIC_DISPONIBLE = False
 
 logger        = logging.getLogger(__name__)

@@ -47,35 +47,42 @@ def es_sysadmin_efectivo(usuario: Usuario) -> bool:
     )
 
 
+# Los códigos de cada rol, en la sesión (o sea, mientras dura el pedido): {rol_id: códigos}.
+_CODIGOS = "argonavis.codigos_permiso"
+
+
 async def usuario_tiene_permiso(
     sesion: AsyncSession,
     user_id: int,
     codigo_permiso: str,
 ) -> bool:
-    """True si el usuario es admin efectivo o su rol tiene el permiso."""
-    usuario = (await sesion.execute(select(Usuario).where(Usuario.id == user_id))).scalar_one_or_none()
+    """True si el usuario es admin efectivo o su rol tiene el permiso. El usuario sale de la
+    sesión (ya lo cargó obtener_id_usuario_actual) y los permisos, de codigos_permiso: una
+    comprobación más no vuelve a la base (2026-11-22)."""
+    usuario = await sesion.get(Usuario, user_id)
     if not usuario:
         return False
     if es_admin_efectivo(usuario):
         return True
-    if usuario.rol_id is None:
-        return False
-    existe = await sesion.execute(
-        select(Permiso.id)
-        .join(RolPermiso, RolPermiso.permiso_id == Permiso.id)
-        .where(RolPermiso.rol_id == usuario.rol_id, Permiso.codigo == codigo_permiso)
-        .limit(1)
-    )
-    return existe.scalar_one_or_none() is not None
+    return codigo_permiso in await codigos_permiso(sesion, usuario)
 
 
 async def codigos_permiso(sesion: AsyncSession, usuario: Usuario) -> set[str]:
-    """Códigos de permiso del rol del usuario (sin el atajo de admin)."""
+    """Códigos de permiso del rol del usuario (sin el atajo de admin). Se consultan una vez por
+    pedido; quien cambie los permisos de un rol en el mismo pedido llama a olvidar_permisos."""
     if usuario.rol_id is None:
         return set()
-    resultado = await sesion.execute(
-        select(Permiso.codigo)
-        .join(RolPermiso, RolPermiso.permiso_id == Permiso.id)
-        .where(RolPermiso.rol_id == usuario.rol_id)
-    )
-    return {fila[0] for fila in resultado.all()}
+    guardados: dict[int, frozenset[str]] = sesion.info.setdefault(_CODIGOS, {})
+    if usuario.rol_id not in guardados:
+        resultado = await sesion.execute(
+            select(Permiso.codigo)
+            .join(RolPermiso, RolPermiso.permiso_id == Permiso.id)
+            .where(RolPermiso.rol_id == usuario.rol_id)
+        )
+        guardados[usuario.rol_id] = frozenset(fila[0] for fila in resultado.all())
+    return set(guardados[usuario.rol_id])
+
+
+def olvidar_permisos(sesion: AsyncSession) -> None:
+    """Después de cambiar los permisos de un rol: la próxima consulta los vuelve a leer."""
+    sesion.info.pop(_CODIGOS, None)

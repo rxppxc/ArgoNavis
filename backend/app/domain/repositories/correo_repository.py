@@ -1,7 +1,10 @@
 from dataclasses import asdict
 from datetime import datetime
 
+from typing import cast
+
 from sqlalchemy import delete, func, select
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.email import Aviso
@@ -34,4 +37,4 @@ class RepositorioCorreo:
                 CorreoSalida.estado != EstadoCorreo.PENDIENTE.value, CorreoSalida.creado_en < antes_de,
             )
         )
-        return resultado.rowcount or 0
+        return cast(CursorResult, resultado).rowcount or 0

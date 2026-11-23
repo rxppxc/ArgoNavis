@@ -14,6 +14,7 @@ import logging
 import os
 import re
 from contextlib import suppress
+from typing import TextIO
 from contextvars import ContextVar
 from datetime import date, timedelta
 from pathlib import Path
@@ -80,7 +81,7 @@ class ArchivoDiario(logging.Handler):
         self.dias = max(dias, 1)
         self.carpeta.mkdir(parents=True, exist_ok=True)
         self._fecha: date | None = None
-        self._archivo = None
+        self._archivo: TextIO | None = None
 
     def _hoy(self) -> date:
         return date.today()   # hora del servidor
@@ -90,8 +91,10 @@ class ArchivoDiario(logging.Handler):
             hoy = self._hoy()
             if hoy != self._fecha:
                 self._cambiar_de_dia(hoy)
-            self._archivo.write(self.format(registro) + "\n")
-            self._archivo.flush()   # una línea, una escritura: entera al final del archivo
+            archivo = self._archivo
+            assert archivo is not None   # lo abre _cambiar_de_dia
+            archivo.write(self.format(registro) + "\n")
+            archivo.flush()   # una línea, una escritura: entera al final del archivo
         except Exception:
             self.handleError(registro)
 
@@ -111,10 +114,13 @@ class ArchivoDiario(logging.Handler):
                     ruta.unlink(missing_ok=True)
 
     def close(self) -> None:
-        with self.lock:
+        self.acquire()
+        try:
             if self._archivo:
                 self._archivo.close()
                 self._archivo = None
+        finally:
+            self.release()
         super().close()
 
 

@@ -108,6 +108,39 @@ def test_el_paquete_sin_internet_lleva_el_postgresql_que_se_va_a_usar(otra):
     assert r.stdout.strip() == (otra or produccion)
 
 
+# Las acciones de la CI, en la primera versión mayor que corre con Node 24 (2026-11-22). Con las
+# de Node 20, GitHub las forzaba a correr con la 24 y avisaba en cada corrida.
+_ACCIONES_CON_NODE_24 = {"actions/checkout": 5, "actions/setup-python": 6, "actions/setup-node": 5,
+                         "actions/upload-artifact": 6}
+
+
+def test_las_acciones_de_la_ci_corren_con_node_24():
+    usadas = re.findall(r"uses:\s*([\w-]+/[\w-]+)@v(\d+)\s", CI.read_text(encoding="utf-8"))
+    assert len(usadas) == CI.read_text(encoding="utf-8").count("uses:"), "cada acción con su versión mayor (@vN)"
+    for accion, mayor in usadas:
+        assert accion in _ACCIONES_CON_NODE_24, f"{accion}: ¿desde qué versión corre con Node 24? Agrégala aquí"
+        assert int(mayor) >= _ACCIONES_CON_NODE_24[accion], f"{accion}@v{mayor} todavía es de Node 20"
+
+
+def test_la_ci_revisa_los_tipos_y_la_cobertura():
+    """mypy (backend/mypy.ini) sobre la aplicación, y la cobertura de las pruebas con un piso
+    (backend/.coveragerc): si baja, la CI falla (2026-11-22)."""
+    import configparser
+
+    pasos = "\n".join(p.get("run", "") for p in yaml.safe_load(CI.read_text(encoding="utf-8"))["jobs"]["backend"]["steps"])
+    assert "venv/bin/python -m mypy app" in pasos
+    assert re.search(r"venv/bin/python -m pytest -q --cov=app\b", pasos)
+    tipos = configparser.ConfigParser()
+    tipos.read(BACKEND / "mypy.ini", encoding="utf-8")
+    assert tipos["mypy"]["plugins"] == "pydantic.mypy" and tipos["mypy"]["check_untyped_defs"] == "True"
+    cobertura = configparser.ConfigParser()
+    cobertura.read(BACKEND / ".coveragerc", encoding="utf-8")
+    assert cobertura["run"]["source"] == "app" and int(cobertura["report"]["fail_under"]) >= 70
+    desarrollo = (BACKEND / "requirements-dev.txt").read_text(encoding="utf-8")
+    for paquete in ("mypy", "pytest-cov", "coverage"):
+        assert re.search(rf"^{paquete}==\d", desarrollo, re.M), f"{paquete} con su versión exacta"
+
+
 def test_las_imagenes_base_tienen_version_exacta():
     for archivo, imagen in _imagenes():
         if imagen.startswith("argonavis-"):

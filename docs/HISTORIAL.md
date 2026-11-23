@@ -786,3 +786,31 @@ Lo que faltaba por código «antes de producción» (CLAUDE.md, pendiente 21). S
 - **La CI** levanta la pila con la 15 y con la 18, carga en la 18 un respaldo de la 15, la pone por HTTPS con un certificado de prueba (entrando por el nombre y validándolo), lo cambia sin reiniciar, comprueba que la vigilancia avise y que sin la clave no arranque.
 - De paso, en `verificar-despliegue.sh`: con `pipefail`, `curl | grep -q` daba por fallida una respuesta buena; lo que se busca, ahora se busca después de guardarlo.
 - **Lo que encontró la CI la primera vez que levantó la pila** (commit `1d57796`): la pila arrancaba y pasaba la revisión del servidor, pero `asignar_rol --crear-local` (el primer SysAdmin de una instalación nueva) se caía al correrlo solo: «expression 'AgenciaNaviera' failed to locate a name». Las tablas se cargaban en `main.py`, y la orden de consola no lo importa. Desde ahí, importar cualquier modelo los trae todos (`app/domain/models/__init__.py`), y `tests/test_consola.py` corre cada orden de consola en un proceso aparte, como en el servidor. Su prueba de antes la llamaba desde pytest, con todo ya cargado, y no lo veía.
+
+## Dependencias al día, tipos, cobertura y menos consultas (2026-11-22)
+Lo de «Después» de la auditoría que no dependía de nadie (CLAUDE.md, pendiente 21).
+- **FastAPI 0.162.7, Starlette 1.10.0, uvicorn 0.54.0 y python-multipart 0.0.33** (venían de 0.138, 1.3.1, 0.49 y 0.0.32). Se leyeron las notas de cada versión. Los cambios de FastAPI en formularios y archivos (0.147 a 0.162) no tocan los envíos: van con un campo de texto y una lista de archivos. Los topes nuevos del cuerpo y del formulario (0.164 y 0.165) vienen apagados. Se quedó en la 0.162.7, que cierra esa serie y arregla la limpieza de las dependencias con `yield` (la sesión de la base) cuando el cliente corta; las siguientes tenían días. Entra `opentelemetry-api`, que FastAPI pide desde la 0.142. Sin vulnerabilidades conocidas (`pip-audit`); pytest y el E2E pasan con el Python 3.12 de producción (`E2E_PYTHON`, nuevo).
+- **mypy en la CI** (`backend/mypy.ini`). Encontró 111 avisos; ninguno era una falla en producción, pero varios dependían de que el código de antes ya lo hubiera validado (la fecha de la operación, una cuenta sin usuario en `asignar_rol`, una URL de la base sin nombre en `permisos_bd`). Quedaron explícitos.
+- **La cobertura de las pruebas, con piso** (`backend/.coveragerc`): 95 %; si baja de 93 %, la CI falla. Sin `concurrency = greenlet` medía 87 %: SQLAlchemy async corre la base en greenlets y coverage perdía el rastro después de cada consulta.
+- **Menos consultas por pedido** (pendiente 16): el usuario se lee una vez, con su rol y su agencia, y queda en la sesión; los permisos, una vez por pedido. Una bandeja pasó de 20 consultas a 13 o 15, y `/auth/me`, de 4 a 1. El usuario se guarda en `sesion.info` porque el mapa de identidad de SQLAlchemy guarda referencias débiles: sin eso se perdía al volver de la dependencia y se leía otra vez. Lo cuenta `tests/test_consultas_por_pedido.py`.
+- **Las acciones de la CI en Node 24** (checkout, setup-python, setup-node y upload-artifact en la v7): GitHub ya las forzaba a Node 24 y avisaba en cada corrida.
+
+## Documentación de la DTI, juego 0.7 (2026-11-23)
+Los 10 documentos de `docs/`, al día con lo del 10 al 22/11/2026 (esquema `d7f3b0c5e849`). Cada uno sube un número: el 06 y el 08 a la 0.7; el 00, el 01, el 04 y el 09 a la 0.6; el 03 a la 0.5; el 02, el 05 y el 07 a la 0.4.
+- **Antes de tocarlos** se volvieron a generar los de la 0.6 con sus guiones (fuera del repositorio) y el texto salió idéntico al de los Word: nadie los había cambiado a mano, así que regenerarlos no pisa nada.
+- **Lo nuevo:**
+  - 03: los supervisores y los sectores en la matriz, con columnas propias.
+  - 04: las reglas RN-95 a RN-122, en las secciones Q a V, sin cambiar la numeración anterior.
+  - 06: 72 rutas, 23 tablas y la configuración nueva.
+  - 07: la vigilancia, el monitoreo externo y el QR en internet.
+  - 08: los riesgos R-24 a R-27, los 29 pendientes en el orden de la auditoría del stack y 26 reglas más 19 puntos para validar con UCVMM.
+  - 09: los supervisores, la boleta, la consulta histórica y el historial completo.
+- **Capturas nuevas** del 01 y la 09, con la interfaz de hoy, contra la pila del E2E (base temporal, sin correos y con datos ficticios). Para que las estadísticas no salieran vacías, la historia de prueba se repartió en meses anteriores, solo en esa base.
+- **Diagramas:**
+  - BPMN 00, 01, 03, 04 y 05: el carril de UCVMM es el del sector del puesto, la autorización se emite y se guarda, y finaliza el puesto nuevo cuando hay cambio de puerto.
+  - Mermaid: la arquitectura (HTTPS, PostgreSQL 15 o 18, vigilancia y respaldos) y el modelo de datos (sectores, boletas, versiones y autorizaciones emitidas).
+- **Corrige errores que traían los documentos:**
+  - El BPMN 04 seguía con el plazo de corrección de «2 días» y la vigencia «+1 día», de antes del 06/11/2026.
+  - El BPMN 01 pedía «pasaporte y seamanbook vigentes» (desde el 13/11, el pasaporte con 3 meses).
+  - El 07 y el 08 decían que Docker corre un solo proceso (son 2 desde el 08/11).
+- **Armado:** se unieron las secciones seguidas de la misma orientación (03, 04, 08 y 09), que dejaban páginas casi vacías, y cada imagen va con su pie. Son 173 páginas.

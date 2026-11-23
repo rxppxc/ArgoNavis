@@ -2,20 +2,27 @@
 
 Línea base técnica y funcional de ARGO NAVIS (antes «NAVIS»), módulo **Autorizaciones Marítimas** de UCVMM. Es un borrador generado desde el código fuente y está pendiente de dos revisiones: la del equipo de desarrollo y, donde se indica, la validación del área usuaria (UCVMM).
 
-- **Versión del juego:** 0.6, borrador para revisión (08/11/2026). Trae la auditoría de rendimiento y disponibilidad de ese día: conexiones con la base de datos acotadas y con topes, respuestas 503 con motivo, chequeo de salud con la base, índices nuevos, Docker sin privilegios, la cuenta de la base de datos con lo justo, el código de cada pedido y una prueba de carga con 100 usuarios.
-  - **Versiones anteriores:** la 0.5 (06/11/2026) trajo la verificación de impedimentos del puesto, los plazos de 72 horas, el horario contado con la aprobación de UCVMM y las estadísticas por día, mes y año; la 0.4 (02/11/2026), las estadísticas rediseñadas y la revisión del código; la 0.3 (30/10/2026), los puntos de la reunión de ese día.
+- **Versión del juego:** 0.7, borrador para revisión (23/11/2026). Trae lo del 10 al 22/11/2026:
+  - los sectores de UCVMM y los supervisores;
+  - los cambios de los trámites: cambio de puerto, rango Pasajero, visas, operación de Técnico y días del sellado;
+  - el recargo fuera del horario y su boleta;
+  - la consulta histórica y el historial completo;
+  - el PDF por el QR;
+  - los contenedores endurecidos, HTTPS listo para activar, PostgreSQL 18 elegible, la vigilancia y los respaldos con retención de años;
+  - las dependencias al día, con los tipos y la cobertura en la CI.
+  - **Versiones anteriores:** la 0.6 (08/11/2026) trajo la auditoría de rendimiento y disponibilidad; la 0.5 (06/11/2026), la verificación de impedimentos del puesto, los plazos de 72 horas, el horario contado con la aprobación de UCVMM y las estadísticas por día, mes y año; la 0.4 (02/11/2026), las estadísticas rediseñadas y la revisión del código; la 0.3 (30/10/2026), los puntos de la reunión de ese día.
   - El historial de cada documento dice qué cambió.
-- **Versión de cada documento:** cada uno que cambia sube un número sobre el que tenía.
-  - El 06 y el 08 están en la 0.6.
-  - El 01, el 04 y el 09, en la 0.5. También el 00, que trae la tabla de versiones al día.
-  - El 03, en la 0.4.
-  - El 02, el 05 y el 07, en la 0.3.
-- **Base:** rama `main`, esquema de base de datos en la revisión Alembic `e7b2d5a9c4f1`.
-- **Pruebas citadas:** 220 casos del backend, 118 pruebas unitarias del frontend y 5 recorridos en el navegador, todos aprobados (08/11/2026), y una prueba de carga con 100 usuarios.
-- **Capturas:**
-  - Las del 01 y la 09 son de la interfaz del 30/10/2026.
-  - Las de las estadísticas y la del puesto de control son del 06/11/2026.
-  - Todas usan datos ficticios.
+- **Versión de cada documento:** cada uno que cambia sube un número sobre el que tenía. Esta vez cambiaron todos.
+  - El 06 y el 08 están en la 0.7.
+  - El 00, el 01, el 04 y el 09, en la 0.6.
+  - El 03, en la 0.5.
+  - El 02, el 05 y el 07, en la 0.4.
+- **Base:** rama `main`, esquema de base de datos en la revisión Alembic `d7f3b0c5e849`.
+- **Pruebas citadas (23/11/2026):**
+  - backend: 644 casos, 643 aprobados y 1 omitido en Windows, que la CI corre en Linux; cobertura del 95,4 % y `mypy` sin avisos;
+  - frontend: 266 pruebas unitarias y 15 recorridos en el navegador, todos aprobados;
+  - la prueba de carga con 100 usuarios es del 08/11/2026.
+- **Capturas:** las del 01 y la 09 son del 23/11/2026, con la interfaz de hoy, tomadas contra una base de datos temporal de prueba (sin correos). Todas usan datos ficticios.
 
 ## Documentos
 
@@ -32,7 +39,7 @@ Línea base técnica y funcional de ARGO NAVIS (antes «NAVIS»), módulo **Auto
 | 08 | Brechas, riesgos, pendientes y evidencias | [08-Brechas-riesgos-y-pendientes.docx](08-Brechas-riesgos-y-pendientes.docx) |
 | 09 | Guía de funcionamiento: cómo se usa, paso a paso y por papel | [09-Guia-de-funcionamiento.docx](09-Guia-de-funcionamiento.docx) |
 
-Para conocer el sistema sin entrar en lo técnico, empieza por el 09: explica en lenguaje sencillo qué hace cada papel (agencia, UCVMM, puesto de control y administración), con capturas. Para la línea base, se sugiere empezar por el 00 (procesos y mapa general) y terminar con el 08, que reúne los riesgos, los pendientes y la lista de puntos a validar con UCVMM.
+Para conocer el sistema sin entrar en lo técnico, empieza por el 09: explica en lenguaje sencillo qué hace cada papel (agencia, UCVMM, puesto de control, supervisión y administración), con capturas. Para la línea base, se sugiere empezar por el 00 (procesos y mapa general) y terminar con el 08, que reúne los riesgos, los pendientes y la lista de puntos a validar con UCVMM.
 
 ## Manuales de usuario
 
@@ -67,19 +74,9 @@ Los diagramas son archivos editables. Cada uno trae su imagen en PNG y SVG.
 
 ## Mantenimiento
 
-- **Los Word son la fuente** (decisión del 2026-11-14). Los guiones que generaron las primeras versiones no están en el repositorio, así que los cambios se hacen en el Word. Cuando cambie el código, hay que actualizar el documento afectado y su versión en la portada.
-- **Rutas que cambiaron el 2026-11-14** (auditoría del proyecto; los Word de la 0.6 citan las anteriores):
-
-  | Antes | Ahora |
-  |---|---|
-  | B: `core/pdf_autorizacion.py` | B: `informes/autorizacion_pdf.py` |
-  | B: `core/informe_estadisticas.py`, `informe_excel.py`, `informe_pdf.py`, `informe_csv.py` | B: `informes/estadisticas.py`, `estadisticas_excel.py`, `estadisticas_pdf.py`, `estadisticas_csv.py` |
-  | B: `core/informe_historico.py` | B: `informes/historico_excel.py` |
-  | B: `obtener_id_usuario_actual` y `requerir_*` (`core/security.py`, `core/permisos.py`) | B: `api/v1/dependencias.py` |
-  | B: manejadores de errores y middlewares (`main.py`) | B: `api/manejadores.py`, `api/middleware.py` |
-  | B: reglas de usuarios, roles y catálogos (`api/v1/admin.py`, `catalogos.py`) | B: `domain/services/usuario_service.py`, `rol_service.py`, `catalogo_service.py` |
-  | F: `modulos/solicitudes/<archivo>` | F: `modulos/solicitudes/formulario/`, `expediente/`, `bandejas/`, `historico/` o `verificacion/` |
-  | API: `GET /solicitudes/historico` y `/historico/exportar` | API: `POST`, con los filtros en el cuerpo |
-  | Contenedores `snm_postgres`, `snm_backend`, `snm_frontend` | `argonavis_postgres`, `argonavis_backend`, `argonavis_frontend` |
+- **Los Word son la fuente** (decisión del 2026-11-14). Los guiones que generan los documentos no están en el repositorio, así que los cambios se hacen en el Word. Cuando cambie el código, hay que actualizar el documento afectado y su versión en la portada.
+  - La 0.7 se volvió a generar con esos guiones, que siguen fuera del repositorio. Antes se comprobó que los Word de la 0.6 no tenían cambios a mano: el texto regenerado era idéntico.
+  - Ya cita las rutas nuevas de la auditoría del 2026-11-14 (`informes/`, `api/v1/dependencias.py`, las carpetas de `modulos/solicitudes/` y los contenedores `argonavis_*`).
+- **Diagramas:** el 2026-11-23 se pusieron al día los BPMN 00, 01, 03, 04 y 05, y los Mermaid de arquitectura y modelo de datos. Si editas un `.bpmn` o un `.mmd`, vuelve a exportar su PNG y su SVG.
 - Si cambia el catálogo de trámites, también cambian el documento 04 (sección 3) y la prueba `backend/tests/test_documento_ucvmm.py`.
 - Cuando UCVMM valide un punto, anota la respuesta en la lista del documento 08 (sección 4) y en la regla correspondiente del 04.

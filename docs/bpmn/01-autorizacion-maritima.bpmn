@@ -35,7 +35,7 @@
         <bpmn:flowNodeRef>MostrarEstado</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>RespuestaQR</bpmn:flowNodeRef>
       </bpmn:lane>
-      <bpmn:lane id="Carril_UCVMM" name="UCVMM · Sector Pacífico">
+      <bpmn:lane id="Carril_UCVMM" name="UCVMM · sector del puesto">
         <bpmn:flowNodeRef>Revisar</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Impedimentos</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Decision</bpmn:flowNodeRef>
@@ -90,7 +90,7 @@
       <bpmn:incoming>Flujo_CumpleTodo_Registrar</bpmn:incoming>
       <bpmn:outgoing>Flujo_Registrar_AvisarUCVMM</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:sendTask id="AvisarUCVMM" name="Avisar a UCVMM por correo">
+    <bpmn:sendTask id="AvisarUCVMM" name="Avisar al buzón del sector por correo">
       <bpmn:incoming>Flujo_Registrar_AvisarUCVMM</bpmn:incoming>
       <bpmn:outgoing>Flujo_AvisarUCVMM_Revisar</bpmn:outgoing>
     </bpmn:sendTask>
@@ -131,12 +131,12 @@
       <bpmn:incoming>Flujo_Decision_Denegada</bpmn:incoming>
       <bpmn:messageEventDefinition id="Def_Denegada" />
     </bpmn:endEvent>
-    <bpmn:serviceTask id="GenerarAutorizacion" name="Generar la autorización (PDF con QR)">
+    <bpmn:serviceTask id="GenerarAutorizacion" name="Emitir la autorización (PDF con QR)">
       <bpmn:documentation>Estado «Aprobada», vigente hasta la fecha de la operación + DIAS_GRACIA_FINALIZACION (si ya pasó, no se aprueba: se devuelve a corrección). El PDF dice «Aprobada por: UCVMM». La observación de aprobación es interna.</bpmn:documentation>
       <bpmn:incoming>Flujo_Decision_GenerarAutorizacion</bpmn:incoming>
       <bpmn:outgoing>Flujo_GenerarAutorizacion_AvisoAprobacion</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:intermediateThrowEvent id="AvisoAprobacion" name="Aviso a la agencia y al puesto de control">
+    <bpmn:intermediateThrowEvent id="AvisoAprobacion" name="Aviso a la agencia y al puesto autorizado">
       <bpmn:incoming>Flujo_GenerarAutorizacion_AvisoAprobacion</bpmn:incoming>
       <bpmn:outgoing>Flujo_AvisoAprobacion_EnParalelo</bpmn:outgoing>
       <bpmn:messageEventDefinition id="Def_AvisoAprobacion" />
@@ -215,7 +215,7 @@
     <bpmn:association id="Asoc_Nota_Acceso" associationDirection="None" sourceRef="Nota_Acceso" targetRef="IniciarSesion" />
     <bpmn:textAnnotation id="Nota_Checklist"><bpmn:text>El checklist depende del trámite, del rango y de la nacionalidad de cada tripulante.</bpmn:text></bpmn:textAnnotation>
     <bpmn:association id="Asoc_Nota_Checklist" associationDirection="None" sourceRef="Nota_Checklist" targetRef="LlenarSolicitud" />
-    <bpmn:textAnnotation id="Nota_Validaciones"><bpmn:text>Operación entre hoy y 365 días · tripulantes mayores de 18 · pasaporte y seamanbook vigentes · PDF, Word o Excel revisados por su contenido y sin macros.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:textAnnotation id="Nota_Validaciones"><bpmn:text>Operación entre hoy y 365 días · tripulantes mayores de 18 · pasaporte con al menos 3 meses de vigencia a partir de la operación · PDF, Word o Excel revisados por su contenido y sin macros.</bpmn:text></bpmn:textAnnotation>
     <bpmn:association id="Asoc_Nota_Validaciones" associationDirection="None" sourceRef="Nota_Validaciones" targetRef="Validar" />
     <bpmn:textAnnotation id="Nota_Separacion"><bpmn:text>Separación de funciones: nadie revisa lo de su propia agencia ni lo que creó.</bpmn:text></bpmn:textAnnotation>
     <bpmn:association id="Asoc_Nota_Separacion" associationDirection="None" sourceRef="Nota_Separacion" targetRef="Revisar" />
@@ -290,7 +290,7 @@
       <bpmndi:BPMNShape id="VerificacionHecha_di" bpmnElement="VerificacionHecha"><dc:Bounds x="812" y="1202" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="775" y="1242" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Nota_Acceso_di" bpmnElement="Nota_Acceso"><dc:Bounds x="285" y="262" width="155" height="48" /></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Nota_Checklist_di" bpmnElement="Nota_Checklist"><dc:Bounds x="450" y="262" width="280" height="48" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Nota_Validaciones_di" bpmnElement="Nota_Validaciones"><dc:Bounds x="860" y="480" width="310" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Nota_Validaciones_di" bpmnElement="Nota_Validaciones"><dc:Bounds x="860" y="480" width="310" height="84" /></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Nota_Separacion_di" bpmnElement="Nota_Separacion"><dc:Bounds x="1000" y="650" width="260" height="48" /></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Nota_Impedimentos_di" bpmnElement="Nota_Impedimentos"><dc:Bounds x="1430" y="800" width="230" height="48" /></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Nota_Custodia_di" bpmnElement="Nota_Custodia"><dc:Bounds x="1880" y="480" width="215" height="85" /></bpmndi:BPMNShape>

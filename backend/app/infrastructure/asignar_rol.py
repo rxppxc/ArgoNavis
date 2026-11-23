@@ -61,6 +61,8 @@ async def asignar(nombre_usuario: str, nombre_rol: str, *, crear: str | None = N
                             f"una sola vez; se cambia al entrar): {temporal}")
             if not obtener_configuracion().PERMITIR_LOGIN_LOCAL:
                 mensajes.append("Ojo: PERMITIR_LOGIN_LOCAL está en false; con eso la cuenta local no puede entrar.")
+        if usuario is None:   # no pasa: `crear` es None, "ad" o "local"
+            raise SystemExit(f"No existe el usuario '{nombre_usuario}'.")
         if mensajes:
             await sesion.flush()
             await bitacora.registrar(

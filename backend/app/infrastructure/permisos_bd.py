@@ -41,12 +41,15 @@ def aplicar(url_duena: str, url_aplicacion: str) -> str:
     """Crea o pone al día la cuenta de `url_aplicacion` usando la de `url_duena`.
     Devuelve qué hizo, para el log del despliegue."""
     duena, aplicacion = make_url(url_duena), make_url(url_aplicacion)
-    if not aplicacion.username or aplicacion.username == duena.username:
+    cuenta = aplicacion.username
+    if not cuenta or cuenta == duena.username:
         return "La aplicación usa la misma cuenta que las migraciones: no hay permisos que ajustar."
     if not aplicacion.password:
         raise SystemExit("La cuenta de la aplicación no tiene clave (DATABASE_URL). En Docker: POSTGRES_APP_PASSWORD.")
-    rol = sql.Identifier(aplicacion.username)
-    base = sql.Identifier(aplicacion.database or duena.database)
+    nombre_base = aplicacion.database or duena.database
+    if not nombre_base:
+        raise SystemExit("DATABASE_URL no dice a qué base entrar (falta el nombre al final).")
+    rol, base = sql.Identifier(cuenta), sql.Identifier(nombre_base)
 
     with psycopg.connect(_para_psycopg(url_duena), autocommit=True) as cx:
         fila = cx.execute("SELECT rolsuper FROM pg_roles WHERE rolname = %s", (aplicacion.username,)).fetchone()

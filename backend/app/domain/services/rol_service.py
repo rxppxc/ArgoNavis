@@ -12,7 +12,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.permisos import ROL_ADMIN, ROL_SYSADMIN
+from app.core.permisos import ROL_ADMIN, ROL_SYSADMIN, olvidar_permisos
 from app.domain.models.rol import Permiso, Rol, RolPermiso
 from app.domain.models.user import Usuario
 from app.domain.schemas.rol import DatosActualizarRol, DatosCrearRol, SalidaPermiso, SalidaRol
@@ -116,4 +116,5 @@ class ServicioRoles:
         for pid in ids_unicos:
             self.sesion.add(RolPermiso(rol_id=rol_id, permiso_id=pid))
         await self.sesion.flush()
+        olvidar_permisos(self.sesion)
         return await self.salida(rol)

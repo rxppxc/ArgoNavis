@@ -14,7 +14,7 @@ El nombre del sistema es «ARGO NAVIS · Sistema Interno Marítimo» (logo, pest
 - Rate limit: `slowapi` (almacenamiento en memoria — para multi-worker mover a Redis)
 - MIME real: `python-magic` (binario `libmagic` en Windows via `python-magic-bin`)
 - PDF: `reportlab` (la autorización y el informe de estadísticas); Excel: `XlsxWriter` (solo escribe, desde el 2026-11-10)
-- Lint: `ruff` en el backend (`backend/ruff.toml`) y ESLint en el frontend; los dos en la CI
+- Lint: `ruff` en el backend (`backend/ruff.toml`) y ESLint en el frontend; tipos con `mypy` (`backend/mypy.ini`, 2026-11-22) y `tsc`; la cobertura del backend, con piso (`backend/.coveragerc`). Todo en la CI
 
 ## Convenciones críticas
 
@@ -344,6 +344,10 @@ Cada una salió de un problema real. El detalle está en el historial.
 - Las variables que apagan el AD, el correo y los logs de las pruebas están en un solo lugar: `tests/entorno_pruebas.py`.
   - Lo usan `conftest.py`, `servidor_e2e.py` y `carga.py`.
   - Una configuración nueva que en las pruebas tenga que quedar apagada va ahí.
+- **Quién pide se lee una vez por pedido** (2026-11-22): `obtener_id_usuario_actual` carga al usuario con su rol y su agencia en una consulta y lo deja en la sesión (`sesion.info`: el mapa de identidad guarda referencias débiles). Después, `sesion.get(Usuario, id)` no vuelve a la base. Los permisos, con `codigos_permiso`: una vez por pedido; si un pedido cambia los de un rol, `olvidar_permisos`. Lo cuenta `tests/test_consultas_por_pedido.py`.
+- `mypy` (`backend/mypy.ini`): un aviso nuevo deja la CI en rojo. Un `# type: ignore` lleva su código (`[arg-type]`) y el porqué. Los «stubs» de reportlab no se usan (sus avisos eran de los stubs).
+- La cobertura se mide con `concurrency = thread, greenlet` (`.coveragerc`): sin greenlet, lo que sigue a un `await` de SQLAlchemy sale como no probado (medía 87 % en vez de 95 %).
+- El E2E corre con el Python de `backend/venv`, o con el de `E2E_PYTHON` (p. ej. un 3.12 como el de producción: el venv de desarrollo es 3.14).
 - Las órdenes de consola (`python -m app.…`: `asignar_rol`, `permisos_bd`, `revisar_documentos`) corren solas en el servidor, sin el resto de la aplicación. Se prueban en un proceso aparte (`tests/test_consola.py`): llamadas desde pytest, que ya cargó todo, no se ve lo que les falta.
   - Por eso **un modelo nuevo se importa en `app/domain/models/__init__.py`**: las relaciones se nombran por texto y SQLAlchemy necesita todas las clases cargadas (2026-11-22: `asignar_rol --crear-local` se caía con «'AgenciaNaviera' failed to locate a name»).
 - Las ayudas comunes (enviar, verificar impedimentos, `login`, `panama`, `programa`) están en `tests/ayudas.py`. `programa("bash")` (o `sh`, `openssl`) encuentra el de Git en Windows: el `bash` del sistema es el de WSL.
@@ -360,9 +364,8 @@ Cada una salió de un problema real. El detalle está en el historial.
 9. **Antivirus (ClamAV) para los archivos subidos** — por ahora no (2026-10-16); necesita el servicio en el servidor.
 10. **Importar tripulantes desde una plantilla Excel** (propuesta 3 de la revisión de UI) — por ahora no (2026-10-19). Con el tope de 30 tripulantes (2026-10-30), pesa menos.
     - Vale la pena si las tripulaciones suelen ser grandes. Para decidir: `SELECT count(*), round(avg(cantidad_tripulantes), 1), max(cantidad_tripulantes), count(*) FILTER (WHERE cantidad_tripulantes > 10) FROM solicitudes;`.
-11. **FastAPI, Starlette y uvicorn** (de la revisión del 2026-10-27; el resto de sus errores ya se corrigió). Sin avisos en las versiones instaladas, no se subieron.
-    - Entre la 0.143 y la 0.162 (del 8 al 23/10/2026), FastAPI cambió cómo lee formularios, archivos y cuerpos, que es justo el envío de solicitudes; la 0.162 revierte parte de la 0.147.
-    - Subirlas cuando se asiente: solas, y probando el envío (pytest y E2E).
+11. **FastAPI, Starlette y uvicorn: al día el 2026-11-22** (FastAPI 0.162.7, Starlette 1.10.0, uvicorn 0.54.0, python-multipart 0.0.33), probadas con pytest y el E2E (con Python 3.12). Desde la 0.142, FastAPI trae `opentelemetry-api`.
+    - Se quedó en la 0.162.7 a propósito: las 0.163 a 0.165 tenían días y reescriben cómo se leen los parámetros. La 0.164 trae un tope del cuerpo propio (`max_body_size`, apagado por defecto) que podría reemplazar `TopeDelCuerpo`; evaluarlo cuando se asiente.
 12. **De la reunión del 2026-10-30, para más adelante:** los feriados en el horario laboral (necesitan un catálogo que mantenga el Administrador) y la notificación de Windows de la campana (el navegador pide permiso).
 13. **Validar con UCVMM:** el aviso de custodia al aprobar no es un documento, así que sigue saliendo para todos los rangos; a los no marinos ya no se les pide el Form. No. 6. Confirmar si les aplica.
 14. **Respaldos fuera del servidor** (de la revisión del 2026-10-27). Hoy `backup.sh` es solo para Docker y deja todo en el mismo servidor; se copian con `rsync -aH` (README). Desde el 2026-11-22 guarda 14 noches, 12 meses y 10 años, pero en ese mismo disco: si se pierde, se pierden con él. Falta probar la restauración entera en el servidor de pruebas.
@@ -370,12 +373,13 @@ Cada una salió de un problema real. El detalle está en el historial.
     - Retención de la bitácora (`audit_logs`): es la tabla que más crece (cada documento visto, cada login) y no se purga. Va con la política de retención (punto 7).
     - Búsqueda por texto de la bitácora: `ILIKE '%…%'` recorre la tabla. Las bandejas y la consulta histórica ya usan un índice de trigramas (2026-11-22).
     - Tope global del login y de la verificación en nginx (`limit_req`): el de slowapi es por proceso. Antes, confirmar si las agencias salen de la VPN con una sola IP (las frenaría a todas juntas).
-16. **Menos consultas por pedido, si crece el uso** (prueba de carga del 2026-11-08). Hoy cada pedido hace 6 consultas solo para saber quién es el usuario:
-    - `obtener_id_usuario_actual` y `usuario_actual` leen el mismo usuario dos veces;
-    - los permisos se consultan en cada pedido (a veces dos veces);
-    - el expediente vuelve a leer el catálogo (trámites, documentos y países) y carga `creada_por` con su rol y su agencia.
-    Juntar la verificación del token con la carga del usuario y cachear el catálogo por proceso ahorraría entre 10 y 20 %. Correr `tests/carga.py` antes y después.
-17. **Documentación de la DTI, juego 0.7:** `docs/` no tiene todavía la identidad «pase oficial» ni los cambios del 2026-11-11 (documentos de los técnicos, nombre neutro para la agencia, costo fuera del horario y consulta histórica), del 2026-11-13 (cambio de puerto, Formulario No. 3 en todos los trámites, cabecera de la agencia, rango Pasajero, pasaporte con 3 meses) del 2026-11-14 (la Visa de los restringidos, los panameños, Shore Pass, quien finalizó y el PDF por el QR) y del 2026-11-16 (la boleta de recargo con el tipo de operación, el alcance del supervisor general, «¿Subir y bajar?» con la Carta Form. 7 y la ocupación fuera del formulario), ni el rediseño visual «B + C» del 2026-11-17 (las capturas de los manuales quedaron con el diseño anterior), ni lo del 2026-11-18 (la operación del trámite de Técnico con «Subir y bajar», los días del sellado de Shore Pass, las visas de los restringidos según el trámite y el rango, las estadísticas sin UCVMM y «tripulantes» otra vez), ni lo del 2026-11-22 (los contenedores endurecidos, la vigilancia, la consulta de las autorizaciones de hace muchos años, el historial completo y el cambio de puerto que solo ve el puesto nuevo).
+16. **Menos consultas por pedido:** hecho lo de quién pide (2026-11-22): el usuario una vez, con su rol y su agencia, y los permisos una vez (una bandeja pasó de 20 consultas a 13 o 15; `/auth/me`, de 4 a 1). Queda, si crece el uso:
+    - el expediente vuelve a leer el catálogo (trámites, documentos y países): cachearlo por proceso pide que un cambio del Administrador llegue a los demás procesos;
+    - las bandejas y el expediente cargan el rol y la agencia de quien creó la solicitud, aunque solo se usa su nombre. No se apagó con `noload`/`raiseload`: el expediente se relee con `populate_existing` y le quitaría el rol al propio usuario si él la creó.
+17. **Documentación de la DTI: al día con el juego 0.7** (2026-11-23, esquema `d7f3b0c5e849`): los 10 documentos, con capturas nuevas tomadas contra la pila del E2E y los BPMN y Mermaid puestos al día (docs/HISTORIAL.md).
+    - Los guiones que la generan siguen fuera del repositorio (`docs/README.md` → Mantenimiento).
+    - Un cambio del código que toque lo documentado pide actualizar el documento y su versión.
+    - Faltan los manuales de UCVMM, del puesto de control y de los supervisores; el de la agencia es del 2026-11-19.
 18. **Recargo fuera del horario, con UCVMM:**
     - La boleta (2026-11-16) es un **borrador**: UCVMM tiene un modelo en papel, que el usuario pasará para copiarlo tal cual (`informes/boleta_recargo_pdf.py`).
     - El sistema no registra el pago (desde el 2026-11-11). La boleta dice cómo se paga desde el 2026-11-18: «Efectivo, tarjeta o cheque a favor del Servicio Nacional de Migración» (`METODOS_DE_PAGO`, `boleta_recargo_pdf.py`).
@@ -384,9 +388,9 @@ Cada una salió de un problema real. El detalle está en el historial.
     - Con la DTI: publicar la verificación del QR en internet (plantilla `frontend/nginx-verificacion-publica.conf`, HTTPS, `set_real_ip_from` y `URL_VERIFICACION_PUBLICA`). Mientras tanto, el QR solo funciona dentro de la red del SNM.
     - Con UCVMM: el nombre y la descripción de la Visa de los restringidos (hoy «Visa», «Para el tripulante de nacionalidad restringida.»; se cambian con una migración).
     - Si las agencias van a entrar al sistema desde internet sin VPN (el usuario lo mencionó), es otra decisión con la DTI: hoy todo está pensado para la VPN. Publicar todo pediría al menos HTTPS, el segundo factor de las agencias (punto 8) y un WAF.
-21. **De la auditoría del stack (2026-11-22)**, en el orden acordado con el usuario. El stack se queda (no agregar microservicios, Redis, Celery ni Kubernetes). Hechos el 2026-11-22: los documentos de Office, los contenedores endurecidos con redes separadas, PostgreSQL 15.20, los registros en volúmenes, `vigilar.py`, `probar-restauracion.sh`, HTTPS listo para activar y PostgreSQL 18 elegible por servidor. El repositorio a privado y a una organización del SNM lo deja el usuario para el final. Los contenedores no se han levantado nunca en la PC del usuario (sin virtualización): lo hace la CI, y no se despliega hasta verla en verde.
+21. **De la auditoría del stack (2026-11-22)**, en el orden acordado con el usuario. El stack se queda (no agregar microservicios, Redis, Celery ni Kubernetes). Hechos el 2026-11-22: los documentos de Office, los contenedores endurecidos con redes separadas, PostgreSQL 15.20, los registros en volúmenes, `vigilar.py`, `probar-restauracion.sh`, HTTPS listo para activar, PostgreSQL 18 elegible por servidor y, de «Después», FastAPI al día (11), `mypy` y la cobertura en la CI, menos consultas por pedido (16) y las acciones de la CI en Node 24. El repositorio a privado y a una organización del SNM lo deja el usuario para el final. Los contenedores no se han levantado nunca en la PC del usuario (sin virtualización): lo hace la CI, y no se despliega hasta verla en verde.
     - **Antes de producción** (que será un servidor nuevo): el nombre y los certificados (punto 1); respaldos fuera del servidor y cifrados (14; preguntar a la DTI si la VM entra en el respaldo de vSphere); instalar la vigilancia en cada servidor (`CORREO_ALERTAS` y el cron) y que la DTI consulte `/api/health` desde otro equipo; PostgreSQL 18 ahí (las dos líneas del `.env.example`; la CI levanta la pila con ella y le carga un respaldo de la 15); correo a dominios externos.
-    - **Después:** subir archivo por archivo, con borrador (hoy, un solo envío de hasta 345 MB); decidir con UCVMM si alcanza con PDF; cookie (2) y segundo factor (8); reemplazar `ldap3` (sin versión estable desde 2021) o un inicio de sesión único; que el backend calcule el checklist y los tipos salgan de OpenAPI; FastAPI (11); retirar el modo Windows de producción; verificador de tipos en Python y cobertura; menos consultas por pedido (16); partir `solicitud_service.py` (4).
+    - **Después:** subir archivo por archivo, con borrador (hoy, un solo envío de hasta 345 MB); decidir con UCVMM si alcanza con PDF; cookie (2) y segundo factor (8); reemplazar `ldap3` (sin versión estable desde 2021) o un inicio de sesión único; que el backend calcule el checklist y los tipos salgan de OpenAPI; retirar el modo Windows de producción; partir `solicitud_service.py` (4).
     - **Continuidad:** el proyecto depende de una sola persona y de una cuenta personal de GitHub.
 22. **De la conservación (2026-11-22), para decidir con el SNM.** Hecho: que se encuentren muchos años después, con su historial completo, y respaldos con margen (docs/HISTORIAL.md). Nada se borra. Falta:
     - **Cuántos años** se conservan (Ley 81, punto 7). Los datos de quien salió de una solicitud al corregirla también se conservan.
@@ -560,8 +564,10 @@ cd backend && venv\Scripts\python -c "from app.main import aplicacion"
 :: Backend: pruebas (BD temporal en el servidor de DATABASE_URL; no envía correos)
 cd backend && venv\Scripts\python -m pytest
 
-:: Backend: lint (la CI lo corre antes de las pruebas)
+:: Backend: lint y tipos (la CI los corre antes de las pruebas), y las pruebas con la cobertura (piso en .coveragerc)
 cd backend && venv\Scripts\python -m ruff check --config ruff.toml . ../vigilar.py
+cd backend && venv\Scripts\python -m mypy app
+cd backend && venv\Scripts\python -m pytest --cov=app
 
 :: Backend: dependencias (se instalan desde el bloqueo; se edita requirements.txt y se regenera)
 cd backend && venv\Scripts\python -m pip install --require-hashes -r requirements.lock
@@ -573,7 +579,8 @@ cd frontend && node node_modules/typescript/bin/tsc -b --noEmit
 cd frontend && npm run lint
 
 :: Frontend: pruebas unitarias (Vitest) y recorrido completo en el navegador (Playwright,
-:: con su propio backend en 8001 y la BD temporal argonavis_e2e; Chrome o PLAYWRIGHT_CHROMIUM=1)
+:: con su propio backend en 8001 y la BD temporal argonavis_e2e; Chrome o PLAYWRIGHT_CHROMIUM=1;
+:: con otro Python para su backend, set E2E_PYTHON=<ruta del python.exe>)
 cd frontend && npm test
 cd frontend && npm run test:e2e
 

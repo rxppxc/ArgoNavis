@@ -31,7 +31,8 @@ from app.infrastructure.database import SesionLocal, motor_bd
 LOTE = 5000       # archivos por consulta
 NOMBRADOS = 10    # en el resumen, los primeros; el resto, contado
 DIAS = 31         # en cuántos días se relee todo
-_QUE_ES = {DocumentoSolicitud: "documento", DocumentoEmitido: "autorización emitida"}
+_QUE_ES: dict[type[DocumentoSolicitud] | type[DocumentoEmitido], str] = {
+    DocumentoSolicitud: "documento", DocumentoEmitido: "autorización emitida"}
 
 
 @dataclass
@@ -94,7 +95,8 @@ async def revisar(dia: int | None = None) -> Revision:
     dia = datetime.now(ZONA_PANAMA).day if dia is None else dia
     revision = Revision(total=0)
     for modelo, que_es in _QUE_ES.items():
-        sospechosos, ultimo = [], 0
+        sospechosos: list[int] = []   # los id de los que hay que volver a mirar
+        ultimo = 0
         while True:
             async with SesionLocal() as sesion:
                 archivos = await RepositorioSolicitud(sesion).archivos_desde(modelo, ultimo, LOTE)

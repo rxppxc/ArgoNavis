@@ -1,0 +1,14 @@
+# Cobertura de las pruebas del backend (2026-11-22). La mide la CI:
+#   venv\Scripts\python -m pytest --cov=app
+[run]
+source = app
+# SQLAlchemy async corre la base en greenlets: sin «greenlet», coverage pierde el rastro
+# después de cada consulta y lo que sigue a un await sale como no probado (con eso medía 87 %).
+concurrency = thread, greenlet
+
+[report]
+# El piso: si la cobertura baja de aquí, la CI falla. El 2026-11-22 medía 95 %; dos puntos de
+# margen por lo que cambia entre Windows y Linux (cada uno recorre su parte del código).
+fail_under = 93
+skip_covered = True
+show_missing = True
