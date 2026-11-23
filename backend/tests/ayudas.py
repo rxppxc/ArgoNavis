@@ -1,10 +1,13 @@
 """Datos y llamadas que comparten las pruebas del flujo."""
 import io
 import json
+import os
 import secrets
+import shutil
 import struct
 import zipfile
 from datetime import datetime, timedelta
+from pathlib import Path
 from app.core.horario import ZONA_PANAMA
 from conftest import Actor
 
@@ -16,6 +19,15 @@ VIGENTE = (HOY + timedelta(days=400)).isoformat()
 def panama(*partes: int) -> datetime:
     """Un momento en hora de Panamá: panama(2026, 10, 30, 15, 1)."""
     return datetime(*partes, tzinfo=ZONA_PANAMA)
+
+
+def programa(nombre: str) -> str | None:
+    """bash, sh, openssl… En Windows, los de Git: el «bash» del sistema es el de WSL."""
+    if os.name != "nt" or nombre == "git":
+        return shutil.which(nombre)
+    git = shutil.which("git")
+    carpetas = (raiz / sub for raiz in (Path(git).resolve().parents if git else []) for sub in ("bin", "usr/bin", "mingw64/bin"))
+    return next((str(c / f"{nombre}.exe") for c in carpetas if (c / f"{nombre}.exe").exists()), None)
 
 
 async def login(cliente, usuario: str, clave: str):

@@ -770,3 +770,18 @@ Respuestas del usuario: «1. El puesto no debe tener acceso a consulta históric
 - **Respaldos con margen:** 14 noches, la primera de los últimos 12 meses y la primera de los últimos 10 años. La base se cuenta ahora por noches y no por la fecha del archivo, para que siempre esté junto a sus documentos. La copia de los documentos solo agrega: lo que se pierde o cambia en el servidor no la contagia, y lo dice en su registro.
 - **Revisión diaria:** también los retirados y las emitidas, y relee los de un día del mes para comprobar su huella (en 31 días, todos).
 - **Pruebas:** `test_historial_completo.py` (15), los casos nuevos de `test_revisar_documentos.py`, `test_respaldos.py`, `test_permisos_bd.py`, `test_migraciones.py` y `test_cambio_de_puerto.py`, `registro.test.ts` y el E2E. Quitando de a una 49 reglas, falla alguna prueba en 47; las otras dos las frena otra barrera. La CI comprobará con contenedores de verdad que la copia conserva el dueño y que se recupera lo perdido.
+
+## HTTPS listo para activar y PostgreSQL 18 elegible (2026-11-22)
+Lo que faltaba por código «antes de producción» (CLAUDE.md, pendiente 21). Sin tocar el `.env`, un servidor de hoy sigue igual: por HTTP y con la 15.
+- **HTTPS en el `.env`** (`USAR_HTTPS=true` y `APP_URL=https://<nombre>`), con el certificado en `certificados/https`:
+  - `frontend/nginx/elegir-modo.sh` corre al arrancar nginx y decide dónde escucha: 8080 (HTTP) u 8443 (HTTPS) con el 8080 solo para redirigir. `nginx.conf` es el mismo en los dos modos, así que las cabeceras, los topes y las rutas no se pueden separar.
+  - Redirige al nombre de `APP_URL` y no al que escribió el usuario: por la IP, el certificado no coincide.
+  - Si falta el certificado, la clave, un permiso o la dirección, nginx no arranca y el registro dice qué. Volver solo a HTTP, sin que nadie se entere, sería peor.
+  - TLS 1.2 y 1.3, y `Strict-Transport-Security` de un año solo por HTTPS (`map $https $hsts`: nginx no manda una cabecera vacía). Sin HTTP/2 a propósito: un envío rechazado por grande se corta distinto y el formulario no podría leer el motivo.
+  - El chequeo de salud del contenedor pasó al 8081, que no sale de él: el 8080 redirige.
+  - La clave privada la ve solo nginx y la CA interna (Active Directory y correo), solo el backend; las dos carpetas, de solo lectura. `certificados/` no va al repositorio.
+- **Se vigila:** `vigilar.py` mira el certificado que nginx está usando (no el archivo) y avisa 21 días antes de que venza; `verificar-despliegue.sh` revisa la redirección, el nombre, la fecha, los intermedios, los permisos de la clave y si se cambió sin recargar. Con la CA interna, la vigilancia manda sus avisos por el correo con TLS.
+- **Al arrancar**, el backend dice si la CA que nombra el `.env` no está (antes: «invalid CA public key file», sin decir cuál, o cada correo fallando).
+- **PostgreSQL 18** en el `.env` (`POSTGRES_IMAGEN` y `POSTGRES_VOLUMEN`): su imagen guarda los datos en otra carpeta y no abre los de la 15, así que lleva su propio volumen y el de la 15 queda intacto. `verificar-despliegue.sh` comprueba que los datos estén en un volumen con nombre.
+- **La CI** levanta la pila con la 15 y con la 18, carga en la 18 un respaldo de la 15, la pone por HTTPS con un certificado de prueba (entrando por el nombre y validándolo), lo cambia sin reiniciar, comprueba que la vigilancia avise y que sin la clave no arranque.
+- De paso, en `verificar-despliegue.sh`: con `pipefail`, `curl | grep -q` daba por fallida una respuesta buena; lo que se busca, ahora se busca después de guardarlo.

@@ -1,4 +1,5 @@
 from decimal import Decimal
+from pathlib import Path
 from typing import Literal
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -185,6 +186,20 @@ class Configuracion(BaseSettings):
                 "SECRET_KEY débil o de ejemplo: en producción usa al menos 32 caracteres aleatorios "
                 "(python -c \"import secrets; print(secrets.token_urlsafe(48))\")."
             )
+        return self
+
+    @model_validator(mode="after")
+    def _la_ca_interna_esta(self) -> "Configuracion":
+        """Con TLS, si la CA que nombra el .env no está: mejor decirlo al arrancar que en el
+        primer login (o en cada correo). En Docker se pone en certificados/ca del servidor."""
+        for variable, con_tls in (("LDAP_CA_CERT", self.LDAP_USAR_SSL or self.LDAP_STARTTLS),
+                                  ("MAIL_CA_CERT", self.MAIL_USAR_SSL or self.MAIL_STARTTLS)):
+            ruta = getattr(self, variable)
+            if con_tls and ruta and not Path(ruta).is_file():
+                raise ValueError(
+                    f"{variable}: no está {ruta}. En Docker, el PEM va en certificados/ca del servidor y la "
+                    "variable dice /certificados/ca/<archivo>.pem."
+                )
         return self
 
     @model_validator(mode="after")

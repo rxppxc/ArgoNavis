@@ -70,12 +70,19 @@ def test_solo_nginx_se_publica_en_la_red():
 
 
 def test_el_puerto_de_nginx_es_el_mismo_en_todas_partes():
-    """Sin root no se puede escuchar en el 80: nginx usa otro y Docker lo publica en el 80."""
-    [puerto] = re.findall(r"^\s*listen (\d+);", NGINX, re.M)
-    assert int(puerto) > 1024
-    assert SERVICIOS["frontend"]["ports"] == [f"80:{puerto}"]
-    assert re.findall(r"^EXPOSE (\d+)", _dockerfile("frontend"), re.M) == [puerto]
-    assert f"http://127.0.0.1:{puerto}/" in SERVICIOS["frontend"]["healthcheck"]["test"]
+    """Sin root no se puede escuchar en el 80 ni en el 443: nginx usa otros y Docker los publica ahí."""
+    def escucha(nombre: str) -> list[str]:
+        return re.findall(r"^\s*listen (\d+)(?: ssl)?;", (RAIZ / "frontend" / "nginx" / nombre).read_text(encoding="utf-8"), re.M)
+
+    [http], [https] = escucha("http.conf"), escucha("https.conf")
+    assert escucha("redireccion.conf") == [http], "con HTTPS, el que redirige es el del 80"
+    assert int(http) > 1024 and int(https) > 1024 and http != https
+    assert SERVICIOS["frontend"]["ports"] == [f"80:{http}", f"443:{https}"]
+    assert re.findall(r"^EXPOSE (.+)", _dockerfile("frontend"), re.M) == [f"{http} {https}"]
+    # El chequeo de salud va por uno que no sale del contenedor y no redirige nunca.
+    [salud] = re.findall(r"^\s*listen 127\.0\.0\.1:(\d+);", NGINX, re.M)
+    assert salud not in (http, https)
+    assert f"http://127.0.0.1:{salud}/" in SERVICIOS["frontend"]["healthcheck"]["test"]
     # Si nginx redirige, que no agregue su puerto interno a la dirección.
     assert re.search(r"^\s*absolute_redirect off;", NGINX, re.M)
 
@@ -119,8 +126,40 @@ def test_la_integracion_continua_levanta_esta_misma_pila():
     assert trabajo["env"]["COMPOSE_FILE"] == "docker-compose-prod.yml"
     pasos = "\n".join(paso.get("run", "") for paso in trabajo["steps"])
     assert "docker compose up -d --build --wait" in pasos
+    # Por HTTP y por HTTPS: con HTTPS, entrando por el nombre y validando el certificado.
+    assert "USAR_HTTPS=true" in pasos and "--resolve argonavis.prueba:443:127.0.0.1" in pasos
+    assert pasos.count("verificar-despliegue.sh --solo-la-pila") == 2
     for guion in ("verificar-despliegue.sh --solo-la-pila", "bash backup.sh", "bash probar-restauracion.sh", "vigilar.py"):
         assert guion in pasos, guion
+
+
+def test_postgresql_18_se_elige_en_el_env_y_con_su_propio_volumen():
+    """Su imagen guarda los datos en otra carpeta, y la 18 no abre los de la 15: la imagen y el
+    volumen se cambian juntos, y el de la 15 queda intacto por si hay que volver. Sin nada en el
+    .env, la de siempre: desplegar en un servidor de hoy no cambia su base."""
+    base = SERVICIOS["postgres_db"]
+    assert re.fullmatch(r"\$\{POSTGRES_IMAGEN:-postgres:15\.\d+-alpine[\d.]+\}", base["image"]), base["image"]
+    assert base["volumes"] == ["${POSTGRES_VOLUMEN:-postgres_data:/var/lib/postgresql/data}"]
+    ejemplo = (RAIZ / ".env.example").read_text(encoding="utf-8")
+    [imagen] = re.findall(r"^# POSTGRES_IMAGEN=(\S+)$", ejemplo, re.M)
+    [(volumen, carpeta)] = re.findall(r"^# POSTGRES_VOLUMEN=(\w+):(\S+)$", ejemplo, re.M)
+    # En la 18, la carpeta del volumen es la que declara la imagen: los datos van en una subcarpeta.
+    assert imagen.startswith("postgres:18.") and carpeta == "/var/lib/postgresql"
+    assert volumen != "postgres_data" and volumen in COMPOSE["volumes"]
+    # La integración continua levanta la pila con las dos.
+    ci = yaml.safe_load((RAIZ / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))
+    variantes = ci["jobs"]["contenedores"]["strategy"]["matrix"]["include"]
+    assert [(v["imagen"], v["volumen"]) for v in variantes] == [("", ""), (imagen, f"{volumen}:{carpeta}")]
+    assert imagen in {f"postgres:{v}" for v in ci["jobs"]["backend"]["strategy"]["matrix"]["postgres"]}
+    pasos = "\n".join(paso.get("run", "") for paso in ci["jobs"]["contenedores"]["steps"])
+    assert set(re.findall(r"postgres:18\S*", pasos)) == {imagen}, "y carga en la 18 un respaldo de la 15"
+
+
+def test_la_revision_del_servidor_mira_donde_estan_los_datos():
+    """Si la imagen y el volumen no casan, la 15 los guardaría en un volumen sin nombre, que se
+    pierde de vista al bajar la pila."""
+    guion = (RAIZ / "verificar-despliegue.sh").read_text(encoding="utf-8")
+    assert "show data_directory" in guion and "argonavis_postgres_" in guion
 
 
 def test_la_carpeta_temporal_de_nginx_es_de_su_usuario():

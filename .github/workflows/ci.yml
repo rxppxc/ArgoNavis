@@ -99,9 +99,16 @@ jobs:
         run: npm test
       - name: Build de producción
         run: npm run build
-      - name: Configuración de nginx (nginx -t, con la imagen de frontend/Dockerfile)
+      - name: Configuración de nginx, por HTTP y por HTTPS (nginx -t, con la imagen de frontend/Dockerfile)
         # Con un error en nginx.conf el contenedor no arranca y el sitio queda caído al desplegar.
-        run: docker run --rm -v "$PWD/nginx.conf:/etc/nginx/conf.d/default.conf:ro" nginx:1.31.8-alpine nginx -t
+        run: |
+          mkdir /tmp/certificados
+          openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj /CN=prueba -keyout /tmp/certificados/argonavis.key -out /tmp/certificados/argonavis.crt
+          for https in false true; do
+            docker run --rm -e USAR_HTTPS=$https -e APP_URL=https://argonavis.prueba -v /tmp/certificados:/certificados:ro \
+              -v "$PWD/nginx.conf:/etc/nginx/conf.d/default.conf:ro" -v "$PWD/nginx:/etc/nginx/argonavis:ro" \
+              --entrypoint sh nginx:1.31.8-alpine -c 'sh /etc/nginx/argonavis/elegir-modo.sh && nginx -t'
+          done
 
   e2e:
     if: github.event_name != 'schedule'
@@ -158,8 +165,19 @@ jobs:
     # que falte (los contenedores corren sin root y con la imagen de solo lectura) sale
     # aquí y no al desplegar.
     if: github.event_name != 'schedule'
+    name: contenedores (${{ matrix.imagen || 'como en producción' }})
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - imagen: ""   # la de docker-compose-prod.yml
+            volumen: ""
+          - imagen: postgres:18.7-alpine3.24   # la del servidor nuevo (.env.example)
+            volumen: postgres_18:/var/lib/postgresql
+    # La 18 todavía no está en ningún servidor: si falla, se ve, pero no deja el push en rojo.
+    continue-on-error: ${{ matrix.imagen != '' }}
     env:
       COMPOSE_FILE: docker-compose-prod.yml
     steps:
@@ -180,8 +198,11 @@ jobs:
           MAIL_FROM=no-reply@prueba.local
           APP_URL=http://localhost
           PERMITIR_LOGIN_LOCAL=true
+          POSTGRES_IMAGEN=${{ matrix.imagen }}
+          POSTGRES_VOLUMEN=${{ matrix.volumen }}
           FIN
       - name: Una base como la de un servidor ya instalado (la versión anterior, arrancada como root)
+        if: matrix.imagen == ''
         run: |
           docker volume create --label com.docker.compose.project=argonavis --label com.docker.compose.volume=postgres_data argonavis_postgres_data
           docker run -d --name anterior --env-file .env -v argonavis_postgres_data:/var/lib/postgresql/data postgres:15.19-alpine3.24
@@ -194,7 +215,9 @@ jobs:
         run: sudo bash verificar-despliegue.sh --solo-la-pila
       - name: Los datos de antes siguen, y se entra después de reiniciar
         run: |
-          test "$(docker compose exec -T postgres_db psql -U postgres -d argonavis -tAc 'SELECT count(*) FROM de_antes')" = 1
+          if [ -z "${{ matrix.imagen }}" ]; then
+            test "$(docker compose exec -T postgres_db psql -U postgres -d argonavis -tAc 'SELECT count(*) FROM de_antes')" = 1
+          fi
           clave=$(docker compose exec -T backend python -m app.infrastructure.asignar_rol ci.sysadmin SysAdmin --crear-local | sed -n 's/.*se cambia al entrar): //p')
           test -n "$clave"
           docker compose restart
@@ -219,6 +242,16 @@ jobs:
           copia=$(sudo find /tmp/respaldos/documentos -mindepth 1 -maxdepth 1 -name '20*' | sort | tail -n 1)
           sudo cp -a "$copia/." "$volumen/"
           en_el_backend 'grep -q uno solicitud-1/a.pdf && echo dos > solicitud-1/b.pdf && mkdir solicitud-2'
+      - name: El respaldo de la 15 se carga en la 18 (README → PostgreSQL 18)
+        if: matrix.imagen == ''
+        run: |
+          docker run -d --name la18 -e POSTGRES_PASSWORD=prueba postgres:18.7-alpine3.24
+          timeout 90 bash -c 'until docker exec la18 pg_isready -q -h 127.0.0.1 -U postgres; do sleep 1; done'
+          docker exec la18 psql -q -U postgres -c 'CREATE ROLE argonavis_app' -c 'CREATE DATABASE argonavis'
+          sudo sh -c 'gunzip -c "$(ls -t /tmp/respaldos/argonavis_bd_*.sql.gz | head -n 1)"' > /tmp/respaldo.sql
+          docker exec -i la18 psql -q -v ON_ERROR_STOP=1 -U postgres -d argonavis < /tmp/respaldo.sql > /dev/null
+          test "$(docker exec la18 psql -U postgres -d argonavis -tAc 'SELECT count(*) FROM alembic_version')" = 1
+          docker rm -f la18
       - name: La vigilancia mira la pila (aquí solo le falta el respaldo programado)
         run: |
           sudo python3 -I vigilar.py > /tmp/vigilancia.txt 2>&1 || true
@@ -229,6 +262,42 @@ jobs:
         run: |
           docker compose down -v
           docker compose up -d --wait --wait-timeout 300
+          curl -fsS http://localhost/api/health
+      - name: Por HTTPS, con un certificado de prueba
+        run: |
+          cat > /tmp/certificado.sh <<'FIN'
+          # Un certificado nuevo de argonavis.prueba que vale $1 días, puesto como dice el README.
+          openssl req -x509 -newkey rsa:2048 -nodes -days "$1" -subj /CN=argonavis.prueba \
+            -addext subjectAltName=DNS:argonavis.prueba -keyout /tmp/argonavis.key -out /tmp/argonavis.crt 2>/dev/null
+          sudo install -o 101 -g 101 -m 400 /tmp/argonavis.key certificados/https/argonavis.key
+          sudo install -m 644 /tmp/argonavis.crt certificados/https/argonavis.crt
+          FIN
+          bash /tmp/certificado.sh 60
+          sed -i 's#^APP_URL=.*#APP_URL=https://argonavis.prueba#' .env
+          echo 'USAR_HTTPS=true' >> .env
+          docker compose up -d --wait --wait-timeout 120
+          sudo bash verificar-despliegue.sh --solo-la-pila
+          # Como un navegador: con el nombre y validando el certificado.
+          curl -fsS --cacert certificados/https/argonavis.crt --resolve argonavis.prueba:443:127.0.0.1 https://argonavis.prueba/api/health
+          test "$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' 'http://localhost/verificar/abc?x=1')" = '301 https://argonavis.prueba/verificar/abc?x=1'
+      - name: El certificado se cambia sin reiniciar, y la vigilancia avisa antes de que venza
+        run: |
+          sudo python3 -I vigilar.py > /tmp/vigilancia.txt 2>&1 || true
+          if grep -E 'Traceback|certificado|La aplicación|argonavis_' /tmp/vigilancia.txt; then exit 1; fi
+          bash /tmp/certificado.sh 10
+          docker exec argonavis_frontend nginx -s reload
+          sleep 3
+          sudo python3 -I vigilar.py > /tmp/vigilancia.txt 2>&1 || true
+          cat /tmp/vigilancia.txt
+          grep -q 'El certificado HTTPS vence el' /tmp/vigilancia.txt
+          ! grep -qE 'Traceback|La aplicación|argonavis_' /tmp/vigilancia.txt
+      - name: Sin la clave, nginx no arranca y dice qué falta; y se vuelve a HTTP por el .env
+        run: |
+          sudo rm certificados/https/argonavis.key
+          docker compose restart frontend
+          timeout 60 bash -c 'until docker logs argonavis_frontend 2>&1 | grep -q "falta certificados/https/argonavis.key"; do sleep 1; done'
+          sed -i 's#^USAR_HTTPS=.*#USAR_HTTPS=false#; s#^APP_URL=.*#APP_URL=http://localhost#' .env
+          docker compose up -d --wait --wait-timeout 120
           curl -fsS http://localhost/api/health
       - name: Estado y registros si falla
         if: failure()

@@ -4,13 +4,20 @@ Corre en el servidor y no en un contenedor: si el backend se cae, tiene que pode
 Aquí el servidor es de mentira: un sistema sano al que cada prueba le rompe algo."""
 import ast
 import importlib.util
+import json
 import os
 import smtplib
+import ssl
+import subprocess
+import threading
 import time
 from datetime import datetime, timedelta, timezone
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 import pytest
+
+from ayudas import programa
 
 RAIZ = Path(__file__).resolve().parents[2]
 
@@ -32,6 +39,7 @@ CONFIG = {
     "MAIL_HOST": "correo.prueba.local", "MAIL_FROM": "no-reply@migracion.gob.pa",
     "MAIL_USERNAME": "cuenta", "MAIL_PASSWORD": "clave-secreta",
 }
+CON_HTTPS = {**CONFIG, "USAR_HTTPS": "true"}
 
 
 class Servidor(vigilar.Sistema):
@@ -42,6 +50,7 @@ class Servidor(vigilar.Sistema):
         self.enviados, self.ordenes = [], []
         self.motivo_salud, self.error_de_correo = "", None
         self.uso, self.memoria = 40, 1500
+        self.por_https, self.vence = None, ConnectionRefusedError("[Errno 111] Connection refused")
         self.respuestas = {
             "docker inspect": (0, "running|healthy|false"),
             "correos_salida": (0, "0|0"),
@@ -72,8 +81,14 @@ class Servidor(vigilar.Sistema):
                 return respuesta
         raise AssertionError(f"orden no esperada: {texto}")
 
-    def salud(self):
+    def salud(self, https=False):
+        self.por_https = https
         return self.motivo_salud
+
+    def vencimiento_certificado(self):
+        if isinstance(self.vence, Exception):
+            raise self.vence
+        return self.vence
 
     def disco(self, carpeta):
         return self.uso, 9000
@@ -230,6 +245,34 @@ def test_la_aplicacion_el_disco_y_la_memoria(servidor):
     assert "503: sin base de datos" in encontrado and "91 %" in encontrado and "60 MB" in encontrado
 
 
+def test_sin_https_no_mira_el_certificado(servidor):
+    """En el 443 no contesta nadie, y está bien."""
+    assert vigilar.revisar(servidor, CONFIG, AHORA) == {} and servidor.por_https is False
+    assert vigilar.revisar(servidor, {**CONFIG, "USAR_HTTPS": "false"}, AHORA) == {}
+
+
+@pytest.mark.parametrize(("dias", "dice"), [
+    (90, None), (22, None),
+    (21, "vence el 15/12/2026 (en 21 días)"), (1, "vence el 25/11/2026 (en 1 día)"),
+    (0, "vence hoy"), (-2, "venció el 22/11/2026"),
+])
+def test_avisa_antes_de_que_venza_el_certificado(servidor, dias, dice):
+    """Vencido, el navegador no deja entrar a nadie; con tiempo, la DTI alcanza a dar otro."""
+    servidor.vence = AHORA + timedelta(days=dias, hours=1 if dias >= 0 else 0)
+    fallas = vigilar.revisar(servidor, CON_HTTPS, AHORA)
+    assert servidor.por_https is True, "la aplicación se consulta por donde atiende"
+    if dice is None:
+        assert fallas == {}
+    else:
+        assert list(fallas) == ["certificado"] and dice in fallas["certificado"] and "README" in fallas["certificado"]
+
+
+@pytest.mark.parametrize("error", [ConnectionRefusedError("x"), TimeoutError("x"), ssl.SSLError("x"), ValueError("x")])
+def test_si_el_certificado_no_se_puede_leer_lo_dice(servidor, error):
+    servidor.vence = error
+    assert "No se pudo leer el certificado" in vigilar.revisar(servidor, CON_HTTPS, AHORA)["certificado"]
+
+
 def test_los_respaldos_viejos_o_que_faltan(servidor):
     servidor.poner_respaldo(horas=30)
     encontrado = _revisar(servidor)
@@ -286,6 +329,26 @@ def test_usa_el_mismo_correo_que_la_aplicacion(monkeypatch, extra, esperado):
     assert llamadas == esperado
 
 
+@pytest.mark.parametrize(("ca", "esperada"), [
+    ("/certificados/ca/snm.pem", "snm.pem"),   # la ruta dentro del contenedor; el archivo, en el servidor
+    ("/certificados/ca/no-esta.pem", None), ("", None),
+])
+@pytest.mark.parametrize("tls", [{"MAIL_STARTTLS": "true"}, {"MAIL_USAR_SSL": "true"}], ids=["STARTTLS", "SMTPS"])
+def test_el_correo_se_valida_con_la_ca_interna(monkeypatch, tmp_path, tls, ca, esperada):
+    """Sin ella, con el correo por TLS no saldría ningún aviso."""
+    carpeta = tmp_path / "certificados" / "ca"
+    carpeta.mkdir(parents=True)
+    (carpeta / "snm.pem").write_text("pem", encoding="utf-8")
+    monkeypatch.setattr(vigilar, "RAIZ", tmp_path)
+    for nombre in ("SMTP", "SMTP_SSL"):
+        monkeypatch.setattr(vigilar.smtplib, nombre, type(nombre, (_Smtp,), {"llamadas": []}))
+    usadas = []
+    monkeypatch.setattr(vigilar.ssl, "create_default_context", lambda cafile=None: usadas.append(cafile))
+    config = {**CONFIG, **tls, "MAIL_CA_CERT": ca}
+    vigilar.Sistema().enviar(config, vigilar.armar_correo(config, "Prueba", "x", AHORA))
+    assert usadas == [str(carpeta / esperada) if esperada else None]
+
+
 def test_el_correo_lleva_tildes_y_no_lleva_secretos():
     mensaje = vigilar.armar_correo(CONFIG, "Atención: aplicación caída\r\nBcc: otro@x", "El año de la ñ", AHORA)
     assert mensaje["Subject"] == "Atención: aplicación caída Bcc: otro@x", "sin saltos de línea en el asunto"
@@ -296,9 +359,11 @@ def test_el_correo_lleva_tildes_y_no_lleva_secretos():
 def test_lee_el_env_como_docker(tmp_path):
     (tmp_path / ".env").write_text(
         "# comentario\nMAIL_HOST=correo.local\r\nCORREO_ALERTAS=\"a@x.pa, b@x.pa\"\n\nCLAVE=con=iguales#y-numeral\n"
-        "MAIL_HOST=el-ultimo.local\nSUELTA\n", encoding="utf-8")
+        "MAIL_HOST=el-ultimo.local\nSUELTA\nUSAR_HTTPS=true   # desde hoy\nENTRE='a # b'\n"
+        "CON_NOTA=\"a b\"  # nota\nVACIA=   # todavía no\n", encoding="utf-8")
     config = vigilar.leer_env(tmp_path / ".env")
-    assert config == {"MAIL_HOST": "el-ultimo.local", "CORREO_ALERTAS": "a@x.pa, b@x.pa", "CLAVE": "con=iguales#y-numeral"}
+    assert config == {"MAIL_HOST": "el-ultimo.local", "CORREO_ALERTAS": "a@x.pa, b@x.pa", "CLAVE": "con=iguales#y-numeral",
+                      "USAR_HTTPS": "true", "ENTRE": "a # b", "CON_NOTA": "a b", "VACIA": ""}
 
 
 # ── El resumen del día ────────────────────────────────────────────────────────
@@ -345,6 +410,64 @@ def test_borra_los_accesos_viejos_de_nginx(servidor):
     servidor.ordenes.clear()
     vigilar.diario(servidor, {**CONFIG, "LOG_DIAS": "30"}, AHORA)
     assert any("-mtime +30" in o for o in servidor.ordenes)
+
+
+# ── Un servidor HTTPS de verdad ───────────────────────────────────────────────
+
+class _Salud(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200 if self.path == "/api/health" else 404)
+        self.end_headers()
+        self.wfile.write(json.dumps({"estado": "ok"}).encode())
+
+    def log_message(self, *args):
+        pass
+
+
+@pytest.fixture
+def servidor_https(tmp_path):
+    """(puerto, cuándo vence) de un servidor con un certificado de otro nombre y firmado por él mismo."""
+    openssl = programa("openssl")
+    if openssl is None:
+        pytest.skip("sin openssl")
+    certificado, clave = tmp_path / "a.crt", tmp_path / "a.key"
+    subprocess.run([openssl, "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "45", "-subj", "/CN=argonavis.prueba",
+                    "-keyout", str(clave), "-out", str(certificado)], check=True, capture_output=True, timeout=120)
+    fecha = subprocess.run([openssl, "x509", "-noout", "-enddate", "-in", str(certificado)], check=True,
+                           capture_output=True, text=True).stdout.strip().removeprefix("notAfter=")
+    contexto = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    contexto.load_cert_chain(certificado, clave)
+    servidor = HTTPServer(("127.0.0.1", 0), _Salud)
+    servidor.socket = contexto.wrap_socket(servidor.socket, server_side=True)
+    threading.Thread(target=servidor.serve_forever, daemon=True).start()
+    yield servidor.server_port, datetime.strptime(fecha, "%b %d %H:%M:%S %Y %Z").replace(tzinfo=timezone.utc)
+    servidor.shutdown()
+    servidor.server_close()
+
+
+def test_mira_el_certificado_que_nginx_esta_usando(servidor_https):
+    """El que sirve, no el del archivo: si se cambió y nginx no lo recargó, sigue con el viejo."""
+    puerto, vence = servidor_https
+    sistema = vigilar.Sistema(puerto_https=puerto)
+    assert sistema.vencimiento_certificado() == vence
+    assert sistema.salud(https=True) == "", "por «localhost» no es el nombre del certificado: no se valida"
+
+
+def test_si_https_no_contesta(servidor_https):
+    sistema = vigilar.Sistema(puerto_https=1)
+    with pytest.raises(OSError):
+        sistema.vencimiento_certificado()
+    assert "no responde" in sistema.salud(https=True)
+
+
+def test_las_dos_formas_de_fecha_de_un_certificado():
+    """Hasta 2049 con el año en dos cifras y, desde 2050, en cuatro."""
+    corta, larga = b"\x17\x0d" + b"261122120000Z", b"\x18\x0f" + b"21560101000000Z"
+    assert vigilar.vence_el(b"\x30\x82" + corta + b"\x17\x0d" + b"280103040506Z" + corta) == \
+        datetime(2028, 1, 3, 4, 5, 6, tzinfo=timezone.utc)
+    assert vigilar.vence_el(corta + larga) == datetime(2156, 1, 1, tzinfo=timezone.utc)
+    with pytest.raises(ValueError):
+        vigilar.vence_el(b"nada")
 
 
 # ── El programa ───────────────────────────────────────────────────────────────

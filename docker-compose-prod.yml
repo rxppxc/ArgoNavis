@@ -20,7 +20,9 @@ services:
     # cambia la etiqueta (y la del flujo de CI, .github/workflows/ci.yml).
     # 15.20 (2026-11-22): corrige 43 vulnerabilidades; no pide reconstruir ninguno de
     # nuestros índices (son B-tree de columnas con largo).
-    image: postgres:15.20-alpine3.24
+    # En un servidor nuevo, la 18 (POSTGRES_IMAGEN y POSTGRES_VOLUMEN en el .env, las dos
+    # juntas; README → PostgreSQL 18): la 15 se queda sin soporte en noviembre de 2027.
+    image: ${POSTGRES_IMAGEN:-postgres:15.20-alpine3.24}
     container_name: argonavis_postgres
     restart: always
     # El usuario postgres de la imagen Alpine, desde el principio: la imagen lo admite y
@@ -44,7 +46,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # La 18 guarda los datos en otra carpeta y no abre los de la 15: lleva su propio volumen.
+      - ${POSTGRES_VOLUMEN:-postgres_data:/var/lib/postgresql/data}
     ports:
       # Solo accesible desde el propio servidor (psql/pg_dump locales o docker exec).
       # El backend le habla por la red interna de Docker; publicarlo en 0.0.0.0
@@ -149,6 +152,9 @@ services:
       # disco: en un tmpfs contarían para la memoria del contenedor.
       - temporales_backend:/tmp
       - registros:/app/registros
+      # La CA interna del SNM, para el TLS con el Active Directory y con el correo
+      # (LDAP_CA_CERT y MAIL_CA_CERT). La «z» es para SELinux, si Docker lo usa.
+      - ./certificados/ca:/certificados/ca:ro,z
     depends_on:
       postgres_db:
         condition: service_healthy
@@ -176,19 +182,26 @@ services:
     networks: [default]        # sin «datos»: nginx no alcanza a PostgreSQL
     environment:
       TZ: EST5                 # la hora de Panamá en los accesos, y el día de cada archivo
+      # HTTPS (README → HTTPS): con true, el certificado de certificados/https; el 80 solo
+      # redirige al nombre de APP_URL. Lo decide frontend/nginx/elegir-modo.sh al arrancar.
+      USAR_HTTPS: ${USAR_HTTPS:-false}
+      APP_URL: ${APP_URL}
     ports:
-      - "80:8080"              # sin root, nginx escucha en el 8080 (frontend/nginx.conf)
+      - "80:8080"              # sin root, nginx escucha en el 8080 (frontend/nginx)
+      - "443:8443"             # con HTTPS; sin él, ahí no contesta nadie
     volumes:
       - temporales_nginx:/var/cache/nginx   # cada envío, mientras llega (ver temporales_backend)
       - registros_nginx:/var/log/argonavis  # un archivo de accesos por día (los borra vigilar.py)
+      - ./certificados/https:/certificados:ro,z
     tmpfs:
-      - /run:uid=101,gid=101,mode=755,size=1m   # nginx.pid
+      - /run:uid=101,gid=101,mode=755,size=1m   # nginx.pid y dónde escucha
     depends_on:
       - backend
     healthcheck:
       # 127.0.0.1 explícito: "localhost" resuelve primero a ::1 (IPv6) dentro
       # del contenedor y nginx solo escucha en IPv4 → falso "unhealthy".
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
+      # El 8081 es solo para esto (frontend/nginx.conf): con HTTPS, el 8080 redirige.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8081/"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -210,6 +223,7 @@ networks:
 
 volumes:
   postgres_data:
+  postgres_18:                 # con POSTGRES_VOLUMEN (.env.example)
   documentos:
   temporales_backend:
   temporales_nginx:

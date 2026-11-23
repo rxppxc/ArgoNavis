@@ -44,6 +44,14 @@ frontend/build/
 .yarn-debug.log*
 .yarn-error.log*
 
+# ───── Certificados del servidor (HTTPS y CA interna): la clave privada, nunca al repositorio ─────
+certificados/*/*
+!certificados/*/.gitkeep
+*.key
+*.pfx
+*.p12
+*.csr
+
 # ───── Documentos de los expedientes (datos de usuario) ─────
 backend/storage/
 /storage/

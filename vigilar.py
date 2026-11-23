@@ -5,8 +5,8 @@ Corre en el servidor y no en un contenedor: si el backend o Docker se caen, tien
 avisar. Usa solo la biblioteca estándar del Python que trae Rocky (3.9) y el mismo correo
 de la aplicación (.env).
 
-  - Cada 5 minutos mira los contenedores, la aplicación, la base, los correos, los
-    respaldos, el disco, la memoria y el reloj. No cambia nada ni deja rastro. Avisa cuando
+  - Cada 5 minutos mira los contenedores, la aplicación, el certificado HTTPS, la base, los
+    correos, los respaldos, el disco, la memoria y el reloj. No cambia nada ni deja rastro. Avisa cuando
     algo falla dos veces seguidas (en un despliegue los contenedores se reinician), no
     repite mientras sigue igual, lo recuerda una vez al día y avisa cuando se resuelve.
   - Con --diario corre verificar-despliegue.sh y manda el resultado si algo falla. Los
@@ -20,7 +20,7 @@ Instalación (una sola vez): CORREO_ALERTAS en el .env y, en el cron de root
   0 7 * * *   python3 -I /home/vperez/argonavis/vigilar.py --diario >> /var/log/argonavis-vigilancia.log 2>&1
 
 Lo que no puede ver: si se apaga el servidor entero, nadie avisa desde adentro. Para eso, el
-monitoreo de la DTI tiene que consultar http://<servidor>/api/health desde otro equipo.
+monitoreo de la DTI tiene que consultar <APP_URL>/api/health desde otro equipo.
 """
 from __future__ import annotations
 
@@ -59,6 +59,7 @@ MEMORIA_MINIMA_MB = 150
 RESPALDO_MAXIMO_HORAS = 26
 CORREO_ATASCADO_HORAS = 2
 ERRORES_POR_HORA = 20
+CERTIFICADO_DIAS = 21                   # antes de que venza: lo que tarda la DTI en dar otro
 
 _CONSULTA_CORREOS = (
     "SELECT count(*) FILTER (WHERE estado = 'fallido' AND creado_en > now() - interval '24 hours'), "
@@ -67,8 +68,41 @@ _CONSULTA_CORREOS = (
 )
 
 
+def usa_https(config: dict) -> bool:
+    return config.get("USAR_HTTPS", "").strip().lower() == "true"
+
+
+def vence_el(certificado: bytes) -> datetime:
+    """Hasta cuándo vale un certificado (en DER): la segunda fecha que lleva; la primera es
+    desde cuándo. Con dos cifras de año hasta 2049 y con cuatro desde 2050."""
+    fechas = re.findall(rb"\x17\x0d(\d{12})Z|\x18\x0f(\d{14})Z", certificado)
+    if len(fechas) < 2:
+        raise ValueError("no es un certificado")
+    corta, larga = fechas[1]
+    texto = (larga or b"20" + corta).decode()
+    return datetime.strptime(texto, "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
+
+
+def _ca_del_correo(config: dict) -> str | None:
+    """La CA interna, en el servidor: MAIL_CA_CERT dice su ruta dentro del contenedor."""
+    nombre = config.get("MAIL_CA_CERT", "").replace("/certificados/ca/", "", 1)
+    ruta = RAIZ / "certificados" / "ca" / nombre
+    return str(ruta) if nombre and ruta.is_file() else None
+
+
 class Sistema:
     """Lo que se mira del servidor. Las pruebas lo reemplazan por uno de mentira."""
+
+    def __init__(self, puerto_http: int = 80, puerto_https: int = 443) -> None:
+        self.puerto_http, self.puerto_https = puerto_http, puerto_https
+
+    @staticmethod
+    def _sin_validar() -> ssl.SSLContext:
+        """Se entra por «localhost», que no es el nombre del certificado: aquí no se valida."""
+        contexto = ssl.create_default_context()
+        contexto.check_hostname = False
+        contexto.verify_mode = ssl.CERT_NONE
+        return contexto
 
     def orden(self, *partes: str, espera: int = 30, juntar: bool = False) -> tuple[int, str]:
         """(código, salida) de un programa; 127 si no existe o no termina a tiempo."""
@@ -81,10 +115,12 @@ class Sistema:
             return 127, ""
         return r.returncode, r.stdout.strip()
 
-    def salud(self) -> str:
+    def salud(self, https: bool = False) -> str:
         """Vacío si la aplicación responde bien (nginx, backend y base); si no, el motivo."""
+        base = f"https://localhost:{self.puerto_https}" if https else f"http://localhost:{self.puerto_http}"
         try:
-            with urllib.request.urlopen("http://localhost/api/health", timeout=20) as r:
+            with urllib.request.urlopen(f"{base}/api/health", timeout=20,
+                                        context=self._sin_validar() if https else None) as r:
                 estado = json.load(r).get("estado")
             return "" if estado == "ok" else f"responde «{estado}»"
         except urllib.error.HTTPError as e:
@@ -94,6 +130,12 @@ class Sistema:
                 return f"responde {e.code}"
         except (OSError, ValueError) as e:
             return f"no responde ({getattr(e, 'reason', None) or type(e).__name__})"
+
+    def vencimiento_certificado(self) -> datetime:
+        """El del que nginx está usando: si se cambió el archivo y no se recargó, sigue el viejo."""
+        with socket.create_connection(("localhost", self.puerto_https), timeout=20) as conexion:
+            with self._sin_validar().wrap_socket(conexion, server_hostname="localhost") as tls:
+                return vence_el(tls.getpeercert(binary_form=True) or b"")
 
     def disco(self, carpeta: str) -> tuple[int, int]:
         """(% usado, MB libres) del disco donde está la carpeta."""
@@ -113,26 +155,29 @@ class Sistema:
         verdadero = {k for k in ("MAIL_USAR_SSL", "MAIL_STARTTLS") if config.get(k, "").lower() == "true"}
         servidor, puerto = config["MAIL_HOST"], int(config.get("MAIL_PORT") or 25)
         if "MAIL_USAR_SSL" in verdadero:
-            conexion = smtplib.SMTP_SSL(servidor, puerto, timeout=20, context=ssl.create_default_context())
+            conexion = smtplib.SMTP_SSL(servidor, puerto, timeout=20, context=ssl.create_default_context(cafile=_ca_del_correo(config)))
         else:
             conexion = smtplib.SMTP(servidor, puerto, timeout=20)
         with conexion as smtp:
             if "MAIL_STARTTLS" in verdadero:
-                smtp.starttls(context=ssl.create_default_context())
+                smtp.starttls(context=ssl.create_default_context(cafile=_ca_del_correo(config)))
             if config.get("MAIL_USERNAME"):
                 smtp.login(config["MAIL_USERNAME"], config.get("MAIL_PASSWORD", ""))
             smtp.send_message(mensaje)
 
 
 def leer_env(ruta: Path) -> dict[str, str]:
-    """Las variables del .env (la última manda, sin las comillas que las rodean)."""
+    """Las variables del .env, como las lee Docker: la última manda, sin las comillas que las
+    rodean y, sin comillas, sin el comentario del final."""
     config: dict[str, str] = {}
     for linea in ruta.read_text(encoding="utf-8").splitlines():
         m = re.match(r"^([A-Za-z_]\w*)=(.*)$", linea.strip())
         if m:
-            valor = m.group(2).strip()
-            if len(valor) > 1 and valor[0] == valor[-1] and valor[0] in "\"'":
-                valor = valor[1:-1]
+            entre_comillas = re.match(r"""^\s*(["'])(.*?)\1(?:\s+#.*)?$""", m.group(2))
+            if entre_comillas:
+                valor = entre_comillas.group(2)
+            else:
+                valor = re.split(r"(?:^|\s)#", m.group(2), maxsplit=1)[0].strip()
             config[m.group(1)] = valor
     return config
 
@@ -146,7 +191,7 @@ def destinatarios(config: dict) -> list[str]:
 def revisar(sistema: Sistema, config: dict, ahora: datetime) -> dict[str, str]:
     """{qué: por qué} de lo que está fallando."""
     fallas: dict[str, str] = {}
-    for mirar in (_contenedores, _aplicacion, _correos, _procesos, _errores, _respaldos, _discos, _equipo):
+    for mirar in (_contenedores, _aplicacion, _certificado, _correos, _procesos, _errores, _respaldos, _discos, _equipo):
         fallas.update(mirar(sistema, config, ahora))
     return fallas
 
@@ -172,8 +217,26 @@ def _contenedores(sistema, config, ahora) -> dict[str, str]:
 
 
 def _aplicacion(sistema, config, ahora) -> dict[str, str]:
-    motivo = sistema.salud()
+    motivo = sistema.salud(https=usa_https(config))
     return {"aplicación": f"La aplicación no funciona: {motivo}."} if motivo else {}
+
+
+def _certificado(sistema, config, ahora) -> dict[str, str]:
+    """El certificado HTTPS, antes de que venza: vencido, el navegador no deja entrar a nadie."""
+    if not usa_https(config):
+        return {}
+    try:
+        vence = sistema.vencimiento_certificado().astimezone(PANAMA)
+    except (OSError, ValueError) as e:   # ssl.SSLError es un OSError
+        return {"certificado": f"No se pudo leer el certificado HTTPS del 443 ({type(e).__name__})."}
+    dias = (vence.date() - ahora.astimezone(PANAMA).date()).days
+    if vence <= ahora:
+        cuando = f"venció el {vence:%d/%m/%Y}: los navegadores no dejan entrar"
+    elif dias > CERTIFICADO_DIAS:
+        return {}
+    else:
+        cuando = "vence hoy" if dias == 0 else f"vence el {vence:%d/%m/%Y} (en {dias} día{'' if dias == 1 else 's'})"
+    return {"certificado": f"El certificado HTTPS {cuando}. Cómo cambiarlo: README → HTTPS."}
 
 
 def _correos(sistema, config, ahora) -> dict[str, str]:

@@ -12,19 +12,10 @@ from pathlib import Path
 
 import pytest
 
+from ayudas import programa
+
 RAIZ = Path(__file__).resolve().parents[2]
-
-
-def _bash() -> str | None:
-    """En Windows, el de Git: el «bash» del sistema es el de WSL."""
-    if os.name != "nt":
-        return shutil.which("bash")
-    git = shutil.which("git")
-    candidatos = [c / "bin" / "bash.exe" for c in Path(git).resolve().parents] if git else []
-    return next((str(c) for c in candidatos if c.exists()), None)
-
-
-BASH = _bash()
+BASH = programa("bash")
 pytestmark = pytest.mark.skipif(BASH is None, reason="sin bash")
 
 DOCKER = r"""#!/usr/bin/env bash

@@ -93,14 +93,14 @@ docker run --rm --user root --entrypoint chown -v argonavis_documentos:/app/stor
 ```
 
 > **Contenedores endurecidos** (desde el 22/11/2026). Si alguien logra ejecutar algo dentro de uno, que no le sirva de nada:
-> - **Sin root:** PostgreSQL corre con el usuario 70, el backend con el 10001 y nginx con el 101, desde que arrancan. Por eso nginx escucha en el 8080 dentro del contenedor; Docker lo publica en el 80, como siempre.
+> - **Sin root:** PostgreSQL corre con el usuario 70, el backend con el 10001 y nginx con el 101, desde que arrancan. Por eso nginx escucha en el 8080 y el 8443 dentro del contenedor; Docker los publica en el 80 y el 443.
 > - **Sin privilegios del sistema** (`cap_drop: ALL`) ni forma de conseguirlos (`no-new-privileges`).
 > - **Con la imagen de solo lectura.** Lo que cada uno escribe va aparte: los datos y los documentos en sus volúmenes, y los envíos mientras llegan, en `temporales_nginx` y `temporales_backend`. Esos dos van en el disco y no en un tmpfs, que contaría para la memoria del contenedor (un envío pesa hasta 345 MB).
 > - **Redes separadas:** PostgreSQL y el backend comparten la red `datos`; nginx no está en ella, así que no alcanza la base. La red `datos` ocupa un rango chico, `172.31.255.240/28`: si coincide con una red del SNM o de la VPN, se cambia con `RED_DATOS` en el `.env` (y hay que bajar la pila una vez: `docker compose -f docker-compose-prod.yml down` y `up -d`).
 >
-> Los datos de una instalación anterior sirven sin tocarlos. Lo revisan `verificar-despliegue.sh` en cada servidor y la integración continua, que construye esta misma pila y la levanta tres veces: sobre una base ya existente, después de un reinicio y desde cero.
+> Los datos de una instalación anterior sirven sin tocarlos. Lo revisan `verificar-despliegue.sh` en cada servidor y la integración continua, que construye esta misma pila y la levanta sobre una base ya existente, después de un reinicio, desde cero y por HTTPS (con PostgreSQL 15 y con la 18).
 
-Después de cada despliegue, `sudo bash verificar-despliegue.sh` revisa sin cambiar nada los contenedores (y su memoria contra su límite), la salud, las cabeceras de seguridad, los puertos, el esquema, los topes de la base, que cada archivo siga en el disco y sea el original, el Active Directory, el correo, los respaldos, el reloj y los errores del log, y termina con «todo bien» o con la lista de fallas.
+Después de cada despliegue, `sudo bash verificar-despliegue.sh` revisa sin cambiar nada los contenedores (y su memoria contra su límite), la salud, las cabeceras de seguridad, los puertos, el HTTPS y su certificado, el esquema, los topes de la base, que cada archivo siga en el disco y sea el original, el Active Directory, el correo, los respaldos, el reloj y los errores del log, y termina con «todo bien» o con la lista de fallas.
 
 > **Recursos de cada contenedor** (desde el 10/11/2026). Cada uno tiene un tope de memoria y de procesos, y el backend además de CPU. Sin topes, uno que se desboca se lleva a los demás: sin memoria, el kernel mata al proceso más grande de la VM, que suele ser PostgreSQL. Con ellos, Docker corta solo dentro del contenedor que se pasó y se levanta solo (uvicorn levanta sus procesos; los contenedores tienen `restart: always`). Se ajustan en el `.env`:
 >
@@ -118,7 +118,7 @@ Después de cada despliegue, `sudo bash verificar-despliegue.sh` revisa sin camb
 > - **Los accesos de nginx** (quién pidió qué y desde dónde, también sin sesión): `docker exec argonavis_frontend ls /var/log/argonavis`.
 
 > **Vigilancia** (`vigilar.py`, desde el 22/11/2026). Avisa por correo cuando algo falla. Corre en el servidor y no en un contenedor: si el backend o Docker se caen, igual avisa. Usa el Python del sistema, sin instalar nada, y el mismo correo de la aplicación.
-> - **Cada 5 minutos** mira los contenedores, la aplicación, la base, los correos que no salen, los respaldos, el disco, la memoria, el reloj y las rachas de errores. Avisa a la segunda falla seguida (en un despliegue los contenedores se reinician), no repite mientras sigue igual, lo recuerda una vez al día y avisa cuando se resuelve.
+> - **Cada 5 minutos** mira los contenedores, la aplicación, el certificado HTTPS, la base, los correos que no salen, los respaldos, el disco, la memoria, el reloj y las rachas de errores. Avisa a la segunda falla seguida (en un despliegue los contenedores se reinician), no repite mientras sigue igual, lo recuerda una vez al día y avisa cuando se resuelve.
 > - **Cada mañana** corre `verificar-despliegue.sh --diario` y manda el resultado si algo falla. **Los lunes** lo manda siempre, para saber que la vigilancia sigue viva, y además prueba que el último respaldo se puede restaurar.
 >
 > Para instalarla, una sola vez: los destinatarios en `CORREO_ALERTAS` del `.env`, `sudo python3 -I vigilar.py --probar` para comprobar que el correo llega, y en el cron de root (`sudo crontab -e`):
@@ -126,7 +126,7 @@ Después de cada despliegue, `sudo bash verificar-despliegue.sh` revisa sin camb
 > */5 * * * * python3 -I /home/vperez/argonavis/vigilar.py >> /var/log/argonavis-vigilancia.log 2>&1
 > 0 7 * * *   python3 -I /home/vperez/argonavis/vigilar.py --diario >> /var/log/argonavis-vigilancia.log 2>&1
 > ```
-> **Lo que no puede ver:** si se apaga el servidor entero, nadie avisa desde adentro. Para eso, el monitoreo de la DTI tiene que consultar `http://<servidor>/api/health` desde otro equipo (responde 200 si todo está bien y 503 si no).
+> **Lo que no puede ver:** si se apaga el servidor entero, nadie avisa desde adentro. Para eso, el monitoreo de la DTI tiene que consultar `<APP_URL>/api/health` desde otro equipo (responde 200 si todo está bien y 503 si no).
 
 > **Respaldos** (`backup.sh`, cron de root a las 2 AM; la línea del cron está en el script). Cada noche:
 > 1. **La base:** `pg_dump` comprimido en `DIR_BACKUPS/argonavis_bd_FECHA.sql.gz`. PostgreSQL lo saca de una foto consistente sin frenar a nadie: el sistema sigue funcionando mientras tanto.
@@ -184,10 +184,40 @@ Después de cada despliegue, `sudo bash verificar-despliegue.sh` revisa sin camb
 >   Actualiza la ruta de `backup.sh` en el cron. Cuando todo funcione, borra los volúmenes viejos y los respaldos `filetransfer_*.gz` (la retención ya solo limpia los `argonavis_*`).
 > - **Windows:** detén el backend y corre `migrate.bat` (pasa las rutas a relativas). Después renombra la base (`ALTER DATABASE filetransfer RENAME TO argonavis` desde `psql`, conectado a `postgres`), mueve `backend\storage\transfers` a `backend\storage\documentos` y cambia `DATABASE_URL` y `STORAGE_PATH` en `backend\.env`.
 
-> **HTTPS y TLS con el AD** (pendiente de infraestructura). Sin esto, la contraseña de cada login viaja en claro: del navegador al servidor (HTTP, puerto 80) y del backend al controlador de dominio (LDAP 389).
-> - **Active Directory:** con el certificado del controlador de dominio, `LDAP_USAR_SSL=true` y `LDAP_PORT=636` (o `LDAP_STARTTLS=true` sobre el 389). `LDAP_HOST` debe ser el nombre que trae el certificado (no la IP) y `LDAP_CA_CERT`, la ruta al PEM de la CA interna (en Docker, montarlo con un volumen). Probarlo primero en desarrollo.
-> - **Navegador:** un certificado para el servidor; en nginx, un `server` en el 443 (`ssl_certificate` / `ssl_certificate_key`) y el 80 redirigiendo al 443. Ya con HTTPS, agregar `Strict-Transport-Security`. En Windows, lo mismo en el proxy que esté delante de uvicorn.
-> - **Correo:** si el SMTP pide usuario y contraseña (`MAIL_USERNAME` / `MAIL_PASSWORD`), activar `MAIL_STARTTLS=true` (587 o 25) o `MAIL_USAR_SSL=true` (465); si no, viajan en claro, y el backend lo advierte al arrancar. Como con el AD: `MAIL_HOST` con el nombre del certificado y `MAIL_CA_CERT` con el PEM de la CA interna. Sin TLS (lo de siempre), ni siquiera se intenta STARTTLS.
+> **HTTPS** (listo para activar desde el 22/11/2026; falta el certificado). Sin él, la contraseña de cada login viaja en claro del navegador al servidor. Se activa en el `.env`, sin tocar el código:
+> 1. **El nombre y el certificado, con la DTI.** Un nombre propio (p. ej. `argonavis.migracion.gob.pa`) que lleve a la IP del servidor, también para quien entra por la VPN, y un certificado para ese nombre **de una autoridad pública** (el comodín `*.migracion.gob.pa` sirve): los equipos de las agencias no conocen la CA interna del SNM y verían una advertencia. Los públicos duran como mucho 200 días (100 desde marzo de 2027), así que cambiarlo es rutina (punto 4). Para que la clave privada no salga del servidor, la solicitud se hace ahí y a la DTI solo se le manda `argonavis.csr`:
+>    ```bash
+>    sudo openssl req -new -newkey rsa:2048 -nodes -subj "/C=PA/O=Servicio Nacional de Migracion/CN=<nombre>" -addext "subjectAltName=DNS:<nombre>" -keyout certificados/https/argonavis.key -out argonavis.csr
+>    ```
+>    Si en cambio entrega un `.pfx`, que trae la clave adentro (pide su contraseña; después se borra del servidor):
+>    ```bash
+>    sudo openssl pkcs12 -in argonavis.pfx -nocerts -nodes -out certificados/https/argonavis.key
+>    sudo sh -c '(openssl pkcs12 -in argonavis.pfx -clcerts -nokeys; openssl pkcs12 -in argonavis.pfx -cacerts -nokeys) > certificados/https/argonavis.crt'
+>    ```
+>    (Si dice «unsupported», con `-legacy` en las tres.)
+> 2. **En el servidor**, en `certificados/https` (no va al repositorio): `argonavis.crt`, el certificado y, detrás, los intermedios; y `argonavis.key`, la clave sin contraseña, que solo lee nginx (corre con el usuario 101):
+>    ```bash
+>    sudo chown 101:101 certificados/https/argonavis.key && sudo chmod 400 certificados/https/argonavis.key
+>    ```
+> 3. **Activarlo:** en el `.env`, `USAR_HTTPS=true` y `APP_URL=https://<nombre>`; después, `docker compose -f docker-compose-prod.yml up -d` y `sudo bash verificar-despliegue.sh`. Si falta algo, nginx no arranca y `docker logs argonavis_frontend` dice qué. Desde ahí, el 80 solo lleva a `https://<nombre>` (también a quien entre por la IP) y todos vuelven a entrar una vez: la sesión es de cada dirección. **El navegador que ya entró por HTTPS no vuelve a HTTP por ese nombre durante un año** (`Strict-Transport-Security`): volver a `USAR_HTTPS=false` solo sirve entrando por la IP.
+> 4. **Cambiarlo, antes de que venza:** se reemplazan los dos archivos y `sudo docker exec argonavis_frontend nginx -s reload`, sin cortar a nadie; si el nuevo tiene un error, nginx sigue con el anterior y lo dice. La vigilancia avisa 21 días antes y `verificar-despliegue.sh` revisa el nombre, la fecha, los intermedios y los permisos de la clave. Vencido, con el nombre no entra nadie: de emergencia, `https://<IP>` y aceptar la advertencia.
+>
+> En Windows, el certificado va en el proxy que esté delante de uvicorn.
+
+> **TLS con el Active Directory y con el correo** (pendiente de la DTI). Sin él, la contraseña de cada login viaja en claro del backend al controlador de dominio (LDAP 389). La CA interna que firma sus certificados se pone en `certificados/ca` (PEM); dentro del contenedor es `/certificados/ca/<archivo>.pem`.
+> - **Active Directory:** `LDAP_USAR_SSL=true` y `LDAP_PORT=636` (o `LDAP_STARTTLS=true` sobre el 389), con `LDAP_CA_CERT=/certificados/ca/<archivo>.pem`. `LDAP_HOST` debe ser el nombre que trae el certificado (no la IP). Probarlo primero en desarrollo. Si la CA no está, el backend no arranca y lo dice.
+> - **Correo:** si el SMTP pide usuario y contraseña (`MAIL_USERNAME` / `MAIL_PASSWORD`), activar `MAIL_STARTTLS=true` (587 o 25) o `MAIL_USAR_SSL=true` (465); si no, viajan en claro, y el backend lo advierte al arrancar. Como con el AD: `MAIL_HOST` con el nombre del certificado y `MAIL_CA_CERT=/certificados/ca/<archivo>.pem` (la vigilancia usa la misma). Sin TLS (lo de siempre), ni siquiera se intenta STARTTLS.
+
+> **PostgreSQL 18** (22/11/2026). Los servidores de hoy usan la 15.20, que se queda sin soporte en noviembre de 2027; la integración continua prueba todo con las dos. Sin tocar el `.env`, un despliegue no cambia la versión.
+> - **En un servidor nuevo**, antes del primer arranque: las dos líneas de `.env.example` (`POSTGRES_IMAGEN` y `POSTGRES_VOLUMEN`). Van juntas, porque la imagen de la 18 guarda los datos en otra carpeta; `verificar-despliegue.sh` comprueba que estén en su volumen. Sin salida a internet, `POSTGRES_IMAGEN=postgres:18.7-alpine3.24 bash empaquetar-sin-internet.sh`.
+> - **Pasar un servidor de la 15 a la 18** (una vez, con el sistema detenido unos minutos). La 18 no abre los datos de la 15: se pasan con un respaldo, en un volumen nuevo. El de la 15 queda intacto; para volver, se quitan las dos líneas del `.env` y `up -d`.
+>   ```bash
+>   docker compose -f docker-compose-prod.yml stop frontend backend
+>   sudo DIR_BACKUPS=$HOME/backups bash backup.sh && sudo DIR_BACKUPS=$HOME/backups bash probar-restauracion.sh
+>   # En el .env, las dos líneas. Después, la base nueva y vacía, con la cuenta de la aplicación:
+>   docker compose -f docker-compose-prod.yml up -d postgres_db backend
+>   ```
+>   Y lo de «Restaurar» (arriba) con la base de ese respaldo; los documentos no se tocan. Al final, `docker compose -f docker-compose-prod.yml up -d` y `sudo bash verificar-despliegue.sh`.
 
 > **Verificación pública del QR** (14/11/2026, para la DTI). Quien escanea el QR del PDF ve si la autorización es auténtica y si sigue vigente, y con «Ver autorización (PDF)» abre el PDF en su celular, sin cuenta: la copia de la agencia (sin nombres de funcionarios), mientras valga y hasta `DIAS_PDF_PUBLICO` (30) días después de la operación. Si ya no se puede ver así, la página dice por qué; los documentos del expediente nunca salen por ahí.
 > - **Hoy el QR solo funciona dentro de la red del SNM.** Desde un celular sin VPN solo se llega a lo que está en internet. Para eso, la DTI publica **solo la verificación** con un nombre propio y HTTPS (sin HTTPS no: el PDF lleva los datos de los pasajeros). La plantilla del proxy está en `frontend/nginx-verificacion-publica.conf`: deja pasar la página `/verificar/{código}`, lo que esa página carga y dos rutas de solo lectura de la API (`GET /api/v1/verificacion/{código}` y su `/autorizacion.pdf`). Todo lo demás (el login, las bandejas, los documentos, el resto de la API) responde 404 desde internet.
@@ -425,7 +455,7 @@ Frontend (opcionales):
 ---
 
 ## Pendiente (decisiones del equipo)
-- HTTPS en el servidor, y TLS con el Active Directory y con el correo (la configuración ya está; ver *Producción*).
+- HTTPS en el servidor, y TLS con el Active Directory y con el correo: ya se activan en el `.env` (ver *Producción*); faltan el nombre y los certificados, que da la DTI.
 - Edición del catálogo de trámites desde la interfaz.
 - Envío por partes para tripulaciones muy grandes: un envío lleva todos sus archivos juntos (hasta 345 MB), y por una VPN lenta uno así puede pasar los 5 minutos que espera el navegador.
 - Política de retención de datos personales (Ley 81 de 2019) y copia de los respaldos fuera del servidor.

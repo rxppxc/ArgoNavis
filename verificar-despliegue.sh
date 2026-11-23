@@ -46,11 +46,21 @@ aviso()   { echo "  [AVISO] $*"; AVISOS=$((AVISOS + 1)); }
 info()    { echo "  [INFO]  $*"; }
 seccion() { echo; echo "== $* =="; }
 env_de()  { grep -E "^$1=" .env | tail -1 | cut -d= -f2-; }
-codigo()  { curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$@"; }
+# -k: con HTTPS se entra por «localhost», que no es el nombre del certificado (se revisa aparte).
+# Lo que se busca en una respuesta, se busca después de guardarla: con «curl | grep -q», grep
+# corta la tubería al encontrarlo y, con pipefail, curl la da por fallida.
+pedir()   { curl -sk --max-time 15 "$@"; }
+codigo()  { pedir -o /dev/null -w '%{http_code}' "$@"; }
+# Con qué arrancó nginx: aunque no esté en marcha y aunque el .env haya cambiado después.
+env_nginx() { docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' argonavis_frontend 2>/dev/null | sed -n "s/^$1=//p" | head -1; }
 # Consulta a la base, con las credenciales que ya tiene el contenedor.
 psql_bd() { docker exec argonavis_postgres sh -c "psql -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" -tA -F' ' -c \"$1\"" 2>/dev/null; }
 # Python dentro del backend (lee el programa de la entrada estándar).
 py_backend() { docker exec -i argonavis_backend python -; }
+
+# Con HTTPS (USAR_HTTPS=true en el .env), la aplicación se revisa por el 443.
+HTTPS=""; BASE=http://localhost
+if env_nginx USAR_HTTPS | grep -qix true; then HTTPS=1; BASE=https://localhost; fi
 
 # ── Contenedores ─────────────────────────────────────────────────────────────
 # Recién desplegado, el backend tarda unos segundos en arrancar (aplica las
@@ -119,20 +129,20 @@ fi
 
 # ── Aplicación ───────────────────────────────────────────────────────────────
 seccion "Aplicación"
-salud=$(curl -s --max-time 15 http://localhost/api/health)
+salud=$(pedir "$BASE/api/health")
 if echo "$salud" | grep -q '"estado":"ok"'; then
   bien "/api/health responde ok (nginx, backend y base de datos)"
 else
   mal "/api/health: ${salud:-sin respuesta}"
 fi
-if curl -s --max-time 15 http://localhost/ | grep -q "<title>ARGO NAVIS"; then bien "La página de ARGO NAVIS carga"; else mal "La página principal no es la de ARGO NAVIS"; fi
-c=$(codigo http://localhost/solicitudes/1)
+if grep -q "<title>ARGO NAVIS" <<<"$(pedir "$BASE/")"; then bien "La página de ARGO NAVIS carga"; else mal "La página principal no es la de ARGO NAVIS"; fi
+c=$(codigo "$BASE/solicitudes/1")
 if [ "$c" = 200 ]; then bien "Recargar una página de la interfaz funciona"; else mal "Recargar una página de la interfaz responde $c"; fi
-c=$(codigo http://localhost/api/v1/solicitudes/revision)
+c=$(codigo "$BASE/api/v1/solicitudes/revision")
 case "$c" in 401|403) bien "La API sin sesión no responde nada ($c)";; *) mal "La API sin sesión responde $c (se esperaba 401)";; esac
-c=$(codigo http://localhost/api/v1/verificacion/codigo-que-no-existe)
+c=$(codigo "$BASE/api/v1/verificacion/codigo-que-no-existe")
 if [ "$c" = 404 ]; then bien "La verificación del QR con un código falso responde 404"; else mal "La verificación del QR con un código falso responde $c"; fi
-c=$(codigo http://localhost/api/v1/verificacion/codigo-que-no-existe/autorizacion.pdf)
+c=$(codigo "$BASE/api/v1/verificacion/codigo-que-no-existe/autorizacion.pdf")
 if [ "$c" = 303 ]; then bien "El PDF por el QR con un código falso lleva a la verificación (303)"; else mal "El PDF por el QR con un código falso responde $c (se esperaba 303)"; fi
 info "APP_URL (enlaces de los correos): $(env_de APP_URL)"
 if [ -n "$(env_de URL_VERIFICACION_PUBLICA)" ]; then
@@ -146,19 +156,19 @@ info "CORREO_UCVMM (aviso de cada solicitud nueva): $(env_de CORREO_UCVMM)"
 # ── Seguridad ────────────────────────────────────────────────────────────────
 seccion "Seguridad"
 for ruta in / /api/health; do
-  cabeceras=$(curl -s -D - -o /dev/null --max-time 15 "http://localhost$ruta")
+  cabeceras=$(pedir -D - -o /dev/null "$BASE$ruta")
   faltan=""
   for h in "content-security-policy" "x-frame-options: DENY" "x-content-type-options: nosniff" "referrer-policy" "x-robots-tag: noindex"; do
     echo "$cabeceras" | grep -qi "^$h" || faltan="$faltan ${h%%:*}"
   done
   if [ -z "$faltan" ]; then bien "Cabeceras de seguridad en $ruta"; else mal "Faltan cabeceras en $ruta:$faltan"; fi
 done
-if curl -s --max-time 15 http://localhost/robots.txt | tr -d '\r' | grep -qx 'Disallow: /'; then
+if pedir "$BASE/robots.txt" | tr -d '\r' | grep -qx 'Disallow: /'; then
   bien "robots.txt pide que no se indexe nada"
 else
   mal "robots.txt no bloquea la indexación"
 fi
-servidor=$(curl -s -D - -o /dev/null --max-time 15 http://localhost/ | grep -i '^server:' | tr -d '\r')
+servidor=$(pedir -D - -o /dev/null "$BASE/" | grep -i '^server:' | tr -d '\r')
 if echo "$servidor" | grep -q '[0-9]'; then aviso "El servidor muestra su versión ($servidor)"; else bien "nginx no muestra su versión"; fi
 ip=$(hostname -I | awk '{print $1}')
 if timeout 3 bash -c "</dev/tcp/$ip/8000" 2>/dev/null; then
@@ -193,22 +203,22 @@ else
 fi
 # Un envío se guarda mientras llega, en nginx y en el backend (los volúmenes temporales_*):
 # 3 MB sin sesión llegan enteros a los dos y se rechazan (401 o 403), sin dejar rastro.
-c=$(head -c 3145728 /dev/zero | codigo -F 'solicitud={}' -F 'archivos=@-;filename=prueba.pdf;type=application/pdf' http://localhost/api/v1/solicitudes)
+c=$(head -c 3145728 /dev/zero | codigo -F 'solicitud={}' -F 'archivos=@-;filename=prueba.pdf;type=application/pdf' "$BASE/api/v1/solicitudes")
 case "$c" in 401|403) bien "Los envíos tienen dónde guardarse mientras llegan (sin sesión: $c)";; *) mal "Un envío de 3 MB sin sesión responde $c (se esperaba 401): ¿puede escribir nginx en /var/cache/nginx y el backend en /tmp?";; esac
 if [ "$(docker exec argonavis_backend printenv APP_ENV 2>/dev/null)" = production ]; then bien "APP_ENV=production"; else mal "APP_ENV no es production"; fi
-c=$(codigo http://localhost/api/docs)
+c=$(codigo "$BASE/api/docs")
 if [ "$c" = 404 ]; then bien "La documentación de la API está oculta"; else aviso "/api/docs responde $c"; fi
 sk=$(env_de SECRET_KEY)
 if [ "${#sk}" -ge 32 ]; then bien "SECRET_KEY de ${#sk} caracteres"; else mal "SECRET_KEY corta (${#sk} caracteres)"; fi
 # Tope del cuerpo (2026-11-10): nginx corta sin leer lo que pase de 1 MB en la API (y
 # de 345 MB al enviar una solicitud). No llega al backend: no deja rastro.
-c=$(head -c 2097152 /dev/zero | codigo -X POST -H 'Content-Type: application/json' --data-binary @- http://localhost/api/v1/auth/login)
+c=$(head -c 2097152 /dev/zero | codigo -X POST -H 'Content-Type: application/json' --data-binary @- "$BASE/api/v1/auth/login")
 if [ "$c" = 413 ]; then bien "nginx corta las peticiones de más de 1 MB en la API (413)"; else mal "Un cuerpo de 2 MB en el login respondió $c (se esperaba 413): revisa client_max_body_size en nginx.conf"; fi
 if [ -z "$DIARIO" ]; then
   frenado=""
   for i in $(seq 1 25); do
     c=$(codigo -X POST -H 'Content-Type: application/json' \
-        -d '{"username":"verificacion.freno","password":"no-es-una-clave"}' http://localhost/api/v1/auth/login)
+        -d '{"username":"verificacion.freno","password":"no-es-una-clave"}' "$BASE/api/v1/auth/login")
     if [ "$c" = 429 ]; then frenado=$i; break; fi
   done
   if [ -n "$frenado" ]; then
@@ -228,6 +238,54 @@ if docker exec argonavis_frontend sh -c 'test -s "/var/log/argonavis/acceso-$(da
   bien "nginx guarda los accesos de cada día"
 else
   mal "nginx no guarda los accesos en /var/log/argonavis (volumen registros_nginx)"
+fi
+
+# ── HTTPS (2026-11-22) ───────────────────────────────────────────────────────
+seccion "HTTPS"
+if [ -z "$HTTPS" ]; then
+  aviso "Sin HTTPS: la contraseña de cada login viaja en claro por la red (README → HTTPS)"
+else
+  publico=$(env_nginx APP_URL); publico=${publico#https://}; publico=${publico%%/*}
+  destino=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 15 http://localhost/solicitudes/1)
+  if [ "$destino" = "301 https://$publico/solicitudes/1" ]; then bien "El 80 solo lleva a https://$publico"; else mal "El 80 responde «$destino» (se esperaba 301 a https://$publico)"; fi
+  if grep -qi '^strict-transport-security: max-age=' <<<"$(pedir -D - -o /dev/null "$BASE/")"; then bien "El navegador no vuelve a probar HTTP (Strict-Transport-Security)"; else mal "Falta Strict-Transport-Security"; fi
+  # El certificado que nginx está usando, que puede no ser el de la carpeta si no se recargó.
+  saludo=$(openssl s_client -connect localhost:443 -servername "${publico%%:*}" </dev/null 2>/dev/null)
+  servido=$(openssl x509 2>/dev/null <<<"$saludo")
+  if [ -z "$servido" ]; then
+    mal "No se pudo leer el certificado del 443 (openssl s_client -connect localhost:443)"
+  else
+    vence=$(openssl x509 -noout -enddate <<<"$servido" | cut -d= -f2)
+    dias=$(( ( $(date -d "$vence" +%s) - $(date +%s) ) / 86400 ))
+    if ! openssl x509 -noout -checkend 0 <<<"$servido" >/dev/null; then
+      mal "El certificado venció el $vence: los navegadores no dejan entrar"
+    elif [ "$dias" -le 21 ]; then
+      aviso "El certificado vence en $dias día(s) ($vence): hay que cambiarlo (README → HTTPS)"
+    else
+      bien "El certificado vale $dias días más ($vence)"
+    fi
+    if openssl x509 -noout -checkhost "${publico%%:*}" <<<"$servido" | grep -q 'does match' \
+       && openssl x509 -noout -ext subjectAltName <<<"$servido" 2>/dev/null | grep -q 'DNS:'; then
+      bien "El certificado es de ${publico%%:*}"
+    else
+      mal "El certificado no es de ${publico%%:*} (el nombre de APP_URL tiene que estar en su subjectAltName)"
+    fi
+    if [ "$(openssl x509 -noout -fingerprint -sha256 <<<"$servido")" != "$(openssl x509 -noout -fingerprint -sha256 -in certificados/https/argonavis.crt 2>/dev/null)" ]; then
+      aviso "nginx sigue con el certificado anterior: sudo docker exec argonavis_frontend nginx -s reload"
+    fi
+    cadena=$(sed -n 's/^ *Verify return code: //p' <<<"$saludo" | head -1)
+    if [ "$cadena" = "0 (ok)" ]; then
+      bien "Lo firma una autoridad que este servidor conoce, con sus intermedios"
+    else
+      aviso "Este servidor no puede comprobar quién firma el certificado (${cadena:-sin respuesta}): o le falta un intermedio a argonavis.crt, o es de la CA interna y los equipos de las agencias verán una advertencia (README → HTTPS)"
+    fi
+  fi
+  permisos=$(stat -c %a certificados/https/argonavis.key 2>/dev/null)
+  if [ -n "$permisos" ] && [ $(( 8#$permisos & 8#077 )) -eq 0 ]; then
+    bien "La clave privada solo la lee nginx"
+  else
+    mal "La clave privada la pueden leer otros (${permisos:-no está}): sudo chmod 400 certificados/https/argonavis.key"
+  fi
 fi
 
 # ── Base de datos ────────────────────────────────────────────────────────────
@@ -295,6 +353,15 @@ if [ "$workers" -gt 1 ]; then
   corriendo=$(docker top argonavis_backend 2>/dev/null | grep -c 'spawn_main')
   if [ "$corriendo" -eq "$workers" ]; then bien "$workers procesos del backend en marcha"; else aviso "Se pidieron $workers procesos del backend y hay $corriendo"; fi
 fi
+# Los datos, en un volumen con nombre (2026-11-22). Si POSTGRES_IMAGEN y POSTGRES_VOLUMEN no
+# casan, PostgreSQL los guardaría en uno sin nombre, que se pierde de vista al bajar la pila.
+datos=$(psql_bd "show data_directory")
+volumen=$(docker inspect -f '{{range .Mounts}}{{if eq .Type "volume"}}{{.Destination}} {{.Name}}{{println}}{{end}}{{end}}' argonavis_postgres 2>/dev/null \
+  | while read -r destino nombre; do case "$datos/" in "$destino/"*) echo "${#destino} $nombre" ;; esac; done | sort -rn | head -1 | cut -d' ' -f2)
+case "$volumen" in
+  argonavis_postgres_*) bien "PostgreSQL $(psql_bd "show server_version" | cut -d' ' -f1) guarda los datos en su volumen ($volumen)" ;;
+  *) mal "PostgreSQL guarda los datos (${datos:-?}) en «${volumen:-ningún volumen}» y no en el suyo: revisa POSTGRES_IMAGEN y POSTGRES_VOLUMEN (README → PostgreSQL 18)" ;;
+esac
 if docker exec argonavis_backend sh -c 'f=/app/storage/documentos/.verificacion; touch "$f" && rm -f "$f"' 2>/dev/null; then
   bien "El backend puede escribir en el volumen de documentos"
 else
@@ -320,17 +387,29 @@ print("ok")
 PY
 )
 if [ "$ldap" = ok ]; then bien "Active Directory: la cuenta de servicio entra"; else mal "Active Directory: ${ldap:-sin respuesta}"; fi
+if grep -qix true <<<"$(docker exec argonavis_backend printenv LDAP_USAR_SSL LDAP_STARTTLS 2>/dev/null)"; then
+  bien "Active Directory: por TLS"
+else
+  aviso "Active Directory sin TLS: la contraseña de cada login viaja en claro hasta el controlador de dominio (README → HTTPS)"
+fi
 smtp=$(py_backend <<'PY' 2>&1 | tail -1
 import os
 import smtplib
+import ssl
+def si(variable):
+    return os.environ.get(variable, "").lower() == "true"
 host = os.environ.get("MAIL_HOST", "")
 if not host:
     print("sin MAIL_HOST")
 else:
     puerto = int(os.environ.get("MAIL_PORT") or 25)
-    clase = smtplib.SMTP_SSL if os.environ.get("MAIL_USAR_SSL", "").lower() == "true" else smtplib.SMTP
-    with clase(host, puerto, timeout=10) as s:
+    # Con TLS, el certificado se valida como lo valida la aplicación (MAIL_CA_CERT o las del sistema).
+    contexto = ssl.create_default_context(cafile=os.environ.get("MAIL_CA_CERT") or None)
+    conexion = smtplib.SMTP_SSL(host, puerto, timeout=10, context=contexto) if si("MAIL_USAR_SSL") else smtplib.SMTP(host, puerto, timeout=10)
+    with conexion as s:
         s.ehlo()
+        if si("MAIL_STARTTLS"):
+            s.starttls(context=contexto)
     print("ok")
 PY
 )

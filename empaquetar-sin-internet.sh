@@ -27,7 +27,8 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
 fi
 commit=$(git rev-parse --short HEAD)
 salida=paquete-sin-internet
-postgres=$(sed -n 's/^ *image: *\(postgres:[^ ]*\).*/\1/p' docker-compose-prod.yml | head -1)
+# Para un servidor con PostgreSQL 18 (README): POSTGRES_IMAGEN=<la de su .env> bash empaquetar-sin-internet.sh
+postgres=${POSTGRES_IMAGEN:-$(sed -n 's/^ *image: *\${POSTGRES_IMAGEN:-\(postgres:[^}]*\)}.*/\1/p' docker-compose-prod.yml | head -1)}
 if [ -z "$postgres" ]; then
   echo "No encontré la imagen de PostgreSQL en docker-compose-prod.yml." >&2
   exit 1

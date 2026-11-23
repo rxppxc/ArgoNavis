@@ -8,12 +8,17 @@
 - Ninguna imagen base usa una etiqueta que cambie sola («nginx:alpine»,
   «python:3.12-slim»): cada build traía lo último sin que nadie lo decidiera.
 """
+import os
 import re
+import subprocess
 from pathlib import Path
 
+import pytest
 import yaml
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
+
+from ayudas import programa
 
 BACKEND = Path(__file__).resolve().parent.parent
 RAIZ = BACKEND.parent
@@ -73,7 +78,9 @@ def _imagenes() -> list[tuple[str, str]]:
             m = re.fullmatch(r"\$\{(\w+)\}", imagen)
             encontradas.append((ruta.name, argumentos[m.group(1)] if m else imagen))
     for imagen in re.findall(r"^\s+image:\s*(\S+)", (RAIZ / "docker-compose-prod.yml").read_text(encoding="utf-8"), re.M):
-        encontradas.append(("docker-compose-prod.yml", imagen))
+        encontradas.append(("docker-compose-prod.yml", re.sub(r"^\$\{\w+:-(.+)\}$", r"\1", imagen)))   # la de por defecto
+    for imagen in re.findall(r"^# POSTGRES_IMAGEN=(\S+)", (RAIZ / ".env.example").read_text(encoding="utf-8"), re.M):
+        encontradas.append((".env.example", imagen))
     for imagenes in _postgres_de_la_ci().values():
         encontradas += [("ci.yml", imagen) for imagen in imagenes]
     return encontradas
@@ -89,6 +96,16 @@ def _postgres_de_la_ci() -> dict[str, set[str]]:
             variantes = trabajo.get("strategy", {}).get("matrix", {}).get("postgres", [""])
             encontradas[nombre] = {imagen.replace("${{ matrix.postgres }}", v) for v in variantes}
     return encontradas
+
+
+@pytest.mark.skipif(programa("bash") is None, reason="sin bash")
+@pytest.mark.parametrize("otra", ["", "postgres:18.7-alpine3.24"])
+def test_el_paquete_sin_internet_lleva_el_postgresql_que_se_va_a_usar(otra):
+    [linea] = re.findall(r"^postgres=.*$", (RAIZ / "empaquetar-sin-internet.sh").read_text(encoding="utf-8"), re.M)
+    r = subprocess.run([programa("bash"), "-c", f'{linea}; echo "$postgres"'], cwd=RAIZ, capture_output=True, text=True,
+                       env={**os.environ, "POSTGRES_IMAGEN": otra})
+    [produccion] = [i for archivo, i in _imagenes() if archivo == "docker-compose-prod.yml" and i.startswith("postgres:")]
+    assert r.stdout.strip() == (otra or produccion)
 
 
 def test_las_imagenes_base_tienen_version_exacta():
