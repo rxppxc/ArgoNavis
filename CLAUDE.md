@@ -344,6 +344,8 @@ Cada una salió de un problema real. El detalle está en el historial.
 - Las variables que apagan el AD, el correo y los logs de las pruebas están en un solo lugar: `tests/entorno_pruebas.py`.
   - Lo usan `conftest.py`, `servidor_e2e.py` y `carga.py`.
   - Una configuración nueva que en las pruebas tenga que quedar apagada va ahí.
+- Las órdenes de consola (`python -m app.…`: `asignar_rol`, `permisos_bd`, `revisar_documentos`) corren solas en el servidor, sin el resto de la aplicación. Se prueban en un proceso aparte (`tests/test_consola.py`): llamadas desde pytest, que ya cargó todo, no se ve lo que les falta.
+  - Por eso **un modelo nuevo se importa en `app/domain/models/__init__.py`**: las relaciones se nombran por texto y SQLAlchemy necesita todas las clases cargadas (2026-11-22: `asignar_rol --crear-local` se caía con «'AgenciaNaviera' failed to locate a name»).
 - Las ayudas comunes (enviar, verificar impedimentos, `login`, `panama`, `programa`) están en `tests/ayudas.py`. `programa("bash")` (o `sh`, `openssl`) encuentra el de Git en Windows: el `bash` del sistema es el de WSL.
 
 ### Lo que sigue pendiente (no urgente)
