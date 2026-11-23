@@ -13,6 +13,7 @@ registra el proxy y las acciones quedan en la bitácora.
 import logging
 import os
 import re
+import sys
 from contextlib import suppress
 from typing import TextIO
 from contextvars import ContextVar
@@ -50,7 +51,8 @@ def _abrir_para_agregar(ruta: Path):
     cada bloque al final de una sola vez. El modo "a" de Python busca el final y
     escribe en dos pasos, y los 4 workers de start-backend-prod.bat se pisaban:
     en una prueba con 4 procesos se perdieron 6807 de 12000 líneas."""
-    if os.name != "nt":
+    # sys.platform y no os.name: mypy entiende sys.platform y salta lo de Windows al revisar como Linux.
+    if sys.platform != "win32":
         return open(ruta, "a", encoding="utf-8")   # O_APPEND ya es atómico en Linux
     import ctypes
     import msvcrt

@@ -11,6 +11,7 @@ el cliente.
 """
 import asyncio
 import hashlib
+import importlib
 import logging
 import re
 import secrets
@@ -19,6 +20,7 @@ import time
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import aiofiles
 from fastapi import HTTPException, UploadFile, status
@@ -26,11 +28,13 @@ from fastapi import HTTPException, UploadFile, status
 from app.core.config import obtener_configuracion
 from app.infrastructure.revision_office import Problema, revisar_office
 
+# Por importlib y no con `import magic`: en Linux es python-magic, que trae sus tipos, y en
+# Windows python-magic-bin, que no; así mypy ve lo mismo en los dos (2026-11-23).
+magic: Any = None
 try:
-    import magic
+    magic = importlib.import_module("magic")
     _MAGIC_DISPONIBLE = True
 except Exception:  # pragma: no cover — libmagic no disponible
-    magic = None
     _MAGIC_DISPONIBLE = False
 
 logger        = logging.getLogger(__name__)
