@@ -818,3 +818,17 @@ Los 10 documentos de `docs/`, al día con lo del 10 al 22/11/2026 (esquema `d7f3
 ## Lo que encontró la CI del commit general (2026-11-23)
 - **mypy en Linux:** en la CI revisa como Linux y fallaba en el código que solo existe en Windows (`registro.py`) y en `python-magic`, que en Linux trae tipos y en Windows no (python-magic-bin). Ahora `mypy.ini` revisa siempre como Linux, lo de Windows va bajo `sys.platform == "win32"` y `magic` se carga con `importlib`.
 - **Consulta histórica:** lo escrito en «Buscar» o «Tripulante» se busca 350 ms después. Una pestaña (o cualquier filtro) pulsada antes dejaba la búsqueda, la URL y el «Volver» del expediente con el texto anterior; en la CI, más rápida, el E2E caía ahí («Volver» devolvía «gomez, juan» en vez de «Pérez Gómez»). Ahora el cambio de un filtro lleva lo escrito (`filtrosConCambio`, con su prueba en `consultaHistorica.test.ts`).
+
+## Manuales de usuario del personal del SNM (2026-11-23)
+Con el de la agencia (del 19/11), ya hay manual para cada papel, en `docs/manuales/` (Word y PDF), con el mismo formato: corto, por tareas y con capturas marcadas.
+- **UCVMM** (10 páginas): la bandeja de su sector, el expediente, la verificación de impedimentos y su corrección, las tres decisiones, la autorización y la boleta, el historial completo y la consulta histórica.
+- **Puesto de control** (6 páginas): la bandeja de cualquier año, la verificación en SIMPLUS (con lo que marcó UCVMM como referencia), el comentario y la confirmación de la finalización, y la boleta.
+- **Supervisores** (8 páginas), el de sector y el general en uno, con un cuadro de lo que ve cada uno: la bandeja de solo lectura, el expediente, las estadísticas, la consulta histórica y la boleta.
+- **Formato de manuales de la DTI** (pedido del usuario, con el manual de APOLO como modelo), en los cuatro:
+  - la portada: escudo, «ARGO NAVIS · Manual de Autorizaciones Marítimas», el papel, y la versión y la fecha abajo;
+  - el encabezado: la franja azul con los logos de Gobierno Nacional y de Migración;
+  - el pie: «Servicio, Excelencia y Control» y las redes. Como en el modelo, no lleva número de página.
+  - Las imágenes salen del propio PDF del modelo. El contenido sigue con su diseño; la franja resta altura a cada página, por eso hay más páginas.
+- **Las capturas**, contra la pila del E2E (base temporal, sin correos), con nombres ficticios: dos agencias, los puertos de Balboa, Rodman y Cristóbal y unos seis meses de historia para las estadísticas. Las cuentas del personal entraron como del dominio, para que el menú no muestre «Cambiar contraseña», que solo tienen las locales.
+- **El de la agencia pasa a la 1.1:** el menú dice «Salir», no «Cerrar sesión». En los cuatro, el párrafo que presenta una imagen va con ella y la tabla del final no se parte.
+- **Documentación de la DTI** (sin cambiar de versión): el 01 da por hecho el P-10 (manuales por papel), el 08 quita ese pendiente (quedan 28) y la guía 09 nombra los botones de la boleta como en pantalla («Generar boleta» y «Generar y descargar»).

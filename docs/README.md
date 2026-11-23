@@ -43,12 +43,14 @@ Para conocer el sistema sin entrar en lo técnico, empieza por el 09: explica en
 
 ## Manuales de usuario
 
-Para quien usa el sistema, uno por papel: cortos, por tareas y con capturas marcadas (datos ficticios). Se reparten en PDF; el Word queda para ajustar textos. El de la agencia no nombra unidades internas del SNM, como el sistema.
+Para quien usa el sistema, uno por papel (los dos supervisores, en uno): cortos, por tareas y con capturas marcadas (datos ficticios). Llevan la portada, el encabezado y el pie del formato de manuales de la DTI. Se reparten en PDF; el Word queda para ajustar textos. El de la agencia no nombra unidades internas del SNM, como el sistema.
 
 | Papel | Archivo | Versión |
 |---|---|---|
-| Agencia naviera | [Manual-agencia-naviera.pdf](manuales/Manual-agencia-naviera.pdf) · [Word](manuales/Manual-agencia-naviera.docx) | 1.0 (19/11/2026), 5 páginas |
-| UCVMM, puesto de control y supervisores | En preparación | — |
+| Agencia naviera | [Manual-agencia-naviera.pdf](manuales/Manual-agencia-naviera.pdf) · [Word](manuales/Manual-agencia-naviera.docx) | 1.1 (23/11/2026), 7 páginas |
+| UCVMM | [Manual-UCVMM.pdf](manuales/Manual-UCVMM.pdf) · [Word](manuales/Manual-UCVMM.docx) | 1.0 (23/11/2026), 10 páginas |
+| Puesto de control | [Manual-puesto-de-control.pdf](manuales/Manual-puesto-de-control.pdf) · [Word](manuales/Manual-puesto-de-control.docx) | 1.0 (23/11/2026), 6 páginas |
+| Supervisores (de sector y general) | [Manual-supervisores.pdf](manuales/Manual-supervisores.pdf) · [Word](manuales/Manual-supervisores.docx) | 1.0 (23/11/2026), 8 páginas |
 
 Cada documento de la línea base trae portada institucional, una página de control (datos, revisión y firmas, historial de versiones y convenciones) y un índice. Si editas un documento, actualiza el índice en Word: clic derecho sobre él → **Actualizar campo**.
 
@@ -78,5 +80,6 @@ Los diagramas son archivos editables. Cada uno trae su imagen en PNG y SVG.
   - La 0.7 se volvió a generar con esos guiones, que siguen fuera del repositorio. Antes se comprobó que los Word de la 0.6 no tenían cambios a mano: el texto regenerado era idéntico.
   - Ya cita las rutas nuevas de la auditoría del 2026-11-14 (`informes/`, `api/v1/dependencias.py`, las carpetas de `modulos/solicitudes/` y los contenedores `argonavis_*`).
 - **Diagramas:** el 2026-11-23 se pusieron al día los BPMN 00, 01, 03, 04 y 05, y los Mermaid de arquitectura y modelo de datos. Si editas un `.bpmn` o un `.mmd`, vuelve a exportar su PNG y su SVG.
+- **Manuales de usuario:** también se generan con guiones fuera del repositorio, con capturas tomadas contra la pila del E2E. Si cambia una pantalla que muestran, hay que cambiar el texto en el Word y, si la captura ya no se parece, tomarla de nuevo.
 - Si cambia el catálogo de trámites, también cambian el documento 04 (sección 3) y la prueba `backend/tests/test_documento_ucvmm.py`.
 - Cuando UCVMM valide un punto, anota la respuesta en la lista del documento 08 (sección 4) y en la regla correspondiente del 04.
