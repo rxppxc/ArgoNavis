@@ -6,6 +6,7 @@
 import type { EstadoSolicitud } from "../../../api/solicitudes";
 import type { RangoFechas } from "../../../components/FiltroFechas";
 import { dosCifras, fechaISOLocal } from "../../../utils/fechas";
+import { HORA_FIN_LABORAL, HORA_INICIO_LABORAL } from "../../../utils/horario";
 
 const ESPACIO = " ";   // entre la cifra y el %, para que no se separen al cortar la línea
 
@@ -77,11 +78,9 @@ export const DIAS_SEMANA = [
   { dia: 7, corto: "Dom", largo: "Domingo" },
 ] as const;
 
-/** Horario laboral, espejo de core/horario.py (lo compara test_constantes_iguales_en_el_frontend):
- *  de lunes a viernes, de 07:00 a 15:00, al minuto y con las dos puntas dentro (las 15:00
- *  en punto todavía son laborales; desde las 15:01, fuera). Cuenta la aprobación de UCVMM. */
-export const HORA_INICIO_LABORAL = 7;
-export const HORA_FIN_LABORAL = 15;
+/** Horario laboral (utils/horario.ts, espejo de core/horario.py): de lunes a viernes, de 07:00
+ *  a 15:00, al minuto y con las dos puntas dentro. Cuenta la aprobación de UCVMM. */
+export { HORA_FIN_LABORAL, HORA_INICIO_LABORAL };
 
 /** El mapa va por horas enteras: laboral de 07 a 14. La de las 15 es fuera salvo su primer minuto. */
 export function enHorarioLaboral(dia: number, hora: number): boolean {

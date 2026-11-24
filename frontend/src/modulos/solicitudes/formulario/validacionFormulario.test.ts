@@ -34,7 +34,6 @@ const REGLAS: Record<string, string> = {
   pasaporte_vencido: "el pasaporte vence el",
   pasaporte_vigencia_corta: "meses de vigencia",   // 2026-11-13; el seamanbook vencido ya no bloquea
   rango_no_permitido: "el rango debe ser",
-  marino_sin_seamanbook: "falta N° de seamanbook",
   pasaporte_repetido: "ya está registrado en el tripulante",
 };
 

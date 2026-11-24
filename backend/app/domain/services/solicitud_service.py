@@ -1709,7 +1709,7 @@ class ServicioSolicitud:
                     nacionalidad=t.nacionalidad_ref.nombre if t.nacionalidad_ref else t.nacionalidad,
                     pasaporte=t.pasaporte, libreta=t.libreta_marino or "",
                     rango=t.rango, ocupacion=t.ocupacion,
-                    restringida=t.nacionalidad_restringida,
+                    restringida=t.nacionalidad_restringida, porta_libreta=t.porta_libreta,
                 )
                 for t in s.tripulantes
             ],

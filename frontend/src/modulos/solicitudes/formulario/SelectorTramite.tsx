@@ -67,18 +67,28 @@ interface Props {
   onElegir: (codigo: string) => Promise<boolean>;
   /** Notas del trámite elegido (vigencia, avisos), debajo del resumen. */
   children?: ReactNode;
+  /** Si se están mostrando los trámites para elegir otro (lo controla la página: «Volver» los
+   *  muestra, 2026-11-23). Sin esto, lo lleva el propio selector. */
+  cambiando?: boolean;
+  onCambiando?: (cambiando: boolean) => void;
 }
 
 /** Paso 1 de «Nueva solicitud»: los trámites en tarjetas, con cuándo se usa
  *  cada uno y qué pide. Antes era una lista desplegable con los nombres solos,
  *  y lo que pedía cada trámite se descubría después de elegirlo. Elegido, se
  *  resume en una línea con «Cambiar». */
-export function SelectorTramite({ tipos, elegido, fijo = false, onElegir, children }: Props) {
-  const [cambiando, setCambiando] = useState(false);
+export function SelectorTramite({
+  tipos, elegido, fijo = false, onElegir, children, cambiando: cambiandoAfuera, onCambiando,
+}: Props) {
+  const [cambiandoPropio, setCambiandoPropio] = useState(false);
+  const cambiando = cambiandoAfuera ?? cambiandoPropio;
+  const setCambiando = onCambiando ?? setCambiandoPropio;
   const refElegido = useRef<HTMLDivElement>(null);
 
   async function elegir(t: TipoTramite) {
-    if (t.codigo !== elegido?.codigo && !(await onElegir(t.codigo))) return;
+    // Si no confirma el cambio (quitaría archivos), vuelve al formulario con el trámite que tenía:
+    // mientras se eligen, el formulario no se ve (2026-11-23).
+    if (t.codigo !== elegido?.codigo) await onElegir(t.codigo);
     setCambiando(false);
     // La tarjeta pulsada desaparece: el foco pasa al resumen (y lo trae a la vista).
     requestAnimationFrame(() => refElegido.current?.focus());

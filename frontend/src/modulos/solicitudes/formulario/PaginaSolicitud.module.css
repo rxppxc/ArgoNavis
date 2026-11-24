@@ -61,8 +61,6 @@
   letter-spacing: .05em; text-transform: uppercase;
 }
 .campo > span em, .campo > label em { color: var(--muted); font-style: normal; font-weight: 500; text-transform: none; letter-spacing: 0; font-family: var(--letra-texto); font-stretch: 100%; }
-/* La fecha elegida, en palabras (FechaEnPalabras). */
-.fechaEnPalabras { color: var(--text-2); font-size: .74rem; margin-top: -2px; }
 /* Una aclaración bajo el campo (el rango único de Shore Pass, 2026-11-14). */
 .notaCampo { color: var(--text-2); font-size: .74rem; line-height: 1.4; margin-top: -2px; }
 
@@ -281,6 +279,22 @@
   padding-top: 6px;
 }
 .avisoFaltan { color: var(--acc-amber); font-size: .84rem; font-weight: 600; }
+
+/* El borrador (2026-11-23): el aviso al recuperarlo, como las notas informativas, y la línea
+   de cuándo se guardó, junto al botón de enviar. */
+.avisoBorrador {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 14px; padding: 11px 14px;
+  border-radius: var(--r-sm);
+  background: var(--nota-fondo);
+  border: 1px solid var(--nota-borde);
+  border-left: 4px solid var(--acc-blue);
+  color: var(--text); font-size: .86rem; line-height: 1.45;
+}
+.avisoBorrador > svg { flex-shrink: 0; color: var(--acc-blue); }
+.avisoBorradorTexto { flex: 1; min-width: 0; }
+.btnTexto { composes: boton texto from "../../../components/Botones.module.css"; flex-shrink: 0; }
+.guardadoBorrador { margin-right: auto; color: var(--text-2); font-size: .8rem; }
 
 .btnEnviar { composes: boton primario grande from "../../../components/Botones.module.css"; }
 

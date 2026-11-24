@@ -80,8 +80,12 @@ test("el formulario cuida los documentos al quitar un tripulante o cambiar de tr
     // Uno solo: el de Beto se fue con él.
     await expect(dialogo).toContainText("se quitará el documento");
     await dialogo.getByRole("button", { name: "Cancelar" }).click();
+    // Sin cambiar, vuelve al formulario con su trámite y sus archivos (2026-11-23: mientras se
+    // eligen los trámites, el formulario no se ve).
     await expect(agencia.getByText("visa-ana.pdf")).toBeVisible();
+    await expect(agencia.getByRole("group", { name: "Tipo de trámite" })).toHaveCount(0);
 
+    await agencia.getByRole("button", { name: "Cambiar", exact: true }).click();
     await agencia.getByRole("button", { name: /^Desembarque/ }).click();
     await agencia.getByRole("alertdialog").getByRole("button", { name: "Cambiar de trámite" }).click();
     await expect(agencia.getByRole("button", { name: "Cambiar", exact: true })).toBeVisible();
@@ -282,7 +286,7 @@ test("el pasaporte con 3 meses de vigencia; el seamanbook vencido solo avisa", a
   });
 
   await test.step("el seamanbook vencido se avisa, pero no impide enviar", async () => {
-    await ficha.getByLabel("Vence el seamanbook *").fill(fechaPanama(0));
+    await ficha.getByLabel("Vence el seamanbook (opcional)").fill(fechaPanama(0));
     await expect(ficha.getByText(/^El seamanbook vence el .*Puedes enviar la solicitud igual/)).toBeVisible();
     await agencia.getByRole("button", { name: "Enviar solicitud" }).click();
     // La lista de lo que falta sigue (el resto de la ficha está vacío), pero sin el seamanbook.
@@ -388,5 +392,53 @@ test("panameños sin visa, la Visa de los restringidos y Shore Pass solo para ma
     await expect(rango.locator("option")).toHaveText(["Marino"]);
     await expect(rango).toHaveValue("marino");
     await expect(rango).toHaveAccessibleDescription("Único rango de este trámite.");
+  });
+});
+
+test("«Volver» regresa a los trámites y lo escrito queda en borrador (2026-11-23)", async ({ browser }) => {
+  const agencia = await entrar(browser, CUENTAS.agencia);
+  await agencia.goto("/new");
+  await agencia.getByRole("button", { name: /^Embarque/ }).click();
+  await agencia.getByLabel("Nombre del buque *").fill("ESTRELLA DEL BORRADOR");
+  await marinoFilipino(agencia, 0, "Ana");
+  await agencia.getByLabel("Adjuntar Formulario No. 3").setInputFiles(pdf("formulario-3.pdf"));
+  await expect(agencia.getByText(/^Borrador guardado en este equipo hoy a las/)).toBeVisible();
+
+  await test.step("con un trámite elegido, «Volver» muestra los trámites sin perder lo escrito", async () => {
+    await agencia.getByRole("button", { name: "Volver" }).click();
+    await expect(agencia).toHaveURL(/\/new$/);
+    await expect(agencia.getByText("Elige otro trámite.")).toBeVisible();
+    await expect(agencia.getByRole("group", { name: "Tipo de trámite" })).toBeVisible();
+    await expect(agencia.getByLabel("Nombre del buque *")).toHaveCount(0);
+
+    await agencia.getByRole("button", { name: /^Embarque/ }).click();
+    await expect(agencia.getByLabel("Nombre del buque *")).toHaveValue("ESTRELLA DEL BORRADOR");
+    await expect(agencia.getByText("formulario-3.pdf")).toBeVisible();
+  });
+
+  await test.step("desde los trámites, «Volver» va al inicio", async () => {
+    await agencia.getByRole("button", { name: "Volver" }).click();
+    await expect(agencia.getByText("Elige otro trámite.")).toBeVisible();
+    await agencia.getByRole("button", { name: "Volver" }).click();
+    await expect(agencia).toHaveURL(/\/dashboard$/);
+  });
+
+  await test.step("al volver al formulario, lo escrito y los archivos siguen ahí", async () => {
+    await agencia.goto("/new");
+    await expect(agencia.getByRole("status").filter({ hasText: "Recuperamos la solicitud que dejaste sin enviar" }))
+      .toBeVisible();
+    await expect(agencia.getByLabel("Nombre del buque *")).toHaveValue("ESTRELLA DEL BORRADOR");
+    await expect(tarjeta(agencia, 0).getByLabel("Nombre(s) *", { exact: true })).toHaveValue("Ana");
+    await expect(agencia.getByText("formulario-3.pdf")).toBeVisible();
+  });
+
+  await test.step("«Empezar de nuevo» lo borra", async () => {
+    await agencia.getByRole("button", { name: "Empezar de nuevo" }).click();
+    await agencia.getByRole("alertdialog").getByRole("button", { name: "Empezar de nuevo" }).click();
+    await expect(agencia.getByRole("group", { name: "Tipo de trámite" })).toBeVisible();
+    await expect(agencia.getByText("Recuperamos la solicitud que dejaste sin enviar")).toHaveCount(0);
+    await agencia.reload();
+    await expect(agencia.getByRole("group", { name: "Tipo de trámite" })).toBeVisible();
+    await expect(agencia.getByText("Recuperamos la solicitud que dejaste sin enviar")).toHaveCount(0);
   });
 });

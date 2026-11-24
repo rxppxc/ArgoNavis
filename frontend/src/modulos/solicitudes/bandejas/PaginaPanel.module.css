@@ -2,6 +2,8 @@
 .btnNuevo { composes: boton primario grande from "../../../components/Botones.module.css"; }
 /* Azul de contorno: buscar es consultar (2026-11-11). */
 .btnHistorico { composes: boton consultar grande from "../../../components/Botones.module.css"; }
+/* Junto al reloj (2026-11-24), los botones del encabezado van al pie, como el título. */
+.alPie { align-self: flex-end; }
 
 /* ─── Selector de bandeja (rol): las mismas pestañas subrayadas de Catálogos ─── */
 .vistas {

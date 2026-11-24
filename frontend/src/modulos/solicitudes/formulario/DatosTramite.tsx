@@ -1,8 +1,9 @@
 import type { PuestoMini } from "../../../api/catalogos";
 import type { TipoTramite } from "../../../api/tramites";
 import { SelectorBuscable } from "../../../components/SelectorBuscable";
+import { SelectorFecha } from "../../../components/SelectorFecha";
 import type { OpcionBuscable } from "../../../utils/busqueda";
-import { FechaEnPalabras } from "../FechaEnPalabras";
+import { isoATexto, sumarDias } from "../../../utils/calendario";
 import { DIAS_SELLADO, OPERACIONES } from "../../../api/tiposSolicitudes";
 import { AYUDA_CAMPOS_TRAMITE, ETIQUETA_OPERACION, formatearFechaHora, textoDias } from "../presentacion";
 import { operacionMaxima, puestosParaCambio, type CabeceraFormulario } from "./validacionFormulario";
@@ -74,12 +75,15 @@ export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos,
               valor={cabecera.bandera} onCambiar={(valor) => onCambiar("bandera", valor)} />
           </>
         )}
-        <label className={styles.campo}>
-          <span>Fecha de la operación en puerto *</span>
-          <input type="date" min={hoy} max={operacionMaxima(hoy)} value={cabecera.fecha_operacion}
-            onChange={(e) => onCambiar("fecha_operacion", e.target.value)} />
-          <FechaEnPalabras iso={cabecera.fecha_operacion} />
-        </label>
+        {/* De hoy a un año (DIAS_MAXIMOS_ANTICIPACION): lo demás va rayado en el calendario y,
+            si se escribe, el campo dice por qué no vale. */}
+        <SelectorFecha className={styles.campo} etiqueta="Fecha de la operación en puerto *"
+          valor={cabecera.fecha_operacion} onCambiar={(iso) => onCambiar("fecha_operacion", iso)}
+          min={hoy} max={operacionMaxima(hoy)}
+          motivoAntes="Esa fecha ya pasó: la operación es de hoy en adelante."
+          motivoDespues={`La operación puede ser hasta un año después de hoy (el ${isoATexto(operacionMaxima(hoy))}).`}
+          ayuda={`Desde hoy hasta el ${isoATexto(operacionMaxima(hoy))} (un año).`}
+          atajos={[{ etiqueta: "Hoy", fecha: hoy }, { etiqueta: "Mañana", fecha: sumarDias(hoy, 1) }]} />
         <label className={styles.campo}>
           <span>Puesto de Control Migratorio *</span>
           <select value={cabecera.puesto_control_id}

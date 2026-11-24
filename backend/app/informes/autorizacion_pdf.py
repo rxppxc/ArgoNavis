@@ -63,6 +63,15 @@ class TripulantePdf:
     # Solo la traen las solicitudes enviadas antes del 2026-11-16 (salió del formulario).
     ocupacion:    str | None = None
     restringida:  bool = False
+    porta_libreta: bool = False   # el rango Marino
+
+
+def celda_libreta(m: TripulantePdf) -> str:
+    """El seamanbook en la tabla: el número; «No indicado» si el Marino no lo dio (es opcional
+    desde el 2026-11-23) y «No aplica» a los rangos que no lo portan."""
+    if m.libreta:
+        return m.libreta
+    return "No indicado" if m.porta_libreta else "No aplica"
 
 
 def titulo_columna_rango(tripulantes: list[TripulantePdf]) -> str:
@@ -337,7 +346,7 @@ def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
             Paragraph(texto_pdf(m.nombre), e_celda),
             Paragraph(nacionalidad, e_celda),
             Paragraph(texto_pdf(m.pasaporte), e_celda),
-            Paragraph(texto_pdf(m.libreta) if m.libreta else "No aplica", e_celda),
+            Paragraph(texto_pdf(celda_libreta(m)), e_celda),
             Paragraph(f"{escape(rango)}<br/>{texto_pdf(m.ocupacion)}" if m.ocupacion else escape(rango), e_celda),
         ])
     proporciones = [0.05, 0.17, 0.17, 0.15, 0.14, 0.14, 0.18]

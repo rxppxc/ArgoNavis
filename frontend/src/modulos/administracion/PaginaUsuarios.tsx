@@ -5,6 +5,8 @@ import { useNotificacion } from "../../components/Notificaciones";
 import { useConfirmar } from "../../components/ModalConfirmacion";
 import { MarcoPagina } from "../../components/MarcoPagina";
 import { EncabezadoPagina } from "../../components/EncabezadoPagina";
+import { RelojHorario } from "../../components/RelojHorario";
+import { usePermisos } from "../../hooks/usePermisos";
 import { copiarAlPortapapeles } from "../../utils/portapapeles";
 import { mensajeDeError } from "../../utils/errores";
 import { BusquedaAD } from "./usuarios/BusquedaAD";
@@ -17,6 +19,7 @@ import styles from "./PaginaUsuarios.module.css";
  *  roles y las acciones de la tabla. */
 export default function PaginaUsuarios() {
   const { usuario } = useAutenticacion();
+  const { esSysAdmin } = usePermisos();
   const { mostrar: mostrarToast } = useNotificacion();
   const confirmar = useConfirmar();
 
@@ -129,6 +132,9 @@ export default function PaginaUsuarios() {
         <EncabezadoPagina
           titulo="Usuarios"
           descripcion="Agrega usuarios del Active Directory o crea cuentas locales para usuarios externos."
+          // Es el inicio del SysAdmin: lleva el reloj, como las bandejas (2026-11-24). Sin el
+          // recargo, que es de las solicitudes y él no las ve.
+          acciones={esSysAdmin && <RelojHorario conRecargo={false} />}
         />
 
         {claveTemporal && (

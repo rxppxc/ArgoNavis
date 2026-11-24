@@ -3,15 +3,16 @@ import type { Pais } from "../../../api/catalogos";
 import type { DocumentoSolicitud, RangoMarino, TripulanteEntrada } from "../../../api/solicitudes";
 import { IconoAlerta, IconoBasura, IconoChevronAbajo } from "../../../components/Iconos";
 import { SelectorBuscable } from "../../../components/SelectorBuscable";
+import { SelectorFecha } from "../../../components/SelectorFecha";
 import type { OpcionBuscable } from "../../../utils/busqueda";
+import { isoATexto, sumarDias, sumarMeses } from "../../../utils/calendario";
 import type { CasillaFormulario } from "../checklist";
 import { ChecklistDocumentos } from "./ChecklistDocumentos";
-import { FechaEnPalabras } from "../FechaEnPalabras";
 import { fechaISOLocal } from "../../../utils/fechas";
 import { ETIQUETA_RANGO, ETIQUETA_SEXO, TODOS_LOS_RANGOS, formatearFecha } from "../presentacion";
 import {
-  MESES_VIGENCIA_PASAPORTE, NACIMIENTO_MINIMO, estadoPasaporte, nacimientoMaximo, portaLibreta, textoVigenciaCorta,
-  type FichaTripulante,
+  EDAD_MINIMA, MESES_VIGENCIA_PASAPORTE, NACIMIENTO_MINIMO, estadoPasaporte, nacimientoMaximo, portaLibreta,
+  textoVigenciaCorta, vigenciaMinimaPasaporte, type FichaTripulante,
 } from "./validacionFormulario";
 import styles from "./PaginaSolicitud.module.css";
 
@@ -100,6 +101,12 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
   const cubiertas = obligatorias.filter((c) => nuevos[c.clave] || existentes[c.clave]?.length).length;
   const completo = cubiertas === obligatorias.length;
 
+  // Los rangos de los calendarios (SelectorFecha, 2026-11-23): lo que no se puede elegir va rayado.
+  const hoy = fechaISOLocal();
+  const nacidoHasta = nacimientoMaximo(hoy);
+  const despuesDelNacimiento = ficha.fecha_nacimiento ? sumarDias(ficha.fecha_nacimiento, 1) : undefined;
+  const minimoPasaporte = validaVigencia ? vigenciaMinimaPasaporte(fechaReferencia) : despuesDelNacimiento;
+
   const campo = (nombreCampo: keyof TripulanteEntrada) => ({
     value: (ficha[nombreCampo] as string | null | undefined) ?? "",
     onChange: (e: { target: { value: string } }) => onCambiar(ficha.clave, nombreCampo, e.target.value),
@@ -156,11 +163,12 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
                 ))}
               </select>
             </label>
-            <label className={styles.campo}>
-              <span>Fecha de nacimiento *</span>
-              <input type="date" min={NACIMIENTO_MINIMO} max={nacimientoMaximo(fechaISOLocal())} {...campo("fecha_nacimiento")} />
-              <FechaEnPalabras iso={ficha.fecha_nacimiento} />
-            </label>
+            <SelectorFecha className={styles.campo} etiqueta="Fecha de nacimiento *" valor={ficha.fecha_nacimiento ?? ""}
+              onCambiar={(iso) => onCambiar(ficha.clave, "fecha_nacimiento", iso)}
+              min={NACIMIENTO_MINIMO} max={nacidoHasta} vista={sumarMeses(hoy, -12 * 30)}
+              motivoAntes="La fecha de nacimiento no puede ser anterior a 1900."
+              motivoDespues={`Debe ser mayor de edad: ${EDAD_MINIMA} años cumplidos (nacido el ${isoATexto(nacidoHasta)} o antes).`}
+              ayuda={`Mayor de edad: nacido el ${isoATexto(nacidoHasta)} o antes.`} />
 
             <SelectorBuscable className={styles.campo} etiqueta="País de nacimiento *" opciones={opcionesPais}
               valor={ficha.pais_nacimiento} onCambiar={(valor) => onCambiar(ficha.clave, "pais_nacimiento", valor)} />
@@ -185,22 +193,30 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
               <span>N° de pasaporte *</span>
               <input type="text" maxLength={100} autoComplete="off" {...campo("pasaporte")} />
             </label>
-            <label className={styles.campo}>
-              <span>Vence el pasaporte *</span>
-              <input type="date" min={ficha.fecha_nacimiento || undefined} {...campo("pasaporte_expira")} />
-              <FechaEnPalabras iso={ficha.pasaporte_expira} />
-            </label>
+            {/* Con la vigencia del trámite, los días con menos de 3 meses desde la operación
+                van rayados; el aviso de la tarjeta (abajo) explica la regla entera. */}
+            <SelectorFecha className={styles.campo} etiqueta="Vence el pasaporte *" valor={ficha.pasaporte_expira ?? ""}
+              onCambiar={(iso) => onCambiar(ficha.clave, "pasaporte_expira", iso)}
+              min={minimoPasaporte}
+              motivoAntes={validaVigencia
+                ? `Debe vencer el ${isoATexto(minimoPasaporte)} o después.`
+                : "El pasaporte debe vencer después de la fecha de nacimiento."}
+              ayuda={validaVigencia
+                ? `Debe vencer el ${isoATexto(minimoPasaporte)} o después: ${MESES_VIGENCIA_PASAPORTE} meses desde la operación.`
+                : undefined} />
             {conLibreta ? (
               <>
+                {/* El número y el vencimiento del seamanbook son opcionales (2026-11-23). */}
                 <label className={styles.campo}>
-                  <span>N° de seamanbook *</span>
+                  <span>N° de seamanbook <em>(opcional)</em></span>
                   <input type="text" maxLength={100} autoComplete="off" {...campo("libreta_marino")} />
                 </label>
-                <label className={styles.campo}>
-                  <span>Vence el seamanbook *</span>
-                  <input type="date" min={ficha.fecha_nacimiento || undefined} {...campo("libreta_expira")} />
-                  <FechaEnPalabras iso={ficha.libreta_expira} />
-                </label>
+                <SelectorFecha className={styles.campo} etiqueta={<>Vence el seamanbook <em>(opcional)</em></>}
+                  valor={ficha.libreta_expira ?? ""} borrable
+                  onCambiar={(iso) => onCambiar(ficha.clave, "libreta_expira", iso)}
+                  min={despuesDelNacimiento}
+                  motivoAntes="El seamanbook debe vencer después de la fecha de nacimiento."
+                  ayuda="Si ya venció, puedes enviar igual: quedará señalado en la revisión." />
               </>
             ) : (
               <div className={styles.sinLibreta}>

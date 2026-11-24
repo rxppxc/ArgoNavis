@@ -18,17 +18,18 @@ import { EncabezadoPagina } from "../../../components/EncabezadoPagina";
 import { EstadoCarga } from "../../../components/EstadoCarga";
 import { IconoAlerta, IconoArchivo, IconoDescargar, IconoReloj } from "../../../components/Iconos";
 import { MarcoPagina } from "../../../components/MarcoPagina";
+import { SelectorFecha } from "../../../components/SelectorFecha";
 import { useNotificacion } from "../../../components/Notificaciones";
 import { ESPERA_BUSQUEDA_MS } from "../../../constants/interfaz";
 import { usePermisos } from "../../../hooks/usePermisos";
 import { mensajeDeError } from "../../../utils/errores";
+import { fechaISOLocal } from "../../../utils/fechas";
 import { estadoParaVolver, pasajeroDelEstado } from "../../../utils/volver";
 import {
   FILTROS_VACIOS, anioDelRango, aniosDisponibles, consultaDeFiltros, filtrosConCambio, filtrosDeUrl, hayFiltros,
   motivoExpiracion, paginaDeUrl, primerosEncontrados, rangoDeAnio, sinOpcionesDesconocidas, ultimaPagina, urlDeFiltros,
   type FiltrosHistorico, type PestanaHistorico,
 } from "./consultaHistorica";
-import { FechaEnPalabras } from "../FechaEnPalabras";
 import { InsigniaEstado } from "../InsigniaEstado";
 import { cifra } from "../../administracion/estadisticas/calculos";
 import { formatearFecha, formatearFechaHora, TEXTO_HORARIO_LABORAL, textoPuestos, textoSectorCorto } from "../presentacion";
@@ -95,6 +96,7 @@ export default function PaginaConsultaHistorica() {
     ({ ...filtrosDeUrl(parametros), pasajero: pasajeroDelEstado(estadoNavegacion) });
   const [filtros, setFiltros] = useState<FiltrosHistorico>(deLaNavegacion);
   const [pagina, setPagina] = useState(() => paginaDeUrl(parametros));
+  const hoy = fechaISOLocal();
   // Lo que se escribe se busca cuando se deja de escribir.
   const [escrito, setEscrito] = useState({ texto: filtros.texto, pasajero: filtros.pasajero });
 
@@ -290,16 +292,14 @@ export default function PaginaConsultaHistorica() {
                 {anio === "otras" && <option value="otras">Otras fechas</option>}
               </select>
             </label>
-            <label className={styles.campo}>
-              <span>Desde</span>
-              <input type="date" value={filtros.desde} onChange={(e) => cambiarDesde(e.target.value)} />
-              <FechaEnPalabras iso={filtros.desde} />
-            </label>
-            <label className={styles.campo}>
-              <span>Hasta</span>
-              <input type="date" value={filtros.hasta} onChange={(e) => cambiarHasta(e.target.value)} />
-              <FechaEnPalabras iso={filtros.hasta} />
-            </label>
+            {/* Una fecha de cada lado: «Desde» no pasa de «Hasta» ni al revés (lo de afuera
+                va rayado; si se escribe, se corre la otra, como antes). */}
+            <SelectorFecha className={styles.campo} etiqueta="Desde" valor={filtros.desde} onCambiar={cambiarDesde}
+              max={filtros.hasta || undefined} motivoDespues="«Desde» no puede ser posterior a «Hasta»."
+              ayuda="Vacío: sin límite de inicio." atajos={[{ etiqueta: "Hoy", fecha: hoy }]} borrable />
+            <SelectorFecha className={styles.campo} etiqueta="Hasta" valor={filtros.hasta} onCambiar={cambiarHasta}
+              min={filtros.desde || undefined} motivoAntes="«Hasta» no puede ser anterior a «Desde»."
+              ayuda="Vacío: sin límite de fin." atajos={[{ etiqueta: "Hoy", fecha: hoy }]} borrable />
           </div>
         </div>
         <div className={styles.pie}>

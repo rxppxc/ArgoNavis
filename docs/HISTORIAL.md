@@ -832,3 +832,16 @@ Con el de la agencia (del 19/11), ya hay manual para cada papel, en `docs/manual
 - **Las capturas**, contra la pila del E2E (base temporal, sin correos), con nombres ficticios: dos agencias, los puertos de Balboa, Rodman y Cristóbal y unos seis meses de historia para las estadísticas. Las cuentas del personal entraron como del dominio, para que el menú no muestre «Cambiar contraseña», que solo tienen las locales.
 - **El de la agencia pasa a la 1.1:** el menú dice «Salir», no «Cerrar sesión». En los cuatro, el párrafo que presenta una imagen va con ella y la tabla del final no se parte.
 - **Documentación de la DTI** (sin cambiar de versión): el 01 da por hecho el P-10 (manuales por papel), el 08 quita ese pendiente (quedan 28) y la guía 09 nombra los botones de la boleta como en pantalla («Generar boleta» y «Generar y descargar»).
+
+## Seamanbook opcional, calendario propio, borrador y reloj del inicio (2026-11-23 y 24)
+Cuatro ajustes que pidió el usuario tras revisar las pantallas. No cambian la API ni la base.
+- **Seamanbook opcional:** el número y el vencimiento ya no son obligatorios, en ningún rango ni trámite. Antes, al Marino no lo dejaba enviar sin ellos. Si se escriben, se validan igual (vence después del nacimiento) y el vencido se sigue señalando. Sin número, el expediente dice «no indicado» y el PDF «No indicado». La Libreta de Marino del catálogo no cambia.
+- **Calendario propio** (`SelectorFecha`), en lugar del campo de fecha del navegador, en el formulario, la consulta histórica, las estadísticas y la bitácora:
+  - se escribe dd/mm/aaaa o se elige en el calendario;
+  - lo que no se puede elegir va rayado y tachado, con el motivo (por ejemplo, una operación antes de hoy o a más de un año);
+  - debajo dice la fecha en palabras o qué está mal. Se quitó `FechaEnPalabras`.
+- **«Volver» en «Nueva solicitud»:** con un trámite elegido, regresaba al inicio y se perdía lo escrito. Ahora regresa a los trámites, y desde ahí al inicio.
+- **Borrador:** lo que se llena se guarda solo en el equipo (con los archivos) y se recupera al volver, con «Empezar de nuevo». Se borra al enviar o a las 24 horas sin cambios (decisión del usuario).
+- **Reloj del inicio:** la hora de Panamá, la fecha, si es horario laboral y hasta cuándo, y el horario, en el inicio de cada rol. Fuera del horario, recuerda el recargo. La regla del horario está ahora también en `utils/horario.ts`, con casos compartidos con el backend (`espejo/horario.json`).
+- **Pruebas:** Vitest del calendario, del borrador y del horario; E2E de «Volver» con el borrador y del reloj, este con el reloj del navegador fijo en un lunes a las 15:00 que pasa a las 15:01.
+- **Pendiente:** las capturas del manual de la agencia muestran el asterisco del seamanbook y el campo de fecha anterior; se pueden volver a tomar.

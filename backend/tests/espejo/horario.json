@@ -1,0 +1,14 @@
+[
+  {"caso": "lunes 00:00 es fuera", "momento": "2026-11-23T00:00:00-05:00", "fuera": true},
+  {"caso": "lunes 06:59:59 es fuera", "momento": "2026-11-23T06:59:59-05:00", "fuera": true},
+  {"caso": "lunes 07:00 es laboral", "momento": "2026-11-23T07:00:00-05:00", "fuera": false},
+  {"caso": "martes 12:30 es laboral", "momento": "2026-11-24T12:30:00-05:00", "fuera": false},
+  {"caso": "viernes 15:00 en punto todavía es laboral", "momento": "2026-11-27T15:00:00-05:00", "fuera": false},
+  {"caso": "viernes 15:00:59 todavía es laboral", "momento": "2026-11-27T15:00:59-05:00", "fuera": false},
+  {"caso": "viernes 15:01 es fuera", "momento": "2026-11-27T15:01:00-05:00", "fuera": true},
+  {"caso": "sábado 10:00 es fuera", "momento": "2026-11-28T10:00:00-05:00", "fuera": true},
+  {"caso": "domingo 10:00 es fuera", "momento": "2026-11-29T10:00:00-05:00", "fuera": true},
+  {"caso": "12:00 UTC del lunes son las 07:00 en Panamá: laboral", "momento": "2026-11-23T12:00:00Z", "fuera": false},
+  {"caso": "03:00 UTC del martes son las 22:00 del lunes en Panamá: fuera", "momento": "2026-11-24T03:00:00Z", "fuera": true},
+  {"caso": "16:00 UTC del sábado son las 11:00 del sábado en Panamá: fuera", "momento": "2026-11-28T16:00:00Z", "fuera": true}
+]

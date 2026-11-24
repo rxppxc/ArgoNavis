@@ -1,0 +1,189 @@
+/* El campo de fecha propio del sistema (SelectorFecha, 2026-11-23). Con los tokens de la
+   identidad «pase oficial», en los dos temas: la franja amarilla arriba del calendario, lo
+   elegido relleno con --principal, hoy con un anillo azul y lo que no se puede elegir rayado,
+   como todo lo desactivado. Sin colores fijos. */
+.contenedor { position: relative; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+
+/* El rótulo, como los de los formularios desde el 2026-11-17: mayúsculas de Archivo (de CSS:
+   el nombre accesible no cambia). Lo entre paréntesis, en gris y sin mayúsculas. */
+.rotulo {
+  color: var(--text);
+  font: 600 .74rem/1.35 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
+  letter-spacing: .05em; text-transform: uppercase;
+}
+.rotulo em {
+  color: var(--muted); font-style: normal; font-weight: 500; text-transform: none; letter-spacing: 0;
+  font-family: var(--letra-texto); font-stretch: 100%;
+}
+
+.caja { position: relative; }
+
+/* El campo, igual en el formulario y en los filtros (gana a `.campo input`). Las cifras van
+   en la letra de máquina, como los números de documento. */
+.caja .entrada {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 40px 9px 11px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text);
+  font: 500 .9rem/1.3 var(--letra-mono);
+  letter-spacing: .02em;
+}
+.caja .entrada::placeholder { color: var(--muted); font-family: var(--letra-mono); }
+.caja .entrada:focus { outline: 2px solid var(--foco); border-color: transparent; }
+.conError .entrada { border-color: var(--acc-red); box-shadow: inset 0 0 0 1px var(--acc-red); }
+.conError .entrada:focus { outline-color: var(--acc-red); }
+
+.boton {
+  position: absolute; top: 0; right: 0; height: 42px; width: 40px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0; border: 0; background: none;
+  color: var(--text-2); cursor: pointer;
+}
+.boton:hover { color: var(--acc-blue); }
+
+/* Bajo el campo: la fecha en palabras, la ayuda o el error. */
+.nota, .error {
+  display: flex; align-items: flex-start; gap: 5px;
+  margin-top: -2px; font-size: .74rem; line-height: 1.4;
+}
+.nota { color: var(--text-2); }
+.error { color: var(--acc-red); font-weight: 600; }
+.error svg { flex-shrink: 0; margin-top: 2px; }
+
+/* ─── El calendario ─── */
+.calendario {
+  position: absolute; left: 0; top: calc(100% + 6px);
+  z-index: 60;
+  width: 340px;   /* ANCHO_CALENDARIO en SelectorFecha.tsx */
+  max-width: calc(100vw - 32px);
+  padding: 12px 12px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-2);
+  border-top: 4px solid var(--franja);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-lg);
+  outline: none;
+}
+.arriba { top: auto; bottom: calc(100% + 6px); }
+.derecha { left: auto; right: 0; }
+
+.cabecera { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+
+.navegar {
+  flex: 0 0 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border-2); border-radius: var(--r-sm);
+  background: var(--card); color: var(--text);
+  cursor: pointer;
+}
+.navegar:hover:not(:disabled) { border-color: var(--acc-blue); color: var(--acc-blue); }
+.navegar:focus-visible { outline: 2px solid var(--foco); outline-offset: 1px; }
+.navegar:disabled {
+  background: repeating-linear-gradient(135deg, var(--desactivado-1) 0 4px, var(--desactivado-2) 4px 8px);
+  border: 1px dashed var(--desactivado-borde); color: var(--muted); cursor: not-allowed;
+}
+
+.selector {
+  flex: 1 1 auto; min-width: 0; height: 32px;
+  padding: 0 6px;
+  border: 1px solid var(--input-border); border-radius: var(--r-sm);
+  background: var(--input-bg); color: var(--text);
+  font: 700 .8rem var(--letra-titulo); font-stretch: 100%;   /* sin estirar: «SEPTIEMBRE» cabe */
+  letter-spacing: .02em; text-transform: uppercase;
+  cursor: pointer;
+}
+.selector.anio { flex: 0 0 84px; font-family: var(--letra-mono); font-stretch: 100%; letter-spacing: 0; }
+.selector:focus-visible { outline: 2px solid var(--foco); outline-offset: 1px; }
+.selector option { background: var(--surface); color: var(--text); text-transform: none; }
+
+.rejilla { width: 100%; border-collapse: separate; border-spacing: 2px; table-layout: fixed; }
+.rejilla th {
+  padding: 2px 0 4px;
+  color: var(--text-2);
+  font: 700 .66rem var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
+  letter-spacing: .06em; text-transform: uppercase;
+  text-align: center;
+}
+.rejilla td { padding: 0; }
+
+.dia {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 38px;
+  padding: 0;
+  border: 1.5px solid transparent; border-radius: var(--r-sm);
+  background: transparent; color: var(--text);
+  font: 500 .86rem var(--letra-mono);
+  cursor: pointer;
+  transition: background var(--t, .15s) var(--ease, ease), border-color var(--t, .15s) var(--ease, ease);
+}
+.dia:hover { background: color-mix(in srgb, var(--acc-blue) 13%, transparent); }
+.dia:focus-visible { outline: 2px solid var(--foco); outline-offset: 1px; z-index: 1; }
+
+/* Los días de los meses vecinos, más tenues (en claro, el gris solo no bastaba). */
+.otroMes { color: var(--muted); font-weight: 400; opacity: .6; }
+.otroMes:hover { opacity: 1; }
+
+/* Hoy: un anillo y un punto, en el azul de consultar. */
+.hoy { border-color: var(--acc-blue); font-weight: 700; }
+.hoy::after {
+  content: ""; position: absolute; left: 50%; bottom: 4px;
+  width: 4px; height: 4px; margin-left: -2px; border-radius: 50%;
+  background: var(--acc-blue);
+}
+
+/* La elegida, rellena (marino en claro, amarillo en oscuro). */
+.elegido, .elegido:hover {
+  background: var(--principal); border-color: var(--principal);
+  color: var(--sobre-principal); font-weight: 700;
+}
+.elegido:hover { background: var(--principal-hover); }
+.elegido.hoy::after { background: var(--sobre-principal); }
+
+/* Lo que no se puede elegir: rayado y tachado, con el motivo al pasar el mouse. */
+.apagado, .apagado:hover {
+  background: repeating-linear-gradient(135deg, var(--desactivado-1) 0 4px, var(--desactivado-2) 4px 8px);
+  border: 1px dashed var(--desactivado-borde);
+  color: var(--muted);
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+.apagado.hoy::after { background: var(--muted); }
+
+.pie {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-top: 8px; padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.atajos { display: flex; flex-wrap: wrap; gap: 6px; }
+.atajo {
+  padding: 6px 12px;
+  border: 1px solid var(--border-2); border-radius: var(--r-sm);
+  background: var(--card); color: var(--text);
+  font: 700 .72rem var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
+  letter-spacing: .05em; text-transform: uppercase;
+  cursor: pointer;
+}
+.atajo:hover { border-color: var(--acc-blue); color: var(--acc-blue); }
+.atajo:focus-visible { outline: 2px solid var(--foco); outline-offset: 1px; }
+.borrar { margin-left: auto; }
+.borrar:hover { border-color: var(--acc-red); color: var(--acc-red); }
+.rango { margin: 0; color: var(--text-2); font-size: .74rem; line-height: 1.4; }
+
+/* Con el dedo, días más altos. */
+@media (pointer: coarse) {
+  .dia { height: 42px; }
+}
+
+/* En el celular, el calendario abajo y de borde a borde, como una hoja. */
+@media (max-width: 480px) {
+  .calendario, .arriba, .derecha {
+    position: fixed; left: 12px; right: 12px; top: auto; bottom: 12px;
+    width: auto; max-width: none;
+    z-index: 1000;
+  }
+}

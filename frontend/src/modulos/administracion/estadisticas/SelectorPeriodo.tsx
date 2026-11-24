@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { RangoFechas } from "../../../components/FiltroFechas";
 import { IconoReloj } from "../../../components/Iconos";
+import { SelectorFecha } from "../../../components/SelectorFecha";
 import { fechaISOLocal } from "../../../utils/fechas";
 import { PRESETS, presetDeRango, rangoDePreset } from "./calculos";
 import styles from "./Estadisticas.module.css";
@@ -42,14 +43,15 @@ export default function SelectorPeriodo({ valor, onCambio }: { valor: RangoFecha
       </div>
       {otrasFechas && (
         <div className={styles.fechas}>
-          <label>
-            Desde
-            <input type="date" value={valor.desde ?? ""} max={hoyISO} onChange={(e) => cambiarDesde(e.target.value || null)} />
-          </label>
-          <label>
-            Hasta
-            <input type="date" value={valor.hasta ?? ""} max={hoyISO} onChange={(e) => cambiarHasta(e.target.value || null)} />
-          </label>
+          {/* Hasta hoy: lo que viene no tiene datos (va rayado en el calendario). */}
+          <SelectorFecha className={styles.campoFecha} etiqueta="Desde" valor={valor.desde ?? ""}
+            onCambiar={(iso) => cambiarDesde(iso || null)} max={hoyISO}
+            motivoDespues="Las estadísticas llegan hasta hoy." atajos={[{ etiqueta: "Hoy", fecha: hoyISO }]}
+            borrable nota={false} />
+          <SelectorFecha className={styles.campoFecha} etiqueta="Hasta" valor={valor.hasta ?? ""}
+            onCambiar={(iso) => cambiarHasta(iso || null)} max={hoyISO}
+            motivoDespues="Las estadísticas llegan hasta hoy." atajos={[{ etiqueta: "Hoy", fecha: hoyISO }]}
+            borrable nota={false} />
         </div>
       )}
     </div>

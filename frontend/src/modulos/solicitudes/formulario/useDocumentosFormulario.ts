@@ -11,6 +11,7 @@ import type { TipoTramite } from "../../../api/tramites";
 import { useNotificacion } from "../../../components/Notificaciones";
 import { validarArchivos } from "../../../utils/archivos";
 import { claveCasilla, construirCasillas, type CasillaFormulario } from "../checklist";
+import type { ArchivosBorrador } from "./borradorSolicitud";
 import { MAX_ADICIONALES, type AdicionalNuevo } from "./DocumentosAdicionales";
 import { nuevaClave, type DocumentosElegidos, type Precarga } from "./envioSolicitud";
 import type { FichaTripulante } from "./validacionFormulario";
@@ -45,10 +46,12 @@ export function useDocumentosFormulario(
   subirYBajar: boolean,
   /** La operación del trámite de Técnico (2026-11-18): decide la garantía o el contrato. */
   operacion: string,
+  /** Los archivos de un borrador recuperado (2026-11-23), ya con las claves de esta página. */
+  iniciales: ArchivosBorrador | null = null,
 ): DocumentosFormulario {
   const { mostrar } = useNotificacion();
-  const [nuevos, setNuevos] = useState<Record<string, File>>({});
-  const [adicionalesNuevos, setAdicionalesNuevos] = useState<AdicionalNuevo[]>([]);
+  const [nuevos, setNuevos] = useState<Record<string, File>>(() => iniciales?.nuevos ?? {});
+  const [adicionalesNuevos, setAdicionalesNuevos] = useState<AdicionalNuevo[]>(() => iniciales?.adicionales ?? []);
   const [adicionalesExistentes, setAdicionalesExistentes] = useState<DocumentoSolicitud[]>(
     () => precarga?.adicionales ?? [],
   );

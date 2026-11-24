@@ -66,14 +66,15 @@ main.py          → arma la aplicación: ciclo de vida, middlewares, rutas, sal
 ```
 modulos/<dominio>/  → páginas + CSS modules de ese dominio. Solicitudes, por pantalla: formulario/,
                       expediente/, bandejas/, historico/, verificacion/; en la raíz, lo compartido
-                      (presentacion, checklist, InsigniaEstado, FechaEnPalabras).
+                      (presentacion, checklist, InsigniaEstado).
 components/         → UI reutilizable entre módulos (también las guardias de ruta, RutasProtegidas,
                       y los vigilantes de sesión y de versión).
 context/            → providers globales (tema, autenticación, permisos).
 hooks/              → hooks compartidos (useAutenticacion y usePermisos leen de sus providers).
 api/                → cliente HTTP + módulos por dominio.
 constants/          → números mágicos.
-utils/              → funciones sin React (fechas, texto sin tildes, archivos, errores…), con sus pruebas.
+utils/              → funciones sin React (fechas, calendario, horario, texto sin tildes, archivos, errores…),
+                      con sus pruebas.
 ```
 
 ### Seguridad — reglas no negociables
@@ -234,12 +235,30 @@ Pedido del usuario: «en el modo claro hay cosas que no se distinguen»; «que c
 - Campos con `--input-border` / `--input-bg` (borde de 3:1). Las notas informativas, en azul (`--nota-fondo` / `--nota-borde`, desde el 2026-11-17) con borde izquierdo `--acc-blue`.
 - Texto libre que escribe un usuario (observaciones, motivos, comentarios, nombres de archivo y de buque): con `overflow-wrap: anywhere`, para que una palabra larguísima sin espacios corte la línea en vez de salirse de su caja (2026-11-08; el `body` lleva `break-word` por defecto). Lo prueba `sinTextoDesbordado` en `e2e/flujo-completo.spec.ts`, que falla con los estilos anteriores.
 - Revisión de UX del 2026-11-08 (40 pantallas por rol, en claro, oscuro y celular):
-  - Bajo cada campo de fecha del formulario va la fecha en palabras (`FechaEnPalabras`: «jueves, 13 de noviembre de 2026»). El navegador muestra la fecha en su propio formato (en un Windows en inglés, mm/dd/aaaa), y así no se confunde el día con el mes. Va con `aria-hidden`, para no cambiar el nombre del campo.
+  - Bajo cada campo de fecha va la fecha en palabras («jueves, 13 de noviembre de 2026»): el campo del navegador mostraba la fecha en su propio formato (en un Windows en inglés, mm/dd/aaaa), y así no se confunde el día con el mes. Desde el 2026-11-23 la pone `SelectorFecha` (abajo), que reemplazó a `FechaEnPalabras`.
   - Los ejemplos dentro de un campo empiezan con «Ej.» («Ej. IMO 9074729»): sin eso parecían un dato ya cargado.
   - El panel del puesto va en tres pasos numerados (verificar, comentario, finalizar), con el plazo arriba. Antes eran tres párrafos seguidos en la columna angosta.
   - En «Usuarios», cada bloque dice qué hace («Agregar un funcionario del Active Directory», «Crear una cuenta local…»), y la tabla tiene un filtro.
   - La sección 4 del formulario se llama «Resumen de documentos» cuando el trámite no pide documentos generales. Antes decía «no pide documentos» junto a «0 / 3 en total».
 - Tablas que en el celular pasan a fichas: cada `<td>` lleva `data-etiqueta` (tripulantes del expediente, usuarios).
+- **Calendario propio** (`SelectorFecha`, `components/`, 2026-11-23). Pedido del usuario: que cualquiera lo entienda y que diga qué fechas no se pueden elegir. Reemplaza el campo de fecha del navegador en el formulario, la consulta histórica, las estadísticas y la bitácora:
+  - Se escribe dd/mm/aaaa (las barras se ponen solas; también acepta AAAA-MM-DD pegado) o se elige en el calendario. Guarda AAAA-MM-DD, como antes.
+  - Lo que no se puede elegir (la operación antes de hoy o a más de un año, un menor de edad, un pasaporte con menos de 3 meses…) va rayado y tachado, con el motivo en el día y bajo el campo. Hoy lleva un anillo y un punto; el elegido va relleno con `--principal`.
+  - Bajo el campo, en este orden: el error de una fecha mal escrita, el motivo si queda fuera del rango, la fecha en palabras, la ayuda o el rango permitido. `nota={false}` deja solo los errores (estadísticas y bitácora).
+  - Patrón combobox de WAI-ARIA. El diálogo se llama «Calendario» y no como el campo: con el mismo nombre, `getByLabel` encontraba dos. La flecha abajo abre y pasa al calendario; flechas, RePág/AvPág (con Mayús, el año), Inicio/Fin, Enter y Esc.
+  - En el celular, una hoja desde abajo. Atajos «Hoy» y «Mañana» donde sirven; «Borrar» en los opcionales (`borrable`).
+  - La lógica, sin React, en `utils/calendario.ts`, con sus pruebas.
+- **«Volver» en «Nueva solicitud»** (2026-11-23): con un trámite elegido, regresa a los trámites y lo escrito queda; desde los trámites, al inicio. Lo decide el formulario (`registrarVolver`, con `alVolver` de `MarcoPagina`). Al corregir una devuelta, «Volver» va al expediente, como siempre.
+  - Mientras se eligen los trámites («Volver» o «Cambiar»), el formulario no se ve. Si no se confirma un cambio que quitaría archivos, vuelve al formulario con el trámite que tenía.
+- **Borrador de la solicitud nueva** (2026-11-23, decisión del usuario: 24 horas, en este equipo, con los archivos):
+  - Se guarda solo mientras se llena (`useBorradorSolicitud`), por usuario, en IndexedDB (`almacenBorradores.ts`). Al volver, un aviso dice que se recuperó y ofrece «Empezar de nuevo»; junto a «Enviar», «Borrador guardado en este equipo…».
+  - Se borra al enviar, al empezar de nuevo, al vaciar el formulario y a las 24 horas sin cambios (`HORAS_BORRADOR`). Al corregir una devuelta no hay borrador.
+  - No pasa por el servidor: otro equipo u otro navegador no lo ven, y una ventana privada no lo guarda. Los datos de los tripulantes quedan en ese equipo hasta 24 horas.
+- **Reloj del inicio** (`RelojHorario`, 2026-11-24). Pedido del usuario: en todos los roles, con el horario y bien integrado; solo en el inicio:
+  - La hora de Panamá (aunque el equipo tenga otra zona), la fecha, si es horario laboral y hasta cuándo («hasta mañana a las 07:00») y el horario. Fuera del horario, recuerda que lo que se apruebe lleva recargo, sin el monto (es configuración del backend) y sin nombrar a UCVMM.
+  - Va en las bandejas de todos y en «Usuarios» del SysAdmin, que es su inicio (sin el recargo: no ve solicitudes).
+  - Como el sello de fecha y hora de un documento: la franja arriba, la hora en letra de máquina y el estado como sello de tinta, verde en horario y morado fuera (el color del chip «Aprobada fuera del horario»). Cambia sola con el minuto (`useMinutoActual`) y no se anuncia al lector de pantalla.
+  - No cuenta los feriados (pendiente 12).
 - Accesibilidad (2026-10-27):
   - Enlace «Saltar al contenido» (clase global `.saltar-contenido`) en `MarcoPagina` y en el login, hacia `<main id="contenido">`.
   - Los íconos son decorativos (`aria-hidden` en `crearIcono`). Todo botón de solo ícono lleva `aria-label` con qué hace y sobre qué: «Ver informe.pdf», «Quitar tripulante 2».
@@ -275,7 +294,7 @@ Cada una salió de un problema real. El detalle está en el historial.
   - **Nunca** uses `date(timezone(...))` sobre la columna: así PostgreSQL no usa el índice.
   - Para agrupar por día sí se usa (`_fecha_panama`).
 - La cantidad de procesos × (`BD_POOL` + `BD_POOL_EXTRA`) tiene que quedar por debajo de `max_connections` de PostgreSQL.
-- El horario laboral vive en `core/horario.py` y en SQL (`_fuera_de_horario`). Tienen que coincidir (`test_horario.py`).
+- El horario laboral vive en `core/horario.py`, en SQL (`_fuera_de_horario`) y en el frontend (`utils/horario.ts`: el reloj del inicio, el mapa de horas y la frase del horario). Tienen que coincidir: `test_horario.py`, los casos de `espejo/horario.json` (pytest y Vitest) y `test_constantes_iguales_en_el_frontend`.
 - Las alertas de la bandeja se cuentan en SQL (`alertas_de`) y las del expediente en Python (`_vencimientos_tripulante`).
   - Si cambias una, cambia la otra (`test_la_bandeja_cuenta_las_alertas_como_el_expediente`).
 - La consulta histórica (`_alcance_historico`, en SQL) y el expediente (`puede_ver`) tienen que ver exactamente lo mismo.
@@ -337,6 +356,11 @@ Cada una salió de un problema real. El detalle está en el historial.
 - Nada de sitemap, canónico, imagen OG ni `llms.txt`: es un sistema interno y nada debe indexarse.
 - Vitest se corre desde `C:\…` en mayúscula: con `c:\…` carga dos copias de sí mismo.
 - Una acción nueva de la bitácora (`AccionAuditoria`) lleva su nombre en `ETIQUETA_ACCION` (`PaginaBitacora.tsx`): sin él, se ve el código crudo (`test_la_bitacora_nombra_todas_las_acciones`).
+- El borrador de la solicitud nueva (2026-11-23):
+  - Al recuperarlo se renuevan las claves de los tripulantes y de los archivos (`restaurar`): el contador de `nuevaClave` vuelve a empezar al recargar la página, y las claves guardadas chocarían con las nuevas.
+  - Por eso, tras recuperarlo, el primer cambio guarda los archivos otra vez, con los datos: sus claves tienen que coincidir. Lo recuperado no se guarda hasta que algo cambie, para que las 24 horas cuenten desde el último cambio.
+  - Lo que espera su momento se guarda al salir de la página. Al enviar o al empezar de nuevo, `descartar` lo cancela: si no, salir enseguida volvería a guardar el borrador.
+  - Una prueba E2E que visite `/new` dos veces en el mismo contexto encuentra el borrador de la primera (cada `entrar()` abre un contexto nuevo).
 
 **Pruebas**
 - Las pruebas que simulan la hora reemplazan `solicitud_service.ahora_utc`.
@@ -400,6 +424,13 @@ Cada una salió de un problema real. El detalle está en el historial.
     - Los nombres del trámite, de los documentos y de los países del expediente son los del catálogo de hoy; en las versiones y en la autorización emitida, los de ese día.
     - Si Legal o Auditoría las van a consultar, un rol de solo lectura. Si un sector necesita ver lo que revisó el otro antes de que el puesto cambiara, es un permiso más.
     - La exportación a Excel llega a 5000 filas.
+23. **Desarrollo pendiente, en el orden recomendado** (explicado al usuario y dejado como pendiente el 2026-11-23; detalla lo de «Después» del punto 21):
+    1. **Partir `solicitud_service.py`** (1.827 líneas) en módulos por tema, sin cambiar el comportamiento. Lo que depende de la hora sigue en un solo lugar (las pruebas reemplazan `ahora_utc`). Va antes del borrador, que le suma mucho código.
+    2. **Subir archivo por archivo, con borrador:** hoy todo viaja en un solo envío de hasta 345 MB y nada se guarda hasta «Enviar». Con borrador en el servidor, cada archivo sube y se revisa al adjuntarse, y el tope del cuerpo baja a unos 2 MB. Cambia la BD y la API: preguntar antes de diseñar. Antes, decidir con UCVMM si basta con PDF.
+    3. **Que el backend calcule el checklist** (hoy espejado en `checklist.ts`) y los tipos del frontend salgan de OpenAPI. Encaja con el borrador.
+    4. **Token en cookie httpOnly** (punto 2), con protección CSRF. Necesita HTTPS (punto 1).
+    5. **Retirar el modo Windows de producción:** Docker en Linux como única forma; Windows solo para desarrollo. Antes, confirmar que el servidor de producción será Linux.
+    6. **Reemplazar `ldap3`** (sin versión desde 2021) por otra librería o un inicio de sesión único con la DTI. Prioridad baja.
 
 ### Flujo actual: Autorizaciones Marítimas (UCVMM)
 
@@ -453,7 +484,8 @@ Basado en el documento de UCVMM "Documentación requerida para las autorizacione
 - Asignar un usuario a una agencia o a un puesto no le da acceso sin el permiso de su rol: la API exige las dos cosas (`ContextoAcceso`). Por eso la pantalla de catálogos ofrece «Mostrar todos los usuarios» a propósito.
 - `valida_vigencia` está activa en **todos** los trámites. Desde el 2026-11-13:
   - el pasaporte tiene que vencer al menos 3 meses después de la operación (`vigencia_minima_pasaporte`), si no, no deja enviar;
-  - el seamanbook vencido ya no bloquea: se avisa en el formulario y se señala en el expediente.
+  - el seamanbook vencido ya no bloquea: se avisa en el formulario y se señala en el expediente;
+  - y desde el 2026-11-23 el número y el vencimiento del seamanbook son **opcionales**, también para el Marino (decisión del usuario). Sin número, el expediente dice «no indicado» y el PDF «No indicado» (`celda_libreta`). La Libreta de Marino del catálogo se sigue pidiendo igual.
   - Antes, los dos bastaba con que vencieran después del día de la operación. Los rangos distintos de "marino" no portan seamanbook.
 - Fechas (`ServicioTramite.validar_tripulantes` y `_validar_formulario`, espejadas en `validacionFormulario.ts`):
   - La operación va de hoy a `DIAS_MAXIMOS_ANTICIPACION` (365).

@@ -7,7 +7,7 @@ No usa la BD.
 """
 import json
 import re
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
@@ -88,6 +88,18 @@ def test_carta_de_subir_y_bajar(caso):
     assert ServicioSolicitud.con_carta_subir_y_bajar(tipo, datos) is caso["esperado"]
 
 
+# ── Horario laboral (el reloj del inicio, 2026-11-24) ─────────────────────────
+
+HORARIO = _casos("horario.json")
+
+
+@pytest.mark.parametrize("caso", HORARIO, ids=_ids(HORARIO))
+def test_horario_laboral(caso):
+    from app.core.horario import fuera_de_horario
+
+    assert fuera_de_horario(datetime.fromisoformat(caso["momento"])) is caso["fuera"]
+
+
 # ── Ficha del tripulante ─────────────────────────────────────────────────────
 
 TRIPULANTES = _casos("tripulantes.json")
@@ -102,7 +114,6 @@ REGLAS = {
     "pasaporte_vencido": "el pasaporte vence el",
     "pasaporte_vigencia_corta": "meses de vigencia",   # 2026-11-13; el seamanbook vencido ya no bloquea
     "rango_no_permitido": "el rango debe ser",
-    "marino_sin_seamanbook": "requiere el número de seamanbook",
     "pasaporte_repetido": "ya está en el tripulante",
 }
 
@@ -164,11 +175,9 @@ def test_constantes_iguales_en_el_frontend():
         == MESES_VIGENCIA_PASAPORTE
     # El mapa de horas de las estadísticas marca el horario laboral por horas enteras.
     assert horario.INICIO_LABORAL.minute == horario.FIN_LABORAL.minute == 0
-    assert _constante_ts("modulos/administracion/estadisticas/calculos.ts", "HORA_INICIO_LABORAL") \
-        == horario.INICIO_LABORAL.hour
-    assert _constante_ts("modulos/administracion/estadisticas/calculos.ts", "HORA_FIN_LABORAL") \
-        == horario.FIN_LABORAL.hour
-    # La pantalla arma la frase del horario con esas horas (TEXTO_HORARIO_LABORAL, presentacion.ts):
+    assert _constante_ts("utils/horario.ts", "HORA_INICIO_LABORAL") == horario.INICIO_LABORAL.hour
+    assert _constante_ts("utils/horario.ts", "HORA_FIN_LABORAL") == horario.FIN_LABORAL.hour
+    # La pantalla arma la frase del horario con esas horas (TEXTO_HORARIO_LABORAL, utils/horario.ts):
     # el correo y el PDF tienen que decir lo mismo.
     assert horario.TEXTO_HORARIO == (
         f"lunes a viernes, de {horario.INICIO_LABORAL:%H:%M} a {horario.FIN_LABORAL:%H:%M}"

@@ -21,6 +21,7 @@ import { PERMISOS_HISTORICO, usePermisos } from "../../../hooks/usePermisos";
 import { MarcoPagina } from "../../../components/MarcoPagina";
 import { EncabezadoPagina } from "../../../components/EncabezadoPagina";
 import { EstadoCarga } from "../../../components/EstadoCarga";
+import { RelojHorario } from "../../../components/RelojHorario";
 import FiltroFechas, { type RangoFechas } from "../../../components/FiltroFechas";
 import { IconoAlerta, IconoBandeja, IconoBuscar, IconoMas, IconoX } from "../../../components/Iconos";
 import { TarjetaSolicitud } from "./TarjetaSolicitud";
@@ -209,20 +210,22 @@ function Panel({ bandejaPedida, estadoPedido }: { bandejaPedida: Bandeja | null;
           : vista === "supervision" && veLosDos
             ? "Trámite de Técnico, Superintendente o Supernumerario, de los dos sectores, en solo lectura"
           : VISTAS[vista].subtitulo}
-        acciones={(puedeCrear || veHistorico) && (
+        acciones={
           <>
             {veHistorico && (
-              <Link to="/historico" className={styles.btnHistorico}>
+              <Link to="/historico" className={`${styles.btnHistorico} ${styles.alPie}`}>
                 <IconoBuscar tamano={15} /> Consulta histórica
               </Link>
             )}
             {puedeCrear && (
-              <Link to="/new" className={styles.btnNuevo}>
+              <Link to="/new" className={`${styles.btnNuevo} ${styles.alPie}`}>
                 <IconoMas /> Nueva solicitud
               </Link>
             )}
+            {/* La hora de Panamá y el horario laboral, en el inicio de todos (2026-11-24). */}
+            <RelojHorario />
           </>
-        )}
+        }
       />
 
       {!cargandoPermisos && vistas.length > 1 && (

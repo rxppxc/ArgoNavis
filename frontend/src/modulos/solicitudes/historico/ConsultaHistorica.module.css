@@ -17,7 +17,8 @@
 .campo { display: flex; flex-direction: column; gap: 6px; margin-bottom: 13px; min-width: 0; }
 /* El rótulo, en mayúsculas espaciadas como en un formulario impreso (de CSS: el
    nombre accesible del campo no cambia). */
-.campo > span {
+/* También el <label> de los campos de fecha (SelectorFecha, 2026-11-23). */
+.campo > span, .campo > label {
   color: var(--text-2);
   font: 600 .66rem/1.35 var(--letra-titulo); font-stretch: var(--ancho-etiqueta);
   letter-spacing: .12em; text-transform: uppercase;

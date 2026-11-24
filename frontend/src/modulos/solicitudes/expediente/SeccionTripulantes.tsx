@@ -120,14 +120,17 @@ export function SeccionTripulantes({ solicitud: s, verificacion: v, onVerDocumen
                       {m.pasaporte_vigencia_corta && ` — menos de ${MESES_VIGENCIA_PASAPORTE} meses de vigencia`}
                     </div>
                     {/* Solo el rango Marino porta seamanbook. */}
+                    {/* El número y el vencimiento son opcionales desde el 2026-11-23. */}
                     {m.porta_libreta && (
                       <div className={styles.libreta}>
                         <div className={styles.celdaSecundaria}>
-                          Seamanbook <span className={styles.celdaPrincipal}>{m.libreta_marino ?? "—"}</span>
+                          Seamanbook <span className={styles.celdaPrincipal}>{m.libreta_marino ?? "no indicado"}</span>
                         </div>
-                        <div className={m.libreta_vencida ? styles.vencido : styles.celdaSecundaria}>
-                          Vence {formatearFecha(m.libreta_expira)}{m.libreta_vencida && " — vencido"}
-                        </div>
+                        {m.libreta_expira && (
+                          <div className={m.libreta_vencida ? styles.vencido : styles.celdaSecundaria}>
+                            Vence {formatearFecha(m.libreta_expira)}{m.libreta_vencida && " — vencido"}
+                          </div>
+                        )}
                       </div>
                     )}
                   </td>

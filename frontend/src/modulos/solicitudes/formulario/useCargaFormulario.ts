@@ -10,6 +10,8 @@ import { apiSolicitudes, type SolicitudDetalle } from "../../../api/solicitudes"
 import { apiTramites, type TipoTramite } from "../../../api/tramites";
 import type { CatalogoMini } from "../../../types";
 import { mensajeDeError } from "../../../utils/errores";
+import { borrarBorrador, leerBorrador, type BorradorGuardado } from "./almacenBorradores";
+import { borradorVigente, claveBorrador } from "./borradorSolicitud";
 
 export interface DatosFormulario {
   tipos: TipoTramite[];
@@ -18,6 +20,10 @@ export interface DatosFormulario {
   agencia: CatalogoMini | null;
   /** La solicitud devuelta, al corregir; null en una nueva. */
   original: SolicitudDetalle | null;
+  /** En una nueva, dónde se guarda su borrador (uno por usuario); null al corregir. */
+  claveBorrador: string | null;
+  /** El borrador que quedó sin enviar, si no venció (24 horas desde su último cambio). */
+  borrador: BorradorGuardado | null;
 }
 
 export type CargaFormulario =
@@ -59,7 +65,7 @@ async function cargar(solicitudId: number | null): Promise<CargaFormulario> {
         };
       }
       const tipo = await apiTramites.obtener(original.tipo_tramite_codigo);
-      return { estado: "lista", datos: { ...catalogos, tipos: [tipo], original } };
+      return { estado: "lista", datos: { ...catalogos, tipos: [tipo], original, claveBorrador: null, borrador: null } };
     }
     if (!perfil.agencia) {
       return {
@@ -68,7 +74,17 @@ async function cargar(solicitudId: number | null): Promise<CargaFormulario> {
           + "Pide al administrador que te asigne a tu agencia.",
       };
     }
-    return { estado: "lista", datos: { ...catalogos, tipos: await apiTramites.listar(), original: null } };
+    // El borrador de este usuario, si lo dejó sin enviar; el vencido se borra (2026-11-23).
+    const clave = claveBorrador(perfil.id);
+    let borrador = await leerBorrador(clave);
+    if (borrador && !borradorVigente(borrador.guardadoEn, Date.now())) {
+      await borrarBorrador(clave);
+      borrador = null;
+    }
+    return {
+      estado: "lista",
+      datos: { ...catalogos, tipos: await apiTramites.listar(), original: null, claveBorrador: clave, borrador },
+    };
   } catch (error) {
     return { estado: "error", mensaje: mensajeDeError(error, "No se pudo cargar el formulario.") };
   }

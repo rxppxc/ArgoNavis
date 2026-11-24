@@ -78,9 +78,13 @@
      "tripulantes": [{"pasaporte_expira": "2026-10-20"}, {"nombre": "Luis", "pasaporte": "P999", "pasaporte_expira": "2026-12-01"}],
      "esperado": []},
 
-    {"caso": "un marino sin seamanbook", "hoy": "2026-10-14", "fecha_operacion": "2026-10-20",
+    {"caso": "un marino sin seamanbook: el número y el vencimiento son opcionales (2026-11-23)", "hoy": "2026-10-14", "fecha_operacion": "2026-10-20",
      "tramite": {"valida_vigencia": true, "rangos_permitidos": null},
-     "tripulantes": [{"libreta_marino": null, "libreta_expira": null}], "esperado": ["marino_sin_seamanbook"]},
+     "tripulantes": [{"libreta_marino": null, "libreta_expira": null}], "esperado": []},
+
+    {"caso": "un marino con el número del seamanbook y sin su vencimiento (2026-11-23)", "hoy": "2026-10-14", "fecha_operacion": "2026-10-20",
+     "tramite": {"valida_vigencia": true, "rangos_permitidos": null},
+     "tripulantes": [{"libreta_expira": null}], "esperado": []},
 
     {"caso": "un técnico no porta seamanbook", "hoy": "2026-10-14", "fecha_operacion": "2026-10-20",
      "tramite": {"valida_vigencia": true, "rangos_permitidos": null},

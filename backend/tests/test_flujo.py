@@ -144,10 +144,6 @@ async def test_validaciones_de_creacion(cliente, escenario: Escenario):
     r = await enviar(cliente, e.nav_a1, datos, [])
     assert r.status_code == 400 and "al menos 3 meses de vigencia" in r.json()["detail"]
 
-    datos = cabecera("F3-EMBARQUE", pid, tripulantes=[tripulante("Juan", libreta_marino=None, libreta_expira=None)], asignaciones=[])
-    r = await enviar(cliente, e.nav_a1, datos, [])
-    assert r.status_code == 400 and "seamanbook" in r.json()["detail"]
-
     datos = cabecera("F3-EMBARQUE", pid, tripulantes=[{"nombre": "Juan"}], asignaciones=[])
     r = await enviar(cliente, e.nav_a1, datos, [])
     assert r.status_code == 422 and "Tripulante 1" in r.json()["detail"]

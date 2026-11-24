@@ -4,12 +4,16 @@
  * todo y los documentos ya cargados se conservan salvo que se reemplacen o se
  * quiten. El estado de los tripulantes y de los documentos va en sus hooks;
  * lo que se envía lo arma `armarEnvio` (envioSolicitud.ts).
+ *
+ * Una nueva se guarda como borrador en este equipo mientras se llena, y se recupera al
+ * volver (24 horas desde el último cambio, borradorSolicitud.ts). Con un trámite elegido,
+ * «Volver» regresa a los trámites; desde ahí, al inicio (2026-11-23).
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiSolicitudes, type DocumentoSolicitud, type SolicitudDetalle } from "../../../api/solicitudes";
 import { EncabezadoPagina } from "../../../components/EncabezadoPagina";
-import { IconoAlerta, IconoMas } from "../../../components/Iconos";
+import { IconoAlerta, IconoMas, IconoReloj } from "../../../components/Iconos";
 import { useConfirmar } from "../../../components/ModalConfirmacion";
 import { ModalPreview } from "../../../components/ModalPreview";
 import { useNotificacion } from "../../../components/Notificaciones";
@@ -21,6 +25,8 @@ import { ChecklistSolicitud } from "./ChecklistSolicitud";
 import { DatosTramite } from "./DatosTramite";
 import { DocumentosAdicionales, MAX_ADICIONALES } from "./DocumentosAdicionales";
 import { armarEnvio, desdeSolicitud } from "./envioSolicitud";
+import { HORAS_BORRADOR, cuandoSeGuardo, restaurar } from "./borradorSolicitud";
+import { useBorradorSolicitud } from "./useBorradorSolicitud";
 import { avanceFormulario } from "./pasosDelFormulario";
 import { AvanceFormulario } from "./AvanceFormulario";
 import { fechaISOLocal } from "../../../utils/fechas";
@@ -39,7 +45,17 @@ const SIN_CASILLAS: CasillaFormulario[] = [];
 
 const faltanDocumentos = (n: number) => (n === 1 ? "Falta 1 documento" : `Faltan ${n} documentos`);
 
-export function FormularioSolicitud({ tipos, puestos, paises, agencia, original }: DatosFormulario) {
+interface Props extends DatosFormulario {
+  /** La página le pide al formulario qué hace «Volver»: con un trámite elegido, vuelve a los
+   *  trámites (devuelve true); si no, la página va al inicio. */
+  registrarVolver?: (volver: (() => boolean) | null) => void;
+  /** «Empezar de nuevo»: la página borra el borrador y monta el formulario vacío. */
+  onEmpezarDeNuevo?: () => void;
+}
+
+export function FormularioSolicitud({
+  tipos, puestos, paises, agencia, original, claveBorrador, borrador, registrarVolver, onEmpezarDeNuevo,
+}: Props) {
   const corrigiendo = original !== null;
   const navegar = useNavigate();
   const { mostrar } = useNotificacion();
@@ -48,8 +64,13 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
   // La solicitud devuelta solo da el estado inicial: PaginaSolicitud monta un
   // formulario nuevo para cada solicitud.
   const [precarga] = useState(() => (original ? desdeSolicitud(original) : null));
-  const [codigoTramite, setCodigoTramite] = useState(original?.tipo_tramite_codigo ?? "");
-  const [cabecera, setCabecera] = useState<CabeceraFormulario>(precarga?.cabecera ?? CABECERA_VACIA);
+  // El borrador recuperado, con claves nuevas para esta página, y cuándo se había guardado.
+  const [inicio] = useState(() => (borrador ? restaurar(borrador.datos, borrador.archivos) : null));
+  const [recuperado] = useState(() => (borrador ? cuandoSeGuardo(borrador.guardadoEn, new Date()) : null));
+  const [codigoTramite, setCodigoTramite] = useState(original?.tipo_tramite_codigo ?? inicio?.datos.codigoTramite ?? "");
+  const [cabecera, setCabecera] = useState<CabeceraFormulario>(precarga?.cabecera ?? inicio?.datos.cabecera ?? CABECERA_VACIA);
+  // Los trámites a la vista para elegir otro («Cambiar» o «Volver»): el resto del formulario se oculta.
+  const [eligiendo, setEligiendo] = useState(false);
   const [vistaPrevia, setVistaPrevia] = useState<DocumentoSolicitud | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [intentoEnviar, setIntentoEnviar] = useState(false);
@@ -68,14 +89,35 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
     () => paises.map((p) => ({ valor: p.codigo, texto: p.nombre })),
     [paises],
   );
-  const fichas = useTripulantesFormulario(precarga?.tripulantes);
+  const fichas = useTripulantesFormulario(precarga?.tripulantes ?? inicio?.datos.tripulantes);
   const { tripulantes } = fichas;
   // «Subir y bajar» (la operación de Técnico desde el 2026-11-18): la Carta de Responsabilidad de cada tripulante.
   const subirYBajar = !!tipo && conCartaSubirYBajar(tipo, cabecera.subir_y_bajar, cabecera.operacion);
   // La operación de Técnico decide la carta de garantía o el contrato (2026-11-18).
   const operacion = tipo?.pide_operacion ? cabecera.operacion : "";
-  const documentos = useDocumentosFormulario(tipo, tripulantes, paisesPorCodigo, precarga, subirYBajar, operacion);
+  const documentos = useDocumentosFormulario(
+    tipo, tripulantes, paisesPorCodigo, precarga, subirYBajar, operacion, inicio?.archivos ?? null);
   const { faltantes } = documentos;
+
+  // El borrador en este equipo (solo una nueva: al corregir, `claveBorrador` es null).
+  const datosBorrador = useMemo(() => ({ codigoTramite, cabecera, tripulantes }), [codigoTramite, cabecera, tripulantes]);
+  const archivosBorrador = useMemo(
+    () => ({ nuevos: documentos.nuevos, adicionales: documentos.adicionalesNuevos }),
+    [documentos.nuevos, documentos.adicionalesNuevos],
+  );
+  const { guardado, descartar } = useBorradorSolicitud(claveBorrador, datosBorrador, archivosBorrador, !!borrador);
+
+  // «Volver»: con un trámite elegido, a los trámites (lo escrito queda); si no, la página va al inicio.
+  useEffect(() => {
+    if (!registrarVolver) return;
+    registrarVolver(() => {
+      if (corrigiendo || !tipo || eligiendo) return false;
+      setEligiendo(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return true;
+    });
+    return () => registrarVolver(null);
+  }, [registrarVolver, corrigiendo, tipo, eligiendo]);
 
   const hoy = fechaISOLocal();
   const errores = useMemo(
@@ -154,6 +196,8 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
         mostrar(`Solicitud ${resultado.numero} corregida y reenviada a revisión.`, "exito", { sello: "reenviada" });
       } else {
         resultado = await apiSolicitudes.crear({ ...datos, codigo_tramite: tipo.codigo }, archivos);
+        // Enviada, el borrador sobra.
+        await descartar();
         mostrar(`Solicitud ${resultado.numero} enviada a revisión.`, "exito", { sello: "enviada" });
       }
       navegar(`/solicitudes/${resultado.id}`);
@@ -162,6 +206,18 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
     } finally {
       setEnviando(false);
     }
+  }
+
+  async function empezarDeNuevo() {
+    const ok = await confirmar({
+      titulo: "Empezar de nuevo",
+      mensaje: "Se borra lo que llenaste en esta solicitud, también los archivos adjuntos.",
+      textoOk: "Empezar de nuevo",
+      peligroso: true,
+    });
+    if (!ok) return;
+    await descartar();
+    onEmpezarDeNuevo?.();
   }
 
   const referenciaVigencia = fechaReferencia(cabecera.fecha_operacion, hoy);
@@ -188,14 +244,26 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
         </div>
       )}
 
+      {recuperado && (
+        <div className={styles.avisoBorrador} role="status">
+          <IconoReloj tamano={16} />
+          <div className={styles.avisoBorradorTexto}>
+            <strong>Recuperamos la solicitud que dejaste sin enviar</strong> (guardada {recuperado}). Se guarda sola
+            en este equipo mientras la llenas; si pasan {HORAS_BORRADOR} horas sin cambios, se borra.
+          </div>
+          <button type="button" className={styles.btnTexto} onClick={empezarDeNuevo}>Empezar de nuevo</button>
+        </div>
+      )}
+
       <form onSubmit={enviar} className={styles.form} noValidate>
         {/* El avance de los cuatro pasos obligatorios (rediseño del 2026-11-17): cuánto falta y dónde. */}
-        <AvanceFormulario pasos={avanceFormulario({ tipoElegido: !!tipo, errores, faltantes: faltantes.length })} />
+        <AvanceFormulario pasos={avanceFormulario({ tipoElegido: !!tipo && !eligiendo, errores, faltantes: faltantes.length })} />
 
         {/* ── 1. Tipo de trámite ── */}
         <section className={styles.bloque} id="paso-tramite">
           <div className={styles.bloqueTitulo}><span className={styles.paso}>1</span> Tipo de trámite</div>
-          <SelectorTramite tipos={tipos} elegido={tipo} fijo={corrigiendo} onElegir={elegirTramite}>
+          <SelectorTramite tipos={tipos} elegido={tipo} fijo={corrigiendo} onElegir={elegirTramite}
+            cambiando={eligiendo} onCambiando={setEligiendo}>
             {tipo?.nota && <div className={styles.nota}>{tipo.nota}</div>}
             {tipo?.valida_vigencia && (
               <div className={styles.nota}>
@@ -206,7 +274,7 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
           </SelectorTramite>
         </section>
 
-        {tipo && (
+        {tipo && !eligiendo && (
           <>
             {/* ── 2. Datos del trámite ── */}
             <DatosTramite
@@ -318,6 +386,9 @@ export function FormularioSolicitud({ tipos, puestos, paises, agencia, original 
             )}
 
             <div className={styles.acciones}>
+              {guardado && (
+                <div className={styles.guardadoBorrador}>Borrador guardado en este equipo {guardado}.</div>
+              )}
               {faltantes.length > 0 && (
                 <div className={styles.avisoFaltan}>{faltanDocumentos(faltantes.length)} por adjuntar</div>
               )}

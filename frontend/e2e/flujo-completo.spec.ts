@@ -81,8 +81,8 @@ test("agencia → UCVMM → corrección → aprobación → verificación → pu
     await expect(agencia.getByLabel(/^Ocupación/)).toHaveCount(0);
     await agencia.getByLabel("N° de pasaporte *").fill("PA1234567");
     await agencia.getByLabel("Vence el pasaporte *").fill("2030-05-01");
-    await agencia.getByLabel("N° de seamanbook *").fill("SB-778812");
-    await agencia.getByLabel("Vence el seamanbook *").fill("2029-11-30");
+    await agencia.getByLabel("N° de seamanbook (opcional)").fill("SB-778812");
+    await agencia.getByLabel("Vence el seamanbook (opcional)").fill("2029-11-30");
 
     for (const documento of ["Visa Especial de Marino", "Generales de Pasaporte", "Libreta de Marino"]) {
       await agencia.getByLabel(`Adjuntar ${documento} de ${TRIPULANTE}`).setInputFiles(pdf(`${documento}.pdf`));

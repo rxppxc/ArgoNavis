@@ -294,9 +294,8 @@ class ServicioTramite:
             if rangos and t.rango not in rangos:
                 errores.append(f"{quien}: en este trámite el rango debe ser {rangos_texto}.")
 
-            porta_libreta = t.rango in RANGOS_CON_LIBRETA
-            if porta_libreta and (not t.libreta_marino or not t.libreta_expira):
-                errores.append(f"{quien}: el rango Marino requiere el número de seamanbook y su fecha de expiración.")
+            # El número y el vencimiento del seamanbook son opcionales (decisión del usuario,
+            # 2026-11-23): si viene la fecha, solo tiene que ser posterior al nacimiento.
 
             if tipo.valida_vigencia:
                 minimo = vigencia_minima_pasaporte(fecha_referencia)

@@ -3,7 +3,6 @@ import type {
   EstadoSolicitud, EventoSolicitud, Operacion, RangoMarino, Sexo, TripulanteSolicitud,
 } from "../../api/solicitudes";
 import { dosCifras } from "../../utils/fechas";
-import { HORA_FIN_LABORAL, HORA_INICIO_LABORAL } from "../administracion/estadisticas/calculos";
 
 export const ETIQUETA_ESTADO: Record<EstadoSolicitud, string> = {
   review:    "En revisión",
@@ -106,8 +105,7 @@ export function textoSectorCorto(s: ConSectores): string | null {
 }
 
 /** El horario laboral, como lo dicen el correo y el PDF (TEXTO_HORARIO, core/horario.py). */
-export const TEXTO_HORARIO_LABORAL =
-  `lunes a viernes, de ${dosCifras(HORA_INICIO_LABORAL)}:00 a ${dosCifras(HORA_FIN_LABORAL)}:00`;
+export { TEXTO_HORARIO_LABORAL } from "../../utils/horario";
 
 /** Aclaraciones del instructivo del Formulario No. 3 (pág. 3) para el buque y
  *  el puerto, según el trámite. Se muestran como placeholder del campo. */
@@ -122,23 +120,6 @@ export function formatearFecha(iso: string | null | undefined): string {
   if (!iso) return "—";
   const [anio, mes, dia] = iso.slice(0, 10).split("-");
   return `${dia}/${mes}/${anio}`;
-}
-
-const FECHA_LARGA = new Intl.DateTimeFormat("es-PA", {
-  weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
-});
-
-/** "2026-11-13" → "jueves, 13 de noviembre de 2026" (en UTC: una fecha sin hora no
- *  debe correrse de día por la zona horaria). Va bajo los campos de fecha del
- *  formulario: el navegador los muestra en su propio formato (en un Windows en
- *  inglés, mm/dd/aaaa), y en palabras no hay cómo confundir el día con el mes. */
-export function fechaEnPalabras(iso: string | null | undefined): string {
-  const partes = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? "");
-  if (!partes) return "";
-  const [anio, mes, dia] = partes.slice(1).map(Number);
-  const fecha = new Date(Date.UTC(anio, mes - 1, dia));
-  if (fecha.getUTCMonth() !== mes - 1) return "";   // 31 de febrero y similares
-  return FECHA_LARGA.format(fecha);
 }
 
 /** Fecha y hora local como "06/10/2026, 03:10 p. m.". El orden día/mes se arma

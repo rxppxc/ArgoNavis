@@ -390,10 +390,24 @@ async def test_seamanbook_solo_rango_marino(cliente, agencia):
     r = await enviar(cliente, naviera, datos, archivos)
     assert r.status_code == 201, r.text
 
+    # El número y el vencimiento del seamanbook son opcionales (decisión del usuario, 2026-11-23);
+    # la Libreta de Marino, como documento, se sigue pidiendo según el catálogo.
     marino = tripulante("Pedro", "PHL", libreta_marino=None, libreta_expira=None)
     datos, archivos = _datos("F3-SHORE-PASS", puesto_id, [marino])
     r = await enviar(cliente, naviera, datos, archivos)
-    assert r.status_code == 400 and "seamanbook" in r.json()["detail"]
+    assert r.status_code == 201, r.text
+    t = r.json()["tripulantes"][0]
+    assert t["libreta_marino"] is None and t["libreta_expira"] is None and not t["libreta_vencida"]
+
+
+def test_celda_del_seamanbook_en_el_pdf():
+    """En el PDF: el número; «No indicado» al Marino que no lo dio (opcional desde el 2026-11-23)
+    y «No aplica» a los rangos que no portan seamanbook."""
+    from app.informes.autorizacion_pdf import TripulantePdf, celda_libreta
+    base = {"nombre": "Ana", "apellido": "Ruiz", "nacionalidad": "Filipinas", "pasaporte": "P1"}
+    assert celda_libreta(TripulantePdf(**base, rango="marino", libreta="SB-1", porta_libreta=True)) == "SB-1"
+    assert celda_libreta(TripulantePdf(**base, rango="marino", libreta="", porta_libreta=True)) == "No indicado"
+    assert celda_libreta(TripulantePdf(**base, rango="militar", libreta="", porta_libreta=False)) == "No aplica"
 
 
 async def test_libreta_en_embarque_todos_los_marinos(cliente, agencia):

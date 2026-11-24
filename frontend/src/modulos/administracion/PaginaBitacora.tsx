@@ -4,7 +4,9 @@ import { apiAdmin, type FiltrosBitacora, type PaginaBitacora as Pagina } from ".
 import { MarcoPagina } from "../../components/MarcoPagina";
 import { EncabezadoPagina } from "../../components/EncabezadoPagina";
 import { useNotificacion } from "../../components/Notificaciones";
+import { SelectorFecha } from "../../components/SelectorFecha";
 import { mensajeDeError } from "../../utils/errores";
+import { fechaISOLocal } from "../../utils/fechas";
 import type { EstadoSolicitud } from "../../api/solicitudes";
 import { ETIQUETA_ESTADO, formatearFechaHora } from "../solicitudes/presentacion";
 import { categoriaAccion } from "./categoriaAccion";
@@ -81,6 +83,7 @@ export default function PaginaBitacora() {
   const [borrador, setBorrador] = useState<FiltrosBitacora>(FILTROS_VACIOS);
   const [filtros, setFiltros] = useState<FiltrosBitacora>(FILTROS_VACIOS);
   const [pagina, setPagina] = useState(1);
+  const hoy = fechaISOLocal();
   // Respuesta etiquetada con la consulta que la produjo: "cargando" se deriva
   // de si corresponde a la consulta actual, y mientras tanto se sigue mostrando
   // la anterior (sin saltos en la tabla).
@@ -151,14 +154,15 @@ export default function PaginaBitacora() {
           <span>Texto en el detalle o IP</span>
           <input type="text" placeholder="N° de solicitud, nombre, IP…" maxLength={200} {...campo("texto")} />
         </label>
-        <label>
-          <span>Desde</span>
-          <input type="date" {...campo("desde")} />
-        </label>
-        <label>
-          <span>Hasta</span>
-          <input type="date" {...campo("hasta")} />
-        </label>
+        {/* La bitácora llega hasta hoy, y «Desde» no pasa de «Hasta» (lo de afuera va rayado). */}
+        <SelectorFecha etiqueta="Desde" valor={borrador.desde ?? ""} max={borrador.hasta || hoy}
+          onCambiar={(iso) => setBorrador((prev) => ({ ...prev, desde: iso }))}
+          motivoDespues={borrador.hasta ? "«Desde» no puede ser posterior a «Hasta»." : "La bitácora llega hasta hoy."}
+          atajos={[{ etiqueta: "Hoy", fecha: hoy }]} borrable nota={false} />
+        <SelectorFecha etiqueta="Hasta" valor={borrador.hasta ?? ""} min={borrador.desde || undefined} max={hoy}
+          onCambiar={(iso) => setBorrador((prev) => ({ ...prev, hasta: iso }))}
+          motivoAntes="«Hasta» no puede ser anterior a «Desde»." motivoDespues="La bitácora llega hasta hoy."
+          atajos={[{ etiqueta: "Hoy", fecha: hoy }]} borrable nota={false} />
         <div className={styles.botones}>
           <button type="submit" className={styles.btnPrimario}>Filtrar</button>
           <button type="button" className={styles.btnTexto} onClick={limpiar}>Limpiar</button>

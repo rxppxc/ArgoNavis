@@ -27,11 +27,8 @@
   background: var(--principal); border-color: var(--principal); color: var(--sobre-principal); font-weight: 700;
 }
 .fechas { display: flex; flex-wrap: wrap; gap: 8px 14px; }
-.fechas label { display: inline-flex; align-items: center; gap: 7px; color: var(--text-2); font-size: .8rem; font-weight: 600; }
-.fechas input {
-  padding: 5px 8px; border-radius: var(--r-sm);
-  border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text); font-size: .82rem;
-}
+/* Los campos de fecha propios (SelectorFecha, 2026-11-23), con el rótulo encima. */
+.campoFecha { width: 200px; max-width: 100%; }
 
 /* ─── Resumen: la cifra que encabeza y, al lado, el estado actual ───
    Hasta el 2026-11-10 había un párrafo con lo mismo en frases y una explicación

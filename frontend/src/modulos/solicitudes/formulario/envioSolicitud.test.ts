@@ -116,6 +116,12 @@ describe("armarEnvio: lo que se manda al servidor", () => {
     ]);
   });
 
+  it("un marino sin seamanbook (opcional desde el 2026-11-23) lo manda vacío, sin cadenas vacías", () => {
+    const sinLibreta: FichaTripulante = { ...ana, libreta_marino: "  ", libreta_expira: "" };
+    const { datos } = armarEnvio(CABECERA_VACIA, [sinLibreta], SIN_DOCUMENTOS);
+    expect([datos.tripulantes[0].libreta_marino, datos.tripulantes[0].libreta_expira]).toEqual([null, null]);
+  });
+
   it("al corregir conserva lo que no se reemplazó, salvo lo de casillas que ya no se piden", () => {
     const lista = casilla("LISTA");
     const visaAna = casilla("VISA", "t11");

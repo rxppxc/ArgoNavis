@@ -165,9 +165,8 @@ export function validarFormulario(
     if (!paises.has(t.nacionalidad)) faltan.push("nacionalidad");
     if (t.pasaporte.trim().length < 3) faltan.push("N° de pasaporte");
     if (!t.pasaporte_expira) faltan.push("vencimiento del pasaporte");
+    // El número y el vencimiento del seamanbook son opcionales (2026-11-23), como en el backend.
     const conLibreta = portaLibreta(t);
-    if (conLibreta && !t.libreta_marino?.trim()) faltan.push("N° de seamanbook");
-    if (conLibreta && !t.libreta_expira) faltan.push("vencimiento del seamanbook");
     if (faltan.length) errores.push(`${quien}: falta ${faltan.join(", ")}.`);
     if (rangos?.length && !rangos.includes(t.rango)) {
       errores.push(`${quien}: en este trámite el rango debe ser ${rangosTexto}.`);
