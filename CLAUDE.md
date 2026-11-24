@@ -259,6 +259,7 @@ Pedido del usuario: «en el modo claro hay cosas que no se distinguen»; «que c
   - Va en las bandejas de todos y en «Usuarios» del SysAdmin, que es su inicio (sin el recargo: no ve solicitudes).
   - Como el sello de fecha y hora de un documento: la franja arriba, la hora en letra de máquina y el estado como sello de tinta, verde en horario y morado fuera (el color del chip «Aprobada fuera del horario»). Cambia sola con el minuto (`useMinutoActual`) y no se anuncia al lector de pantalla.
   - No cuenta los feriados (pendiente 12).
+- **Mapa de horas de las estadísticas** (2026-11-24): las horas van en las rayas entre casillas, como en una regla, y el recuadro del horario laboral va de la marca «07» a la «15» (07:00 a 15:00). Con las horas centradas sobre la casilla se leía «de 07 a 14», y el usuario lo marcó como error. La casilla de las 15 (15:00 a 15:59) queda afuera: su globo dice que las 15:00 en punto son laborales. No metas esa casilla en el recuadro: dejaría adentro lo de 15:01 a 15:59, que es fuera.
 - Accesibilidad (2026-10-27):
   - Enlace «Saltar al contenido» (clase global `.saltar-contenido`) en `MarcoPagina` y en el login, hacia `<main id="contenido">`.
   - Los íconos son decorativos (`aria-hidden` en `crearIcono`). Todo botón de solo ícono lleva `aria-label` con qué hace y sobre qué: «Ver informe.pdf», «Quitar tripulante 2».

@@ -853,3 +853,6 @@ Cuatro ajustes que pidió el usuario tras revisar las pantallas. No cambian la A
   - Datos y archivos se escriben en una sola transacción, así quedan siempre juntos.
   - Los archivos se guardan como su contenido y no como `File`, que algunos navegadores no guardan en IndexedDB en una ventana privada (y los contextos de Playwright lo son).
   - La prueba vuelve con «Nueva solicitud», como la agencia, y después recarga para comprobar que sigue ahí. Se comprobó que falla sin el guardado al salir.
+
+## El recuadro del mapa de horas, hasta las 15:00 (2026-11-24)
+En las estadísticas, el recuadro del horario laboral se leía «de 07 a 14», y el globo de la casilla de las 14 decía «de 14:00 a 14:59» (el usuario lo marcó como error: el horario va hasta las 15:00). Ahora las horas van en las rayas entre casillas, como en una regla: el recuadro va de la marca «07» a la «15», y la leyenda dice «Horario laboral, de 07:00 a 15:00». La casilla de las 15 sigue afuera: de 15:01 a 15:59 es fuera, y su globo aclara que las 15:00 en punto son laborales.

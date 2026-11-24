@@ -175,7 +175,9 @@ export default function MapaHoras({ datos }: { datos: EstadisticasSolicitudes })
               {Array.from({ length: NIVELES_CALOR + 1 }, (_, n) => <span key={n} className={`${styles.celda} ${styles[`nivel${n}`] ?? ""}`} />)}
               Más
             </span>
-            <span className={styles.escalaRecuadro}>Horario laboral</span>
+            <span className={styles.escalaRecuadro}>
+              Horario laboral, de {dosCifras(HORA_INICIO_LABORAL)}:00 a {dosCifras(HORA_FIN_LABORAL)}:00
+            </span>
           </div>
         </div>
       )}

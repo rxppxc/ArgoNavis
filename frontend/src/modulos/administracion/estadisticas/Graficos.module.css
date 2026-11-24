@@ -209,7 +209,13 @@
   display: grid; grid-template-columns: 34px repeat(24, minmax(0, 1fr)); grid-template-rows: auto repeat(7, 24px);
   gap: 2px; border-radius: var(--r-sm);
 }
-.horaEje { color: var(--muted); font-size: .66rem; text-align: center; font-variant-numeric: tabular-nums; padding-bottom: 3px; }
+/* Cada hora va en la raya donde empieza su casilla, como en una regla: el recuadro va de la
+   marca «07» a la «15», de 07:00 a 15:00. Centradas sobre la casilla, el recuadro se leía
+   «de 07 a 14» (2026-11-24). El medio del espacio entre casillas queda 1 px antes de la casilla. */
+.horaEje {
+  justify-self: start; transform: translateX(calc(-50% - 1px));
+  color: var(--muted); font-size: .66rem; font-variant-numeric: tabular-nums; padding-bottom: 3px;
+}
 .diaEje { color: var(--text-2); font-size: .74rem; font-weight: 700; align-self: center; }
 .celda { border-radius: var(--r-xs); background: var(--overlay); }
 /* De menos a más: el verde de «aprobada» (--graf-calor) sobre la tarjeta (en
