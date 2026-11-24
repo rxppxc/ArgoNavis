@@ -253,7 +253,7 @@ Pedido del usuario: «en el modo claro hay cosas que no se distinguen»; «que c
 - **Borrador de la solicitud nueva** (2026-11-23, decisión del usuario: 24 horas, en este equipo, con los archivos):
   - Se guarda solo mientras se llena (`useBorradorSolicitud`), por usuario, en IndexedDB (`almacenBorradores.ts`). Al volver, un aviso dice que se recuperó y ofrece «Empezar de nuevo»; junto a «Enviar», «Borrador guardado en este equipo…».
   - Se borra al enviar, al empezar de nuevo, al vaciar el formulario y a las 24 horas sin cambios (`HORAS_BORRADOR`). Al corregir una devuelta no hay borrador.
-  - No pasa por el servidor: otro equipo u otro navegador no lo ven, y una ventana privada no lo guarda. Los datos de los tripulantes quedan en ese equipo hasta 24 horas.
+  - No pasa por el servidor: otro equipo u otro navegador no lo ven, y en una ventana privada dura hasta cerrarla. Los datos de los tripulantes quedan en ese equipo hasta 24 horas.
 - **Reloj del inicio** (`RelojHorario`, 2026-11-24). Pedido del usuario: en todos los roles, con el horario y bien integrado; solo en el inicio:
   - La hora de Panamá (aunque el equipo tenga otra zona), la fecha, si es horario laboral y hasta cuándo («hasta mañana a las 07:00») y el horario. Fuera del horario, recuerda que lo que se apruebe lleva recargo, sin el monto (es configuración del backend) y sin nombrar a UCVMM.
   - Va en las bandejas de todos y en «Usuarios» del SysAdmin, que es su inicio (sin el recargo: no ve solicitudes).
@@ -358,8 +358,10 @@ Cada una salió de un problema real. El detalle está en el historial.
 - Una acción nueva de la bitácora (`AccionAuditoria`) lleva su nombre en `ETIQUETA_ACCION` (`PaginaBitacora.tsx`): sin él, se ve el código crudo (`test_la_bitacora_nombra_todas_las_acciones`).
 - El borrador de la solicitud nueva (2026-11-23):
   - Al recuperarlo se renuevan las claves de los tripulantes y de los archivos (`restaurar`): el contador de `nuevaClave` vuelve a empezar al recargar la página, y las claves guardadas chocarían con las nuevas.
-  - Por eso, tras recuperarlo, el primer cambio guarda los archivos otra vez, con los datos: sus claves tienen que coincidir. Lo recuperado no se guarda hasta que algo cambie, para que las 24 horas cuenten desde el último cambio.
+  - Por eso, tras recuperarlo, el primer cambio guarda los archivos otra vez, con los datos: sus claves tienen que coincidir. Datos y archivos van en la misma transacción (`guardarBorrador`). Lo recuperado no se guarda hasta que algo cambie, para que las 24 horas cuenten desde el último cambio.
+  - Los archivos se guardan como su contenido (`serializarArchivos`: ArrayBuffer, nombre, tipo y fecha), no como `File`: algunos navegadores no guardan un `File` en IndexedDB en una ventana privada, y los contextos de Playwright lo son.
   - Lo que espera su momento se guarda al salir de la página. Al enviar o al empezar de nuevo, `descartar` lo cancela: si no, salir enseguida volvería a guardar el borrador.
+  - Las operaciones de `almacenBorradores.ts` van en fila (`enFila`): leer al volver espera a lo que se guardaba al salir. Una recarga, en cambio, corta lo que se estaba guardando: en la CI (2026-11-24) el E2E volvía con `goto` y el adjunto no llegaba. Una prueba vuelve al formulario con el enlace, como la agencia.
   - Una prueba E2E que visite `/new` dos veces en el mismo contexto encuentra el borrador de la primera (cada `entrar()` abre un contexto nuevo).
 
 **Pruebas**

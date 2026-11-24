@@ -29,6 +29,42 @@ export interface ArchivosBorrador {
   adicionales: AdicionalNuevo[];
 }
 
+/** Un archivo como se guarda: su contenido, su nombre, su tipo y su fecha, no el `File`. Algunos
+ *  navegadores no guardan un `File` en IndexedDB en una ventana privada (y las pruebas corren
+ *  en una); el contenido como ArrayBuffer lo guardan todos. */
+export interface ArchivoGuardado {
+  nombre:     string;
+  tipo:       string;
+  modificado: number;
+  contenido:  ArrayBuffer;
+}
+
+export interface ArchivosGuardados {
+  nuevos:      Record<string, ArchivoGuardado>;
+  adicionales: { clave: string; archivo: ArchivoGuardado }[];
+}
+
+async function guardable(archivo: File): Promise<ArchivoGuardado> {
+  return { nombre: archivo.name, tipo: archivo.type, modificado: archivo.lastModified, contenido: await archivo.arrayBuffer() };
+}
+
+/** La primera versión (72028b0, que no llegó a desplegarse) guardaba el `File` tal cual. */
+const comoFile = (g: ArchivoGuardado | File) =>
+  g instanceof File ? g : new File([g.contenido], g.nombre, { type: g.tipo, lastModified: g.modificado });
+
+export async function serializarArchivos(archivos: ArchivosBorrador): Promise<ArchivosGuardados> {
+  const nuevos = await Promise.all(Object.entries(archivos.nuevos).map(async ([casilla, a]) => [casilla, await guardable(a)] as const));
+  const adicionales = await Promise.all(archivos.adicionales.map(async (a) => ({ clave: a.clave, archivo: await guardable(a.archivo) })));
+  return { nuevos: Object.fromEntries(nuevos), adicionales };
+}
+
+export function recuperarArchivos(guardados: ArchivosGuardados): ArchivosBorrador {
+  return {
+    nuevos: Object.fromEntries(Object.entries(guardados.nuevos).map(([casilla, g]) => [casilla, comoFile(g)])),
+    adicionales: guardados.adicionales.map((a) => ({ clave: a.clave, archivo: comoFile(a.archivo) })),
+  };
+}
+
 /** Uno por usuario: otra cuenta en el mismo equipo no ve el borrador de esta. */
 export function claveBorrador(usuarioId: number): string {
   return `solicitud-nueva:${usuarioId}`;

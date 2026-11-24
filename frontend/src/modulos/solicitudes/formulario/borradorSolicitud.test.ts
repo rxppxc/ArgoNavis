@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  HORAS_BORRADOR, borradorVigente, claveBorrador, cuandoSeGuardo, restaurar, tieneContenido,
-  type ArchivosBorrador, type DatosBorrador,
+  HORAS_BORRADOR, borradorVigente, claveBorrador, cuandoSeGuardo, recuperarArchivos, restaurar, serializarArchivos,
+  tieneContenido,
+  type ArchivosBorrador, type ArchivosGuardados, type DatosBorrador,
 } from "./borradorSolicitud";
 import { fichaVacia } from "./envioSolicitud";
 import { CABECERA_VACIA, type CabeceraFormulario, type FichaTripulante } from "./validacionFormulario";
@@ -98,6 +99,31 @@ describe("restaurar: claves nuevas, con los archivos en su sitio", () => {
     );
     expect(datos.tripulantes[0]).toMatchObject({ nombre: "Ana", pasaporte: "" });
     expect(datos.cabecera).toMatchObject({ nombre_buque: "ESTRELLA", fecha_operacion: "" });
+  });
+});
+
+describe("los archivos se guardan como su contenido y vuelven como File", () => {
+  it("con su nombre, su tipo, su fecha y su contenido", async () => {
+    const original = new File(["%PDF-1.4 hola"], "formulario-3.pdf", { type: "application/pdf", lastModified: 1_700_000_000_000 });
+    const guardados = await serializarArchivos({
+      nuevos: { "DOC-F3|s": original }, adicionales: [{ clave: "a1", archivo: archivo("carta.pdf") }],
+    });
+    // Lo que va a IndexedDB no lleva ningún File: solo datos y el contenido.
+    expect(guardados.nuevos["DOC-F3|s"].contenido).toBeInstanceOf(ArrayBuffer);
+
+    const vuelta = recuperarArchivos(structuredClone(guardados));
+    const f = vuelta.nuevos["DOC-F3|s"];
+    expect(f).toBeInstanceOf(File);
+    expect([f.name, f.type, f.lastModified, f.size]).toEqual(["formulario-3.pdf", "application/pdf", 1_700_000_000_000, original.size]);
+    expect(await f.text()).toBe("%PDF-1.4 hola");
+    expect(vuelta.adicionales[0].clave).toBe("a1");
+    expect(vuelta.adicionales[0].archivo.name).toBe("carta.pdf");
+  });
+  it("lo guardado como File por la primera versión (72028b0) se recupera igual", async () => {
+    const viejo = archivo("formulario-3.pdf");
+    const vuelta = recuperarArchivos({ nuevos: { "DOC-F3|s": viejo }, adicionales: [] } as unknown as ArchivosGuardados);
+    expect(vuelta.nuevos["DOC-F3|s"].name).toBe("formulario-3.pdf");
+    expect(await vuelta.nuevos["DOC-F3|s"].text()).toBe("%PDF-1.4");
   });
 });
 

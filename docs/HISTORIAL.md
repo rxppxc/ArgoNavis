@@ -840,8 +840,16 @@ Cuatro ajustes que pidió el usuario tras revisar las pantallas. No cambian la A
   - se escribe dd/mm/aaaa o se elige en el calendario;
   - lo que no se puede elegir va rayado y tachado, con el motivo (por ejemplo, una operación antes de hoy o a más de un año);
   - debajo dice la fecha en palabras o qué está mal. Se quitó `FechaEnPalabras`.
-- **«Volver» en «Nueva solicitud»:** con un trámite elegido, regresaba al inicio y se perdía lo escrito. Ahora regresa a los trámites, y desde ahí al inicio.
+- **«Volver» en «Nueva solicitud»:** con un trámite elegido, regresaba al inicio y se perdía lo escrito. Ahora regresa a los trámites, y desde ahí al inicio. Mientras se eligen los trámites el formulario no se ve, y cancelar un cambio de trámite vuelve al formulario con el que tenía.
 - **Borrador:** lo que se llena se guarda solo en el equipo (con los archivos) y se recupera al volver, con «Empezar de nuevo». Se borra al enviar o a las 24 horas sin cambios (decisión del usuario).
 - **Reloj del inicio:** la hora de Panamá, la fecha, si es horario laboral y hasta cuándo, y el horario, en el inicio de cada rol. Fuera del horario, recuerda el recargo. La regla del horario está ahora también en `utils/horario.ts`, con casos compartidos con el backend (`espejo/horario.json`).
 - **Pruebas:** Vitest del calendario, del borrador y del horario; E2E de «Volver» con el borrador y del reloj, este con el reloj del navegador fijo en un lunes a las 15:00 que pasa a las 15:01.
 - **Pendiente:** las capturas del manual de la agencia muestran el asterisco del seamanbook y el campo de fecha anterior; se pueden volver a tomar.
+
+## Lo que encontró la CI del borrador (2026-11-24)
+- **El adjunto no volvía:** en la CI, el E2E del borrador recuperaba los datos pero no el Formulario No. 3. El archivo llegaba después del último guardado y la prueba salía antes de que se guardara solo. Lo guardaba el formulario al salir, pero la prueba volvía con `goto`, y la recarga cortaba ese guardado. En el equipo, el guardado ganaba la carrera.
+- **Arreglo:**
+  - Las operaciones del borrador van en fila: leer al volver espera a lo que se guardaba al salir.
+  - Datos y archivos se escriben en una sola transacción, así quedan siempre juntos.
+  - Los archivos se guardan como su contenido y no como `File`, que algunos navegadores no guardan en IndexedDB en una ventana privada (y los contextos de Playwright lo son).
+  - La prueba vuelve con «Nueva solicitud», como la agencia, y después recarga para comprobar que sigue ahí. Se comprobó que falla sin el guardado al salir.

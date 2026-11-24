@@ -401,8 +401,10 @@ test("«Volver» regresa a los trámites y lo escrito queda en borrador (2026-11
   await agencia.getByRole("button", { name: /^Embarque/ }).click();
   await agencia.getByLabel("Nombre del buque *").fill("ESTRELLA DEL BORRADOR");
   await marinoFilipino(agencia, 0, "Ana");
-  await agencia.getByLabel("Adjuntar Formulario No. 3").setInputFiles(pdf("formulario-3.pdf"));
+  // Lo escrito ya quedó guardado; el archivo llega después y se sale enseguida, antes de que
+  // se guarde por su cuenta: se guarda al salir (la CI, más rápida, salía así).
   await expect(agencia.getByText(/^Borrador guardado en este equipo hoy a las/)).toBeVisible();
+  await agencia.getByLabel("Adjuntar Formulario No. 3").setInputFiles(pdf("formulario-3.pdf"));
 
   await test.step("con un trámite elegido, «Volver» muestra los trámites sin perder lo escrito", async () => {
     await agencia.getByRole("button", { name: "Volver" }).click();
@@ -424,11 +426,19 @@ test("«Volver» regresa a los trámites y lo escrito queda en borrador (2026-11
   });
 
   await test.step("al volver al formulario, lo escrito y los archivos siguen ahí", async () => {
-    await agencia.goto("/new");
-    await expect(agencia.getByRole("status").filter({ hasText: "Recuperamos la solicitud que dejaste sin enviar" }))
-      .toBeVisible();
+    // Como lo haría la agencia, con «Nueva solicitud» del inicio. Con un goto, la recarga cortaba
+    // el guardado que hace el formulario al salir (2026-11-24, en la CI).
+    await agencia.getByRole("link", { name: "Nueva solicitud" }).first().click();
+    const recuperado = agencia.getByRole("status").filter({ hasText: "Recuperamos la solicitud que dejaste sin enviar" });
+    await expect(recuperado).toBeVisible();
     await expect(agencia.getByLabel("Nombre del buque *")).toHaveValue("ESTRELLA DEL BORRADOR");
     await expect(tarjeta(agencia, 0).getByLabel("Nombre(s) *", { exact: true })).toHaveValue("Ana");
+    await expect(agencia.getByText("formulario-3.pdf")).toBeVisible();
+
+    // Y siguen al recargar la página (o al cerrar el navegador y volver).
+    await agencia.reload();
+    await expect(recuperado).toBeVisible();
+    await expect(agencia.getByLabel("Nombre del buque *")).toHaveValue("ESTRELLA DEL BORRADOR");
     await expect(agencia.getByText("formulario-3.pdf")).toBeVisible();
   });
 

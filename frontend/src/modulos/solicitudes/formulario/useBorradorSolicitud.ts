@@ -10,7 +10,7 @@
  *   eso, salir justo después lo volvería a guardar.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { borrarBorrador, guardarArchivos, guardarDatos } from "./almacenBorradores";
+import { borrarBorrador, guardarBorrador } from "./almacenBorradores";
 import { cuandoSeGuardo, tieneContenido, type ArchivosBorrador, type DatosBorrador } from "./borradorSolicitud";
 
 const ESPERA_GUARDADO_MS = 700;
@@ -57,11 +57,13 @@ export function useBorradorSolicitud(
       const ahora = Date.now();
       hayGuardado.current = true;
       const anteriores = archivosGuardados.current;
-      if (anteriores?.nuevos !== archivos.nuevos || anteriores?.adicionales !== archivos.adicionales) {
-        archivosGuardados.current = archivos;
-        void guardarArchivos(clave, archivos, ahora);
-      }
-      void guardarDatos(clave, datos, ahora).then((ok) => { if (ok) setGuardado(cuandoSeGuardo(ahora, new Date(ahora))); });
+      const cambiaron = anteriores?.nuevos !== archivos.nuevos || anteriores?.adicionales !== archivos.adicionales;
+      if (cambiaron) archivosGuardados.current = archivos;
+      void guardarBorrador(clave, datos, cambiaron ? archivos : null, ahora).then((ok) => {
+        if (ok) setGuardado(cuandoSeGuardo(ahora, new Date(ahora)));
+        // Si no se pudo, los archivos se intentan otra vez con el próximo guardado.
+        else if (cambiaron && archivosGuardados.current === archivos) archivosGuardados.current = null;
+      });
     };
     pendiente.current = guardar;
     const espera = setTimeout(guardar, ESPERA_GUARDADO_MS);
