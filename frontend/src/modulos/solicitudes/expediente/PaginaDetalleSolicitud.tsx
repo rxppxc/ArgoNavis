@@ -32,7 +32,7 @@ import { QueSigue } from "./QueSigue";
 import { RegistroExpediente } from "./RegistroExpediente";
 import {
   ETIQUETA_OPERACION, formatearFecha, formatearFechaHora, puestoAutorizado, TEXTO_HORARIO_LABORAL, textoDias,
-  textoPuestos, textoSector, tiempoRestante,
+  textoPuestos, textoSector, textoVigencia, tiempoRestante,
 } from "../presentacion";
 import { SeccionTripulantes } from "./SeccionTripulantes";
 import { useVerificacionImpedimentos } from "./useVerificacionImpedimentos";
@@ -86,7 +86,8 @@ function BannerEstado({ s }: { s: SolicitudDetalle }) {
           <div className={styles.bannerTitulo}>Autorización aprobada</div>
           <div className={styles.bannerTexto}>
             Aprobada el {formatearFechaHora(s.aprobada_en)} por {s.aprobada_por ?? "el Servicio Nacional de Migración"}. Vigente hasta el{" "}
-            {formatearFechaHora(s.vigente_hasta)}: el puesto de control debe finalizarla antes de esa fecha.
+            {formatearFechaHora(s.vigente_hasta)}{s.horas_vigencia ? ` (${textoVigencia(s.horas_vigencia)})` : ""}: el
+            puesto de control debe finalizarla antes de esa fecha.
           </div>
           {s.observacion_aprobacion && <div className={styles.bannerPie}>Observación interna: {s.observacion_aprobacion}</div>}
           <AvisoFueraDeHorario s={s} />

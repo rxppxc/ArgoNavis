@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import obtener_configuracion
 from app.core.email import Aviso
-from app.core.horario import ZONA_PANAMA, aviso_fuera_de_horario, fuera_de_horario, texto_costo
+from app.core.horario import texto_vigencia, ZONA_PANAMA, aviso_fuera_de_horario, fuera_de_horario, texto_costo
 from app.core.identidad import INSTITUCION
 from app.domain.models.solicitud import EstadoSolicitud, Solicitud
 from app.domain.repositories.catalogo_repository import RepositorioCatalogo
@@ -117,6 +117,8 @@ class ServicioNotificacion:
     async def aprobada(self, s: Solicitud) -> list[Aviso]:
         """A la agencia (con la autorización) y al puesto de control que la finaliza."""
         vigencia = f"Vigente hasta el {_fecha_hora(s.vigente_hasta)}."
+        if s.tipo_tramite and s.tipo_tramite.horas_vigencia:   # Urgencia médica (2026-11-26)
+            vigencia = f"Vigente hasta el {_fecha_hora(s.vigente_hasta)}: {texto_vigencia(s.tipo_tramite.horas_vigencia)}."
         # Aprobada fuera del horario: el aviso y el recargo (2026-11-11),
         # a la agencia y al puesto que la recibe.
         fuera = s.aprobada_en is not None and fuera_de_horario(s.aprobada_en)

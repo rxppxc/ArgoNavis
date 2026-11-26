@@ -4,7 +4,7 @@ import { MarcoPagina } from "../../components/MarcoPagina";
 import { EncabezadoPagina } from "../../components/EncabezadoPagina";
 import { EstadoCarga } from "../../components/EstadoCarga";
 import { useNotificacion } from "../../components/Notificaciones";
-import { ETIQUETA_RANGO } from "../solicitudes/presentacion";
+import { ETIQUETA_RANGO, textoVigencia } from "../solicitudes/presentacion";
 import {
   IconoArchivo, IconoUsuario, IconoChevronDerecha, IconoCandado,
 } from "../../components/Iconos";
@@ -56,6 +56,7 @@ export default function PaginaTramites() {
                 t.requiere_motivo && "Motivo",
                 t.permite_subir_y_bajar && "¿Subir y bajar? (Sí / No)",
                 t.pide_operacion && "Operación (Embarque, Desembarque o Subir y bajar)",
+                t.horas_vigencia && `Vale ${textoVigencia(t.horas_vigencia)}`,
                 t.pide_dias_sellado && "Días del sellado (5 o 15)",
                 t.permite_cambio_puerto && "Cambio de puerto (opcional)",
               ].filter(Boolean) as string[];

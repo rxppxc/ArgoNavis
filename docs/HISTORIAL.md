@@ -856,3 +856,13 @@ Cuatro ajustes que pidió el usuario tras revisar las pantallas. No cambian la A
 
 ## El recuadro del mapa de horas, hasta las 15:00 (2026-11-24)
 En las estadísticas, el recuadro del horario laboral se leía «de 07 a 14», y el globo de la casilla de las 14 decía «de 14:00 a 14:59» (el usuario lo marcó como error: el horario va hasta las 15:00). Ahora las horas van en las rayas entre casillas, como en una regla: el recuadro va de la marca «07» a la «15», y la leyenda dice «Horario laboral, de 07:00 a 15:00». La casilla de las 15 sigue afuera: de 15:01 a 15:59 es fuera, y su globo aclara que las 15:00 en punto son laborales.
+
+## Urgencia médica y el boleto opcional (2026-11-26)
+Pedido del usuario. Migración `a6d2f8c3e417`: cambia el catálogo y agrega `tipos_tramite.horas_vigencia`.
+- **Boleto aéreo opcional** en Desembarque y en el trámite de Técnico, para todos los rangos a los que se pide; en los demás trámites se sigue exigiendo. Usa `rangos_opcional`, que existía desde el 2026-11-11 sin uso.
+- **Urgencia médica:**
+  - la Carta de Responsabilidad (Form. No. 7) pasa a ser una por solicitud, abajo con los documentos de la solicitud (decisión del usuario, entre eso y dejarla por tripulante al final de su lista). Se sigue pidiendo solo si hay algún Marino o Pasajero;
+  - pide la operación como el trámite de Técnico (Embarque, Desembarque o Subir y bajar). Solo se registra: no cambia los documentos;
+  - la autorización vale **exactamente 120 horas desde la aprobación** (decisión del usuario, entre eso, hasta el final del quinto día y cinco días contando el de la aprobación). Lo dicen la tarjeta del trámite, el formulario, el expediente, el PDF (con la hora) y el correo.
+- **Lo que ya estaba:** las solicitudes enviadas conservan la foto de su checklist y su `vigente_hasta` (`test_cambio_de_catalogo_no_altera_solicitudes_enviadas`). Una Urgencia médica devuelta que se corrija después del cambio pide la Carta una sola vez, abajo. La consulta histórica no tiene tope de años, y los documentos y su huella se conservan (`test_consulta_de_anios.py`).
+- **Pendiente:** el documento 04 de la DTI (reglas del catálogo) y el manual de la agencia (documentos de Urgencia médica y de Desembarque) no tienen estos cambios todavía.

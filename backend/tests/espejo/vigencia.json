@@ -1,0 +1,5 @@
+[
+  {"caso": "Urgencia médica: 120 horas son 5 días", "horas": 120, "texto": "120 horas (5 días) desde la aprobación"},
+  {"caso": "24 horas: un día, en singular", "horas": 24, "texto": "24 horas (1 día) desde la aprobación"},
+  {"caso": "horas que no son días enteros: solo las horas", "horas": 36, "texto": "36 horas desde la aprobación"}
+]

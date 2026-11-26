@@ -2,10 +2,10 @@ import { useRef, useState, type ReactNode } from "react";
 import type { TipoTramite } from "../../../api/tramites";
 import {
   IconoAncla, IconoArchivo, IconoCaminar, IconoCheck, IconoCruzMedica, IconoDesembarque, IconoEmbarque,
-  IconoHerramienta, IconoIntercambio, IconoPasaporte,
+  IconoHerramienta, IconoIntercambio, IconoPasaporte, IconoReloj,
 } from "../../../components/Iconos";
 import { aplicaAlRango } from "../checklist";
-import { AYUDA_CAMPOS_TRAMITE, ETIQUETA_RANGO, TODOS_LOS_RANGOS } from "../presentacion";
+import { AYUDA_CAMPOS_TRAMITE, ETIQUETA_RANGO, TODOS_LOS_RANGOS, textoVigencia } from "../presentacion";
 import styles from "./SelectorTramite.module.css";
 
 /** Ícono y color de cada trámite del Form. 3, para distinguir las tarjetas de
@@ -54,8 +54,15 @@ function resumenRequisitos(t: TipoTramite): string {
 
 function Requisitos({ tipo }: { tipo: TipoTramite }) {
   const texto = resumenRequisitos(tipo);
-  if (!texto) return null;
-  return <span className={styles.requisitos}><IconoArchivo tamano={12} /> {texto}</span>;
+  return (
+    <>
+      {texto && <span className={styles.requisitos}><IconoArchivo tamano={12} /> {texto}</span>}
+      {/* Cuánto vale, si es por horas (Urgencia médica: 120, 2026-11-26). */}
+      {tipo.horas_vigencia && (
+        <span className={styles.requisitos}><IconoReloj tamano={12} /> Vale {textoVigencia(tipo.horas_vigencia)}</span>
+      )}
+    </>
+  );
 }
 
 interface Props {

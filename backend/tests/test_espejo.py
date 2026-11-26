@@ -100,6 +100,18 @@ def test_horario_laboral(caso):
     assert fuera_de_horario(datetime.fromisoformat(caso["momento"])) is caso["fuera"]
 
 
+# ── Vigencia por horas (Urgencia médica, 2026-11-26) ─────────────────────────
+
+VIGENCIA = _casos("vigencia.json")
+
+
+@pytest.mark.parametrize("caso", VIGENCIA, ids=_ids(VIGENCIA))
+def test_texto_de_la_vigencia(caso):
+    from app.core.horario import texto_vigencia
+
+    assert texto_vigencia(caso["horas"]) == caso["texto"]
+
+
 # ── Ficha del tripulante ─────────────────────────────────────────────────────
 
 TRIPULANTES = _casos("tripulantes.json")

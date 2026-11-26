@@ -463,6 +463,8 @@ class SalidaSolicitudResumen(BaseModel):
     enviada_en:           datetime
     plazo_correccion:     datetime | None = None
     vigente_hasta:        datetime | None = None
+    # Las horas que vale desde la aprobación, si se aprobó con esa regla (Urgencia médica, 2026-11-26).
+    horas_vigencia:       int | None = None
     aprobada_en:          datetime | None = None
     negada_en:            datetime | None = None
     finalizada_en:        datetime | None = None

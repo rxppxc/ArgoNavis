@@ -3,7 +3,7 @@ import { leerEspejo, type Caso } from "../../pruebas/espejo";
 import { tripulanteDePrueba } from "../../pruebas/datos";
 import {
   ETIQUETA_EVENTO, normalizarImo, TEXTO_HORARIO_LABORAL, textoSector, textoSectorCorto,
-  tituloColumnaRango,
+  textoVigencia, tituloColumnaRango,
 } from "./presentacion";
 
 describe("tituloColumnaRango (la ocupación salió del formulario el 2026-11-16)", () => {
@@ -48,5 +48,12 @@ describe("textoSector (2026-11-22)", () => {
     expect(textoSectorCorto({ sector_nombre: "Sector Pacífico", sector_actual_nombre: null })).toBe("Sector Pacífico");
     expect(textoSectorCorto({ sector_nombre: "Sector Pacífico", sector_actual_nombre: "Sector Atlántico" }))
       .toBe("Sector Pacífico (hoy, Sector Atlántico)");
+  });
+});
+
+describe("textoVigencia (espejo de texto_vigencia, core/horario.py; 2026-11-26)", () => {
+  interface CasoVigencia extends Caso { horas: number; texto: string }
+  it.each(leerEspejo<CasoVigencia[]>("vigencia.json"))("$caso", ({ horas, texto }) => {
+    expect(textoVigencia(horas)).toBe(texto);
   });
 });

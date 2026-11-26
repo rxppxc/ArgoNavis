@@ -28,7 +28,7 @@ from reportlab.lib.units import mm
 from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.core import identidad
-from app.core.horario import ZONA_PANAMA, aviso_fuera_de_horario
+from app.core.horario import ZONA_PANAMA, aviso_fuera_de_horario, texto_vigencia
 from app.informes.pdf import color_pdf, obtener_fuentes, texto_pdf
 
 # La paleta del SNM (core/identidad.py) y, en los estados, el color de su insignia
@@ -119,6 +119,9 @@ class DatosPdfAutorizacion:
     # palabras (2026-11-18): None en los demás.
     operacion:           str | None = None
     dias_sellado:        str | None = None
+    # Las horas que vale desde la aprobación, si se aprobó con esa regla (Urgencia médica, 120:
+    # 2026-11-26). None = hasta el final del día de `vigente_hasta`.
+    horas_vigencia:      int | None = None
     # Aprobada fuera del horario laboral, con su recargo (2026-11-11).
     fuera_de_horario:       bool = False
     costo_fuera_de_horario: Decimal | None = None
@@ -212,7 +215,11 @@ def generar_pdf_autorizacion(d: DatosPdfAutorizacion) -> bytes:
         # Se aprobó y nadie la finalizó (2026-11-22): consta, pero ya no autoriza nada.
         texto_estado, color_estado = f"EXPIRADA — NO SE FINALIZÓ ANTES DEL {_f(d.vigente_hasta)}", GRIS
     else:
-        texto_estado = "APROBADA" + (f" — VIGENTE HASTA EL {_f(d.vigente_hasta)}" if d.vigente_hasta else "")
+        if d.vigente_hasta and d.horas_vigencia:   # vale por horas: la hora importa
+            texto_estado = (f"APROBADA — VIGENTE HASTA EL {_f(d.vigente_hasta, True)} · "
+                            f"{texto_vigencia(d.horas_vigencia).upper()}")
+        else:
+            texto_estado = "APROBADA" + (f" — VIGENTE HASTA EL {_f(d.vigente_hasta)}" if d.vigente_hasta else "")
         color_estado = VERDE
     estado = Table(
         [[Paragraph(escape(texto_estado), estilo("estado", fontName=negrita, fontSize=9.5, alignment=TA_CENTER, textColor=colors.white))]],

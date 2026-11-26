@@ -102,6 +102,8 @@ export interface SolicitudResumen {
   enviada_en: string;
   plazo_correccion: string | null;
   vigente_hasta: string | null;
+  /** Las horas que vale desde la aprobación, si se aprobó con esa regla (Urgencia médica, 2026-11-26). */
+  horas_vigencia?: number | null;
   aprobada_en: string | null;
   negada_en: string | null;
   finalizada_en: string | null;
@@ -395,6 +397,8 @@ export interface VerificacionAutorizacion {
   fecha_operacion: string | null;
   aprobada_en: string | null;
   vigente_hasta: string | null;
+  /** Las horas que vale desde la aprobación, si se aprobó con esa regla (Urgencia médica, 2026-11-26). */
+  horas_vigencia?: number | null;
   finalizada_en: string | null;
   puesto_finalizacion_nombre: string | null;
   /** Quien escanea puede ver el PDF (la copia de la agencia, 2026-11-14): mientras

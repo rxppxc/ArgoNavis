@@ -298,6 +298,16 @@ class ServicioSolicitud:
         )
 
     @staticmethod
+    def horas_vigencia(s: Solicitud) -> int | None:
+        """Las horas que vale desde la aprobación, si se aprobó con la regla de horas de su trámite
+        (Urgencia médica, 120: 2026-11-26). Se mira la solicitud y no solo el catálogo: las
+        aprobadas antes valen hasta el final del día y no las dicen."""
+        horas = s.tipo_tramite.horas_vigencia
+        if horas and s.aprobada_en and s.vigente_hasta and s.vigente_hasta - s.aprobada_en == timedelta(hours=horas):
+            return horas
+        return None
+
+    @staticmethod
     def _hay_pdf(ctx: ContextoAcceso, s: Solicitud) -> bool:
         """La autorización en PDF: aprobada o finalizada. La que se aprobó y venció sin
         finalizarse la ve el SNM, con su sello (2026-11-22); la agencia no."""
@@ -1201,7 +1211,10 @@ class ServicioSolicitud:
         # Fuera del horario laboral lleva el recargo de hoy (2026-11-11).
         costo = configuracion.COSTO_FUERA_DE_HORARIO
         s.costo_fuera_de_horario = costo if costo > 0 and fuera_de_horario(s.aprobada_en) else None
-        s.vigente_hasta          = fin_del_dia(limite)
+        # Vale las horas del trámite desde la aprobación (Urgencia médica, 120: 2026-11-26) o, si
+        # no las tiene, hasta el final del día, DIAS_GRACIA_FINALIZACION días después de la operación.
+        horas = s.tipo_tramite.horas_vigencia
+        s.vigente_hasta          = s.aprobada_en + timedelta(hours=horas) if horas else fin_del_dia(limite)
         s.codigo_verificacion    = secrets.token_urlsafe(24)
         self._registrar_evento(s, ctx.usuario, TipoEventoSolicitud.APROBADA, anterior, s.estado, observacion)
         await self.repo.guardar()
@@ -1366,7 +1379,7 @@ class ServicioSolicitud:
             cantidad_tripulantes=s.cantidad_tripulantes,
             creada_por=s.creada_por.full_name if s.creada_por else None,
             created_at=s.created_at, enviada_en=s.enviada_en,
-            plazo_correccion=s.plazo_correccion, vigente_hasta=s.vigente_hasta,
+            plazo_correccion=s.plazo_correccion, vigente_hasta=s.vigente_hasta, horas_vigencia=self.horas_vigencia(s),
             aprobada_en=s.aprobada_en, negada_en=s.negada_en,
             finalizada_en=s.finalizada_en, expirada_en=s.expirada_en,
             veces_devuelta=s.veces_devuelta or 0,
@@ -1697,6 +1710,7 @@ class ServicioSolicitud:
             fuera_de_horario=fuera_de_horario(s.aprobada_en),
             costo_fuera_de_horario=s.costo_fuera_de_horario,
             vigente_hasta=s.vigente_hasta.astimezone(ZONA_PANAMA) if s.vigente_hasta else None,
+            horas_vigencia=self.horas_vigencia(s),
             finalizada_en=s.finalizada_en.astimezone(ZONA_PANAMA) if s.finalizada_en else None,
             expirada_en=s.expirada_en.astimezone(ZONA_PANAMA) if s.expirada_en else None,
             puesto_finalizacion=s.puesto_finalizacion_nombre,

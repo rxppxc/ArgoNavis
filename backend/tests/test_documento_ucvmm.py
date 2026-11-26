@@ -14,7 +14,7 @@ propio; si el catálogo o las reglas se apartan de ella, estas pruebas fallan:
     aplique"); los procesos de Desembarque, Urgencias, Renovación y Shore Pass
     piden avisar al aprobar que se debe tramitar la custodia.
 
-Siete reglas van más allá de la lectura literal, por decisión del usuario:
+Ocho reglas van más allá de la lectura literal, por decisión del usuario:
   - Ningún documento vencido: la vigencia bloquea en los 8 trámites (la Nota
     de la pág. 9 la pedía solo en Embarque, Visita médica y Shore Pass). Desde el
     2026-11-13, el pasaporte con al menos 3 meses a partir de la operación, y el
@@ -44,14 +44,19 @@ Siete reglas van más allá de la lectura literal, por decisión del usuario:
   - En Embarque y Desembarque, la agencia responde «¿Subir y bajar?»; con «Sí»,
     cada pasajero, de cualquier rango, adjunta la Carta de Responsabilidad
     (Form. No. 7), además de lo demás (condición `subir_y_bajar`, 2026-11-16).
+  - Pedido del 2026-11-26: la copia del boleto aéreo es opcional en Desembarque y en
+    el trámite de Técnico (en los demás se sigue exigiendo); en Urgencia médica, la
+    Carta de Responsabilidad (Form. No. 7) va una por solicitud, con los documentos de
+    la solicitud, el trámite pide la operación como el de Técnico (solo se registra) y
+    la autorización vale 120 horas desde la aprobación.
 """
 import secrets
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import pytest
 
 from app.domain.models.solicitud import vigencia_minima_pasaporte
-from ayudas import HOY, MANANA, cabecera, enviar, pdf, tripulante, verificar_impedimentos
+from ayudas import HOY, MANANA, cabecera, enviar, panama, pdf, tripulante, verificar_impedimentos
 from conftest import Actor, crear_actor, id_sector
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
@@ -74,6 +79,8 @@ VISA_MARINO_RESTRINGIDO = ("DOC-VISA-MARINO", "marino", "nacionalidad_restringid
 LIBRETA = ("DOC-LIBRETA-MARINO", "marino", "siempre", None)           # solo el Marino: requiere_libreta
 LISTA = ("DOC-LISTA-TRIPULANTES", "solicitud", "siempre", None)       # "debe subirse al trámite"
 CARTA = ("DOC-FORM7-RESPONSABILIDAD", "marino", "siempre", MARINO)    # "para cada tripulante"
+# En Urgencia médica, una por solicitud (2026-11-26), si hay algún Marino o Pasajero.
+CARTA_DE_LA_SOLICITUD = ("DOC-FORM7-RESPONSABILIDAD", "solicitud", "siempre", MARINO)
 REPORTE = ("DOC-REPORTE-MEDICO", "marino", "siempre", MARINO)         # "para cada tripulante"
 CITA = ("DOC-CITA-CONSULADO", "marino", "siempre", MARINO)
 BOLETO = ("DOC-BOLETO-AEREO", "marino", "siempre", NO_MARINOS)        # reunión del 2026-10-30
@@ -89,8 +96,12 @@ CARTA_GARANTIA = ("DOC-CARTA-GARANTIA", "solicitud", "subir_y_bajar", None)
 # desde el 2026-11-13; sus filas de Embarque y Desembarque se borraron el 2026-11-14.
 TECNICOS = ("superintendente", "supernumerario", "tecnico")
 BOLETO_MILITAR = ("DOC-BOLETO-AEREO", "marino", "solo_extranjeros", ("militar",))   # no a panameños (2026-11-14)
-# (trámite, documento) → rangos para los que es opcional: hoy ninguno.
-OPCIONAL: dict[tuple[str, str], tuple[str, ...]] = {}
+# (trámite, documento) → rangos para los que es opcional: el boleto aéreo en Desembarque y en el
+# trámite de Técnico (2026-11-26).
+OPCIONAL: dict[tuple[str, str], tuple[str, ...]] = {
+    ("F3-DESEMBARQUE", "DOC-BOLETO-AEREO"): ("marino", "militar", "pasajero"),
+    ("F3-TECNICO", "DOC-BOLETO-AEREO"): ("superintendente", "supernumerario", "tecnico"),
+}
 
 # campos: los propios del trámite (además de la cabecera común del Formulario 3)
 # vigencia: si el pasaporte y el seamanbook vencidos impiden enviar (Nota de la pág. 9)
@@ -111,7 +122,9 @@ DOCUMENTO = {
     },
     "F3-URGENCIA-MEDICA": {
         "campos": ["puerto_desembarque", "clinica_hospital"], "vigencia": True, "aviso_custodia": True,
-        "documentos": {FORM3, CARTA, REPORTE, GENERALES, LIBRETA, BOLETO, VISA_MILITAR_RESTRINGIDO,
+        # 2026-11-26: la operación como en Técnico y la autorización vale 120 horas desde la aprobación.
+        "operacion": True, "horas_vigencia": 120,
+        "documentos": {FORM3, CARTA_DE_LA_SOLICITUD, REPORTE, GENERALES, LIBRETA, BOLETO, VISA_MILITAR_RESTRINGIDO,
                        VISA_MARINO_RESTRINGIDO},
     },
     "F3-RENOV-PASAPORTE": {
@@ -173,6 +186,9 @@ def _asignaciones(codigo_tramite: str, tripulantes: list[dict], *, sin: set[str]
         if codigo in sin:
             continue
         if alcance == "solicitud":
+            rangos = documento[3]
+            if rangos and not any(t["rango"] in rangos for t in tripulantes):
+                continue
             if condicion == "nacionalidad_restringida" and not any(t["nacionalidad"] == "CUB" for t in tripulantes):
                 continue
             if condicion == "subir_y_bajar" and not subir_y_bajar:
@@ -247,6 +263,7 @@ async def test_catalogo_igual_al_documento(cliente, agencia):
         assert tipo["permite_subir_y_bajar"] == esperado.get("subir_y_bajar", False), codigo
         assert tipo["pide_operacion"] == esperado.get("operacion", False), codigo
         assert tipo["pide_dias_sellado"] == esperado.get("dias_sellado", False), codigo
+        assert tipo["horas_vigencia"] == esperado.get("horas_vigencia"), codigo
 
 
 @pytest.mark.parametrize("codigo", sorted(DOCUMENTO))
@@ -331,6 +348,103 @@ async def test_custodia_segun_el_formulario(cliente, agencia, codigo):
     assert r.status_code == 201, (codigo, r.text)
     # Desde el 2026-11-14 se señala en todos los trámites: a los restringidos se les pide la Visa.
     assert r.json()["tiene_nacionalidad_restringida"], codigo
+
+
+# El rango al que cada trámite le pide el boleto aéreo (Shore Pass no: solo admite Marino).
+RANGO_CON_BOLETO = {"F3-EMBARQUE": "militar", "F3-DESEMBARQUE": "marino", "F3-URGENCIA-MEDICA": "militar",
+                    "F3-RENOV-PASAPORTE": "militar", "F3-TECNICO": "tecnico", "F3-CAMBIO-NAVE": "militar"}
+
+
+@pytest.mark.parametrize("codigo", sorted(RANGO_CON_BOLETO))
+async def test_boleto_opcional_solo_en_desembarque_y_tecnico(cliente, agencia, codigo):
+    """La copia del boleto aéreo es opcional en Desembarque y en el trámite de Técnico: sin ella
+    se envía y su casilla queda como opcional. En los demás trámites se sigue exigiendo
+    (pedido del 2026-11-26)."""
+    naviera, puesto_id = agencia
+    tripulantes = [tripulante("Ana", "PHL", rango=RANGO_CON_BOLETO[codigo])]
+    datos, archivos = _datos(codigo, puesto_id, tripulantes, sin={"DOC-BOLETO-AEREO"})
+    r = await enviar(cliente, naviera, datos, archivos)
+    if codigo in ("F3-DESEMBARQUE", "F3-TECNICO"):
+        assert r.status_code == 201, (codigo, r.text)
+        boleto = next(c for c in r.json()["checklist"] if c["documento_codigo"] == "DOC-BOLETO-AEREO")
+        assert not boleto["obligatoria"] and not boleto["cubierta"], boleto
+    else:
+        assert r.status_code == 400 and "Boleto" in r.json()["detail"], (codigo, r.text)
+
+
+async def test_urgencia_una_carta_form7_por_solicitud(cliente, agencia):
+    """En Urgencia médica, la Carta de Responsabilidad (Form. No. 7) es una sola para toda la
+    solicitud, con los documentos de la solicitud (pedido del 2026-11-26). Antes, una por tripulante."""
+    naviera, puesto_id = agencia
+    datos, archivos = _datos("F3-URGENCIA-MEDICA", puesto_id, [tripulante("Ana", "PHL"), tripulante("Beto", "PHL")])
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 201, r.text
+    cartas = [c for c in r.json()["checklist"] if c["documento_codigo"] == "DOC-FORM7-RESPONSABILIDAD"]
+    assert len(cartas) == 1 and cartas[0]["alcance"] == "solicitud" and cartas[0]["tripulante_id"] is None, cartas
+    assert cartas[0]["cubierta"]
+
+
+async def test_urgencia_pide_la_operacion(cliente, agencia):
+    """Urgencia médica pide la operación como el trámite de Técnico: Embarque, Desembarque o
+    Subir y bajar (2026-11-26). Solo se registra: «Subir y bajar» no le suma documentos."""
+    naviera, puesto_id = agencia
+    tripulantes = [tripulante("Ana", "PHL")]
+    datos, archivos = _datos("F3-URGENCIA-MEDICA", puesto_id, tripulantes)
+    datos["operacion"] = None
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 400 and "Operación" in r.json()["detail"], r.text
+
+    datos, archivos = _datos("F3-URGENCIA-MEDICA", puesto_id, tripulantes, operacion="subir_y_bajar")
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 201, r.text
+    assert r.json()["operacion"] == "subir_y_bajar"
+    codigos = [c["documento_codigo"] for c in r.json()["checklist"]]
+    assert codigos.count("DOC-FORM7-RESPONSABILIDAD") == 1 and "DOC-CARTA-GARANTIA" not in codigos
+
+
+async def test_urgencia_vale_120_horas_desde_la_aprobacion(cliente, admin, monkeypatch):
+    """La autorización de Urgencia médica vale exactamente 120 horas desde que se aprueba, y el
+    correo de la agencia lo dice. Los demás trámites siguen valiendo hasta el final del día, dos
+    días después de la operación (pedido del 2026-11-26)."""
+    from app.core import email
+    from app.domain.services.solicitud_service import fin_del_dia
+
+    mensajes = []
+
+    async def smtp_falso(mensaje, **_):
+        mensajes.append(mensaje)
+
+    monkeypatch.setattr(email.configuracion, "MAIL_HOST", "smtp.prueba.local")
+    monkeypatch.setattr(email.aiosmtplib, "send", smtp_falso)
+    sufijo = secrets.token_hex(2)
+    r = await cliente.post("/admin/agencias", json={"nombre": f"Agencia Vigencia {sufijo}", "correo": "vigencia@prueba.pa"},
+                           headers=admin.headers)
+    naviera = await crear_actor("Naviera", agencia_id=r.json()["id"], prefijo="naviera")
+    r = await cliente.post("/admin/puestos", json={"nombre": f"Puesto Vigencia {sufijo}", "sector_id": await id_sector()},
+                           headers=admin.headers)
+    puesto_id = r.json()["id"]
+    revisor = await crear_actor("UCVMM", prefijo="revisor")
+
+    for codigo in ("F3-URGENCIA-MEDICA", "F3-DESEMBARQUE"):
+        datos, archivos = _datos(codigo, puesto_id, [tripulante("Ana", "PHL")])
+        r = await enviar(cliente, naviera, datos, archivos)
+        assert r.status_code == 201, (codigo, r.text)
+        sid = r.json()["id"]
+        await verificar_impedimentos(cliente, revisor, sid)
+        mensajes.clear()
+        r = await cliente.post(f"/solicitudes/{sid}/aprobar", json={}, headers=revisor.headers)
+        assert r.status_code == 200, (codigo, r.text)
+        s = r.json()
+        vigente = datetime.fromisoformat(s["vigente_hasta"])
+        texto = next(m for m in mensajes if "vigencia@prueba.pa" in m["To"]).get_body(preferencelist=("plain",)).get_content()
+        if codigo == "F3-URGENCIA-MEDICA":
+            assert vigente - datetime.fromisoformat(s["aprobada_en"]) == timedelta(hours=120), s
+            assert "120 horas (5 días) desde la aprobación" in texto, texto
+            assert s["horas_vigencia"] == 120   # el expediente lo dice junto a «Vigente hasta»
+        else:
+            assert vigente == fin_del_dia(date.fromisoformat(s["fecha_operacion"]) + timedelta(days=2)), s
+            assert "desde la aprobación" not in texto, texto
+            assert s["horas_vigencia"] is None
 
 
 async def test_aviso_de_custodia_al_aprobar(cliente, admin, monkeypatch):
@@ -444,12 +558,16 @@ async def test_tramite_tecnico_solo_sus_rangos(cliente, agencia):
 async def test_rangos_no_marinos_generales_y_boleto(cliente, agencia, codigo):
     """Reunión del 2026-10-30: a un rango distinto de Marino solo se le piden
     las Generales de pasaporte y el boleto aéreo. Embarque y Desembarque, abajo;
-    Shore Pass admite solo al Marino (2026-11-14)."""
+    Shore Pass admite solo al Marino (2026-11-14). En el trámite de Técnico el boleto
+    es opcional desde el 2026-11-26."""
     naviera, puesto_id = agencia
     tripulantes = [tripulante("Hans", "DEU", rango="tecnico")]
     datos, archivos = _datos(codigo, puesto_id, tripulantes, sin={"DOC-BOLETO-AEREO"})
     r = await enviar(cliente, naviera, datos, archivos)
-    assert r.status_code == 400 and "Boleto" in r.json()["detail"], (codigo, r.text)
+    if codigo == "F3-TECNICO":
+        assert r.status_code == 201, (codigo, r.text)
+    else:
+        assert r.status_code == 400 and "Boleto" in r.json()["detail"], (codigo, r.text)
 
     datos, archivos = _datos(codigo, puesto_id, tripulantes)
     r = await enviar(cliente, naviera, datos, archivos)
@@ -762,7 +880,9 @@ async def test_subir_y_bajar_del_tecnico_pide_la_carta_por_tripulante(cliente, a
     assert r.status_code == 201, r.text
     s = r.json()
     assert all(CARTA_FORM7 in _del_pasajero(s, i) for i in range(2))
-    assert all(c["cubierta"] and c["obligatoria"] for c in s["checklist"])
+    assert all(c["cubierta"] for c in s["checklist"])
+    # Todo obligatorio salvo el boleto aéreo, opcional en este trámite desde el 2026-11-26.
+    assert all(c["obligatoria"] == (c["documento_codigo"] != "DOC-BOLETO-AEREO") for c in s["checklist"])
     # Es la operación, no la pregunta de antes: el expediente no dice «Subir y bajar: Sí».
     assert s["operacion"] == "subir_y_bajar" and s["subir_y_bajar"] is False
 
@@ -1077,3 +1197,50 @@ async def test_la_garantia_no_se_pide_en_otros_tramites(cliente, agencia):
     assert r.status_code == 201, r.text
     codigos = {c["documento_codigo"] for c in r.json()["checklist"]}
     assert not codigos & {GARANTIA_O_CONTRATO_, CARTA_GARANTIA_}
+
+
+async def test_el_pdf_de_urgencia_dice_su_vigencia(monkeypatch):
+    """El PDF de una autorización de Urgencia médica dice hasta qué hora vale y que son 120 horas
+    desde la aprobación (2026-11-26); el de los demás trámites, solo el día."""
+    from app.informes import autorizacion_pdf
+    from app.informes.autorizacion_pdf import DatosPdfAutorizacion, generar_pdf_autorizacion
+
+    parrafos: list[str] = []
+    original = autorizacion_pdf.Paragraph
+    monkeypatch.setattr(autorizacion_pdf, "Paragraph", lambda texto, *a, **k: (parrafos.append(texto), original(texto, *a, **k))[1])
+
+    def datos(**cambios) -> DatosPdfAutorizacion:
+        return DatosPdfAutorizacion(**{
+            "numero": "AM-2026-000001", "estado": "approved", "tipo_tramite": "Urgencia médica", "nota_tramite": None,
+            "aviso_custodia": False, "agencia_naviera": "Agencia", "nombre_buque": "Aurora", "imo": None, "bandera": None,
+            "puesto_control": "Balboa", "fecha_operacion": date(2026, 11, 27), "nombre_puerto": None,
+            "puerto_desembarque": None, "clinica_hospital": None, "motivo": None,
+            "fecha_solicitud": panama(2026, 11, 26, 9), "aprobada_en": panama(2026, 11, 26, 10), "aprobada_por": "SNM",
+            "copia_interna": False, "vigente_hasta": panama(2026, 12, 1, 10), "finalizada_en": None,
+            "puesto_finalizacion": None, "expirada_en": None, "url_verificacion": "http://x/verificar/abc",
+            "codigo_verificacion": "abc", "tripulantes": [], **cambios,
+        })
+
+    generar_pdf_autorizacion(datos(horas_vigencia=120))
+    todo = " ".join(parrafos)
+    assert "VIGENTE HASTA EL 01/12/2026 10:00 AM" in todo and "120 HORAS (5 DÍAS) DESDE LA APROBACIÓN" in todo, todo
+
+    parrafos.clear()
+    generar_pdf_autorizacion(datos(tipo_tramite="Desembarque", vigente_hasta=panama(2026, 11, 29, 23, 59)))
+    todo = " ".join(parrafos)
+    assert "VIGENTE HASTA EL 29/11/2026" in todo and "DESDE LA APROBACIÓN" not in todo and "11:59" not in todo, todo
+
+
+async def test_las_aprobadas_antes_de_la_regla_no_dicen_las_120_horas():
+    """Las horas se miran en la solicitud, no solo en el catálogo: una Urgencia médica aprobada antes
+    del 2026-11-26 vale hasta el final del día y su PDF no dice «120 horas»."""
+    from types import SimpleNamespace
+
+    from app.domain.services.solicitud_service import ServicioSolicitud
+
+    tipo = SimpleNamespace(horas_vigencia=120)
+    aprobada = panama(2026, 11, 20, 10)
+    nueva = SimpleNamespace(tipo_tramite=tipo, aprobada_en=aprobada, vigente_hasta=aprobada + timedelta(hours=120))
+    antes = SimpleNamespace(tipo_tramite=tipo, aprobada_en=aprobada, vigente_hasta=panama(2026, 11, 23, 23, 59, 59))
+    assert ServicioSolicitud.horas_vigencia(nueva) == 120
+    assert ServicioSolicitud.horas_vigencia(antes) is None

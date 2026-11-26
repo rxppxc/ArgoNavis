@@ -44,6 +44,9 @@ export interface TipoTramite {
   pide_operacion: boolean;
   /** El formulario pide los días del sellado: 5 o 15 (2026-11-18: Shore Pass). */
   pide_dias_sellado: boolean;
+  /** Horas que vale la autorización desde la aprobación (2026-11-26: Urgencia médica, 120);
+   *  null = hasta el final del día, dos días después de la operación. */
+  horas_vigencia: number | null;
   /** Pasaporte con al menos 3 meses de vigencia desde la operación (2026-11-13; el
    *  seamanbook vencido solo se señala). */
   valida_vigencia: boolean;

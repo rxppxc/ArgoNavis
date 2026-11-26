@@ -98,8 +98,8 @@ test("el formulario cuida los documentos al quitar un tripulante o cambiar de tr
     await agencia.getByLabel("Adjuntar Generales de Pasaporte de Ana").setInputFiles(pdf("generales.pdf"));
     await agencia.getByLabel("Adjuntar Copia de Boleto Aéreo de Ana").setInputFiles(pdf("boleto.pdf"));
     // Su tarjeta queda completa: solo faltan los de la solicitud, la Lista de Tripulantes y
-    // el Formulario No. 3.
-    await expect(tarjeta(agencia, 0).getByText("2/2 documentos")).toBeVisible();
+    // el Formulario No. 3. El boleto es opcional en Desembarque (2026-11-26): no cuenta.
+    await expect(tarjeta(agencia, 0).getByText("1/1 documentos")).toBeVisible();
     await expect(agencia.getByText("Faltan 2 documentos por adjuntar")).toBeVisible();
     await agencia.getByLabel("Adjuntar Formulario No. 3").setInputFiles(pdf("formulario-3.pdf"));
     await expect(agencia.getByText("Falta 1 documento por adjuntar")).toBeVisible();
@@ -450,5 +450,42 @@ test("«Volver» regresa a los trámites y lo escrito queda en borrador (2026-11
     await agencia.reload();
     await expect(agencia.getByRole("group", { name: "Tipo de trámite" })).toBeVisible();
     await expect(agencia.getByText("Recuperamos la solicitud que dejaste sin enviar")).toHaveCount(0);
+  });
+});
+
+test("Urgencias: operación, 120 horas de vigencia y una sola Carta Form. 7; el boleto opcional en Desembarque (2026-11-26)", async ({ browser }) => {
+  const agencia = await entrar(browser, CUENTAS.agencia);
+  await agencia.goto("/new");
+  const urgencias = agencia.getByRole("button", { name: /^Urgencias/ });
+  await expect(urgencias, "la tarjeta dice cuánto vale").toContainText("Vale 120 horas (5 días) desde la aprobación");
+  await urgencias.click();
+  await expect(agencia.getByText("La autorización de este trámite vale 120 horas (5 días) desde la aprobación."))
+    .toBeVisible();
+  await marinoFilipino(agencia, 0, "Ana");
+  await agencia.getByRole("button", { name: "Agregar tripulante" }).click();
+  await marinoFilipino(agencia, 1, "Beto");
+
+  await test.step("una sola Carta de Responsabilidad, abajo, con los documentos de la solicitud", async () => {
+    await expect(agencia.getByLabel("Adjuntar Carta de Responsabilidad (Form. No. 7)", { exact: true })).toHaveCount(1);
+    await expect(agencia.getByLabel(/^Adjuntar Carta de Responsabilidad \(Form\. No\. 7\) de /)).toHaveCount(0);
+  });
+
+  await test.step("pide la operación, como el trámite de Técnico; «Subir y bajar» no suma documentos", async () => {
+    const operacion = agencia.getByLabel("Operación *");
+    await expect(operacion, "empieza sin elegir").toHaveValue("");
+    await expect(operacion.locator("option")).toHaveText(["Selecciona…", "Embarque", "Desembarque", "Subir y bajar"]);
+    const resumen = agencia.getByText(/^Faltan? \d+ documentos? por adjuntar$/);
+    await operacion.selectOption("embarque");
+    const conEmbarque = await resumen.textContent();
+    await operacion.selectOption("subir_y_bajar");
+    await expect(resumen).toHaveText(conEmbarque ?? "");
+    await expect(agencia.getByText(/cada tripulante adjunta la Carta de Responsabilidad/)).toHaveCount(0);
+  });
+
+  await test.step("en Desembarque, el boleto aéreo es opcional", async () => {
+    await agencia.getByRole("button", { name: "Cambiar", exact: true }).click();
+    await agencia.getByRole("button", { name: /^Desembarque/ }).click();
+    await expect(agencia.getByLabel("Adjuntar Copia de Boleto Aéreo de Ana (opcional)")).toHaveCount(1);
+    await expect(agencia.getByText("La autorización de este trámite vale", { exact: false })).toHaveCount(0);
   });
 });

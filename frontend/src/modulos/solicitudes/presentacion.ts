@@ -37,6 +37,14 @@ export function textoDias(dias: number): string {
   return `${dias} días`;
 }
 
+/** Cuánto vale la autorización de un trámite con `horas_vigencia` (Urgencia médica, 120:
+ *  2026-11-26): «120 horas (5 días) desde la aprobación». Espejo de texto_vigencia
+ *  (core/horario.py), con los casos de backend/tests/espejo/vigencia.json. */
+export function textoVigencia(horas: number): string {
+  const dias = horas % 24 === 0 ? ` (${horas / 24} ${horas === 24 ? "día" : "días"})` : "";
+  return `${horas} horas${dias} desde la aprobación`;
+}
+
 export const ETIQUETA_SEXO: Record<Sexo, string> = {
   M: "Masculino",
   F: "Femenino",

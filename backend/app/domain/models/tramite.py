@@ -71,6 +71,9 @@ class TipoTramite(Base):
     # Si el formulario pide los días del sellado: 5 o 15 (2026-11-18, solo Shore Pass).
     # Obligatorios; no cambian los documentos ni la vigencia.
     pide_dias_sellado:           Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Horas que vale la autorización desde que se aprueba (2026-11-26: Urgencia médica, 120).
+    # Nula = como siempre: hasta el final del día, DIAS_GRACIA_FINALIZACION días después de la operación.
+    horas_vigencia:              Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # Si el trámite valida la vigencia (hoy, los 8): el pasaporte con al menos 3 meses
     # a partir de la operación; el seamanbook vencido solo se señala (2026-11-13).

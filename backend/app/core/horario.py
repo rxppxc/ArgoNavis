@@ -52,6 +52,13 @@ def aviso_fuera_de_horario(costo: Decimal | None) -> list[str]:
     return lineas
 
 
+def texto_vigencia(horas: int) -> str:
+    """Cuánto vale la autorización de un trámite con `horas_vigencia`: «120 horas (5 días) desde la
+    aprobación». Espejo: textoVigencia (presentacion.ts)."""
+    dias = f" ({horas // 24} {'día' if horas == 24 else 'días'})" if horas % 24 == 0 else ""
+    return f"{horas} horas{dias} desde la aprobación"
+
+
 def entre_fechas_panama(columna, desde: date | None, hasta: date | None) -> list:
     """Filtro por días de Panamá (inclusive) sobre una columna con hora, como un
     rango de instantes: `columna >= inicio de desde` y `< inicio del día siguiente

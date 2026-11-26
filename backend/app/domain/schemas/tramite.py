@@ -49,6 +49,9 @@ class SalidaTipoTramite(BaseModel):
     pide_operacion:              bool = False
     # El formulario pide los días del sellado: 5 o 15 (2026-11-18: Shore Pass).
     pide_dias_sellado:           bool = False
+    # Horas que vale la autorización desde la aprobación (2026-11-26: Urgencia médica, 120);
+    # nulo = hasta el final del día, dos días después de la operación.
+    horas_vigencia:              int | None = None
     valida_vigencia:             bool = False
     # Rangos de tripulante admitidos (nulo = cualquiera).
     rangos_permitidos: list[str] | None = None
