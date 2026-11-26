@@ -52,7 +52,7 @@ class DatosPdfBoleta:
     puesto:           str
     puesto_destino:   str | None   # cambio de puerto: el nuevo
     fecha_operacion:  date
-    pasajeros:        int
+    cantidad_tripulantes: int
     aprobada_en:      datetime
     generada_en:      datetime
     anulada_en:       datetime | None = None
@@ -276,7 +276,7 @@ def generar_pdf_boleta(d: DatosPdfBoleta) -> bytes:
         ("PUESTO DE CONTROL", texto_pdf(puesto)),
         ("BUQUE", texto_pdf(buque)),
         ("FECHA DE LA OPERACIÓN", f"{d.fecha_operacion:%d/%m/%Y}"),
-        ("TRIPULANTES", str(d.pasajeros)),
+        ("TRIPULANTES", str(d.cantidad_tripulantes)),
         ("APROBADA EL", _momento(d.aprobada_en)),
         ("HORARIO LABORAL", texto_pdf(TEXTO_HORARIO)),
         ("BOLETA GENERADA EL", _momento(d.generada_en)),

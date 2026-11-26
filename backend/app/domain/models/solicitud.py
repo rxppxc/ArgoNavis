@@ -474,3 +474,17 @@ class EventoSolicitud(Base):
 # registrado cuando se configura Solicitud, también en los scripts que no cargan
 # app.main (la siembra del E2E). boleta.py no importa este módulo: no hay ciclo.
 from app.domain.models import boleta as _boleta  # noqa: E402, F401
+
+
+def aviso_impedimentos(nombres: list[str]) -> str | None:
+    """Lo que la agencia lee al devolverse una solicitud con tripulantes con impedimento
+    (pedido del usuario del 2026-11-26): quiénes son y que la solicitud no puede avanzar con
+    ellos. None si no hay ninguno. No nombra unidades internas."""
+    if not nombres:
+        return None
+    if len(nombres) == 1:
+        return (f"Tripulante con impedimento: {nombres[0]}. La solicitud no puede avanzar con esa persona: "
+                "quítala al corregir; si va otra persona, agrégala como tripulante nuevo.")
+    lista = ", ".join(nombres[:-1]) + f" y {nombres[-1]}"
+    return (f"Tripulantes con impedimento: {lista}. La solicitud no puede avanzar con esas personas: "
+            "quítalas al corregir; si va otra persona, agrégala como tripulante nuevo.")

@@ -74,7 +74,7 @@ class FilaHistorico:
     buque:            str | None
     imo:              str | None
     fecha_operacion:  date
-    pasajeros:        int
+    cantidad_tripulantes: int
     enviada_en:       datetime
     aprobada_en:      datetime | None
     finalizada_en:    datetime | None
@@ -175,7 +175,7 @@ def generar(d: DatosHistorico) -> bytes:
         color = ESTADOS.get(s.estado, (s.estado, GRIS))[1]
         valores: list[Any] = [
             s.numero, etiqueta_estado(s), s.tramite, s.agencia, s.puesto, s.sector, s.buque, s.imo,
-            s.fecha_operacion, s.pasajeros, s.enviada_en, s.aprobada_en, s.finalizada_en,
+            s.fecha_operacion, s.cantidad_tripulantes, s.enviada_en, s.aprobada_en, s.finalizada_en,
             "Sí" if s.fuera_de_horario else None, s.costo,
         ]
         for col, ((_, _, tipo), valor) in enumerate(zip(_COLUMNAS, valores, strict=True), start=1):

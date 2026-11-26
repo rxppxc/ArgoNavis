@@ -46,6 +46,11 @@ function mensaje(decision: Decision, conImpedimento: string[]): string {
   }
   return decision === "devolver"
     ? "La agencia recibirá el motivo y tendrá un plazo para corregir. Si no corrige a tiempo, la solicitud expira."
+      // Desde el 2026-11-26 la agencia ve quiénes tienen impedimento y tiene que quitarlos.
+      + (conImpedimento.length
+        ? ` También verá que ${conImpedimento.join(", ")} ${conImpedimento.length === 1 ? "tiene" : "tienen"} impedimento `
+          + "y que la solicitud no puede avanzar con esas personas."
+        : "")
     : "La solicitud quedará denegada de forma definitiva y se avisará a la agencia.";
 }
 

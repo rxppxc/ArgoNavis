@@ -36,7 +36,7 @@ describe("construirCasillas (espejo de construir_casillas)", () => {
     expect(pares.filter((_, i) => !casillas[i].obligatoria)).toEqual(opcionales);
   });
 
-  it("la clave de una casilla sigue al pasajero, no a su posición", () => {
+  it("la clave de una casilla sigue al tripulante, no a su posición", () => {
     expect(claveCasilla("PASAPORTE", "n7")).toBe("PASAPORTE|n7");
     expect(claveCasilla("LISTA", null)).toBe("LISTA|s");
   });

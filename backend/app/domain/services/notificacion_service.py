@@ -23,7 +23,7 @@ from app.core.config import obtener_configuracion
 from app.core.email import Aviso
 from app.core.horario import texto_vigencia, ZONA_PANAMA, aviso_fuera_de_horario, fuera_de_horario, texto_costo
 from app.core.identidad import INSTITUCION
-from app.domain.models.solicitud import EstadoSolicitud, Solicitud
+from app.domain.models.solicitud import EstadoSolicitud, Solicitud, aviso_impedimentos
 from app.domain.repositories.catalogo_repository import RepositorioCatalogo
 
 configuracion = obtener_configuracion()
@@ -169,6 +169,8 @@ class ServicioNotificacion:
         ])
 
     async def devuelta(self, s: Solicitud) -> list[Aviso]:
+        # Quiénes tienen impedimento: la solicitud no puede avanzar con ellos (2026-11-26).
+        aviso = aviso_impedimentos([t.nombre_completo for t in s.tripulantes if t.con_impedimento])
         return self._con_destinatarios([Aviso(
             destinatarios=await self._correos_agencia(s), numero=s.numero or "", estado="Devuelta a corrección",
             titulo="La solicitud necesita correcciones",
@@ -178,7 +180,8 @@ class ServicioNotificacion:
             campos=_campos(s),
             destacado=(
                 f"Motivo: {s.motivo_devolucion}\n\n"
-                f"Plazo para corregir: hasta el {_fecha_hora(s.plazo_correccion)}."
+                + (f"{aviso}\n\n" if aviso else "")
+                + f"Plazo para corregir: hasta el {_fecha_hora(s.plazo_correccion)}."
             ),
             tono="naranja",
             boton_texto="Corregir solicitud", boton_url=url_solicitud(s, "/corregir"),

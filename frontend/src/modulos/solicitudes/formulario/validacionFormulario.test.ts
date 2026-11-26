@@ -97,6 +97,27 @@ describe("datos del trámite", () => {
     expect(validarFormulario(tramiteDePrueba(), completa, [], paises, hoy)).toEqual(["Registra al menos un tripulante."]);
   });
 
+  it("la operación, con las que ofrece el trámite: «Subir y bajar» solo en el de Técnico (2026-11-26)", () => {
+    const tecnico = tramiteDePrueba({ pide_operacion: true, operaciones: ["embarque", "desembarque", "subir_y_bajar"] });
+    const urgencias = tramiteDePrueba({ pide_operacion: true, operaciones: ["embarque", "desembarque"] });
+    expect(validar({}, tecnico)).toEqual(["Elige la operación: Embarque, Desembarque o Subir y bajar."]);
+    expect(validar({}, urgencias)).toEqual(["Elige la operación: Embarque o Desembarque."]);
+    expect(validar({ operacion: "subir_y_bajar" }, tecnico)).toEqual([]);
+    expect(validar({ operacion: "subir_y_bajar" }, urgencias))
+      .toEqual(["La operación «Subir y bajar» no es de este trámite: elige Embarque o Desembarque."]);
+    expect(validar({ operacion: "desembarque" }, urgencias)).toEqual([]);
+  });
+
+  it("al corregir, quien tiene impedimento no puede seguir en la solicitud (2026-11-26)", () => {
+    const beto = ficha({ id: 7, nombre: "Beto", apellido: "Pérez" }, "n7");
+    const nueva = ficha({ nombre: "Carla", pasaporte: "PX998877" }, "n8");
+    expect(validarFormulario(tramiteDePrueba(), completa, [beto, nueva], paises, hoy, new Set([7]))).toEqual([
+      "Quita a Beto Pérez: tiene impedimento y la solicitud no puede avanzar con esa persona. "
+        + "Si va otra persona, agrégala como tripulante nuevo.",
+    ]);
+    expect(validarFormulario(tramiteDePrueba(), completa, [nueva], paises, hoy, new Set([7]))).toEqual([]);
+  });
+
   it(`hasta ${MAX_TRIPULANTES} tripulantes`, () => {
     const tripulacion = (n: number) => Array.from({ length: n }, (_, i) => ficha({ pasaporte: `P${1000 + i}` }, `n${i}`));
     expect(validarFormulario(tramiteDePrueba(), completa, tripulacion(MAX_TRIPULANTES), paises, hoy)).toEqual([]);

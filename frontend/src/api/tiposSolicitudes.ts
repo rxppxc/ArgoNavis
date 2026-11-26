@@ -353,6 +353,8 @@ export interface SolicitudDetalle extends SolicitudResumen {
   observaciones: string | null;
   impedimentos_verificados: boolean;
   comentario_impedimentos: string | null;
+  /** Devuelta, los tripulantes con impedimento: la agencia los ve y debe quitarlos (2026-11-26). */
+  tripulantes_con_impedimento: string[];
   impedimentos_verificados_en: string | null;
   impedimentos_verificados_por: string | null;
   /** La del puesto de control, aparte de la de UCVMM: se exige antes de finalizar. */

@@ -38,7 +38,7 @@ SECTOR_DEL_PUESTO = "Sector Pacífico"
 # Para el cambio de puerto (2026-11-13): otro puesto del mismo sector y uno del otro.
 PUESTO_MISMO_SECTOR = "Puesto E2E Rodman"
 PUESTO_OTRO_SECTOR = "Puesto E2E Atlántico"
-# A los pasajeros de esta nacionalidad se les pide la Visa (2026-11-14).
+# A los tripulantes de esta nacionalidad se les pide la Visa (2026-11-14).
 NACIONALIDAD_RESTRINGIDA = "CUB"
 # Una solicitud del trámite de Técnico, aprobada fuera del horario con recargo, del
 # Puesto E2E Rodman (2026-11-16): para la boleta de recargo y el supervisor general, que

@@ -37,6 +37,19 @@ export function textoDias(dias: number): string {
   return `${dias} días`;
 }
 
+/** Lo que lee la agencia al devolverse una solicitud con tripulantes con impedimento (2026-11-26):
+ *  quiénes son y que la solicitud no puede avanzar con ellos. Espejo de aviso_impedimentos
+ *  (models/solicitud.py), con los casos de backend/tests/espejo/impedimentos.json. */
+export function avisoImpedimentos(nombres: string[]): string | null {
+  if (!nombres.length) return null;
+  const final = "si va otra persona, agrégala como tripulante nuevo.";
+  if (nombres.length === 1) {
+    return `Tripulante con impedimento: ${nombres[0]}. La solicitud no puede avanzar con esa persona: quítala al corregir; ${final}`;
+  }
+  const lista = `${nombres.slice(0, -1).join(", ")} y ${nombres[nombres.length - 1]}`;
+  return `Tripulantes con impedimento: ${lista}. La solicitud no puede avanzar con esas personas: quítalas al corregir; ${final}`;
+}
+
 /** Cuánto vale la autorización de un trámite con `horas_vigencia` (Urgencia médica, 120:
  *  2026-11-26): «120 horas (5 días) desde la aprobación». Espejo de texto_vigencia
  *  (core/horario.py), con los casos de backend/tests/espejo/vigencia.json. */

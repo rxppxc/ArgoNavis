@@ -40,7 +40,7 @@ def _datos_pdf():
     return DatosPdfBoleta(
         numero_oficio="UCVMM-045-2026", monto=Decimal("20.00"), numero_solicitud="AM-2026-000123",
         tipo_tramite="Embarque", agencia="Naviera del Istmo, S.A.", buque="MSC ARIES", imo="9074729",
-        puesto="Balboa", puesto_destino=None, fecha_operacion=date(2026, 11, 20), pasajeros=3,
+        puesto="Balboa", puesto_destino=None, fecha_operacion=date(2026, 11, 20), cantidad_tripulantes=3,
         aprobada_en=panama(2026, 11, 14, 16, 20), generada_en=panama(2026, 11, 15, 10, 5),
         anulada_en=None, motivo_anulacion=None,
         tipos_operacion=["Embarque", "Desembarque", "Cambio de Nave", "Urgencias o Atención Médica"],

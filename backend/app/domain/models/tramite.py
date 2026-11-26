@@ -68,6 +68,9 @@ class TipoTramite(Base):
     # Si el formulario pide la operación: Embarque, Desembarque o Subir y bajar
     # (2026-11-18, solo el trámite de Técnico). Obligatoria; no cambia los documentos.
     pide_operacion:              Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Las que ofrece, si la pide (2026-11-26): «Subir y bajar» solo en el de Técnico; Urgencia
+    # médica, Embarque o Desembarque. Nulo en los que no la piden.
+    operaciones:                 Mapped[list[str] | None] = mapped_column(ARRAY(String(20)), nullable=True)
     # Si el formulario pide los días del sellado: 5 o 15 (2026-11-18, solo Shore Pass).
     # Obligatorios; no cambian los documentos ni la vigencia.
     pide_dias_sellado:           Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")

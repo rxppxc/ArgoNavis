@@ -6,7 +6,7 @@
  *
  * El alcance lo pone el servidor: el mismo del expediente (las que revisó su sector y las
  * que esperan en él). Los filtros van en la URL (sin sumar entradas al historial): se puede
- * recargar o compartir la misma búsqueda. El pasajero no (2026-11-14): viaja en el estado de
+ * recargar o compartir la misma búsqueda. El tripulante buscado no (2026-11-14): viaja en el estado de
  * la navegación, y la API lo recibe en el cuerpo del pedido, fuera de los logs.
  */
 import { useEffect, useMemo, useState } from "react";
@@ -91,7 +91,7 @@ export default function PaginaConsultaHistorica() {
   const { pathname, search, state: estadoNavegacion, key: claveNavegacion } = useLocation();
   const tipoNavegacion = useNavigationType();
   // Los filtros viven aquí y la URL los copia: así se pueden recargar o compartir. El
-  // pasajero, en el estado de la navegación (al volver del expediente o al recargar).
+  // tripulante buscado, en el estado de la navegación (al volver del expediente o al recargar).
   const deLaNavegacion = (): FiltrosHistorico =>
     ({ ...filtrosDeUrl(parametros), pasajero: pasajeroDelEstado(estadoNavegacion) });
   const [filtros, setFiltros] = useState<FiltrosHistorico>(deLaNavegacion);
@@ -123,7 +123,7 @@ export default function PaginaConsultaHistorica() {
     return () => clearTimeout(t);
   }, [escrito, filtros.texto, filtros.pasajero]);
 
-  // La URL copia los filtros solo si cambiaron (antes navegaba dos veces), y el pasajero va
+  // La URL copia los filtros solo si cambiaron (antes navegaba dos veces), y el tripulante buscado va
   // en el estado de esa entrada del historial, no en la dirección.
   const urlBuscada = new URLSearchParams(urlDeFiltros(filtros, pagina)).toString();
   const pasajeroGuardado = pasajeroDelEstado(estadoNavegacion);

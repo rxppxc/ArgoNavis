@@ -378,10 +378,10 @@ test("panameños sin visa, la Visa de los restringidos y Shore Pass solo para ma
     await expect(ficha.getByText("0/3 documentos")).toBeVisible();
   });
 
-  await test.step("al militar restringido, la «Visa», como antes", async () => {
+  await test.step("al militar restringido, ninguna visa fuera del trámite de Técnico (2026-11-26)", async () => {
     await ficha.getByLabel("Rango *").selectOption("militar");
-    await expect(ficha.getByText(/^Nacionalidad restringida: debe adjuntar «Visa»\./)).toBeVisible();
-    await expect(agencia.getByLabel("Adjuntar Visa de Ana", { exact: true })).toBeAttached();
+    await expect(ficha.getByText("Nacionalidad restringida.", { exact: true })).toBeVisible();
+    await expect(agencia.getByLabel("Adjuntar Visa de Ana", { exact: true })).toHaveCount(0);
     await ficha.getByLabel("Rango *").selectOption("marino");
   });
 
@@ -453,7 +453,7 @@ test("«Volver» regresa a los trámites y lo escrito queda en borrador (2026-11
   });
 });
 
-test("Urgencias: operación, 120 horas de vigencia y una sola Carta Form. 7; el boleto opcional en Desembarque (2026-11-26)", async ({ browser }) => {
+test("Urgencias: Embarque o Desembarque, 120 horas de vigencia y una sola Carta Form. 7; el boleto opcional en Desembarque (2026-11-26)", async ({ browser }) => {
   const agencia = await entrar(browser, CUENTAS.agencia);
   await agencia.goto("/new");
   const urgencias = agencia.getByRole("button", { name: /^Urgencias/ });
@@ -470,16 +470,12 @@ test("Urgencias: operación, 120 horas de vigencia y una sola Carta Form. 7; el 
     await expect(agencia.getByLabel(/^Adjuntar Carta de Responsabilidad \(Form\. No\. 7\) de /)).toHaveCount(0);
   });
 
-  await test.step("pide la operación, como el trámite de Técnico; «Subir y bajar» no suma documentos", async () => {
+  await test.step("pide la operación: Embarque o Desembarque («Subir y bajar», solo en Técnico)", async () => {
     const operacion = agencia.getByLabel("Operación *");
     await expect(operacion, "empieza sin elegir").toHaveValue("");
-    await expect(operacion.locator("option")).toHaveText(["Selecciona…", "Embarque", "Desembarque", "Subir y bajar"]);
-    const resumen = agencia.getByText(/^Faltan? \d+ documentos? por adjuntar$/);
-    await operacion.selectOption("embarque");
-    const conEmbarque = await resumen.textContent();
-    await operacion.selectOption("subir_y_bajar");
-    await expect(resumen).toHaveText(conEmbarque ?? "");
-    await expect(agencia.getByText(/cada tripulante adjunta la Carta de Responsabilidad/)).toHaveCount(0);
+    await expect(operacion.locator("option")).toHaveText(["Selecciona…", "Embarque", "Desembarque"]);
+    await operacion.selectOption("desembarque");
+    await expect(operacion).toHaveValue("desembarque");
   });
 
   await test.step("en Desembarque, el boleto aéreo es opcional", async () => {

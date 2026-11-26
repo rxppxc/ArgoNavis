@@ -237,7 +237,7 @@ class ConsultaBandeja(BaseModel):
 class ConsultaHistorica(BaseModel):
     """Filtros de la consulta histórica (2026-11-11): las solicitudes que ve el
     personal del SNM, de cualquier año, con filtros que las bandejas no tienen.
-    Van en el cuerpo del pedido (POST, 2026-11-14), para que el pasajero buscado no
+    Van en el cuerpo del pedido (POST, 2026-11-14), para que el tripulante buscado no
     quede en los logs; la exportación a Excel usa los mismos."""
     texto:            str | None = Field(default=None, max_length=100)   # número, buque, IMO, agencia, puesto
     pasajero:         str | None = Field(default=None, max_length=100)   # nombre, pasaporte o seamanbook
@@ -527,6 +527,8 @@ class SalidaSolicitud(SalidaSolicitudResumen):
 
     impedimentos_verificados:     bool = False
     comentario_impedimentos:      str | None = None
+    # Devuelta, los tripulantes con impedimento: la agencia los ve y debe quitarlos (2026-11-26).
+    tripulantes_con_impedimento:  list[str] = Field(default_factory=list)
     impedimentos_verificados_en:  datetime | None = None
     impedimentos_verificados_por: str | None = None
     # La del puesto de control antes de finalizar (2026-11-06), aparte de la de UCVMM.

@@ -29,7 +29,7 @@ const LLENOS: FiltrosHistorico = {
 };
 
 describe("los filtros en la URL", () => {
-  it("van y vuelven iguales, salvo el pasajero, que no va en la URL (2026-11-14)", () => {
+  it("van y vuelven iguales, salvo el tripulante buscado, que no va en la URL (2026-11-14)", () => {
     const url = new URLSearchParams(urlDeFiltros(LLENOS, 3));
     expect(url.has("pasajero")).toBe(false);
     expect(filtrosDeUrl(url)).toEqual({ ...LLENOS, pasajero: "" });

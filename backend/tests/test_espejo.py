@@ -112,6 +112,18 @@ def test_texto_de_la_vigencia(caso):
     assert texto_vigencia(caso["horas"]) == caso["texto"]
 
 
+# ── Al devolver: quiénes tienen impedimento (2026-11-26) ──────────────────────
+
+IMPEDIMENTOS = _casos("impedimentos.json")
+
+
+@pytest.mark.parametrize("caso", IMPEDIMENTOS, ids=_ids(IMPEDIMENTOS))
+def test_aviso_de_impedimentos(caso):
+    from app.domain.models.solicitud import aviso_impedimentos
+
+    assert aviso_impedimentos(caso["nombres"]) == caso["texto"]
+
+
 # ── Ficha del tripulante ─────────────────────────────────────────────────────
 
 TRIPULANTES = _casos("tripulantes.json")

@@ -32,7 +32,7 @@ import { QueSigue } from "./QueSigue";
 import { RegistroExpediente } from "./RegistroExpediente";
 import {
   ETIQUETA_OPERACION, formatearFecha, formatearFechaHora, puestoAutorizado, TEXTO_HORARIO_LABORAL, textoDias,
-  textoPuestos, textoSector, textoVigencia, tiempoRestante,
+  avisoImpedimentos, textoPuestos, textoSector, textoVigencia, tiempoRestante,
 } from "../presentacion";
 import { SeccionTripulantes } from "./SeccionTripulantes";
 import { useVerificacionImpedimentos } from "./useVerificacionImpedimentos";
@@ -69,6 +69,10 @@ function BannerEstado({ s }: { s: SolicitudDetalle }) {
         <div className={`${styles.banner} ${styles.bannerCorreccion}`}>
           <div className={styles.bannerTitulo}><IconoAlerta tamano={15} /> Devuelta a corrección</div>
           <div className={styles.bannerTexto}>{s.motivo_devolucion}</div>
+          {/* Quiénes tienen impedimento: la agencia los ve y debe quitarlos (2026-11-26). */}
+          {s.tripulantes_con_impedimento.length > 0 && (
+            <div className={styles.bannerTexto}><strong>{avisoImpedimentos(s.tripulantes_con_impedimento)}</strong></div>
+          )}
           <div className={styles.bannerPie}>
             Plazo para corregir: hasta el {formatearFechaHora(s.plazo_correccion)}
             {plazo.vencido ? " (vencido)" : ` (${plazo.frase})`}
@@ -261,7 +265,7 @@ export default function PaginaDetalleSolicitud() {
   // las estadísticas, la pestaña de la bandeja); sin origen, al inicio.
   const { state: estadoNavegacion } = useLocation();
   const volverA = destinoDeVolver(estadoNavegacion);
-  // El pasajero buscado en la consulta histórica vuelve con ella (no va en la URL).
+  // El tripulante buscado en la consulta histórica vuelve con ella (no va en la URL).
   const estadoVolver = estadoDeVolver(estadoNavegacion);
   const [solicitud, setSolicitud] = useState<SolicitudDetalle | null>(null);
   const [error, setError] = useState<string | null>(null);

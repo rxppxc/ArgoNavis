@@ -128,7 +128,9 @@ export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos,
             <span>Operación *</span>
             <select value={cabecera.operacion} onChange={(e) => onCambiar("operacion", e.target.value)}>
               <option value="">Selecciona…</option>
-              {OPERACIONES.map((o) => <option key={o} value={o}>{ETIQUETA_OPERACION[o]}</option>)}
+              {/* Las del trámite: «Subir y bajar», solo el de Técnico (2026-11-26). */}
+              {OPERACIONES.filter((o) => !tipo.operaciones || tipo.operaciones.includes(o))
+                .map((o) => <option key={o} value={o}>{ETIQUETA_OPERACION[o]}</option>)}
             </select>
           </label>
         )}

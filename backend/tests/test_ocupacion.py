@@ -1,4 +1,4 @@
-"""La ocupación del pasajero salió del formulario (2026-11-16).
+"""La ocupación del tripulante salió del formulario (2026-11-16).
 
 La columna queda y admite nulo: las solicitudes enviadas antes la conservan y la
 siguen mostrando, en el expediente y en el PDF de la autorización. Al corregir una
@@ -39,7 +39,7 @@ async def agencia(cliente, admin) -> tuple[Actor, int]:
 
 
 async def _enviada_con_ocupacion(cliente, naviera: Actor, puesto_id: int) -> dict:
-    """Una solicitud como las de antes del 2026-11-16: el pasajero con su ocupación."""
+    """Una solicitud como las de antes del 2026-11-16: el tripulante con su ocupación."""
     datos, archivos = _datos(puesto_id, tripulante("Ana", "PAN"))
     r = await enviar(cliente, naviera, datos, archivos)
     assert r.status_code == 201, r.text
@@ -51,7 +51,7 @@ async def _enviada_con_ocupacion(cliente, naviera: Actor, puesto_id: int) -> dic
     return s
 
 
-async def test_el_pasajero_va_sin_ocupacion(cliente, agencia):
+async def test_el_tripulante_va_sin_ocupacion(cliente, agencia):
     naviera, puesto_id = agencia
     ficha = tripulante("Ana", "PAN")
     assert "ocupacion" not in ficha
@@ -119,13 +119,13 @@ async def test_al_corregir_se_borra_la_ocupacion(cliente, agencia):
 
 
 async def test_titulo_columna_rango():
-    """La columna del PDF dice «Rango / Ocupación» solo si algún pasajero la tiene."""
+    """La columna del PDF dice «Rango / Ocupación» solo si algún tripulante la tiene."""
     from app.informes.autorizacion_pdf import TripulantePdf, titulo_columna_rango
 
-    def pasajero(ocupacion: str | None) -> TripulantePdf:
+    def de_la_tabla(ocupacion: str | None) -> TripulantePdf:
         return TripulantePdf(nombre="Ana", apellido="Pérez", nacionalidad="Panamá", pasaporte="P1", libreta="",
                              rango="marino", ocupacion=ocupacion)
 
-    assert titulo_columna_rango([pasajero(None), pasajero(None)]) == "Rango"
-    assert titulo_columna_rango([pasajero(None), pasajero("Primer oficial")]) == "Rango / Ocupación"
+    assert titulo_columna_rango([de_la_tabla(None), de_la_tabla(None)]) == "Rango"
+    assert titulo_columna_rango([de_la_tabla(None), de_la_tabla("Primer oficial")]) == "Rango / Ocupación"
     assert titulo_columna_rango([]) == "Rango"

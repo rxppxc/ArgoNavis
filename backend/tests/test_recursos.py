@@ -44,26 +44,26 @@ async def _trozos(total: int, trozo: int = 256 * 1024):
 
 @asincrona
 async def test_el_tope_de_un_envio_alcanza_para_el_catalogo():
-    """Con el catálogo de hoy, ningún trámite pide más documentos por pasajero ni por
+    """Con el catálogo de hoy, ningún trámite pide más documentos por tripulante ni por
     solicitud de los que cuenta TOPE_CUERPO_ENVIO_MB. Si UCVMM agrega uno, esta prueba
     falla: sube MAX_DOCUMENTOS_* (solicitud_service.py) y client_max_body_size (nginx.conf)."""
     async with SesionLocal() as sesion:
         tipos = await RepositorioTramite(sesion).listar_tipos()
     # Todas las combinaciones que cambian el checklist, juntas en una solicitud.
-    pasajeros = [
+    fichas = [
         TripulanteChecklist(nombre=f"{rango.value}-{panameno}-{restringida}", es_panameno=panameno,
                             rango=rango.value, nacionalidad_restringida=restringida)
         for rango in RangoMarino for panameno in (False, True) for restringida in (False, True)
     ]
     servicio = ServicioTramite()
-    por_pasajero = de_la_solicitud = 0
+    por_tripulante = de_la_solicitud = 0
     for tipo in tipos:
-        casillas = servicio.construir_casillas(tipo, pasajeros)
+        casillas = servicio.construir_casillas(tipo, fichas)
         de_la_solicitud = max(de_la_solicitud, sum(c.indice_tripulante is None for c in casillas))
-        for indice in range(len(pasajeros)):
-            por_pasajero = max(por_pasajero, sum(c.indice_tripulante == indice for c in casillas))
-    assert tipos and por_pasajero and de_la_solicitud
-    assert por_pasajero <= MAX_DOCUMENTOS_POR_TRIPULANTE, f"un trámite pide {por_pasajero} documentos por pasajero"
+        for indice in range(len(fichas)):
+            por_tripulante = max(por_tripulante, sum(c.indice_tripulante == indice for c in casillas))
+    assert tipos and por_tripulante and de_la_solicitud
+    assert por_tripulante <= MAX_DOCUMENTOS_POR_TRIPULANTE, f"un trámite pide {por_tripulante} documentos por tripulante"
     assert de_la_solicitud <= MAX_DOCUMENTOS_DE_LA_SOLICITUD, f"un trámite pide {de_la_solicitud} por solicitud"
     assert TOPE_CUERPO_ENVIO_MB == 345   # 30 × 5 + 2 + 20 = 172 archivos de 2 MB, más 1 MB (2026-11-14)
 

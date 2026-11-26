@@ -30,7 +30,7 @@ import { useBorradorSolicitud } from "./useBorradorSolicitud";
 import { avanceFormulario } from "./pasosDelFormulario";
 import { AvanceFormulario } from "./AvanceFormulario";
 import { fechaISOLocal } from "../../../utils/fechas";
-import { formatearFechaHora, tiempoRestante } from "../presentacion";
+import { avisoImpedimentos, formatearFechaHora, tiempoRestante } from "../presentacion";
 import { SelectorTramite } from "./SelectorTramite";
 import { TarjetaTripulante } from "./TarjetaTripulante";
 import type { DatosFormulario } from "./useCargaFormulario";
@@ -120,9 +120,14 @@ export function FormularioSolicitud({
   }, [registrarVolver, corrigiendo, tipo, eligiendo]);
 
   const hoy = fechaISOLocal();
+  // Al corregir, los que la revisión marcó con impedimento: no pueden seguir (2026-11-26).
+  const conImpedimento = useMemo(
+    () => new Set((original?.tripulantes ?? []).filter((t) => t.con_impedimento).map((t) => t.id)),
+    [original],
+  );
   const errores = useMemo(
-    () => (tipo ? validarFormulario(tipo, cabecera, tripulantes, paisesPorCodigo, hoy) : []),
-    [tipo, cabecera, tripulantes, paisesPorCodigo, hoy],
+    () => (tipo ? validarFormulario(tipo, cabecera, tripulantes, paisesPorCodigo, hoy, conImpedimento) : []),
+    [tipo, cabecera, tripulantes, paisesPorCodigo, hoy, conImpedimento],
   );
 
   const cambiar = useCallback((campo: keyof CabeceraFormulario, valor: string) => {
@@ -163,9 +168,9 @@ export function FormularioSolicitud({
     if (!nuevo?.permite_subir_y_bajar) {
       setCabecera((prev) => ({ ...prev, subir_y_bajar: "no" }));
     }
-    if (!nuevo?.pide_operacion) {
-      setCabecera((prev) => ({ ...prev, operacion: "" }));
-    }
+    // Sin operación, o con una que el trámite nuevo no ofrece («Subir y bajar» fuera de Técnico).
+    setCabecera((prev) => (nuevo?.pide_operacion && (!nuevo.operaciones || nuevo.operaciones.includes(prev.operacion))
+      ? prev : { ...prev, operacion: "" }));
     if (!nuevo?.pide_dias_sellado) {
       setCabecera((prev) => ({ ...prev, dias_sellado: "" }));
     }
@@ -237,6 +242,9 @@ export function FormularioSolicitud({
         <div className={styles.bannerDevolucion}>
           <div className={styles.bannerTitulo}><IconoAlerta tamano={15} /> Motivo de la devolución</div>
           <div className={styles.bannerTexto}>{original.motivo_devolucion}</div>
+          {original.tripulantes_con_impedimento.length > 0 && (
+            <div className={styles.bannerTexto}><strong>{avisoImpedimentos(original.tripulantes_con_impedimento)}</strong></div>
+          )}
           <div className={styles.bannerPlazo}>
             Plazo para corregir: hasta el {formatearFechaHora(original.plazo_correccion)}
             {!plazo.vencido && <> ({plazo.frase})</>}
@@ -311,6 +319,7 @@ export function FormularioSolicitud({
                   fechaReferencia={referenciaVigencia}
                   rangosPermitidos={tipo.rangos_permitidos}
                   avisoCustodia={tipo.aviso_custodia}
+                  conImpedimento={!!t.id && conImpedimento.has(t.id)}
                   casillas={documentos.casillasPorTripulante.get(t.clave) ?? SIN_CASILLAS}
                   nuevos={documentos.nuevos}
                   existentes={documentos.existentes}

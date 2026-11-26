@@ -47,6 +47,8 @@ class SalidaTipoTramite(BaseModel):
     permite_subir_y_bajar:       bool = False
     # El formulario pide la operación: Embarque, Desembarque o Subir y bajar (2026-11-18: Técnico).
     pide_operacion:              bool = False
+    # Las que ofrece (2026-11-26): «Subir y bajar», solo el trámite de Técnico.
+    operaciones:                 list[str] | None = None
     # El formulario pide los días del sellado: 5 o 15 (2026-11-18: Shore Pass).
     pide_dias_sellado:           bool = False
     # Horas que vale la autorización desde la aprobación (2026-11-26: Urgencia médica, 120);

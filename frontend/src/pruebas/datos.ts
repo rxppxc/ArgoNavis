@@ -8,7 +8,7 @@ export function tramiteDePrueba(cambios: Partial<TipoTramite> = {}): TipoTramite
     id: 1, codigo: "T", nombre: "Trámite de prueba",
     requiere_buque: false, requiere_puerto: false, requiere_puerto_desembarque: false,
     requiere_motivo: false, requiere_clinica: false, permite_cambio_puerto: false, permite_subir_y_bajar: false,
-    pide_operacion: false, pide_dias_sellado: false, horas_vigencia: null, valida_vigencia: true, rangos_permitidos: null,
+    pide_operacion: false, operaciones: null, pide_dias_sellado: false, horas_vigencia: null, valida_vigencia: true, rangos_permitidos: null,
     aviso_custodia: false, descripcion: null, nota: null, orden: 1, activo: true, documentos: [],
     ...cambios,
   };
@@ -57,7 +57,7 @@ export function solicitudDePrueba(cambios: Partial<SolicitudDetalle> = {}): Soli
     pide_operacion: false, pide_dias_sellado: false,
     bandera: null, bandera_nombre: null, nombre_puerto: null, puerto_desembarque: null,
     motivo: null, clinica_hospital: null, observaciones: null,
-    impedimentos_verificados: false, comentario_impedimentos: null,
+    impedimentos_verificados: false, comentario_impedimentos: null, tripulantes_con_impedimento: [],
     impedimentos_verificados_en: null, impedimentos_verificados_por: null,
     impedimentos_puesto_verificados: false, comentario_impedimentos_puesto: null,
     impedimentos_puesto_en: null, impedimentos_puesto_por: null,

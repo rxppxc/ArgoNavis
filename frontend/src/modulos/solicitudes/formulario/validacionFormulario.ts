@@ -3,7 +3,8 @@
 import type { Pais, PuestoMini } from "../../../api/catalogos";
 import type { Operacion, TripulanteEntrada } from "../../../api/solicitudes";
 import type { TipoTramite } from "../../../api/tramites";
-import { ETIQUETA_RANGO, RANGOS_CON_LIBRETA, formatearFecha, normalizarImo } from "../presentacion";
+import { OPERACIONES } from "../../../api/tiposSolicitudes";
+import { ETIQUETA_OPERACION, ETIQUETA_RANGO, RANGOS_CON_LIBRETA, formatearFecha, normalizarImo } from "../presentacion";
 
 export interface CabeceraFormulario {
   puesto_control_id: string;
@@ -110,12 +111,20 @@ export function puestosParaCambio(puestos: PuestoMini[], puestoControlId: string
   return puestos.filter((p) => p.id !== elegido.id);
 }
 
+/** «Embarque, Desembarque o Subir y bajar». */
+function enumerarO(palabras: string[]): string {
+  return palabras.length > 1 ? `${palabras.slice(0, -1).join(", ")} o ${palabras[palabras.length - 1]}` : palabras[0] ?? "";
+}
+
+/** `conImpedimento`: al corregir, los tripulantes que la revisión marcó con impedimento (por su
+ *  id): no pueden seguir en la solicitud (2026-11-26). Espejo de corregir() del backend. */
 export function validarFormulario(
   tipo: TipoTramite,
   c: CabeceraFormulario,
   tripulantes: FichaTripulante[],
   paises: Map<string, Pais>,
   hoy: string,
+  conImpedimento: ReadonlySet<number> = new Set(),
 ): string[] {
   const errores: string[] = [];
 
@@ -138,12 +147,26 @@ export function validarFormulario(
   if (tipo.requiere_puerto_desembarque && !c.puerto_desembarque.trim()) errores.push("Indica el puerto de desembarque.");
   if (tipo.requiere_motivo && !c.motivo.trim()) errores.push("Indica el motivo.");
   if (tipo.requiere_clinica && !c.clinica_hospital.trim()) errores.push("Indica la clínica u hospital.");
-  // Obligatoria en el trámite de Técnico (2026-11-18); el backend: validar_campos_cabecera.
-  if (tipo.pide_operacion && !c.operacion) errores.push("Elige la operación: Embarque, Desembarque o Subir y bajar.");
+  // Obligatoria en el trámite de Técnico (2026-11-18) y en Urgencia médica (2026-11-26), con las que
+  // ofrece cada uno: «Subir y bajar», solo el de Técnico. El backend: _validar_formulario.
+  if (tipo.pide_operacion) {
+    const ofrecidas = OPERACIONES.filter((o) => !tipo.operaciones || tipo.operaciones.includes(o));
+    const opciones = enumerarO(ofrecidas.map((o) => ETIQUETA_OPERACION[o]));
+    if (!c.operacion) errores.push(`Elige la operación: ${opciones}.`);
+    else if (!ofrecidas.some((o) => o === c.operacion)) {
+      errores.push(`La operación «${ETIQUETA_OPERACION[c.operacion]}» no es de este trámite: elige ${opciones}.`);
+    }
+  }
   // Obligatorios en Shore Pass (2026-11-18); el backend: validar_campos_cabecera.
   if (tipo.pide_dias_sellado && !c.dias_sellado) errores.push("Elige los días del sellado: 5 o 15.");
 
   if (tripulantes.length === 0) errores.push("Registra al menos un tripulante.");
+  for (const t of tripulantes) {
+    if (t.id && conImpedimento.has(t.id)) {
+      errores.push(`Quita a ${`${t.nombre} ${t.apellido}`.trim()}: tiene impedimento y la solicitud no puede avanzar con `
+        + "esa persona. Si va otra persona, agrégala como tripulante nuevo.");
+    }
+  }
   // Solo pasa al corregir una solicitud enviada antes del tope: el botón no deja agregar más.
   if (tripulantes.length > MAX_TRIPULANTES) {
     errores.push(`Una solicitud admite hasta ${MAX_TRIPULANTES} tripulantes: quita ${tripulantes.length - MAX_TRIPULANTES} `

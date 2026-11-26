@@ -43,7 +43,7 @@ export const apiSolicitudes = {
       .then((r) => r.data),
 
   /** Consulta histórica (personal del SNM): las que ve, de cualquier año. Los filtros van en
-   *  el cuerpo (POST): el pasajero buscado no queda en los logs del servidor (2026-11-14). */
+   *  el cuerpo (POST): el tripulante buscado no queda en los logs del servidor (2026-11-14). */
   historico: (consulta: ConsultaHistorica) =>
     clienteApi.post<PaginaSolicitudes>("/solicitudes/historico", parametros(consulta))
       .then((r) => r.data),

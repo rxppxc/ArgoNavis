@@ -28,6 +28,8 @@ interface Props {
   rangosPermitidos: RangoMarino[] | null;
   /** Al aprobar se avisa que se debe tramitar la custodia (lo dice el proceso del trámite). */
   avisoCustodia:    boolean;
+  /** Al corregir, si la revisión le marcó impedimento: tiene que quitarse (2026-11-26). */
+  conImpedimento?:  boolean;
   /** Casillas del checklist que corresponden a este tripulante. */
   casillas:   CasillaFormulario[];
   nuevos:     Record<string, File>;
@@ -55,6 +57,8 @@ const VISAS = ["DOC-VISA", "DOC-VISA-MARINO"];
  *  desde el 2026-11-18, y el Form. No. 6 en Desembarque) y, en los trámites que lo dicen,
  *  que al aprobarse se tramita la custodia. */
 function textoRestringida(documentos: string[], avisoCustodia: boolean): string {
+  // Sin nada que adjuntar ni custodia (un Militar fuera del trámite de Técnico, 2026-11-26): solo se señala.
+  if (!documentos.length && !avisoCustodia) return "Nacionalidad restringida.";
   const partes = ["Nacionalidad restringida:"];
   if (documentos.length) partes.push(`debe adjuntar ${enumerar(documentos)}.`);
   if (avisoCustodia) {
@@ -69,7 +73,7 @@ function textoRestringida(documentos: string[], avisoCustodia: boolean): string 
  *  para no alargar la página. */
 export const TarjetaTripulante = memo(function TarjetaTripulante({
   ficha, indice, puedeQuitar, opcionesPais, paises, validaVigencia, fechaReferencia, rangosPermitidos,
-  avisoCustodia, casillas, nuevos, existentes, contraida,
+  avisoCustodia, conImpedimento = false, casillas, nuevos, existentes, contraida,
   onCambiar, onQuitar, onAlternar, onElegir, onDescartar, onVer,
 }: Props) {
   const conLibreta = portaLibreta(ficha);
@@ -225,8 +229,15 @@ export const TarjetaTripulante = memo(function TarjetaTripulante({
             )}
           </div>
 
-          {(restringida || pasaporteVencido || pasaporteCorto || libretaVencida) && (
+          {(conImpedimento || restringida || pasaporteVencido || pasaporteCorto || libretaVencida) && (
             <div className={styles.marinoAlertas}>
+              {conImpedimento && (
+                <div className={styles.alertaError} role="alert">
+                  <IconoAlerta tamano={13} />
+                  Tiene impedimento según la revisión: la solicitud no puede avanzar con esta persona. Quítala; si va
+                  otra persona, agrégala como tripulante nuevo.
+                </div>
+              )}
               {restringida && (
                 <div className={porRestringida.length ? styles.alertaInfo : styles.alertaAviso}>
                   <IconoAlerta tamano={13} />

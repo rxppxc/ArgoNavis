@@ -1,7 +1,7 @@
 /**
  * La consulta histórica sin React (2026-11-11): los filtros, cómo van en la URL
  * (para volver a la misma búsqueda o compartirla), la consulta para la API y el
- * atajo por año. El pasajero no va en la URL (2026-11-14: quedaba en el historial del
+ * atajo por año. El tripulante buscado no va en la URL (2026-11-14: quedaba en el historial del
  * navegador y en los logs del servidor): viaja en el estado de la navegación.
  */
 import type { ConsultaHistorica, EstadoSolicitud, OpcionesHistorico, SolicitudResumen } from "../../../api/solicitudes";

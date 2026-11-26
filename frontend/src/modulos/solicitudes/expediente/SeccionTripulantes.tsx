@@ -1,6 +1,7 @@
 import type { SolicitudDetalle, TripulanteSolicitud } from "../../../api/solicitudes";
 import BarraProgreso from "../../../components/BarraProgreso";
 import { IconoArchivo, IconoCheck } from "../../../components/Iconos";
+import { PERMISOS_PERSONAL_SNM, usePermisos } from "../../../hooks/usePermisos";
 import { ETIQUETA_RANGO, ETIQUETA_SEXO, formatearFecha, formatearFechaHora, tituloColumnaRango } from "../presentacion";
 import type { VerificacionImpedimentos } from "./useVerificacionImpedimentos";
 import { MESES_VIGENCIA_PASAPORTE } from "../formulario/validacionFormulario";
@@ -19,6 +20,8 @@ interface Props {
  *  tripulante: antes se marcaba en un panel aparte que repetía la lista y, con
  *  tripulaciones grandes, dejaba la decisión muy abajo. */
 export function SeccionTripulantes({ solicitud: s, verificacion: v, onVerDocumentacion }: Props) {
+  const { esAdmin, tieneAlguno } = usePermisos();
+  const esPersonalSnm = esAdmin || tieneAlguno(...PERMISOS_PERSONAL_SNM);
   const total = s.tripulantes.length;
   const marcados = v ? total - v.pendientes : 0;
   // La ocupación salió del formulario el 2026-11-16: solo la nombran las solicitudes de antes.
@@ -95,11 +98,11 @@ export function SeccionTripulantes({ solicitud: s, verificacion: v, onVerDocumen
                       {ETIQUETA_SEXO[m.sexo]} · Nacimiento: {formatearFecha(m.fecha_nacimiento)}
                       {m.pais_nacimiento_nombre && <> · {m.pais_nacimiento_nombre}</>}
                     </div>
-                    {/* Solo llega al personal del SNM: a la agencia el backend le manda null.
-                        Quien verifica ve lo suyo en su columna; el puesto ve además lo de UCVMM,
-                        como referencia (marca lo suyo desde cero). */}
+                    {/* Al personal del SNM; a la agencia, solo mientras está devuelta (2026-11-26), sin
+                        nombrar a UCVMM. Quien verifica ve lo suyo en su columna; el puesto ve además lo
+                        de UCVMM, como referencia (marca lo suyo desde cero). */}
                     {v?.etapa !== "ucvmm" && m.con_impedimento && (
-                      <span className={styles.chipImpedimento}>Con impedimento (UCVMM)</span>
+                      <span className={styles.chipImpedimento}>{esPersonalSnm ? "Con impedimento (UCVMM)" : "Con impedimento"}</span>
                     )}
                     {!v && m.con_impedimento_puesto && (
                       <span className={styles.chipImpedimento}>Con impedimento (puesto)</span>

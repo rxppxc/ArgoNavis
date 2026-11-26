@@ -49,7 +49,7 @@ async def historia(cliente):
     async with SesionLocal() as s:
         sabado = _ultimo_sabado()
         hoy = datetime.now(ZONA_PANAMA).date()
-        # clave: (agencia, puesto, trámite, estado, enviada, operación, aprobada, pasajero, pasaporte)
+        # clave: (agencia, puesto, trámite, estado, enviada, operación, aprobada, tripulante, pasaporte)
         datos = {
             "marzo25":  (0, puesto_p, 0, "finalized", panama(2025, 3, 10, 9), date(2025, 3, 12),
                          panama(2025, 3, 11, 10), ("Ana Maria", "Rios"), "PA%123"),

@@ -44,6 +44,7 @@ from app.core.permisos import (
 from app.domain.models.boleta import BoletaRecargo
 from app.domain.models.catalogo import PuestoControl
 from app.domain.models.solicitud import (
+    aviso_impedimentos,
     DIAS_SELLADO, ETIQUETA_OPERACION, RANGOS_CON_LIBRETA, CasillaSolicitud, DocumentoEmitido, DocumentoSolicitud,
     EstadoSolicitud, EventoSolicitud, OperacionTecnico, Solicitud, TipoEmitido, TipoEventoSolicitud,
     TripulanteSolicitud, VersionSolicitud, texto_dias, vigencia_minima_pasaporte,
@@ -298,6 +299,15 @@ class ServicioSolicitud:
         )
 
     @staticmethod
+    def con_impedimento_al_devolver(s: Solicitud) -> list[str]:
+        """Los tripulantes con impedimento según la verificación de UCVMM, que la agencia ve
+        mientras la solicitud está devuelta (pedido del usuario del 2026-11-26): la solicitud no
+        puede avanzar con ellos. En los demás estados la verificación sigue siendo interna."""
+        if s.estado != Estado.EN_CORRECCION.value:
+            return []
+        return [t.nombre_completo for t in s.tripulantes if t.con_impedimento]
+
+    @staticmethod
     def horas_vigencia(s: Solicitud) -> int | None:
         """Las horas que vale desde la aprobación, si se aprobó con la regla de horas de su trámite
         (Urgencia médica, 120: 2026-11-26). Se mira la solicitud y no solo el catálogo: las
@@ -550,7 +560,7 @@ class ServicioSolicitud:
                             else s.puesto_nombre),
                     sector=s.sector.nombre,
                     buque=s.nombre_buque, imo=s.imo, fecha_operacion=s.fecha_operacion,
-                    pasajeros=s.cantidad_tripulantes, enviada_en=s.enviada_en, aprobada_en=s.aprobada_en,
+                    cantidad_tripulantes=s.cantidad_tripulantes, enviada_en=s.enviada_en, aprobada_en=s.aprobada_en,
                     finalizada_en=s.finalizada_en,
                     fuera_de_horario=s.aprobada_en is not None and fuera_de_horario(s.aprobada_en),
                     costo=s.costo_fuera_de_horario,
@@ -599,6 +609,12 @@ class ServicioSolicitud:
         faltan = self.tramites.validar_campos_cabecera(tipo, datos.model_dump())
         if faltan:
             raise _error(status.HTTP_400_BAD_REQUEST, f"Faltan datos obligatorios del formulario: {', '.join(faltan)}.")
+        # Cada trámite ofrece sus operaciones: «Subir y bajar», solo el de Técnico (2026-11-26).
+        if tipo.pide_operacion and datos.operacion and tipo.operaciones and datos.operacion not in tipo.operaciones:
+            nombres = [ETIQUETA_OPERACION[o] for o in tipo.operaciones]
+            opciones = ", ".join(nombres[:-1]) + f" o {nombres[-1]}" if len(nombres) > 1 else nombres[0]
+            raise _error(status.HTTP_400_BAD_REQUEST,
+                         f"La operación «{ETIQUETA_OPERACION[datos.operacion]}» no es de este trámite: elige {opciones}.")
 
         hoy = hoy_panama()
         assert datos.fecha_operacion is not None and datos.puesto_control_id is not None
@@ -943,6 +959,15 @@ class ServicioSolicitud:
         if len(ids) != len(set(ids)) or any(i not in existentes for i in ids):
             raise _error(status.HTTP_400_BAD_REQUEST, "La lista de tripulantes no coincide con la solicitud.")
         quitados = set(existentes) - set(ids)
+        # Quien tiene impedimento no sigue en la solicitud (2026-11-26): se quita, y si va otra
+        # persona, se agrega como tripulante nuevo (y se verifica de nuevo).
+        con_impedimento = [existentes[i] for i in ids if existentes[i].con_impedimento]
+        if con_impedimento:
+            raise _error(
+                status.HTTP_400_BAD_REQUEST,
+                f"{con_impedimento[0].nombre_completo} tiene impedimento y la solicitud no puede avanzar con esa "
+                "persona: quítala. Si va otra persona, agrégala como tripulante nuevo.",
+            )
 
         # ── Documentos que se conservan (los de un tripulante quitado se van con él) ──
         documentos_por_id = {d.id: d for d in s.documentos}
@@ -1228,7 +1253,10 @@ class ServicioSolicitud:
         s.motivo_devolucion  = motivo
         s.plazo_correccion   = ahora_utc() + timedelta(days=configuracion.PLAZO_CORRECCION_DIAS)
         s.veces_devuelta     = (s.veces_devuelta or 0) + 1
-        self._registrar_evento(s, ctx.usuario, TipoEventoSolicitud.DEVUELTA, anterior, s.estado, motivo)
+        # Quiénes tienen impedimento, en el historial que ve la agencia (2026-11-26).
+        aviso = aviso_impedimentos(self.con_impedimento_al_devolver(s))
+        texto = f"{motivo}\n\n{aviso}" if aviso else motivo
+        self._registrar_evento(s, ctx.usuario, TipoEventoSolicitud.DEVUELTA, anterior, s.estado, texto)
         await self.repo.guardar()
         return await self._recargar(s.id)
 
@@ -1426,6 +1454,8 @@ class ServicioSolicitud:
         tipo = await self.repo_tramites.buscar_tipo_por_id(s.tipo_tramite_id)
         assert tipo is not None
 
+        # Devuelta, la agencia ve quiénes tienen impedimento (2026-11-26).
+        devuelta = s.estado == Estado.EN_CORRECCION.value
         tripulantes = []
         for t in s.tripulantes:
             pasaporte_vencido, pasaporte_corta, libreta_vencida = self._vencimientos_tripulante(t, s.fecha_operacion)
@@ -1440,7 +1470,8 @@ class ServicioSolicitud:
                 libreta_marino=t.libreta_marino, libreta_expira=t.libreta_expira,
                 rango=t.rango, ocupacion=t.ocupacion, es_panameno=t.es_panameno,
                 nacionalidad_restringida=t.nacionalidad_restringida,
-                con_impedimento=t.con_impedimento if ctx.es_personal_snm else None,
+                con_impedimento=(t.con_impedimento if ctx.es_personal_snm
+                                 else (True if devuelta and t.con_impedimento else None)),
                 con_impedimento_puesto=t.con_impedimento_puesto if ctx.es_personal_snm else None,
                 porta_libreta=t.porta_libreta, orden=t.orden,
                 pasaporte_vencido=pasaporte_vencido, pasaporte_vigencia_corta=pasaporte_corta,
@@ -1494,6 +1525,7 @@ class ServicioSolicitud:
             motivo=s.motivo, clinica_hospital=s.clinica_hospital, observaciones=s.observaciones,
             impedimentos_verificados=s.impedimentos_verificados if interno else False,
             comentario_impedimentos=s.comentario_impedimentos if interno else None,
+            tripulantes_con_impedimento=self.con_impedimento_al_devolver(s),
             impedimentos_verificados_en=s.impedimentos_verificados_en if interno else None,
             impedimentos_verificados_por=self._autor_ultimo(
                 s, TipoEventoSolicitud.IMPEDIMENTOS, TipoEventoSolicitud.IMPEDIMENTOS_CORREGIDOS,
@@ -1609,7 +1641,7 @@ class ServicioSolicitud:
             numero_oficio=boleta.numero_oficio, monto=boleta.monto, numero_solicitud=s.numero or str(s.id),
             tipo_tramite=s.tipo_tramite.nombre, agencia=s.agencia_nombre, buque=s.nombre_buque, imo=s.imo,
             puesto=s.puesto_nombre, puesto_destino=s.puesto_destino_nombre, fecha_operacion=s.fecha_operacion,
-            pasajeros=len(s.tripulantes), aprobada_en=s.aprobada_en.astimezone(ZONA_PANAMA),
+            cantidad_tripulantes=len(s.tripulantes), aprobada_en=s.aprobada_en.astimezone(ZONA_PANAMA),
             generada_en=boleta.generada_en.astimezone(ZONA_PANAMA),
             anulada_en=boleta.anulada_en.astimezone(ZONA_PANAMA) if boleta.anulada_en else None,
             motivo_anulacion=boleta.motivo_anulacion,
@@ -1631,7 +1663,10 @@ class ServicioSolicitud:
         (2026-11-18), en casillas, con la X en la elegida. Las de antes no las tienen."""
         elecciones = []
         if s.operacion:
-            elecciones.append(("OPERACIÓN", tuple(ETIQUETA_OPERACION.values()), ETIQUETA_OPERACION[s.operacion]))
+            # Las del trámite (Urgencia médica: Embarque o Desembarque, 2026-11-26), y la elegida aunque ya no esté.
+            ofrecidas = s.tipo_tramite.operaciones or list(ETIQUETA_OPERACION)
+            opciones = tuple(e for o, e in ETIQUETA_OPERACION.items() if o in ofrecidas or o == s.operacion)
+            elecciones.append(("OPERACIÓN", opciones, ETIQUETA_OPERACION[s.operacion]))
         if s.dias_sellado:
             elecciones.append(("DÍAS DEL SELLADO", tuple(texto_dias(d) for d in DIAS_SELLADO), texto_dias(s.dias_sellado)))
         return elecciones

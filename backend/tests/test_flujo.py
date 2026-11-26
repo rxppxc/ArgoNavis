@@ -745,8 +745,8 @@ async def test_la_bandeja_cuenta_las_alertas_como_el_expediente(cliente, escenar
     await cambiar(pasaporte_expira=minimo - timedelta(days=1))
     assert await alertas() == (1, 1), "pasaporte con menos de 3 meses de vigencia"
     r = await cliente.get(f"/solicitudes/{creada['id']}", headers=e.nav_a1.headers)
-    pasajero = r.json()["tripulantes"][0]
-    assert pasajero["pasaporte_vigencia_corta"] and not pasajero["pasaporte_vencido"]
+    primero = r.json()["tripulantes"][0]
+    assert primero["pasaporte_vigencia_corta"] and not primero["pasaporte_vencido"]
     await cambiar(pasaporte_expira=operacion + timedelta(days=400))
 
     await cambiar(rango="tecnico", libreta_expira=operacion - timedelta(days=1))

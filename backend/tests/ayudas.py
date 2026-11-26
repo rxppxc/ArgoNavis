@@ -52,7 +52,7 @@ async def rol_mixto() -> str:
 
 def cuerpo_impedimentos(detalle: dict, con_impedimento: set[str] = frozenset(),
                         comentario: str | None = "Sin impedimentos en SIMPLUS") -> dict:
-    """La verificación por pasajero: todos "sin impedimento" salvo los nombrados."""
+    """La verificación por tripulante: todos "sin impedimento" salvo los nombrados."""
     return {
         "tripulantes": [{"tripulante_id": t["id"], "con_impedimento": t["nombre"] in con_impedimento}
                         for t in detalle["tripulantes"]],

@@ -7,7 +7,7 @@
  * navegador conserva al recargar y con Atrás/Adelante. Sin ella (un enlace de un correo,
  * la campana, una pestaña nueva), al inicio.
  *
- * El pasajero buscado en la consulta histórica no va en la URL (2026-11-14: quedaba en el
+ * El tripulante buscado en la consulta histórica no va en la URL (2026-11-14: quedaba en el
  * historial del navegador y en los logs del servidor): viaja también en ese estado, y el
  * «Volver» se lo devuelve a la consulta.
  */
@@ -18,12 +18,12 @@ export interface ExtraVolver {
   pasajero?: string;
 }
 
-/** El estado que lleva un enlace al expediente: de dónde se abrió (y el pasajero buscado). */
+/** El estado que lleva un enlace al expediente: de dónde se abrió (y el tripulante buscado). */
 export function estadoParaVolver(pathname: string, search = "", extra: ExtraVolver = {}): { volverA: string } & ExtraVolver {
   return { volverA: pathname + search, ...(extra.pasajero ? { pasajero: extra.pasajero } : {}) };
 }
 
-/** El pasajero que trae el estado de la navegación (al volver del expediente o al recargar
+/** El tripulante buscado que trae el estado de la navegación (al volver del expediente o al recargar
  *  la consulta). Como cualquiera puede armar el estado, solo un texto, con el tope del campo. */
 export function pasajeroDelEstado(estado: unknown): string {
   const pasajero = typeof estado === "object" && estado !== null ? (estado as { pasajero?: unknown }).pasajero : undefined;

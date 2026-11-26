@@ -2,7 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { IconoAtras } from "./Iconos";
 import styles from "./BotonVolver.module.css";
 
-/** `estado`: lo que le devuelve a la página de origen (el pasajero de la consulta histórica). */
+/** `estado`: lo que le devuelve a la página de origen (el tripulante buscado en la consulta histórica). */
 export function BotonVolver({ to, estado, onClick }: { to?: string; estado?: unknown; onClick?: () => void }) {
   const navegar = useNavigate();
   if (to)      return <Link to={to} state={estado} className={styles.btn}><IconoAtras />Volver</Link>;

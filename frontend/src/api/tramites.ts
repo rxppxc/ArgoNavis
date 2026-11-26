@@ -42,6 +42,8 @@ export interface TipoTramite {
   permite_subir_y_bajar: boolean;
   /** El formulario pide la operación: Embarque, Desembarque o Subir y bajar (2026-11-18: Técnico). */
   pide_operacion: boolean;
+  /** Las que ofrece, si la pide (2026-11-26): «Subir y bajar», solo el trámite de Técnico. */
+  operaciones: string[] | null;
   /** El formulario pide los días del sellado: 5 o 15 (2026-11-18: Shore Pass). */
   pide_dias_sellado: boolean;
   /** Horas que vale la autorización desde la aprobación (2026-11-26: Urgencia médica, 120);

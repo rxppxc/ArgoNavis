@@ -3,7 +3,7 @@ import { leerEspejo, type Caso } from "../../pruebas/espejo";
 import { tripulanteDePrueba } from "../../pruebas/datos";
 import {
   ETIQUETA_EVENTO, normalizarImo, TEXTO_HORARIO_LABORAL, textoSector, textoSectorCorto,
-  textoVigencia, tituloColumnaRango,
+  avisoImpedimentos, textoVigencia, tituloColumnaRango,
 } from "./presentacion";
 
 describe("tituloColumnaRango (la ocupación salió del formulario el 2026-11-16)", () => {
@@ -55,5 +55,12 @@ describe("textoVigencia (espejo de texto_vigencia, core/horario.py; 2026-11-26)"
   interface CasoVigencia extends Caso { horas: number; texto: string }
   it.each(leerEspejo<CasoVigencia[]>("vigencia.json"))("$caso", ({ horas, texto }) => {
     expect(textoVigencia(horas)).toBe(texto);
+  });
+});
+
+describe("avisoImpedimentos (espejo de aviso_impedimentos, models/solicitud.py; 2026-11-26)", () => {
+  interface CasoImpedimentos extends Caso { nombres: string[]; texto: string | null }
+  it.each(leerEspejo<CasoImpedimentos[]>("impedimentos.json"))("$caso", ({ nombres, texto }) => {
+    expect(avisoImpedimentos(nombres)).toBe(texto);
   });
 });

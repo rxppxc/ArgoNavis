@@ -1,0 +1,7 @@
+[
+  {"caso": "sin nadie con impedimento, no hay aviso", "nombres": [], "texto": null},
+  {"caso": "una persona", "nombres": ["Beto Pérez"],
+   "texto": "Tripulante con impedimento: Beto Pérez. La solicitud no puede avanzar con esa persona: quítala al corregir; si va otra persona, agrégala como tripulante nuevo."},
+  {"caso": "varias personas", "nombres": ["Ana Ruiz", "Beto Pérez", "Carla Díaz"],
+   "texto": "Tripulantes con impedimento: Ana Ruiz, Beto Pérez y Carla Díaz. La solicitud no puede avanzar con esas personas: quítalas al corregir; si va otra persona, agrégala como tripulante nuevo."}
+]
