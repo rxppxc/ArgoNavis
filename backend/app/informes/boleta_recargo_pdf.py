@@ -18,7 +18,7 @@ from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import KeepInFrame, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.core import identidad
 from app.core.horario import ZONA_PANAMA, texto_costo
@@ -273,5 +273,8 @@ def generar_pdf_boleta(d: DatosPdfBoleta) -> bytes:
                              mask="auto")
         canvas.restoreState()
 
-    doc.build(historia, onFirstPage=pagina, onLaterPages=pagina)
+    # Como el papel, en una hoja: si no cabe, se encoge lo justo (2026-11-27). Lo que mide depende de
+    # la fuente (DejaVu en el servidor es más ancha que la Arial de Windows) y de los textos libres
+    # (la agencia, la nave, los puestos y el motivo de la anulación); con los de siempre no se encoge.
+    doc.build([KeepInFrame(ancho, doc.height, historia, mode="shrink")], onFirstPage=pagina, onLaterPages=pagina)
     return buffer.getvalue()

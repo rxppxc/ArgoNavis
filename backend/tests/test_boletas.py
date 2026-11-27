@@ -132,6 +132,33 @@ async def test_la_boleta_cabe_en_una_hoja():
     assert _paginas(generar_pdf_boleta(cargada)) == 1
 
 
+async def test_la_boleta_cabe_en_una_hoja_con_todo_al_tope():
+    """Con cada texto libre en su largo máximo, también una hoja, con cualquier fuente: en la CI
+    (DejaVu, más ancha que la Arial de Windows) el caso cargado pasaba a dos (2026-11-27)."""
+    from app.domain.models.boleta import LARGO_MOTIVO_ANULACION
+    from app.domain.models.catalogo import AgenciaNaviera, PuestoControl
+    from app.domain.models.solicitud import Solicitud
+    from app.informes.boleta_recargo_pdf import generar_pdf_boleta
+
+    def largo(columna) -> int:
+        return columna.property.columns[0].type.length
+
+    def texto(n: int) -> str:
+        return ("Agencia Marítima del Istmo " * 40)[:n]
+
+    al_tope = replace(
+        _datos_pdf(), agencia=texto(largo(AgenciaNaviera.nombre)), buque=texto(largo(Solicitud.nombre_buque)),
+        puesto=texto(largo(PuestoControl.nombre)), puesto_destino=texto(largo(PuestoControl.nombre)),
+        tipo_tramite="Autorización de Técnico, Superintendente o Supernumerario", detalle="operación: Subir y bajar",
+        tipos_operacion=["Embarque", "Desembarque", "Cambio de Nave", "Urgencias o Atención Médica",
+                         "Sellado de Shore Pass", "Autorización de Técnico, Superintendente o Supernumerario",
+                         "Renovación de Pasaporte"],
+        numero_oficio="0716-SNM-UCVMM-2026-PACÍFICO-BALBOA-0001"[:40],
+        anulada_en=panama(2026, 11, 15, 11, 0), motivo_anulacion=texto(LARGO_MOTIVO_ANULACION),
+    )
+    assert _paginas(generar_pdf_boleta(al_tope)) == 1
+
+
 async def test_la_boleta_sigue_el_formulario_4(monkeypatch):
     """El modelo en papel de UCVMM (pedido del usuario del 2026-11-26): el Formulario No. 4,
     con el oficio que escribe el funcionario y el número de la solicitud, los datos del cobro,
