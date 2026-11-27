@@ -573,12 +573,14 @@ async def generar_boleta(
     svc:     ServicioSolicitud = Depends(_servicio),
     sesion:  AsyncSession   = Depends(obtener_sesion_bd, scope="function"),
 ):
-    """UCVMM, el supervisor de sector o el puesto de control generan la boleta de
-    recargo de una solicitud aprobada fuera del horario, con el número de oficio
-    (único entre todas las boletas). La agencia no la ve: la imprime el SNM."""
+    """El analista de UCVMM que aprobó la solicitud fuera del horario (o, si no está, otro de
+    su sector) genera la boleta de recargo con el número de oficio, único entre todas las
+    boletas (2026-11-27). Si no es quien aprobó, la bitácora dice en lugar de quién."""
     s, boleta = await svc.generar_boleta(ctx, solicitud_id, datos.numero_oficio)
+    en_lugar_de = await svc.en_lugar_de(ctx, s)
     await _auditar(sesion, request, ctx.usuario, AccionAuditoria.BOLETA_GENERADA, s,
-                   boleta_id=boleta.id, numero_oficio=boleta.numero_oficio, monto=str(boleta.monto))
+                   boleta_id=boleta.id, numero_oficio=boleta.numero_oficio, monto=str(boleta.monto),
+                   **({"en_lugar_de": en_lugar_de} if en_lugar_de else {}))
     return await svc.construir_detalle(ctx, s)
 
 
@@ -610,7 +612,8 @@ async def descargar_boleta(
     svc:     ServicioSolicitud = Depends(_servicio),
     sesion:  AsyncSession   = Depends(obtener_sesion_bd, scope="function"),
 ):
-    """El PDF de la boleta (la anulada, con el sello). Solo el personal del SNM."""
+    """El PDF de la boleta (la anulada, con el sello): UCVMM, el supervisor de sector y el
+    Administrador. El puesto de control y el supervisor general, no (2026-11-27)."""
     s, boleta, datos = await svc.datos_pdf_boleta(ctx, solicitud_id, boleta_id)
     # La conexión vuelve al pool mientras se arma el PDF, como la autorización.
     await sesion.commit()

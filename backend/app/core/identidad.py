@@ -18,6 +18,7 @@ USO_INTERNO = "Uso interno del SNM"
 # Paleta del SNM (tema claro).
 MARINO = "#10233F"     # títulos y encabezados de tabla
 TEXTO = "#17283E"      # la tinta
+AZUL = "#003DA5"       # el azul institucional: lo que se destaca sin ser un estado (9.6:1 sobre blanco)
 GRIS = "#526176"       # textos secundarios
 AMARILLO = "#F2C94C"   # la franja: solo relleno, nunca texto
 BORDE = "#CAD5E1"

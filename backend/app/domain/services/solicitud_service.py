@@ -120,6 +120,9 @@ _EVENTOS_INTERNOS = {
     TipoEventoSolicitud.BOLETA_GENERADA.value,   # la boleta de recargo no la ve la agencia (2026-11-16)
     TipoEventoSolicitud.BOLETA_ANULADA.value,
 }
+# Los de la boleta, además, solo para quien la ve (`ve_boletas`): el puesto de control y el
+# supervisor general tampoco (2026-11-27).
+_EVENTOS_BOLETA = {TipoEventoSolicitud.BOLETA_GENERADA.value, TipoEventoSolicitud.BOLETA_ANULADA.value}
 _ETIQUETA_EMITIDO = {
     TipoEmitido.APROBADA.value:   "Autorización aprobada",
     TipoEmitido.FINALIZADA.value: "Autorización finalizada",
@@ -286,15 +289,15 @@ class ServicioSolicitud:
         del_puerto = vigente and self._es_del_puerto(ctx, s)
         revisable  = ctx.puede_revisar_esta(s) and s.estado == Estado.EN_REVISION.value
         conflicto  = revisable and self._tiene_conflicto(ctx, s)
-        gestiona_boleta = self.puede_gestionar_boleta(ctx, s)
+        boleta_vigente = next((b for b in s.boletas if b.vigente), None)
         return AccionesSolicitud(
             corregir=ctx.es_de_su_agencia(s) and s.estado == Estado.EN_CORRECCION.value and en_plazo,
             revisar=revisable and not conflicto,
             finalizar=del_puerto,
             descargar_autorizacion=self._hay_pdf(ctx, s) and self.puede_ver(ctx, s),
             conflicto_revision=conflicto,
-            generar_boleta=gestiona_boleta and not any(b.vigente for b in s.boletas),
-            anular_boleta=gestiona_boleta and any(b.vigente for b in s.boletas),
+            generar_boleta=self.puede_generar_boleta(ctx, s) and boleta_vigente is None,
+            anular_boleta=boleta_vigente is not None and self.puede_anular_boleta(ctx, s, boleta_vigente),
             ver_registro=ctx.ve_registro(s),
         )
 
@@ -324,21 +327,36 @@ class ServicioSolicitud:
         vencida = s.estado == Estado.EXPIRADA.value and s.aprobada_en is not None
         return s.estado in (Estado.APROBADA.value, Estado.FINALIZADA.value) or (vencida and ctx.es_personal_snm)
 
-    def puede_gestionar_boleta(self, ctx: ContextoAcceso, s: Solicitud) -> bool:
-        """Generan y anulan la boleta de recargo (2026-11-16) UCVMM y el supervisor de
-        sector (de sus sectores), el puesto de control que la finaliza y el
-        Administrador, si la solicitud lleva recargo. La agencia y el supervisor
-        general, no."""
-        if s.costo_fuera_de_horario is None or s.aprobada_en is None:
-            return False
-        return self._gestiona_boletas_de(ctx, s)
+    # ── La boleta de recargo (2026-11-16): quién la ve y quién la gestiona (2026-11-27) ──
 
-    def _gestiona_boletas_de(self, ctx: ContextoAcceso, s: Solicitud) -> bool:
-        return (
-            ctx.es_admin
-            or ((ctx.es_revisor or ctx.es_supervisor_sector) and ctx.en_sus_sectores(s))
-            or (s.aprobada_en is not None and self._es_del_puerto(ctx, s))
-        )
+    @staticmethod
+    def ve_boletas(ctx: ContextoAcceso, s: Solicitud) -> bool:
+        """La ven y la descargan UCVMM y el supervisor de sector (de sus sectores) y el
+        Administrador. El puesto de control, el supervisor general y la agencia no la ven
+        (2026-11-27; antes el puesto la generaba y el general la descargaba)."""
+        return ctx.es_admin or ((ctx.es_revisor or ctx.es_supervisor_sector) and ctx.en_sus_sectores(s))
+
+    @staticmethod
+    def _es_ucvmm_de(ctx: ContextoAcceso, s: Solicitud) -> bool:
+        """UCVMM de los sectores de la solicitud. El Administrador no: solo ve (2026-11-27)."""
+        return ctx.es_revisor and not ctx.es_admin and ctx.en_sus_sectores(s)
+
+    def puede_generar_boleta(self, ctx: ContextoAcceso, s: Solicitud) -> bool:
+        """El número de oficio lo pone el analista de UCVMM que la aprobó fuera del horario; si
+        no está, otro de UCVMM del sector, y queda dicho en lugar de quién (`en_lugar_de`)."""
+        return s.costo_fuera_de_horario is not None and s.aprobada_en is not None and self._es_ucvmm_de(ctx, s)
+
+    def puede_anular_boleta(self, ctx: ContextoAcceso, s: Solicitud, boleta: BoletaRecargo) -> bool:
+        """Anula (con motivo, para poner otro número) quien la aprobó o quien generó esa boleta.
+        Nadie más toca una boleta que no puso."""
+        return self._es_ucvmm_de(ctx, s) and ctx.usuario.id in (s.aprobada_por_id, boleta.generada_por_id)
+
+    async def en_lugar_de(self, ctx: ContextoAcceso, s: Solicitud) -> str | None:
+        """Quien aprobó la solicitud, si la boleta la pone otro: queda en la bitácora y en el historial."""
+        if s.aprobada_por_id is None or s.aprobada_por_id == ctx.usuario.id:
+            return None
+        aprobador = await self.sesion.get(Usuario, s.aprobada_por_id)
+        return aprobador.full_name if aprobador else None
 
     async def obtener(self, ctx: ContextoAcceso, solicitud_id: int, *, bloquear: bool = False) -> Solicitud:
         """La solicitud, si el usuario puede verla. Con `bloquear`, además toma
@@ -1516,7 +1534,9 @@ class ServicioSolicitud:
             ))
 
         interno = ctx.es_personal_snm
-        eventos = [ev for ev in (self.evento_para(e, interno) for e in s.eventos) if ev is not None]
+        ve_boletas = self.ve_boletas(ctx, s)
+        eventos = [ev for ev in (self.evento_para(e, interno) for e in s.eventos)
+                   if ev is not None and (ve_boletas or ev.tipo not in _EVENTOS_BOLETA)]
 
         return SalidaSolicitud(
             **self._campos_resumen(s, interno=interno),
@@ -1556,7 +1576,7 @@ class ServicioSolicitud:
             tripulantes=tripulantes, documentos=documentos, checklist=checklist,
             eventos=eventos,
             acciones=self.acciones(ctx, s),
-            boletas=[self.salida_boleta(b) for b in s.boletas] if interno else None,
+            boletas=[self.salida_boleta(b) for b in s.boletas] if ve_boletas else None,
         )
 
     # ── Boleta de recargo (2026-11-16) ───────────────────────────────────────
@@ -1571,11 +1591,13 @@ class ServicioSolicitud:
         )
 
     async def _para_boleta(self, ctx: ContextoAcceso, solicitud_id: int) -> Solicitud:
-        """La solicitud bloqueada (FOR UPDATE), si quien pide gestiona sus boletas: dos
-        funcionarios que generan a la vez no dejan dos vigentes."""
+        """La solicitud bloqueada (FOR UPDATE), si quien pide es de UCVMM de su sector: dos
+        funcionarios que generan a la vez no dejan dos vigentes. Quién anula cuál, en
+        `puede_anular_boleta`."""
         s = await self.obtener(ctx, solicitud_id, bloquear=True)
-        if not self._gestiona_boletas_de(ctx, s):
-            raise _error(status.HTTP_403_FORBIDDEN, "No puedes generar ni anular boletas de esta solicitud.")
+        if not self._es_ucvmm_de(ctx, s):
+            raise _error(status.HTTP_403_FORBIDDEN,
+                         "La boleta la pone UCVMM: el analista que aprobó la solicitud o, si no está, otro de su sector.")
         if s.costo_fuera_de_horario is None or s.aprobada_en is None:
             raise _error(status.HTTP_409_CONFLICT,
                          "La solicitud no lleva recargo: no se aprobó fuera del horario laboral.")
@@ -1602,8 +1624,11 @@ class ServicioSolicitud:
             generada_en=ahora_utc(), generada_por_id=ctx.usuario.id,
         )
         self.repo.agregar_registro(boleta)
+        # Si no la pone quien aprobó, queda dicho en lugar de quién (2026-11-27).
+        en_lugar_de = await self.en_lugar_de(ctx, s)
         self._registrar_evento(s, ctx.usuario, TipoEventoSolicitud.BOLETA_GENERADA, None, None,
-                               f"Oficio N.º {numero_oficio}.")
+                               f"Oficio N.º {numero_oficio}"
+                               f"{f', en lugar de {en_lugar_de}, que la aprobó' if en_lugar_de else ''}.")
         try:
             await self.repo.guardar()
         except IntegrityError as exc:
@@ -1624,6 +1649,9 @@ class ServicioSolicitud:
             raise _error(status.HTTP_404_NOT_FOUND, "Boleta no encontrada.")
         if not boleta.vigente:
             raise _error(status.HTTP_409_CONFLICT, "La boleta ya está anulada.")
+        if not self.puede_anular_boleta(ctx, s, boleta):
+            raise _error(status.HTTP_403_FORBIDDEN,
+                         "La anula quien aprobó la solicitud o quien generó esta boleta.")
         boleta.anulada_en = ahora_utc()
         boleta.anulada_por_id = ctx.usuario.id
         boleta.motivo_anulacion = motivo
@@ -1636,11 +1664,12 @@ class ServicioSolicitud:
     async def datos_pdf_boleta(
         self, ctx: ContextoAcceso, solicitud_id: int, boleta_id: int,
     ) -> tuple[Solicitud, BoletaRecargo, DatosPdfBoleta]:
-        """La boleta para el PDF: la descarga el personal del SNM que ve la solicitud
-        (el supervisor general también); la agencia, no."""
+        """La boleta para el PDF: la descargan quienes la ven (`ve_boletas`): UCVMM y el supervisor
+        de sector de sus sectores y el Administrador (2026-11-27)."""
         s = await self.obtener(ctx, solicitud_id)
-        if not ctx.es_personal_snm:
-            raise _error(status.HTTP_403_FORBIDDEN, "La boleta de recargo es del personal del SNM.")
+        if not self.ve_boletas(ctx, s):
+            raise _error(status.HTTP_403_FORBIDDEN,
+                         "La boleta de recargo la ven UCVMM, el supervisor de sector y el Administrador.")
         boleta = next((b for b in s.boletas if b.id == boleta_id), None)
         if boleta is None or s.aprobada_en is None:
             raise _error(status.HTTP_404_NOT_FOUND, "Boleta no encontrada.")
@@ -1657,7 +1686,7 @@ class ServicioSolicitud:
             anulada_en=boleta.anulada_en.astimezone(ZONA_PANAMA) if boleta.anulada_en else None,
             motivo_anulacion=boleta.motivo_anulacion,
             tipos_operacion=[t.nombre for t in tipos],
-            detalle=self._detalle_boleta(s),
+            detalles=self._detalles_boleta(s),
         )
 
     @staticmethod
@@ -1668,18 +1697,20 @@ class ServicioSolicitud:
         return s.subir_y_bajar if s.tipo_tramite.permite_subir_y_bajar or s.subir_y_bajar else None
 
     @classmethod
-    def _detalle_boleta(cls, s: Solicitud) -> str | None:
-        """Lo que va entre paréntesis junto a la casilla marcada de la boleta (2026-11-26; antes, en
-        casillas propias): la operación (Técnico y Urgencia médica), los días del sellado de Shore
-        Pass y, en las de antes que respondieron «Sí», «subir y bajar»."""
-        partes = []
+    def _detalles_boleta(cls, s: Solicitud) -> list[str]:
+        """Lo que eligió la agencia, una línea cada cosa bajo la casilla marcada de la boleta
+        (2026-11-27; del 2026-11-26 al 27, entre paréntesis en la misma línea): la operación
+        (Técnico y, del 2026-11-26 al 27, Urgencia médica), los días del sellado (Shore Pass y
+        Urgencia médica) y, en las de antes que respondieron «Sí», «Subir y bajar». El cambio de
+        puerto lo suma `casillas_operacion`, con los dos puestos."""
+        lineas = []
         if s.operacion:
-            partes.append(f"operación: {ETIQUETA_OPERACION[s.operacion]}")
+            lineas.append(f"Operación: {ETIQUETA_OPERACION[s.operacion]}")
         if s.dias_sellado:
-            partes.append(texto_dias(s.dias_sellado))
+            lineas.append(f"Sellado: {texto_dias(s.dias_sellado)}")
         if cls._respuesta_subir_y_bajar(s):
-            partes.append("subir y bajar")
-        return "; ".join(partes) or None
+            lineas.append("Subir y bajar: Sí")
+        return lineas
 
     # ── Autorización (PDF) y verificación pública ────────────────────────────
 

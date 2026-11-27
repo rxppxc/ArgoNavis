@@ -1,9 +1,10 @@
 /**
  * Boleta de recargo por atención fuera del horario laboral (2026-11-16): UCVMM la
  * genera con el número de oficio (que no se repite), se descarga el PDF y, como en un
- * talonario, la anula y genera otra. El supervisor general la ve en el trámite de
- * Técnico, sin generar ni anular. La agencia no la ve. La solicitud la siembra
- * servidor_e2e.py (NUMERO_RECARGO): de Técnico, aprobada un sábado a las 16:20.
+ * talonario, la anula y genera otra. El supervisor de sector la ve y la descarga, sin
+ * generar ni anular; el supervisor general y la agencia no la ven (2026-11-27). La solicitud
+ * la siembra servidor_e2e.py (NUMERO_RECARGO): de Técnico, aprobada por e2e.ucvmm un sábado
+ * a las 16:20.
  */
 import { readFile } from "node:fs/promises";
 import type { Page } from "@playwright/test";
@@ -73,10 +74,9 @@ test("boleta de recargo: se genera con el oficio, se anula como en un talonario 
     await expect(ucvmm.getByText("Boleta de recargo anulada", { exact: true })).toBeVisible();
   });
 
-  await test.step("el supervisor general la ve en el trámite de Técnico, sin generar ni anular", async () => {
-    const supervisor = await entrar(browser, CUENTAS.supervisor);
+  await test.step("el supervisor de sector la ve y la descarga, sin generar ni anular (2026-11-27)", async () => {
+    const supervisor = await entrar(browser, CUENTAS.supsector);
     await abrirSembrada(supervisor, "supervision");
-    await expect(supervisor.getByText("Sector Pacífico", { exact: true })).toBeVisible();
     await expect(supervisor.getByRole("button", { name: /^(Aprobar|Devolver|Denegar|Finalizar|Guardar verificación)/ }))
       .toHaveCount(0);
     const suyo = supervisor.getByRole("region", { name: PANEL });
@@ -85,6 +85,14 @@ test("boleta de recargo: se genera con el oficio, se anula como en un talonario 
     const descarga = supervisor.waitForEvent("download");
     await suyo.getByRole("button", { name: "Descargar boleta" }).click();
     expect((await descarga).suggestedFilename()).toBe(`Boleta-recargo-${NUMERO_RECARGO}-e2e-002.pdf`);
+  });
+
+  await test.step("el supervisor general ya no la ve (2026-11-27)", async () => {
+    const general = await entrar(browser, CUENTAS.supervisor);
+    await abrirSembrada(general, "supervision");
+    await expect(general.getByText("Sector Pacífico", { exact: true })).toBeVisible();
+    await expect(general.getByRole("region", { name: PANEL })).toHaveCount(0);
+    await expect(general.getByText(/E2E-00|Boleta de recargo/)).toHaveCount(0);
   });
 
   await test.step("la agencia ve el recargo, pero no la boleta ni su historial", async () => {

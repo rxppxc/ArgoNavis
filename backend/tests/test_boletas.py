@@ -71,33 +71,33 @@ def _textos_del_pdf(monkeypatch, datos) -> str:
 
 async def test_casillas_operacion():
     """El tipo de operación va en casillas, como en papel (2026-11-16): los trámites del
-    sistema, con la X en el de la solicitud. Junto a la marcada, lo que eligió la agencia, y
-    con cambio de puerto, también esa casilla (2026-11-26)."""
+    sistema, con la X en el de la solicitud. Debajo de la marcada, lo que eligió la agencia y el
+    cambio de puerto, una línea cada uno (2026-11-27; antes, entre paréntesis y en una casilla
+    «Cambio de Puerto» aparte)."""
     from app.informes.boleta_recargo_pdf import casillas_operacion
 
     tipos = ["Embarque", "Desembarque", "Cambio de Nave"]
     assert casillas_operacion(tipos, "Desembarque") == [
-        ("Embarque", False, None), ("Desembarque", True, None), ("Cambio de Nave", False, None),
+        ("Embarque", False, []), ("Desembarque", True, []), ("Cambio de Nave", False, []),
     ]
     # Un trámite que ya no está activo (Cambio de Puerto, 2026-11-13) se suma al final, marcado.
     assert casillas_operacion(tipos, "Cambio de Puerto") == [
-        ("Embarque", False, None), ("Desembarque", False, None), ("Cambio de Nave", False, None),
-        ("Cambio de Puerto", True, None),
+        ("Embarque", False, []), ("Desembarque", False, []), ("Cambio de Nave", False, []),
+        ("Cambio de Puerto", True, []),
     ]
-    # La operación de Técnico o los días del sellado, entre paréntesis junto a la marcada.
-    assert casillas_operacion(["Embarque", "Técnico"], "Técnico", detalle="operación: Subir y bajar") == [
-        ("Embarque", False, None), ("Técnico", True, "operación: Subir y bajar"),
+    # La operación de Técnico o los días del sellado, bajo la marcada.
+    assert casillas_operacion(["Embarque", "Técnico"], "Técnico", detalles=["Operación: Subir y bajar"]) == [
+        ("Embarque", False, []), ("Técnico", True, ["Operación: Subir y bajar"]),
     ]
-    # Con cambio de puerto, la X también en «Cambio de Puerto», y junto a ella de cuál a cuál
-    # (pedido del usuario del 2026-11-27).
+    # El cambio de puerto, bajo Embarque o Desembarque, de cuál a cuál: sin casilla aparte.
     assert casillas_operacion(tipos, "Embarque", cambio_de_puerto=("Amador", "Cristóbal")) == [
-        ("Embarque", True, None), ("Desembarque", False, None), ("Cambio de Nave", False, None),
-        ("Cambio de Puerto", True, "de Amador a Cristóbal"),
+        ("Embarque", True, ["Cambio de puerto: de Amador a Cristóbal"]), ("Desembarque", False, []),
+        ("Cambio de Nave", False, []),
     ]
-    # También si «Cambio de Puerto» estuviera entre los activos.
+    # Aunque «Cambio de Puerto» estuviera entre los activos, no se marca: va bajo su trámite.
     assert casillas_operacion(["Desembarque", "Cambio de Puerto"], "Desembarque",
                               cambio_de_puerto=("Amador", "Cristóbal")) == [
-        ("Desembarque", True, None), ("Cambio de Puerto", True, "de Amador a Cristóbal"),
+        ("Desembarque", True, ["Cambio de puerto: de Amador a Cristóbal"]), ("Cambio de Puerto", False, []),
     ]
 
 
@@ -130,7 +130,7 @@ async def test_la_boleta_cabe_en_una_hoja():
                 "Autorización de Técnico, Superintendente o Supernumerario", "Renovación de Pasaporte"]
     cargada = replace(
         _datos_pdf(), agencia="Agencia Naviera Internacional del Istmo de Panamá y del Caribe, S.A. " * 2,
-        tipo_tramite=tramites[5], tipos_operacion=tramites, detalle="operación: Subir y bajar",
+        tipo_tramite=tramites[5], tipos_operacion=tramites, detalles=["Operación: Subir y bajar"],
         puesto_destino="Cristóbal", anulada_en=panama(2026, 11, 15, 11, 0),
         motivo_anulacion="El número de oficio estaba mal escrito y se generó otra boleta con el correcto.",
     )
@@ -155,7 +155,9 @@ async def test_la_boleta_cabe_en_una_hoja_con_todo_al_tope():
     al_tope = replace(
         _datos_pdf(), agencia=texto(largo(AgenciaNaviera.nombre)), buque=texto(largo(Solicitud.nombre_buque)),
         puesto=texto(largo(PuestoControl.nombre)), puesto_destino=texto(largo(PuestoControl.nombre)),
-        tipo_tramite="Autorización de Técnico, Superintendente o Supernumerario", detalle="operación: Subir y bajar",
+        tipo_tramite="Autorización de Técnico, Superintendente o Supernumerario",
+        # Con el cambio de puerto (de los dos puestos al tope), en su línea bajo la casilla (2026-11-27).
+        detalles=["Operación: Subir y bajar"],
         tipos_operacion=["Embarque", "Desembarque", "Cambio de Nave", "Urgencias o Atención Médica",
                          "Sellado de Shore Pass", "Autorización de Técnico, Superintendente o Supernumerario",
                          "Renovación de Pasaporte"],
@@ -195,22 +197,23 @@ async def test_la_boleta_sigue_el_formulario_4(monkeypatch):
     assert "firma del jefe encargado del Sector Atlántico (UCVMM)" in texto
     assert "sello del jefe encargado del Sector Atlántico de UCVMM." in texto and "Pacífico" not in texto
 
-    # Con cambio de puerto, el lugar dice los dos y se marca «Cambio de Puerto», con de cuál a cuál
-    # junto a la casilla (2026-11-27).
+    # Con cambio de puerto, el lugar dice los dos y, bajo la casilla marcada, de cuál a cuál, en
+    # azul (2026-11-27): sin casilla «Cambio de Puerto» aparte.
     texto = _textos_del_pdf(monkeypatch, replace(_datos_pdf(), puesto_destino="Cristóbal"))
-    sin_marcas = re.sub(r"<[^>]+>", "", texto)   # el paréntesis va en letra normal (<font>)
-    assert "Balboa → Cristóbal" in texto and "CAMBIO DE PUERTO (de Balboa a Cristóbal)" in sin_marcas
+    sin_marcas = re.sub(r"<[^>]+>", "", texto)   # el rótulo va en negrita
+    assert "Balboa → Cristóbal" in texto and "Cambio de puerto: de Balboa a Cristóbal" in sin_marcas
+    assert "CAMBIO DE PUERTO" not in texto
     texto = _textos_del_pdf(monkeypatch, _datos_pdf())
-    assert "CAMBIO DE PUERTO" not in texto, "sin cambio de puerto, ni la casilla"
+    assert "Cambio de puerto" not in texto, "sin cambio de puerto, nada"
 
-    # Lo que eligió la agencia, entre paréntesis junto a la casilla marcada.
+    # Lo que eligió la agencia, con el mismo estilo, bajo la casilla marcada.
     texto = _textos_del_pdf(monkeypatch, replace(
         _datos_pdf(), tipo_tramite="Autorización de Técnico, Superintendente o Supernumerario",
         tipos_operacion=["Embarque", "Autorización de Técnico, Superintendente o Supernumerario"],
-        detalle="operación: Subir y bajar",
+        detalles=["Operación: Subir y bajar"],
     ))
     assert "AUTORIZACIÓN DE TÉCNICO, SUPERINTENDENTE O SUPERNUMERARIO" in texto
-    assert "(operación: Subir y bajar)" in texto
+    assert "Operación: Subir y bajar" in re.sub(r"<[^>]+>", "", texto) and "(operación" not in texto
 
     # Anulada: lo dice arriba, con el motivo, además del sello.
     texto = _textos_del_pdf(monkeypatch, replace(
@@ -235,12 +238,14 @@ class Escenario:
     puesto_id:    int
     puesto:       str
     naviera:      Actor
-    revisor:      Actor
+    revisor:      Actor   # el que aprueba las solicitudes de `_solicitud`
     revisor_atl:  Actor
     sup_sector:   Actor
     general:      Actor
     del_puesto:   Actor
     puesto_ajeno: Actor
+    otro_revisor:   Actor   # UCVMM del mismo sector, que no la aprobó (2026-11-27)
+    tercer_revisor: Actor
 
 
 @pytest.fixture(scope="module")
@@ -267,13 +272,17 @@ async def esc(cliente) -> Escenario:
         sup_sector=await crear_actor("Supervisor de sector", prefijo="supervisor"),
         general=await crear_actor("Supervisor general", prefijo="general"),
         del_puesto=del_puesto, puesto_ajeno=puesto_ajeno,
+        otro_revisor=await crear_actor("UCVMM", prefijo="revisor"),
+        tercer_revisor=await crear_actor("UCVMM", prefijo="revisor"),
     )
 
 
 async def _solicitud(e: Escenario, *, recargo: bool = True, codigo: str = "F3-EMBARQUE",
-                     operacion: str | None = None, dias_sellado: int | None = None) -> tuple[int, str]:
-    """Una solicitud aprobada el último sábado a las 10:00 (fuera del horario), con el
-    recargo de B/.20.00 o sin él. Devuelve (id, número)."""
+                     operacion: str | None = None, dias_sellado: int | None = None,
+                     aprobada_por: Actor | None = None) -> tuple[int, str]:
+    """Una solicitud aprobada el último sábado a las 10:00 (fuera del horario) por
+    `aprobada_por` (`e.revisor` si no se dice), con el recargo de B/.20.00 o sin él.
+    Devuelve (id, número)."""
     aprobada = _ultimo_sabado_a_las_10()
     numero = f"BR-{e.sufijo}-{next(_contador)}"
     async with SesionLocal() as s:
@@ -284,6 +293,7 @@ async def _solicitud(e: Escenario, *, recargo: bool = True, codigo: str = "F3-EM
             titulo=f"Boleta {e.sufijo}", nombre_buque="MSC PRUEBA", imo="9074729",
             fecha_operacion=datetime.now(ZONA_PANAMA).date() + timedelta(days=5), cantidad_tripulantes=0,
             estado="approved", enviada_en=aprobada - timedelta(days=1), aprobada_en=aprobada,
+            aprobada_por_id=(aprobada_por or e.revisor).id,
             costo_fuera_de_horario=Decimal("20.00") if recargo else None, operacion=operacion,
             dias_sellado=dias_sellado,
             vigente_hasta=datetime.now(ZONA_PANAMA) + timedelta(days=10),
@@ -307,22 +317,122 @@ async def _generar(cliente, actor: Actor, sid: int, numero_oficio: str):
                               headers=actor.headers)
 
 
-async def test_generan_ucvmm_sector_puesto_y_admin(cliente, esc, admin):
-    for actor in (esc.revisor, esc.sup_sector, esc.del_puesto, admin):
-        sid, _ = await _solicitud(esc)
-        antes = (await cliente.get(f"/solicitudes/{sid}", headers=actor.headers)).json()
-        assert antes["boletas"] == [] and antes["acciones"]["generar_boleta"] is True, actor.username
-        r = await _generar(cliente, actor, sid, f"  of-{esc.sufijo}   {sid} ")
-        assert r.status_code == 201, (actor.username, r.text)
-        boleta = r.json()["boletas"][0]
-        assert boleta["numero_oficio"] == f"of-{esc.sufijo} {sid}", "sin espacios de más"
-        assert boleta["monto"] == "B/.20.00" and boleta["vigente"] is True and boleta["anulada_en"] is None
-        assert boleta["generada_por"] and boleta["generada_por"].endswith("Prueba")
-        assert r.json()["acciones"]["generar_boleta"] is False and r.json()["acciones"]["anular_boleta"] is True
-        evento = next(ev for ev in r.json()["eventos"] if ev["tipo"] == "boleta_generada")
-        assert f"Oficio N.º of-{esc.sufijo} {sid}" in evento["comentario"]
-        [registro] = await _bitacora(AccionAuditoria.BOLETA_GENERADA, sid)
-        assert registro["numero_oficio"] == f"of-{esc.sufijo} {sid}" and registro["boleta_id"] == boleta["id"]
+async def _nombre(actor: Actor) -> str:
+    from app.domain.models.user import Usuario
+
+    async with SesionLocal() as s:
+        return (await s.get(Usuario, actor.id)).full_name
+
+
+async def test_genera_quien_la_aprobo(cliente, esc):
+    """El número de oficio lo pone el analista de UCVMM que aprobó la solicitud fuera del horario
+    (pedido del usuario del 2026-11-27)."""
+    sid, _ = await _solicitud(esc)
+    antes = (await cliente.get(f"/solicitudes/{sid}", headers=esc.revisor.headers)).json()
+    assert antes["boletas"] == [] and antes["acciones"]["generar_boleta"] is True
+    r = await _generar(cliente, esc.revisor, sid, f"  of-{esc.sufijo}   {sid} ")
+    assert r.status_code == 201, r.text
+    boleta = r.json()["boletas"][0]
+    assert boleta["numero_oficio"] == f"of-{esc.sufijo} {sid}", "sin espacios de más"
+    assert boleta["monto"] == "B/.20.00" and boleta["vigente"] is True and boleta["anulada_en"] is None
+    assert boleta["generada_por"] and boleta["generada_por"].endswith("Prueba")
+    assert r.json()["acciones"]["generar_boleta"] is False and r.json()["acciones"]["anular_boleta"] is True
+    evento = next(ev for ev in r.json()["eventos"] if ev["tipo"] == "boleta_generada")
+    assert evento["comentario"] == f"Oficio N.º of-{esc.sufijo} {sid}."
+    [registro] = await _bitacora(AccionAuditoria.BOLETA_GENERADA, sid)
+    assert registro["numero_oficio"] == f"of-{esc.sufijo} {sid}" and registro["boleta_id"] == boleta["id"]
+    assert "en_lugar_de" not in registro
+
+
+async def test_si_no_esta_quien_la_aprobo_la_genera_otro_de_ucvmm(cliente, esc, admin):
+    """Si el analista que la aprobó no está, otro de UCVMM del sector pone el oficio, y queda
+    auditado: la bitácora y el historial dicen en lugar de quién."""
+    sid, _ = await _solicitud(esc)
+    antes = (await cliente.get(f"/solicitudes/{sid}", headers=esc.otro_revisor.headers)).json()
+    assert antes["acciones"]["generar_boleta"] is True
+    r = await _generar(cliente, esc.otro_revisor, sid, f"OTRO-{esc.sufijo}")
+    assert r.status_code == 201, r.text
+    quien_aprobo = await _nombre(esc.revisor)
+    evento = next(ev for ev in r.json()["eventos"] if ev["tipo"] == "boleta_generada")
+    assert evento["comentario"] == f"Oficio N.º OTRO-{esc.sufijo}, en lugar de {quien_aprobo}, que la aprobó."
+    [registro] = await _bitacora(AccionAuditoria.BOLETA_GENERADA, sid)
+    assert registro["en_lugar_de"] == quien_aprobo
+
+
+async def test_si_la_aprobo_el_administrador_la_genera_ucvmm(cliente, esc, admin):
+    """El Administrador solo ve: aunque la haya aprobado él, el oficio lo pone UCVMM del sector."""
+    sid, _ = await _solicitud(esc, aprobada_por=admin)
+    detalle = (await cliente.get(f"/solicitudes/{sid}", headers=admin.headers)).json()
+    assert detalle["acciones"]["generar_boleta"] is False
+    assert (await _generar(cliente, admin, sid, f"ADM-{esc.sufijo}")).status_code == 403
+    r = await _generar(cliente, esc.revisor, sid, f"ADM-UCVMM-{esc.sufijo}")
+    assert r.status_code == 201, r.text
+    [registro] = await _bitacora(AccionAuditoria.BOLETA_GENERADA, sid)
+    assert registro["en_lugar_de"] == await _nombre(admin)
+
+
+async def test_el_supervisor_de_sector_y_el_administrador_solo_ven_y_descargan(cliente, esc, admin):
+    sid, _ = await _solicitud(esc)
+    boleta_id = (await _generar(cliente, esc.revisor, sid, f"VER-{esc.sufijo}")).json()["boletas"][0]["id"]
+    for actor in (esc.sup_sector, admin):
+        detalle = (await cliente.get(f"/solicitudes/{sid}", headers=actor.headers)).json()
+        assert [b["id"] for b in detalle["boletas"]] == [boleta_id], actor.username
+        assert detalle["acciones"]["generar_boleta"] is False and detalle["acciones"]["anular_boleta"] is False
+        assert any(ev["tipo"] == "boleta_generada" for ev in detalle["eventos"])
+        r = await cliente.get(f"/solicitudes/{sid}/boletas/{boleta_id}/boleta.pdf", headers=actor.headers)
+        assert r.status_code == 200 and r.content[:5] == b"%PDF-", actor.username
+        r = await cliente.post(f"/solicitudes/{sid}/boletas/{boleta_id}/anular", json={"motivo": "No me toca"},
+                               headers=actor.headers)
+        assert r.status_code == 403, (actor.username, r.text)
+    otra, _ = await _solicitud(esc)
+    for actor in (esc.sup_sector, admin):
+        assert (await _generar(cliente, actor, otra, f"NO-{esc.sufijo}-{actor.id}")).status_code == 403
+
+
+async def test_anulan_quien_la_aprobo_y_quien_la_genero(cliente, esc):
+    """Anular (con motivo) y poner otro número lo hace quien la aprobó; si la generó otro
+    analista, también él. Nadie más toca una boleta que no puso."""
+    async def anular(actor: Actor, sid: int, boleta_id: int):
+        return await cliente.post(f"/solicitudes/{sid}/boletas/{boleta_id}/anular",
+                                  json={"motivo": "Equivocación en el número"}, headers=actor.headers)
+
+    # La generó otro analista: un tercero no la anula; él sí.
+    sid, _ = await _solicitud(esc)
+    boleta_id = (await _generar(cliente, esc.otro_revisor, sid, f"AN1-{esc.sufijo}")).json()["boletas"][0]["id"]
+    detalle = (await cliente.get(f"/solicitudes/{sid}", headers=esc.tercer_revisor.headers)).json()
+    assert detalle["acciones"]["anular_boleta"] is False and detalle["acciones"]["generar_boleta"] is False
+    assert (await anular(esc.tercer_revisor, sid, boleta_id)).status_code == 403
+    assert (await anular(esc.otro_revisor, sid, boleta_id)).status_code == 200
+
+    # La generó otro analista: quien la aprobó también la anula.
+    sid, _ = await _solicitud(esc)
+    boleta_id = (await _generar(cliente, esc.otro_revisor, sid, f"AN2-{esc.sufijo}")).json()["boletas"][0]["id"]
+    assert (await anular(esc.revisor, sid, boleta_id)).status_code == 200
+
+    # La generó quien la aprobó: otro analista no la anula.
+    sid, _ = await _solicitud(esc)
+    boleta_id = (await _generar(cliente, esc.revisor, sid, f"AN3-{esc.sufijo}")).json()["boletas"][0]["id"]
+    detalle = (await cliente.get(f"/solicitudes/{sid}", headers=esc.otro_revisor.headers)).json()
+    assert detalle["acciones"]["anular_boleta"] is False
+    assert (await anular(esc.otro_revisor, sid, boleta_id)).status_code == 403
+
+
+async def test_el_puesto_y_el_supervisor_general_no_ven_la_boleta(cliente, esc):
+    """El puesto de control y el supervisor general no ven la boleta ni su historial, ni la
+    descargan (2026-11-27; antes, el puesto la generaba y el general la descargaba)."""
+    embarque, _ = await _solicitud(esc)
+    tecnico, _ = await _solicitud(esc, codigo="F3-TECNICO")
+    for actor, sid in ((esc.del_puesto, embarque), (esc.general, tecnico)):
+        boleta_id = (await _generar(cliente, esc.revisor, sid, f"NV-{sid}-{esc.sufijo}")).json()["boletas"][0]["id"]
+        detalle = (await cliente.get(f"/solicitudes/{sid}", headers=actor.headers)).json()
+        assert detalle["boletas"] is None, actor.username
+        assert not [ev for ev in detalle["eventos"] if ev["tipo"].startswith("boleta_")], actor.username
+        assert detalle["acciones"]["generar_boleta"] is False and detalle["acciones"]["anular_boleta"] is False
+        r = await cliente.get(f"/solicitudes/{sid}/boletas/{boleta_id}/boleta.pdf", headers=actor.headers)
+        assert r.status_code == 403, (actor.username, r.text)
+        r = await cliente.post(f"/solicitudes/{sid}/boletas/{boleta_id}/anular", json={"motivo": "No me toca"},
+                               headers=actor.headers)
+        assert r.status_code == 403, (actor.username, r.text)
 
 
 async def test_no_generan_agencia_general_ni_ajenos(cliente, esc):
@@ -402,7 +512,7 @@ async def test_dos_generaciones_a_la_vez(cliente, esc, monkeypatch):
 
     monkeypatch.setattr(ServicioSolicitud, "_para_boleta", con_pausa)
     a, b = await asyncio.gather(_generar(cliente, esc.revisor, sid, f"PAR-A-{esc.sufijo}"),
-                                _generar(cliente, esc.sup_sector, sid, f"PAR-B-{esc.sufijo}"))
+                                _generar(cliente, esc.otro_revisor, sid, f"PAR-B-{esc.sufijo}"))
     assert sorted([a.status_code, b.status_code]) == [201, 409]
     detalle = (await cliente.get(f"/solicitudes/{sid}", headers=esc.revisor.headers)).json()
     assert len(detalle["boletas"]) == 1
@@ -423,23 +533,6 @@ async def test_la_agencia_no_ve_boletas(cliente, esc):
     assert r.status_code == 403
 
 
-async def test_el_supervisor_general_descarga_las_de_tecnico(cliente, esc):
-    """La ve y la descarga en las solicitudes del trámite de Técnico (lo que ve desde
-    el 2026-11-16), sin generar ni anular."""
-    sid, _ = await _solicitud(esc, codigo="F3-TECNICO")
-    boleta_id = (await _generar(cliente, esc.revisor, sid, f"GEN-{esc.sufijo}")).json()["boletas"][0]["id"]
-    detalle = (await cliente.get(f"/solicitudes/{sid}", headers=esc.general.headers)).json()
-    assert [b["id"] for b in detalle["boletas"]] == [boleta_id]
-    assert detalle["acciones"]["generar_boleta"] is False and detalle["acciones"]["anular_boleta"] is False
-    r = await cliente.get(f"/solicitudes/{sid}/boletas/{boleta_id}/boleta.pdf", headers=esc.general.headers)
-    assert r.status_code == 200 and r.content[:5] == b"%PDF-"
-    r = await cliente.post(f"/solicitudes/{sid}/boletas/{boleta_id}/anular", json={"motivo": "No me corresponde"},
-                           headers=esc.general.headers)
-    assert r.status_code == 403
-    embarque, _ = await _solicitud(esc)
-    assert (await cliente.get(f"/solicitudes/{embarque}", headers=esc.general.headers)).status_code == 403
-
-
 async def test_pdf_de_la_boleta_por_la_api(cliente, esc, monkeypatch):
     from app.api.v1 import solicitudes as rutas
     from app.informes.boleta_recargo_pdf import generar_pdf_boleta
@@ -456,7 +549,8 @@ async def test_pdf_de_la_boleta_por_la_api(cliente, esc, monkeypatch):
     boleta_id = (await _generar(cliente, esc.revisor, sid, oficio)).json()["boletas"][0]["id"]
     ruta = f"/solicitudes/{sid}/boletas/{boleta_id}/boleta.pdf"
 
-    r = await cliente.get(ruta, headers=esc.del_puesto.headers)
+    # La descarga el supervisor de sector, que solo ve (2026-11-27; antes, el puesto de control).
+    r = await cliente.get(ruta, headers=esc.sup_sector.headers)
     assert r.status_code == 200 and r.content[:5] == b"%PDF-"
     assert r.headers["content-disposition"] == f'attachment; filename="Boleta-recargo-{numero}-{slug(oficio)}.pdf"'
     datos = armados[-1]
@@ -468,8 +562,8 @@ async def test_pdf_de_la_boleta_por_la_api(cliente, esc, monkeypatch):
         activos = (await sesion.execute(select(TipoTramite.nombre).where(TipoTramite.activo.is_(True))
                                         .order_by(TipoTramite.orden, TipoTramite.nombre))).scalars().all()
     assert datos.tipos_operacion == list(activos) and datos.tipo_tramite == "Embarque"
-    # Nada junto a la casilla; firma el jefe encargado del sector de la solicitud (2026-11-26).
-    assert datos.detalle is None and datos.sector == PACIFICO
+    # Nada bajo la casilla; firma el jefe encargado del sector de la solicitud (2026-11-26).
+    assert datos.detalles == [] and datos.sector == PACIFICO
     [registro] = await _bitacora(AccionAuditoria.BOLETA_DESCARGADA, sid)
     assert registro["numero_oficio"] == oficio and registro["anulada"] is False
 
@@ -482,8 +576,8 @@ async def test_pdf_de_la_boleta_por_la_api(cliente, esc, monkeypatch):
 
 
 @pytest.mark.parametrize(("codigo", "elegido", "esperado"), [
-    ("F3-TECNICO", {"operacion": "subir_y_bajar"}, "operación: Subir y bajar"),
-    ("F3-SHORE-PASS", {"dias_sellado": 15}, "15 días"),
+    ("F3-TECNICO", {"operacion": "subir_y_bajar"}, ["Operación: Subir y bajar"]),
+    ("F3-SHORE-PASS", {"dias_sellado": 15}, ["Sellado: 15 días"]),
 ])
 async def test_la_boleta_lleva_la_operacion_y_los_dias(cliente, esc, monkeypatch, codigo, elegido, esperado):
     """La operación del trámite de Técnico y los días del sellado de Shore Pass (2026-11-18)
@@ -503,4 +597,4 @@ async def test_la_boleta_lleva_la_operacion_y_los_dias(cliente, esc, monkeypatch
     r = await cliente.get(f"/solicitudes/{sid}/boletas/{boleta_id}/boleta.pdf", headers=esc.revisor.headers)
     assert r.status_code == 200 and r.content[:5] == b"%PDF-"
     datos = armados[-1]
-    assert datos.detalle == esperado
+    assert datos.detalles == esperado

@@ -26,6 +26,7 @@ from app.informes.comun import COLOR_DENEGADA, fecha_larga
 from app.informes.pdf import color_pdf, obtener_fuentes, texto_pdf
 
 TINTA = color_pdf(identidad.TEXTO)
+AZUL = color_pdf(identidad.AZUL)   # el detalle bajo la casilla marcada (2026-11-27)
 ROJO  = color_pdf(COLOR_DENEGADA)
 
 CONCEPTO = "Recargo por atención fuera del horario laboral"
@@ -58,29 +59,27 @@ class DatosPdfBoleta:
     # El tipo de operación en casillas (2026-11-16): los trámites activos del catálogo, en
     # su orden; la X va en `tipo_tramite`.
     tipos_operacion:  list[str] = field(default_factory=list)
-    # Junto a la casilla marcada, entre paréntesis (2026-11-26): la operación de Técnico, los días
-    # del sellado de Shore Pass o, en las de antes que respondieron «Sí», «subir y bajar».
-    detalle:          str | None = None
+    # Bajo la casilla marcada, una línea cada una (2026-11-27; del 2026-11-26 al 27, entre paréntesis):
+    # la operación de Técnico, los días del sellado o, en las de antes que respondieron «Sí», «Subir y
+    # bajar». El cambio de puerto lo suma `casillas_operacion` con `puesto` y `puesto_destino`.
+    detalles:         list[str] = field(default_factory=list)
 
 
 def casillas_operacion(
-    tipos: list[str], elegido: str, *, detalle: str | None = None,
+    tipos: list[str], elegido: str, *, detalles: list[str] | None = None,
     cambio_de_puerto: tuple[str, str] | None = None,
-) -> list[tuple[str, bool, str | None]]:
-    """Cada tipo de operación con su marca y, en el de la solicitud, `detalle`, como las casillas
-    de un formulario en papel. Si el de la solicitud ya no está entre los activos (Cambio de
-    Puerto, desde el 2026-11-13), va al final, marcado. Con cambio de puerto (el puesto de antes y
-    el nuevo), la X también va en «Cambio de Puerto», y junto a ella de cuál a cuál (2026-11-27)."""
-    casillas = [(tipo, tipo == elegido, detalle if tipo == elegido else None) for tipo in tipos]
-    if elegido not in tipos:
-        casillas.append((elegido, True, detalle))
+) -> list[tuple[str, bool, list[str]]]:
+    """Cada tipo de operación con su marca y, en el de la solicitud, sus líneas de detalle, como las
+    casillas de un formulario en papel. Si el de la solicitud ya no está entre los activos (Cambio de
+    Puerto, desde el 2026-11-13), va al final, marcado. El cambio de puerto (el puesto de antes y el
+    nuevo) va bajo la casilla del trámite, de cuál a cuál, y no marca otra casilla (2026-11-27)."""
+    lineas = list(detalles or [])
     if cambio_de_puerto and elegido != CAMBIO_DE_PUERTO:
         de, a = cambio_de_puerto
-        cambio = f"de {de} a {a}"
-        if CAMBIO_DE_PUERTO in tipos:
-            casillas = [(t, True, cambio) if t == CAMBIO_DE_PUERTO else (t, marcada, d) for t, marcada, d in casillas]
-        else:
-            casillas.append((CAMBIO_DE_PUERTO, True, cambio))
+        lineas.append(f"Cambio de puerto: de {de} a {a}")
+    casillas = [(tipo, tipo == elegido, lineas if tipo == elegido else []) for tipo in tipos]
+    if elegido not in tipos:
+        casillas.append((elegido, True, lineas))
     return casillas
 
 
@@ -125,6 +124,7 @@ def generar_pdf_boleta(d: DatosPdfBoleta) -> bytes:
                         spaceAfter=0)
     e_casilla  = estilo("casilla", fontName=negrita, fontSize=10, leading=12.5, spaceAfter=0)
     e_marca    = estilo("marca", fontName=negrita, fontSize=9, leading=10, alignment=TA_CENTER, spaceAfter=0)
+    e_detalle  = estilo("detalle", fontSize=9.5, leading=12, textColor=AZUL, spaceAfter=0)
     e_firma    = estilo("firma", fontSize=9.5, leading=12, alignment=TA_CENTER, spaceAfter=0)
     e_valida   = estilo("valida", fontName=negrita, fontSize=10.5, leading=14, alignment=TA_CENTER, spaceAfter=0)
     e_anulada  = estilo("anulada", fontName=negrita, fontSize=9, leading=12, textColor=ROJO, alignment=TA_CENTER,
@@ -217,19 +217,33 @@ def generar_pdf_boleta(d: DatosPdfBoleta) -> bytes:
         ]))
         return caja
 
-    filas = []
+    # Lo que eligió la agencia y el cambio de puerto, bajo la casilla marcada (2026-11-27): una línea
+    # cada uno, en azul y con una raya a la izquierda, como las notas del sistema. Sin color (impresa en
+    # blanco y negro) se sigue leyendo por la sangría y la raya. «Rótulo: valor», el rótulo en negrita.
+    def linea_de_detalle(linea: str) -> Paragraph:
+        rotulo, _, valor = linea.partition(": ")
+        return Paragraph(f"{neg(texto_pdf(rotulo) + ':')} {texto_pdf(valor)}" if valor else texto_pdf(linea),
+                         e_detalle)
+
+    filas, estilo_filas = [], []
     cambio = (d.puesto, d.puesto_destino) if d.puesto_destino else None
-    for tipo, marcada, detalle in casillas_operacion(d.tipos_operacion, d.tipo_tramite, detalle=d.detalle,
-                                                     cambio_de_puerto=cambio):
-        texto = texto_pdf(tipo.upper())
-        if detalle:
-            texto += f' <font name="{normal}">({texto_pdf(detalle)})</font>'
-        filas.append([cuadro(marcada), Paragraph(texto, e_casilla)])
+    for tipo, marcada, lineas in casillas_operacion(d.tipos_operacion, d.tipo_tramite, detalles=d.detalles,
+                                                    cambio_de_puerto=cambio):
+        filas.append([cuadro(marcada), Paragraph(texto_pdf(tipo.upper()), e_casilla)])
+        for linea in lineas:
+            fila = len(filas)
+            filas.append(["", linea_de_detalle(linea)])
+            estilo_filas += [
+                ("LINEBEFORE", (1, fila), (1, fila), 1.6, AZUL),
+                ("LEFTPADDING", (1, fila), (1, fila), 6),
+                ("TOPPADDING", (0, fila), (-1, fila), 0.4), ("BOTTOMPADDING", (0, fila), (-1, fila), 1.2),
+            ]
     casillas = Table(filas, colWidths=[8 * mm, ancho - 8 * mm], hAlign="LEFT")
     casillas.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
         ("TOPPADDING", (0, 0), (-1, -1), 1.6), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.6),
+        *estilo_filas,
     ]))
     historia += [casillas, Spacer(1, 3 * mm)]
 

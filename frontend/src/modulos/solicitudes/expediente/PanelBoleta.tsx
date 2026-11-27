@@ -22,11 +22,12 @@ function tipoDelError(error: unknown): "aviso" | "error" {
   return estado === 409 || estado === 422 ? "aviso" : "error";
 }
 
-/** La boleta de recargo por atención fuera del horario laboral (2026-11-16), para el
- *  personal del SNM: la agencia no la ve (le llega `boletas` en null). UCVMM, el
- *  supervisor de sector y el puesto de control la generan con el número de oficio y,
- *  como en un talonario, la anulan con motivo y generan otra. El supervisor general
- *  solo la descarga. */
+/** La boleta de recargo por atención fuera del horario laboral (2026-11-16). La ven y la
+ *  descargan UCVMM, el supervisor de sector y el Administrador; al puesto de control, al
+ *  supervisor general y a la agencia les llega `boletas` en null (2026-11-27). El número de
+ *  oficio lo pone el analista de UCVMM que aprobó la solicitud o, si no está, otro de su
+ *  sector; como en un talonario, la anula con motivo quien la aprobó o quien la generó, y se
+ *  genera otra. Lo dicen `acciones.generar_boleta` y `acciones.anular_boleta`. */
 export function PanelBoleta({ s, onActualizada }: {
   s: SolicitudDetalle; onActualizada: (s: SolicitudDetalle) => void;
 }) {
@@ -67,7 +68,15 @@ export function PanelBoleta({ s, onActualizada }: {
           </p>
         </div>
       ) : (
-        <p className={styles.vacio}>Sin boleta vigente.</p>
+        <>
+          <p className={styles.vacio}>Sin boleta vigente.</p>
+          {/* Quien solo la ve sabe quién la pone (2026-11-27): sin botón y sin explicación no se entendía. */}
+          {!s.acciones.generar_boleta && (
+            <p className={styles.ayuda}>
+              La genera el analista de UCVMM que aprobó la solicitud o, si no está, otro de su sector.
+            </p>
+          )}
+        </>
       )}
       <div className={styles.filaBotones}>
         {vigente && s.acciones.anular_boleta && (
