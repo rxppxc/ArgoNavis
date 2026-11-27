@@ -49,8 +49,10 @@ class SalidaTipoTramite(BaseModel):
     pide_operacion:              bool = False
     # Las que ofrece (2026-11-26): «Subir y bajar», solo el trámite de Técnico.
     operaciones:                 list[str] | None = None
-    # El formulario pide los días del sellado: 5 o 15 (2026-11-18: Shore Pass).
+    # El formulario pide los días del sellado: 5 o 15 (2026-11-18: Shore Pass; 2026-11-27: Urgencia médica).
     pide_dias_sellado:           bool = False
+    # Los que ofrece (2026-11-27): Urgencia médica, solo 5, que viene elegido. Nulo = 5 o 15.
+    dias_sellado_opciones:       list[int] | None = None
     # Horas que vale la autorización desde la aprobación (2026-11-26: Urgencia médica, 120);
     # nulo = hasta el final del día, dos días después de la operación.
     horas_vigencia:              int | None = None

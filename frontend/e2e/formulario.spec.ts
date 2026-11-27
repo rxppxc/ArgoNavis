@@ -462,7 +462,7 @@ test("«Volver» regresa a los trámites y lo escrito queda en borrador (2026-11
   });
 });
 
-test("Urgencias: Embarque o Desembarque, 120 horas de vigencia y una sola Carta Form. 7; el boleto opcional en Desembarque (2026-11-26)", async ({ browser }) => {
+test("Urgencias: 120 horas de vigencia, 5 días de sellado ya elegidos y una sola Carta Form. 7; el boleto opcional en Desembarque (2026-11-27)", async ({ browser }) => {
   const agencia = await entrar(browser, CUENTAS.agencia);
   await agencia.goto("/new");
   const urgencias = agencia.getByRole("button", { name: /^Urgencias/ });
@@ -479,12 +479,16 @@ test("Urgencias: Embarque o Desembarque, 120 horas de vigencia y una sola Carta 
     await expect(agencia.getByLabel(/^Adjuntar Carta de Responsabilidad \(Form\. No\. 7\) de /)).toHaveCount(0);
   });
 
-  await test.step("pide la operación: Embarque o Desembarque («Subir y bajar», solo en Técnico)", async () => {
-    const operacion = agencia.getByLabel("Operación *");
-    await expect(operacion, "empieza sin elegir").toHaveValue("");
-    await expect(operacion.locator("option")).toHaveText(["Selecciona…", "Embarque", "Desembarque"]);
-    await operacion.selectOption("desembarque");
-    await expect(operacion).toHaveValue("desembarque");
+  await test.step("sin operación ni puerto de desembarque, con 5 días de sellado ya elegidos (2026-11-27)", async () => {
+    await expect(agencia.getByLabel("Operación *")).toHaveCount(0);
+    await expect(agencia.getByLabel("Puerto de desembarque *")).toHaveCount(0);
+    const dias = agencia.getByLabel("Días del sellado *");
+    await expect(dias, "viene elegido").toHaveValue("5");
+    await expect(dias.locator("option")).toHaveText(["5 días"]);
+    await expect(dias).toHaveAccessibleDescription("Único plazo de sellado de este trámite.");
+    // No cuenta entre los datos que faltan: el resumen de «Datos del trámite» no lo pide.
+    await agencia.getByRole("button", { name: "Enviar solicitud" }).click();
+    await expect(agencia.getByText("Elige los días del sellado", { exact: false })).toHaveCount(0);
   });
 
   await test.step("en Desembarque, el boleto aéreo es opcional", async () => {

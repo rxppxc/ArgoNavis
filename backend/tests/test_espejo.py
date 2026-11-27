@@ -88,6 +88,17 @@ def test_carta_de_subir_y_bajar(caso):
     assert ServicioSolicitud.con_carta_subir_y_bajar(tipo, datos) is caso["esperado"]
 
 
+# ── Los días del sellado: Urgencia médica, solo 5, ya elegidos (2026-11-27) ──────
+
+DIAS_SELLADO = _casos("dias_sellado.json")
+
+
+@pytest.mark.parametrize("caso", DIAS_SELLADO, ids=_ids(DIAS_SELLADO))
+def test_dias_del_sellado(caso):
+    tipo = TipoTramite(codigo="T", nombre="Trámite", **caso["tramite"])
+    assert ServicioTramite.dias_sellado_de(tipo, caso["elegidos"]) == caso["esperado"]
+
+
 # ── Horario laboral (el reloj del inicio, 2026-11-24) ─────────────────────────
 
 HORARIO = _casos("horario.json")

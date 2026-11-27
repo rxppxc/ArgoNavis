@@ -3,8 +3,10 @@
 import type { Pais, PuestoMini } from "../../../api/catalogos";
 import type { Operacion, TripulanteEntrada } from "../../../api/solicitudes";
 import type { TipoTramite } from "../../../api/tramites";
-import { OPERACIONES } from "../../../api/tiposSolicitudes";
-import { ETIQUETA_OPERACION, ETIQUETA_RANGO, RANGOS_CON_LIBRETA, formatearFecha, normalizarImo } from "../presentacion";
+import { DIAS_SELLADO, OPERACIONES, type DiasSellado } from "../../../api/tiposSolicitudes";
+import {
+  ETIQUETA_OPERACION, ETIQUETA_RANGO, RANGOS_CON_LIBRETA, formatearFecha, normalizarImo, textoDias,
+} from "../presentacion";
 
 export interface CabeceraFormulario {
   puesto_control_id: string;
@@ -116,6 +118,19 @@ function enumerarO(palabras: string[]): string {
   return palabras.length > 1 ? `${palabras.slice(0, -1).join(", ")} o ${palabras[palabras.length - 1]}` : palabras[0] ?? "";
 }
 
+/** Los días del sellado que ofrece el trámite: sin lista, 5 o 15; Urgencia médica, solo 5 (2026-11-27). */
+export function diasDelTramite(tipo: Pick<TipoTramite, "dias_sellado_opciones">): DiasSellado[] {
+  return DIAS_SELLADO.filter((d) => !tipo.dias_sellado_opciones || tipo.dias_sellado_opciones.includes(d));
+}
+
+/** Los días del sellado de la solicitud: los elegidos o, si el trámite ofrece uno solo, ese, aunque
+ *  no se haya tocado el campo; «» si el trámite no los pide. Espejo de dias_sellado_de (tramite_service.py). */
+export function diasSelladoDe(tipo: Pick<TipoTramite, "pide_dias_sellado" | "dias_sellado_opciones">, elegidos: string): string {
+  if (!tipo.pide_dias_sellado) return "";
+  const ofrecidos = diasDelTramite(tipo);
+  return elegidos || (ofrecidos.length === 1 ? String(ofrecidos[0]) : "");
+}
+
 /** `conImpedimento`: al corregir, los tripulantes que la revisión marcó con impedimento (por su
  *  id): no pueden seguir en la solicitud (2026-11-26). Espejo de corregir() del backend. */
 export function validarFormulario(
@@ -157,8 +172,18 @@ export function validarFormulario(
       errores.push(`La operación «${ETIQUETA_OPERACION[c.operacion]}» no es de este trámite: elige ${opciones}.`);
     }
   }
-  // Obligatorios en Shore Pass (2026-11-18); el backend: validar_campos_cabecera.
-  if (tipo.pide_dias_sellado && !c.dias_sellado) errores.push("Elige los días del sellado: 5 o 15.");
+  // Obligatorios en Shore Pass (2026-11-18) y en Urgencia médica, que solo ofrece 5 y los trae elegidos
+  // (2026-11-27); el backend: validar_campos_cabecera y _validar_formulario.
+  if (tipo.pide_dias_sellado) {
+    // Con una sola opción nunca faltan (diasSelladoDe): faltan solo donde se elige entre 5 y 15.
+    const ofrecidos = diasDelTramite(tipo);
+    const dias = diasSelladoDe(tipo, c.dias_sellado);
+    if (!dias) errores.push("Elige los días del sellado: 5 o 15.");
+    else if (!ofrecidos.some((d) => String(d) === dias)) {
+      const opciones = enumerarO(ofrecidos.map((d) => textoDias(d)));
+      errores.push(`El sellado de ${textoDias(Number(dias))} no es de este trámite: elige ${opciones}.`);
+    }
+  }
 
   if (tripulantes.length === 0) errores.push("Registra al menos un tripulante.");
   for (const t of tripulantes) {

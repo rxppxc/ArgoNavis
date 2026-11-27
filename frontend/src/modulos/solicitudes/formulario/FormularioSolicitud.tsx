@@ -37,7 +37,8 @@ import type { DatosFormulario } from "./useCargaFormulario";
 import { useDocumentosFormulario } from "./useDocumentosFormulario";
 import { useTripulantesFormulario } from "./useTripulantesFormulario";
 import {
-  CABECERA_VACIA, MAX_TRIPULANTES, MESES_VIGENCIA_PASAPORTE, fechaReferencia, validarFormulario, type CabeceraFormulario,
+  CABECERA_VACIA, MAX_TRIPULANTES, MESES_VIGENCIA_PASAPORTE, diasDelTramite, fechaReferencia, validarFormulario,
+  type CabeceraFormulario,
 } from "./validacionFormulario";
 import styles from "./PaginaSolicitud.module.css";
 
@@ -171,9 +172,10 @@ export function FormularioSolicitud({
     // Sin operación, o con una que el trámite nuevo no ofrece («Subir y bajar» fuera de Técnico).
     setCabecera((prev) => (nuevo?.pide_operacion && (!nuevo.operaciones || nuevo.operaciones.includes(prev.operacion))
       ? prev : { ...prev, operacion: "" }));
-    if (!nuevo?.pide_dias_sellado) {
-      setCabecera((prev) => ({ ...prev, dias_sellado: "" }));
-    }
+    // Sin días del sellado, o con unos que el trámite nuevo no ofrece (15 en Urgencia médica, 2026-11-27).
+    setCabecera((prev) => (nuevo?.pide_dias_sellado
+      && (!prev.dias_sellado || diasDelTramite(nuevo).some((d) => String(d) === prev.dias_sellado))
+      ? prev : { ...prev, dias_sellado: "" }));
     documentos.descartarTodos();
     fichas.ajustarRangos(nuevo?.rangos_permitidos ?? null);
     return true;

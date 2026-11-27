@@ -44,8 +44,10 @@ export interface TipoTramite {
   pide_operacion: boolean;
   /** Las que ofrece, si la pide (2026-11-26): «Subir y bajar», solo el trámite de Técnico. */
   operaciones: string[] | null;
-  /** El formulario pide los días del sellado: 5 o 15 (2026-11-18: Shore Pass). */
+  /** El formulario pide los días del sellado: 5 o 15 (2026-11-18: Shore Pass; 2026-11-27: Urgencia médica). */
   pide_dias_sellado: boolean;
+  /** Los que ofrece (2026-11-27): Urgencia médica, solo 5, que viene elegido. null = 5 o 15. */
+  dias_sellado_opciones: number[] | null;
   /** Horas que vale la autorización desde la aprobación (2026-11-26: Urgencia médica, 120);
    *  null = hasta el final del día, dos días después de la operación. */
   horas_vigencia: number | null;

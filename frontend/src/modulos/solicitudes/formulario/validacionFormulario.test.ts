@@ -4,7 +4,8 @@ import type { RangoMarino, TripulanteEntrada } from "../../../api/solicitudes";
 import { tramiteDePrueba } from "../../../pruebas/datos";
 import { leerEspejo, type Caso } from "../../../pruebas/espejo";
 import {
-  CABECERA_VACIA, MAX_TRIPULANTES, estadoPasaporte, fechaReferencia, nacimientoMaximo, operacionMaxima,
+  CABECERA_VACIA, MAX_TRIPULANTES, diasDelTramite, diasSelladoDe, estadoPasaporte, fechaReferencia,
+  nacimientoMaximo, operacionMaxima,
   puestosParaCambio, validarFormulario, vigenciaMinimaPasaporte,
   type CabeceraFormulario, type FichaTripulante,
 } from "./validacionFormulario";
@@ -222,5 +223,34 @@ describe("los días del sellado de Shore Pass (2026-11-18)", () => {
 
   it("un trámite que no los pide no los exige", () => {
     expect(validarFormulario(tramiteDePrueba(), cabecera, [ficha()], paises, hoy)).toEqual([]);
+  });
+});
+
+interface CasoDiasSellado extends Caso {
+  tramite: { pide_dias_sellado: boolean; dias_sellado_opciones: number[] | null };
+  elegidos: number | null;
+  esperado: number | null;
+}
+
+describe("los días del sellado de Urgencia médica: solo 5, ya elegidos (2026-11-27)", () => {
+  const hoy = "2026-10-14";
+  const cabecera: CabeceraFormulario = { ...CABECERA_VACIA, puesto_control_id: "1", fecha_operacion: "2026-10-20" };
+  const urgencia = tramiteDePrueba({ pide_dias_sellado: true, dias_sellado_opciones: [5] });
+  const shorePass = tramiteDePrueba({ pide_dias_sellado: true });
+
+  it("cada trámite ofrece los suyos: sin lista, 5 o 15", () => {
+    expect(diasDelTramite(urgencia)).toEqual([5]);
+    expect(diasDelTramite(shorePass)).toEqual([5, 15]);
+  });
+
+  it.each(leerEspejo<CasoDiasSellado[]>("dias_sellado.json"))("$caso (espejo de dias_sellado_de)",
+    ({ tramite, elegidos, esperado }) => {
+      expect(diasSelladoDe(tramiteDePrueba(tramite), elegidos ? String(elegidos) : "")).toBe(esperado ? String(esperado) : "");
+    });
+
+  it("no falta nada sin tocar el campo, y 15 no es de este trámite", () => {
+    expect(validarFormulario(urgencia, cabecera, [ficha()], paises, hoy)).toEqual([]);
+    expect(validarFormulario(urgencia, { ...cabecera, dias_sellado: "15" }, [ficha()], paises, hoy))
+      .toEqual(["El sellado de 15 días no es de este trámite: elige 5 días."]);
   });
 });

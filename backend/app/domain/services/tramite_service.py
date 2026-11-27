@@ -243,9 +243,19 @@ class ServicioTramite:
             faltantes.append("Clínica u hospital")
         if tipo.pide_operacion and not datos.get("operacion"):
             faltantes.append("Operación (Embarque, Desembarque o Subir y bajar)")
-        if tipo.pide_dias_sellado and not datos.get("dias_sellado"):
+        if tipo.pide_dias_sellado and not self.dias_sellado_de(tipo, datos.get("dias_sellado")):
             faltantes.append("Días del sellado (5 o 15)")
         return faltantes
+
+    @staticmethod
+    def dias_sellado_de(tipo: TipoTramite, elegidos: int | None) -> int | None:
+        """Los días del sellado de la solicitud: los elegidos o, si el trámite ofrece uno solo
+        (Urgencia médica, 5: 2026-11-27), ese, que el formulario trae elegido. None si el trámite no
+        los pide (Shore Pass y Urgencia médica sí). Espejo: diasSelladoDe (validacionFormulario.ts)."""
+        if not tipo.pide_dias_sellado:
+            return None
+        opciones = tipo.dias_sellado_opciones or []
+        return elegidos or (opciones[0] if len(opciones) == 1 else None)
 
     def validar_tripulantes(
         self,

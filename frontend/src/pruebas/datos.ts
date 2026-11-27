@@ -8,7 +8,8 @@ export function tramiteDePrueba(cambios: Partial<TipoTramite> = {}): TipoTramite
     id: 1, codigo: "T", nombre: "Trámite de prueba",
     requiere_buque: false, requiere_puerto: false, requiere_puerto_desembarque: false,
     requiere_motivo: false, requiere_clinica: false, permite_cambio_puerto: false, permite_subir_y_bajar: false,
-    pide_operacion: false, operaciones: null, pide_dias_sellado: false, horas_vigencia: null, valida_vigencia: true, rangos_permitidos: null,
+    pide_operacion: false, operaciones: null, pide_dias_sellado: false, dias_sellado_opciones: null,
+    horas_vigencia: null, valida_vigencia: true, rangos_permitidos: null,
     aviso_custodia: false, descripcion: null, nota: null, orden: 1, activo: true, documentos: [],
     ...cambios,
   };

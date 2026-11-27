@@ -255,6 +255,50 @@ async def test_aprobada_fuera_del_horario_lleva_el_costo(cliente, monkeypatch):
     assert not armados[-1].fuera_de_horario and armados[-1].costo_fuera_de_horario is None
 
 
+async def test_devolver_y_denegar_fuera_del_horario_no_cuentan(cliente, monkeypatch):
+    """Solo cuenta la aprobación de UCVMM (el usuario pidió validarlo el 2026-11-27): devolver a
+    corrección o denegar fuera del horario no llevan recargo ni insignia, y no suman en «fuera del
+    horario» de las estadísticas."""
+    from app.domain.services import solicitud_service
+
+    sufijo = secrets.token_hex(3)
+    revisor = await crear_actor("UCVMM", prefijo="revisor")
+    supervisor = await crear_actor("Supervisor de sector", prefijo="supervisor")
+    async with SesionLocal() as s:
+        agencia = AgenciaNaviera(nombre=f"Agencia Decision {sufijo}")
+        puesto = PuestoControl(nombre=f"Puesto Decision {sufijo}", sector_id=await id_sector())
+        s.add_all([agencia, puesto])
+        await s.commit()
+        tipo_id = (await s.execute(select(TipoTramite.id).limit(1))).scalar_one()
+    naviera = await crear_actor("Naviera", agencia_id=agencia.id, prefijo="naviera")
+    sabado_noche = datetime.combine(_ultimo(5), time(20, 0), ZONA_PANAMA)
+    antes = (await cliente.get("/solicitudes/estadisticas", headers=supervisor.headers)).json()
+
+    for accion in ("devolver", "negar"):
+        async with SesionLocal() as s:
+            solicitud = Solicitud(
+                agencia_id=agencia.id, agencia_nombre=agencia.nombre, creada_por_id=naviera.id,
+                tipo_tramite_id=tipo_id, puesto_control_id=puesto.id, puesto_nombre=puesto.nombre,
+                titulo="Prueba de decisión", fecha_operacion=datetime.now(ZONA_PANAMA).date(),
+                cantidad_tripulantes=0, estado="review", enviada_en=sabado_noche - timedelta(hours=1),
+                impedimentos_verificados=True,
+            )
+            s.add(solicitud)
+            await s.commit()
+            sid = solicitud.id
+        monkeypatch.setattr(solicitud_service, "ahora_utc", lambda: sabado_noche.astimezone(timezone.utc))
+        r = await cliente.post(f"/solicitudes/{sid}/{accion}", json={"motivo": "Prueba fuera del horario"},
+                               headers=revisor.headers)
+        assert r.status_code == 200, (accion, r.text)
+        monkeypatch.undo()
+        s_api = (await cliente.get(f"/solicitudes/{sid}", headers=revisor.headers)).json()
+        assert s_api["aprobada_en"] is None, accion
+        assert not s_api["fuera_de_horario"] and s_api["costo_fuera_de_horario"] is None, accion
+
+    despues = (await cliente.get("/solicitudes/estadisticas", headers=supervisor.headers)).json()
+    assert despues["aprobadas_fuera_horario"] == antes["aprobadas_fuera_horario"]
+
+
 async def test_series_del_periodo(cliente):
     """Con un periodo, la serie muestra sus días, meses y años (hasta hoy)."""
     supervisor = await crear_actor("Supervisor de sector", prefijo="supervisor")

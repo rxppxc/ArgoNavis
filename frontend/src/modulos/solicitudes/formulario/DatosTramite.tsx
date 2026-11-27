@@ -4,11 +4,13 @@ import { SelectorBuscable } from "../../../components/SelectorBuscable";
 import { SelectorFecha } from "../../../components/SelectorFecha";
 import type { OpcionBuscable } from "../../../utils/busqueda";
 import { isoATexto, sumarDias } from "../../../utils/calendario";
-import { DIAS_SELLADO, OPERACIONES } from "../../../api/tiposSolicitudes";
+import { OPERACIONES } from "../../../api/tiposSolicitudes";
 import {
   AYUDA_CAMPOS_TRAMITE, avisoSubirYBajar, ETIQUETA_OPERACION, formatearFechaHora, textoDias, textoVigencia,
 } from "../presentacion";
-import { operacionMaxima, puestosParaCambio, type CabeceraFormulario } from "./validacionFormulario";
+import {
+  diasDelTramite, diasSelladoDe, operacionMaxima, puestosParaCambio, type CabeceraFormulario,
+} from "./validacionFormulario";
 import styles from "./PaginaSolicitud.module.css";
 
 interface Props {
@@ -35,6 +37,9 @@ export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos,
   const conCambio = ofreceCambio && cabecera.cambio_puerto === "si";
   const paraCambio = puestosParaCambio(puestos, cabecera.puesto_control_id);
   const destino = puestos.find((p) => String(p.id) === cabecera.puesto_destino_id);
+  // Los días del sellado que ofrece: Urgencia médica, solo 5 (2026-11-27).
+  const diasOfrecidos = diasDelTramite(tipo);
+  const diasUnico = diasOfrecidos.length === 1;
 
   /** Otro puesto elegido: el del cambio se quita si pasa a ser el mismo. */
   function elegirPuesto(id: string) {
@@ -148,15 +153,22 @@ export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos,
             La autorización de este trámite vale <strong>{textoVigencia(tipo.horas_vigencia)}</strong>.
           </p>
         )}
-        {/* Los días del sellado de Shore Pass (pedido del usuario del 2026-11-18): obligatorios, empiezan
-            sin elegir y no cambian los documentos ni la vigencia. */}
+        {/* Los días del sellado (pedido del usuario del 2026-11-18): obligatorios y no cambian los
+            documentos ni la vigencia. En Shore Pass empiezan sin elegir; Urgencia médica ofrece solo 5,
+            que viene elegido (2026-11-27), como el rango de un trámite con uno solo. */}
         {tipo.pide_dias_sellado && (
           <label className={styles.campo}>
             <span>Días del sellado *</span>
-            <select value={cabecera.dias_sellado} onChange={(e) => onCambiar("dias_sellado", e.target.value)}>
-              <option value="">Selecciona…</option>
-              {DIAS_SELLADO.map((d) => <option key={d} value={d}>{textoDias(d)}</option>)}
+            <select value={diasSelladoDe(tipo, cabecera.dias_sellado)} aria-describedby={diasUnico ? "nota-dias-sellado" : undefined}
+              onChange={(e) => onCambiar("dias_sellado", e.target.value)}>
+              {!diasUnico && <option value="">Selecciona…</option>}
+              {diasOfrecidos.map((d) => <option key={d} value={d}>{textoDias(d)}</option>)}
             </select>
+            {diasUnico && (
+              <small id="nota-dias-sellado" className={styles.notaCampo} aria-hidden="true">
+                Único plazo de sellado de este trámite.
+              </small>
+            )}
           </label>
         )}
         {/* «¿Subir y bajar?» (Sí / No), en los trámites que lo pregunten: con «Sí», cada tripulante adjunta

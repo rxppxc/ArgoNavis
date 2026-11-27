@@ -1,0 +1,12 @@
+[
+  {"caso": "Urgencia médica, sin tocar el campo: 5, el único que ofrece",
+   "tramite": {"pide_dias_sellado": true, "dias_sellado_opciones": [5]}, "elegidos": null, "esperado": 5},
+  {"caso": "Urgencia médica con 5 elegidos: 5",
+   "tramite": {"pide_dias_sellado": true, "dias_sellado_opciones": [5]}, "elegidos": 5, "esperado": 5},
+  {"caso": "Shore Pass sin elegir: faltan",
+   "tramite": {"pide_dias_sellado": true, "dias_sellado_opciones": null}, "elegidos": null, "esperado": null},
+  {"caso": "Shore Pass con 15: 15",
+   "tramite": {"pide_dias_sellado": true, "dias_sellado_opciones": null}, "elegidos": 15, "esperado": 15},
+  {"caso": "Un trámite que no los pide los descarta",
+   "tramite": {"pide_dias_sellado": false, "dias_sellado_opciones": null}, "elegidos": 15, "esperado": null}
+]

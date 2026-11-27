@@ -71,9 +71,11 @@ class TipoTramite(Base):
     # Las que ofrece, si la pide (2026-11-26): «Subir y bajar» solo en el de Técnico; Urgencia
     # médica, Embarque o Desembarque. Nulo en los que no la piden.
     operaciones:                 Mapped[list[str] | None] = mapped_column(ARRAY(String(20)), nullable=True)
-    # Si el formulario pide los días del sellado: 5 o 15 (2026-11-18, solo Shore Pass).
-    # Obligatorios; no cambian los documentos ni la vigencia.
+    # Si el formulario pide los días del sellado: 5 o 15 (2026-11-18: Shore Pass; 2026-11-27:
+    # Urgencia médica). Obligatorios; no cambian los documentos ni la vigencia.
     pide_dias_sellado:           Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Los que ofrece, si los pide (2026-11-27): Urgencia médica, solo 5, que viene elegido. Nulo = 5 o 15.
+    dias_sellado_opciones:       Mapped[list[int] | None] = mapped_column(ARRAY(Integer), nullable=True)
     # Horas que vale la autorización desde que se aprueba (2026-11-26: Urgencia médica, 120).
     # Nula = como siempre: hasta el final del día, DIAS_GRACIA_FINALIZACION días después de la operación.
     horas_vigencia:              Mapped[int | None] = mapped_column(Integer, nullable=True)

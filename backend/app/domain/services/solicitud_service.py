@@ -615,6 +615,13 @@ class ServicioSolicitud:
             opciones = ", ".join(nombres[:-1]) + f" o {nombres[-1]}" if len(nombres) > 1 else nombres[0]
             raise _error(status.HTTP_400_BAD_REQUEST,
                          f"La operación «{ETIQUETA_OPERACION[datos.operacion]}» no es de este trámite: elige {opciones}.")
+        # Y sus días del sellado: Urgencia médica, solo 5 (2026-11-27).
+        ofrecidos = tipo.dias_sellado_opciones
+        if tipo.pide_dias_sellado and datos.dias_sellado and ofrecidos and datos.dias_sellado not in ofrecidos:
+            nombres = [texto_dias(d) for d in ofrecidos]
+            opciones = ", ".join(nombres[:-1]) + f" o {nombres[-1]}" if len(nombres) > 1 else nombres[0]
+            raise _error(status.HTTP_400_BAD_REQUEST,
+                         f"El sellado de {texto_dias(datos.dias_sellado)} no es de este trámite: elige {opciones}.")
 
         hoy = hoy_panama()
         assert datos.fecha_operacion is not None and datos.puesto_control_id is not None
@@ -798,7 +805,8 @@ class ServicioSolicitud:
         s.subir_y_bajar        = self._subir_y_bajar(tipo, datos)
         # La del trámite de Técnico (2026-11-18); los demás trámites la descartan.
         s.operacion            = datos.operacion if tipo.pide_operacion else None
-        s.dias_sellado         = datos.dias_sellado if tipo.pide_dias_sellado else None   # Shore Pass
+        # Shore Pass y, desde el 2026-11-27, Urgencia médica (solo 5, que vale aunque no llegue).
+        s.dias_sellado         = self.tramites.dias_sellado_de(tipo, datos.dias_sellado)
         assert datos.fecha_operacion is not None   # la exige _validar_formulario
         s.fecha_operacion      = datos.fecha_operacion
         s.cantidad_tripulantes = cantidad_tripulantes

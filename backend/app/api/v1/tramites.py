@@ -44,6 +44,7 @@ def mapear_tipo(tipo: TipoTramite) -> SalidaTipoTramite:
         pide_operacion=tipo.pide_operacion,
         operaciones=tipo.operaciones,
         pide_dias_sellado=tipo.pide_dias_sellado,
+        dias_sellado_opciones=tipo.dias_sellado_opciones,
         horas_vigencia=tipo.horas_vigencia,
         valida_vigencia=tipo.valida_vigencia,
         rangos_permitidos=tipo.rangos_permitidos,

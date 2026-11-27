@@ -84,8 +84,9 @@ VISA_MARINO_RESTRINGIDO = ("DOC-VISA-MARINO", "marino", "nacionalidad_restringid
 LIBRETA = ("DOC-LIBRETA-MARINO", "marino", "siempre", None)           # solo el Marino: requiere_libreta
 LISTA = ("DOC-LISTA-TRIPULANTES", "solicitud", "siempre", None)       # "debe subirse al trámite"
 CARTA = ("DOC-FORM7-RESPONSABILIDAD", "marino", "siempre", MARINO)    # "para cada tripulante"
-# En Urgencia médica, una por solicitud (2026-11-26), si hay algún Marino o Pasajero.
-CARTA_DE_LA_SOLICITUD = ("DOC-FORM7-RESPONSABILIDAD", "solicitud", "siempre", MARINO)
+# En Urgencia médica, una por solicitud (2026-11-26): hasta el 2026-11-27, si había algún Marino o
+# Pasajero; desde entonces, siempre, sea cual sea el rango (decisión del usuario).
+CARTA_DE_URGENCIA = ("DOC-FORM7-RESPONSABILIDAD", "solicitud", "siempre", None)
 REPORTE = ("DOC-REPORTE-MEDICO", "marino", "siempre", MARINO)         # "para cada tripulante"
 CITA = ("DOC-CITA-CONSULADO", "marino", "siempre", MARINO)
 BOLETO = ("DOC-BOLETO-AEREO", "marino", "siempre", NO_MARINOS)        # reunión del 2026-10-30
@@ -127,10 +128,12 @@ DOCUMENTO = {
                        CUSTODIA, VISA_MARINO_RESTRINGIDO},
     },
     "F3-URGENCIA-MEDICA": {
-        "campos": ["puerto_desembarque", "clinica_hospital"], "vigencia": True, "aviso_custodia": True,
-        # 2026-11-26: la operación como en Técnico y la autorización vale 120 horas desde la aprobación.
-        "operacion": True, "operaciones": ("embarque", "desembarque"), "horas_vigencia": 120,
-        "documentos": {FORM3, CARTA_DE_LA_SOLICITUD, REPORTE, GENERALES, LIBRETA, BOLETO, VISA_MARINO_RESTRINGIDO},
+        # Decisión del usuario del 2026-11-27, sobre el Form. 3: sin el puerto de desembarque ni la
+        # operación (que pedía desde el 2026-11-26), y con los días del sellado, solo 5. La
+        # autorización vale 120 horas desde la aprobación (2026-11-26).
+        "campos": ["clinica_hospital"], "vigencia": True, "aviso_custodia": True,
+        "dias_sellado": True, "dias_sellado_opciones": (5,), "horas_vigencia": 120,
+        "documentos": {FORM3, CARTA_DE_URGENCIA, REPORTE, GENERALES, LIBRETA, BOLETO, VISA_MARINO_RESTRINGIDO},
     },
     "F3-RENOV-PASAPORTE": {
         "campos": ["puerto_desembarque"], "vigencia": True, "aviso_custodia": True,
@@ -271,6 +274,7 @@ async def test_catalogo_igual_al_documento(cliente, agencia):
         assert tipo["pide_dias_sellado"] == esperado.get("dias_sellado", False), codigo
         assert tipo["horas_vigencia"] == esperado.get("horas_vigencia"), codigo
         assert tuple(tipo["operaciones"] or ()) == esperado.get("operaciones", ()), codigo
+        assert tuple(tipo["dias_sellado_opciones"] or ()) == esperado.get("dias_sellado_opciones", ()), codigo
 
 
 @pytest.mark.parametrize("codigo", sorted(DOCUMENTO))
@@ -380,39 +384,46 @@ async def test_boleto_opcional_solo_en_desembarque_y_tecnico(cliente, agencia, c
         assert r.status_code == 400 and "Boleto" in r.json()["detail"], (codigo, r.text)
 
 
-async def test_urgencia_una_carta_form7_por_solicitud(cliente, agencia):
+@pytest.mark.parametrize("rangos", [("marino", "marino"), ("militar",), ("militar", "pasajero")],
+                         ids=["marinos", "solo un militar", "militar y pasajero"])
+async def test_urgencia_una_carta_form7_por_solicitud(cliente, agencia, rangos):
     """En Urgencia médica, la Carta de Responsabilidad (Form. No. 7) es una sola para toda la
-    solicitud, con los documentos de la solicitud (pedido del 2026-11-26). Antes, una por tripulante."""
+    solicitud, con los documentos de la solicitud (pedido del 2026-11-26; antes, una por
+    tripulante), y obligatoria sea cual sea el rango (2026-11-27; antes, si había algún Marino o
+    Pasajero)."""
     naviera, puesto_id = agencia
-    datos, archivos = _datos("F3-URGENCIA-MEDICA", puesto_id, [tripulante("Ana", "PHL"), tripulante("Beto", "PHL")])
+    tripulantes = [tripulante(f"Ana{i}", "PHL", rango=rango) for i, rango in enumerate(rangos)]
+    datos, archivos = _datos("F3-URGENCIA-MEDICA", puesto_id, tripulantes, sin={"DOC-FORM7-RESPONSABILIDAD"})
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 400 and "Carta de Responsabilidad (Form. No. 7)" in r.json()["detail"], r.text
+
+    datos, archivos = _datos("F3-URGENCIA-MEDICA", puesto_id, tripulantes)
     r = await enviar(cliente, naviera, datos, archivos)
     assert r.status_code == 201, r.text
     cartas = [c for c in r.json()["checklist"] if c["documento_codigo"] == "DOC-FORM7-RESPONSABILIDAD"]
     assert len(cartas) == 1 and cartas[0]["alcance"] == "solicitud" and cartas[0]["tripulante_id"] is None, cartas
     assert cartas[0]["documento_nombre"] == "Carta de Responsabilidad (Form. No. 7)", "la de siempre, sin rangos"
-    assert cartas[0]["cubierta"]
+    assert cartas[0]["obligatoria"] and cartas[0]["cubierta"]
 
 
-async def test_urgencia_pide_la_operacion(cliente, agencia):
-    """Urgencia médica pide la operación: Embarque o Desembarque (2026-11-26). Solo se registra.
-    «Subir y bajar» es solo del trámite de Técnico: aquí se rechaza."""
+async def test_urgencia_sin_operacion_ni_puerto_y_con_5_dias_de_sellado(cliente, agencia):
+    """Urgencia médica (decisión del usuario del 2026-11-27): ya no pide la operación ni el puerto de
+    desembarque (lo que llegue de un navegador con la versión anterior se descarta), y pide los días
+    del sellado, solo 5: si no llegan, son 5; 15 no es de este trámite. La vigencia sigue en 120 horas."""
     naviera, puesto_id = agencia
     tripulantes = [tripulante("Ana", "PHL")]
-    datos, archivos = _datos("F3-URGENCIA-MEDICA", puesto_id, tripulantes)
-    datos["operacion"] = None
-    r = await enviar(cliente, naviera, datos, archivos)
-    assert r.status_code == 400 and "Operación" in r.json()["detail"], r.text
-
-    datos, archivos = _datos("F3-URGENCIA-MEDICA", puesto_id, tripulantes, operacion="subir_y_bajar")
-    r = await enviar(cliente, naviera, datos, archivos)
-    assert r.status_code == 400 and "Subir y bajar" in r.json()["detail"], r.text
-
-    datos, archivos = _datos("F3-URGENCIA-MEDICA", puesto_id, tripulantes, operacion="desembarque")
+    datos, archivos = _datos("F3-URGENCIA-MEDICA", puesto_id, tripulantes, operacion="desembarque",
+                             puerto_desembarque="Balboa", dias_sellado=None)
     r = await enviar(cliente, naviera, datos, archivos)
     assert r.status_code == 201, r.text
-    assert r.json()["operacion"] == "desembarque"
-    codigos = [c["documento_codigo"] for c in r.json()["checklist"]]
-    assert codigos.count("DOC-FORM7-RESPONSABILIDAD") == 1 and "DOC-GARANTIA-O-CONTRATO" not in codigos
+    s = r.json()
+    assert s["operacion"] is None and s["pide_operacion"] is False
+    assert s["puerto_desembarque"] is None
+    assert s["dias_sellado"] == 5 and s["pide_dias_sellado"] is True, "por defecto, 5"
+
+    datos, archivos = _datos("F3-URGENCIA-MEDICA", puesto_id, tripulantes, dias_sellado=15)
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 400 and "5 días" in r.json()["detail"], r.text
 
 
 async def test_urgencia_vale_120_horas_desde_la_aprobacion(cliente, admin, monkeypatch):
