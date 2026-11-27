@@ -78,9 +78,15 @@ describe("avisoSubirYBajar (la operación del trámite de Técnico; 2026-11-26)"
         + "y «Carta de garantía de la agencia contratante», en los documentos de la solicitud.");
   });
 
+  it("con uno solo, en singular (desde el 2026-11-27, la Form. 7 de Técnico va en toda operación)", () => {
+    expect(avisoSubirYBajar([{ ...generales, alcance: "marino" }, { ...garantia, alcance: "solicitud" }]))
+      .toBe("Con «Subir y bajar» se adjunta además, una por solicitud, «Carta de garantía de la agencia contratante», "
+        + "en los documentos de la solicitud.");
+  });
+
   it("si un documento va por tripulante, lo dice aparte", () => {
     expect(avisoSubirYBajar([{ ...form7, alcance: "marino" }, { ...garantia, alcance: "solicitud" }]))
-      .toBe("Con «Subir y bajar» se adjuntan además, una por solicitud, «Carta de garantía de la agencia contratante», "
+      .toBe("Con «Subir y bajar» se adjunta además, una por solicitud, «Carta de garantía de la agencia contratante», "
         + "en los documentos de la solicitud. Cada tripulante adjunta «Carta de Responsabilidad (Form. No. 7)» "
         + "en sus documentos.");
   });

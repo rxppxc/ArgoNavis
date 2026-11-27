@@ -64,20 +64,23 @@ class DatosPdfBoleta:
 
 
 def casillas_operacion(
-    tipos: list[str], elegido: str, *, detalle: str | None = None, cambio_de_puerto: bool = False,
+    tipos: list[str], elegido: str, *, detalle: str | None = None,
+    cambio_de_puerto: tuple[str, str] | None = None,
 ) -> list[tuple[str, bool, str | None]]:
     """Cada tipo de operación con su marca y, en el de la solicitud, `detalle`, como las casillas
     de un formulario en papel. Si el de la solicitud ya no está entre los activos (Cambio de
-    Puerto, desde el 2026-11-13), va al final, marcado. Con cambio de puerto, la X también va en
-    «Cambio de Puerto»."""
+    Puerto, desde el 2026-11-13), va al final, marcado. Con cambio de puerto (el puesto de antes y
+    el nuevo), la X también va en «Cambio de Puerto», y junto a ella de cuál a cuál (2026-11-27)."""
     casillas = [(tipo, tipo == elegido, detalle if tipo == elegido else None) for tipo in tipos]
     if elegido not in tipos:
         casillas.append((elegido, True, detalle))
     if cambio_de_puerto and elegido != CAMBIO_DE_PUERTO:
+        de, a = cambio_de_puerto
+        cambio = f"de {de} a {a}"
         if CAMBIO_DE_PUERTO in tipos:
-            casillas = [(t, marcada or t == CAMBIO_DE_PUERTO, d) for t, marcada, d in casillas]
+            casillas = [(t, True, cambio) if t == CAMBIO_DE_PUERTO else (t, marcada, d) for t, marcada, d in casillas]
         else:
-            casillas.append((CAMBIO_DE_PUERTO, True, None))
+            casillas.append((CAMBIO_DE_PUERTO, True, cambio))
     return casillas
 
 
@@ -215,8 +218,9 @@ def generar_pdf_boleta(d: DatosPdfBoleta) -> bytes:
         return caja
 
     filas = []
+    cambio = (d.puesto, d.puesto_destino) if d.puesto_destino else None
     for tipo, marcada, detalle in casillas_operacion(d.tipos_operacion, d.tipo_tramite, detalle=d.detalle,
-                                                     cambio_de_puerto=bool(d.puesto_destino)):
+                                                     cambio_de_puerto=cambio):
         texto = texto_pdf(tipo.upper())
         if detalle:
             texto += f' <font name="{normal}">({texto_pdf(detalle)})</font>'

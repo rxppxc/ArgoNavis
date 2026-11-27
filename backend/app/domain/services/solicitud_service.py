@@ -735,8 +735,9 @@ class ServicioSolicitud:
 
     @classmethod
     def con_carta_subir_y_bajar(cls, tipo: TipoTramite, datos: _DatosFormularioSolicitud) -> bool:
-        """Si se pide la Carta de Responsabilidad (Form. No. 7) de cada tripulante (la
-        condición SUBIR_Y_BAJAR): con la operación «Subir y bajar» del trámite de Técnico
+        """Si se piden los documentos de la condición SUBIR_Y_BAJAR (hoy, la carta de garantía de
+        la agencia contratante; hasta el 2026-11-27, también la Carta Form. 7 de Técnico, que desde
+        entonces va con toda operación): con la operación «Subir y bajar» del trámite de Técnico
         (2026-11-18) o con «¿Subir y bajar? Sí» donde se pregunte. Espejo:
         conCartaSubirYBajar (checklist.ts)."""
         operacion = tipo.pide_operacion and datos.operacion == OperacionTecnico.SUBIR_Y_BAJAR.value

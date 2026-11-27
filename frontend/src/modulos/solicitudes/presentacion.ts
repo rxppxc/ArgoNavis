@@ -76,7 +76,8 @@ export function avisoSubirYBajar(
   const porTripulante = suyos.filter((d) => d.alcance === "marino").map((d) => d.nombre);
   const partes: string[] = [];
   if (deLaSolicitud.length) {
-    partes.push(`Con «Subir y bajar» se adjuntan además, una por solicitud, ${enumerarCitados(deLaSolicitud)}, `
+    const verbo = deLaSolicitud.length === 1 ? "se adjunta" : "se adjuntan";
+    partes.push(`Con «Subir y bajar» ${verbo} además, una por solicitud, ${enumerarCitados(deLaSolicitud)}, `
       + "en los documentos de la solicitud.");
   }
   if (porTripulante.length) {

@@ -168,7 +168,7 @@ test("el cambio de puerto ofrece todos los demás puestos, también los del otro
   await expect(nuevo).toHaveCount(0);
 });
 
-test("«Subir y bajar» del trámite de Técnico pide su Carta de Responsabilidad, una por solicitud (2026-11-26)", async ({ browser }) => {
+test("el trámite de Técnico pide su Carta de Responsabilidad, una por solicitud, con toda operación (2026-11-27)", async ({ browser }) => {
   const agencia = await entrar(browser, CUENTAS.agencia);
   await agencia.goto("/new");
 
@@ -189,24 +189,27 @@ test("«Subir y bajar» del trámite de Técnico pide su Carta de Responsabilida
     "Adjuntar Carta de Responsabilidad (Form. No. 7) de Técnico, Superintendente o Supernumerario", { exact: true });
   const cartasDeTripulante = agencia.locator('[id^="tripulante-"]').getByLabel(/^Adjuntar Carta de Responsabilidad/);
   const resumen = agencia.getByText(/^Faltan? \d+ documentos? por adjuntar$/);
+  // Desde el 2026-11-27, con toda operación (antes, solo con «Subir y bajar»).
   await operacion.selectOption("embarque");
-  await expect(carta).toHaveCount(0);
+  await expect(carta, "con Embarque, una por solicitud").toHaveCount(1);
+  await expect(cartasDeTripulante, "ninguna en las tarjetas").toHaveCount(0);
   const conEmbarque = Number(/\d+/.exec((await resumen.textContent()) ?? "")?.[0]);
 
   await operacion.selectOption("subir_y_bajar");
-  await expect(carta, "una por solicitud").toHaveCount(1);
-  await expect(cartasDeTripulante, "ninguna en las tarjetas").toHaveCount(0);
+  await expect(carta, "con «Subir y bajar»").toHaveCount(1);
+  await expect(cartasDeTripulante).toHaveCount(0);
+  // «Subir y bajar» suma solo la carta de garantía, en lugar de «la carta de garantía o el contrato».
   await expect(agencia.getByText(
-    /se adjuntan además, una por solicitud, «Carta de Responsabilidad \(Form\. No\. 7\) de Técnico, Superintendente o Supernumerario» y «Carta de garantía/,
+    "Con «Subir y bajar» se adjunta además, una por solicitud, «Carta de garantía de la agencia contratante», "
+    + "en los documentos de la solicitud.",
   )).toBeVisible();
-  // Lo demás se sigue pidiendo, más la Carta; la garantía o el contrato pasa a ser solo la carta de garantía.
-  await expect(resumen).toHaveText(`Faltan ${conEmbarque + 1} documentos por adjuntar`);
+  await expect(resumen).toHaveText(`Faltan ${conEmbarque} documentos por adjuntar`);
   await expect(agencia.getByLabel("Adjuntar Carta de garantía de la agencia contratante", { exact: true })).toHaveCount(1);
   await expect(agencia.getByLabel("Adjuntar Carta de garantía de la agencia contratante o contrato")).toHaveCount(0);
 
-  await test.step("con Desembarque deja de pedirse", async () => {
+  await test.step("con Desembarque también se pide", async () => {
     await operacion.selectOption("desembarque");
-    await expect(carta).toHaveCount(0);
+    await expect(carta).toHaveCount(1);
     await expect(resumen).toHaveText(`Faltan ${conEmbarque} documentos por adjuntar`);
   });
 });

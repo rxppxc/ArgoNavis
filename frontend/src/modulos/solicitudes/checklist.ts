@@ -44,8 +44,9 @@ export function opcionalPara(d: Pick<TramiteDocumento, "rangos_opcional">, rango
   return !!d.rangos_opcional && d.rangos_opcional.includes(rango);
 }
 
-/** Si se pide la Carta de Responsabilidad (Form. No. 7) de cada tripulante (la condición
- *  `subir_y_bajar`): con la operación «Subir y bajar» del trámite de Técnico (2026-11-18) o
+/** Si se piden los documentos de la condición `subir_y_bajar` (hoy, la carta de garantía de la
+ *  agencia contratante; hasta el 2026-11-27, también la Carta Form. 7 de Técnico, que desde entonces
+ *  va con toda operación): con la operación «Subir y bajar» del trámite de Técnico (2026-11-18) o
  *  con «¿Subir y bajar? Sí» donde se pregunte (Embarque y Desembarque, del 2026-11-16 al 18).
  *  Espeja ServicioSolicitud.con_carta_subir_y_bajar. */
 export function conCartaSubirYBajar(

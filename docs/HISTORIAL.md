@@ -917,3 +917,9 @@ El usuario marcó el inicio: «con la incorporación del reloj, todo quedó deso
 - **El encabezado vuelve a ser el de todas las páginas:** título a la izquierda y botones a la derecha. El reloj va debajo, como una franja de borde a borde: a la izquierda la hora, el sello, «hasta …» y el recargo; a la derecha la fecha y el horario. Si no cabe, el recargo baja entero; en el celular va apilado. Igual en «Usuarios» del SysAdmin.
 - **La misma información y la misma identidad:** la franja amarilla arriba, la hora en letra de máquina y el sello de tinta, verde o morado. Ocupa la mitad de alto que la tarjeta.
 - **Lo prueba** `reloj.spec.ts` a 1024 px: el reloj queda bajo el encabezado, con los bordes de las pestañas, y «Nueva solicitud» en la fila del título.
+
+## La Form. 7 de Técnico en toda operación y el cambio de puerto en la boleta (2026-11-27)
+Dos pedidos del usuario:
+- **La Carta de Responsabilidad (Form. No. 7) de Técnico, obligatoria con las tres operaciones** (Embarque, Desembarque y Subir y bajar), una por solicitud. Hasta hoy la pedía solo «Subir y bajar». La migración `f2b6d9c4a738` cambia la condición de su fila (`subir_y_bajar` → `siempre`) y su descripción. Las ya enviadas conservan la foto de su checklist. «Subir y bajar» sigue sumando la carta de garantía de la agencia contratante en lugar de «la carta de garantía o el contrato», y su aviso del formulario ahora la nombra sola, en singular.
+- **La boleta dice el cambio de puerto de cuál a cuál:** junto a la casilla «CAMBIO DE PUERTO» va «(de Amador a Cristóbal)» (`casillas_operacion`). El «Lugar» no cambia. Se le preguntó si el trámite de Técnico debía permitir el cambio de puerto con Embarque o Desembarque, y respondió que no: solo la boleta.
+- **Lo prueban** `test_el_tecnico_pide_una_carta_por_solicitud_en_toda_operacion`, la tabla de `test_documento_ucvmm.py`, `test_casillas_operacion` y `test_la_boleta_sigue_el_formulario_4`, y el E2E del formulario.

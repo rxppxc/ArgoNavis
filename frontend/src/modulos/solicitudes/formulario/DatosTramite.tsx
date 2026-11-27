@@ -124,7 +124,8 @@ export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos,
           </label>
         )}
         {/* La operación del trámite de Técnico (pedido del usuario del 2026-11-18): obligatoria y empieza
-            sin elegir. «Subir y bajar» pide además la Carta de Responsabilidad, una por solicitud. */}
+            sin elegir. La Carta de Responsabilidad, una por solicitud, va con toda operación desde el
+            2026-11-27 (antes, solo con «Subir y bajar»). */}
         {tipo.pide_operacion && (
           <label className={styles.campo}>
             <span>Operación *</span>
@@ -136,8 +137,9 @@ export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos,
             </select>
           </label>
         )}
-        {/* Lo que «Subir y bajar» suma en el trámite de Técnico: desde el 2026-11-26, la Carta Form. 7
-            y la carta de garantía, una por solicitud. En Urgencia médica la operación solo se registra. */}
+        {/* Lo que «Subir y bajar» suma en el trámite de Técnico: la carta de garantía de la agencia
+            contratante, una por solicitud (hasta el 2026-11-27, también la Carta Form. 7, que desde
+            entonces va con toda operación). En Urgencia médica la operación solo se registra. */}
         {tipo.pide_operacion && cabecera.operacion === "subir_y_bajar" && avisoSubirYBajar(tipo.documentos) && (
           <p className={styles.operacionAviso}>{avisoSubirYBajar(tipo.documentos)}</p>
         )}

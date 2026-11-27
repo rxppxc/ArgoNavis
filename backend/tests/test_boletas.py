@@ -88,10 +88,16 @@ async def test_casillas_operacion():
     assert casillas_operacion(["Embarque", "Técnico"], "Técnico", detalle="operación: Subir y bajar") == [
         ("Embarque", False, None), ("Técnico", True, "operación: Subir y bajar"),
     ]
-    # Con cambio de puerto, la X también en «Cambio de Puerto».
-    assert casillas_operacion(tipos, "Embarque", cambio_de_puerto=True) == [
+    # Con cambio de puerto, la X también en «Cambio de Puerto», y junto a ella de cuál a cuál
+    # (pedido del usuario del 2026-11-27).
+    assert casillas_operacion(tipos, "Embarque", cambio_de_puerto=("Amador", "Cristóbal")) == [
         ("Embarque", True, None), ("Desembarque", False, None), ("Cambio de Nave", False, None),
-        ("Cambio de Puerto", True, None),
+        ("Cambio de Puerto", True, "de Amador a Cristóbal"),
+    ]
+    # También si «Cambio de Puerto» estuviera entre los activos.
+    assert casillas_operacion(["Desembarque", "Cambio de Puerto"], "Desembarque",
+                              cambio_de_puerto=("Amador", "Cristóbal")) == [
+        ("Desembarque", True, None), ("Cambio de Puerto", True, "de Amador a Cristóbal"),
     ]
 
 
@@ -189,9 +195,13 @@ async def test_la_boleta_sigue_el_formulario_4(monkeypatch):
     assert "firma del jefe encargado del Sector Atlántico (UCVMM)" in texto
     assert "sello del jefe encargado del Sector Atlántico de UCVMM." in texto and "Pacífico" not in texto
 
-    # Con cambio de puerto, el lugar dice los dos y se marca «Cambio de Puerto».
+    # Con cambio de puerto, el lugar dice los dos y se marca «Cambio de Puerto», con de cuál a cuál
+    # junto a la casilla (2026-11-27).
     texto = _textos_del_pdf(monkeypatch, replace(_datos_pdf(), puesto_destino="Cristóbal"))
-    assert "Balboa → Cristóbal" in texto and "CAMBIO DE PUERTO" in texto
+    sin_marcas = re.sub(r"<[^>]+>", "", texto)   # el paréntesis va en letra normal (<font>)
+    assert "Balboa → Cristóbal" in texto and "CAMBIO DE PUERTO (de Balboa a Cristóbal)" in sin_marcas
+    texto = _textos_del_pdf(monkeypatch, _datos_pdf())
+    assert "CAMBIO DE PUERTO" not in texto, "sin cambio de puerto, ni la casilla"
 
     # Lo que eligió la agencia, entre paréntesis junto a la casilla marcada.
     texto = _textos_del_pdf(monkeypatch, replace(
