@@ -58,6 +58,8 @@ export function ChecklistSolicitud({ documentos, tripulantes, onIrATripulante, o
           onElegir={documentos.elegir}
           onDescartar={documentos.descartar}
           onVer={onVer}
+          onElegirOtro={documentos.elegirOtro}
+          onQuitarExistente={documentos.quitarExistente}
         />
       ) : (
         <div className={styles.sinDocs}>

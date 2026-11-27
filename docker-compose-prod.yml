@@ -148,7 +148,7 @@ services:
       - LOGIN_AD_MINUTOS_ESPERA=${LOGIN_AD_MINUTOS_ESPERA:-30}
     volumes:
       - documentos:/app/storage/documentos
-      # Los archivos de un envío mientras llegan (hasta 345 MB). En un volumen, o sea en el
+      # Los archivos de un envío mientras llegan (hasta 365 MB). En un volumen, o sea en el
       # disco: en un tmpfs contarían para la memoria del contenedor.
       - temporales_backend:/tmp
       - registros:/app/registros

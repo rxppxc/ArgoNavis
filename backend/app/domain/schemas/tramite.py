@@ -25,6 +25,8 @@ class SalidaTramiteDocumento(BaseModel):
     rangos:       list[str] | None = None
     # Rangos para los que es opcional (nulo = obligatorio): ver TramiteDocumento.rangos_opcional.
     rangos_opcional: list[str] | None = None
+    # Cuántos archivos admite su casilla: la Form. 7 de Renovación, Urgencias y Técnico, 10 (2026-11-27).
+    maximo_archivos: int = 1
 
 
 # ── Tipos de trámite ─────────────────────────────────────────────────────────

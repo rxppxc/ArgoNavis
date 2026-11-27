@@ -77,16 +77,27 @@ VISA = ("DOC-VISA-MARINO", "marino", "siempre", MARINO)
 # 2026-11-14: la Visa Especial de Marino de Embarque y Cambio de nave, no a los panameños,
 # y la Visa de las nacionalidades restringidas, en todos los trámites y para cualquier rango.
 VISA_EXTRANJEROS = ("DOC-VISA-MARINO", "marino", "solo_extranjeros", MARINO)
+# 2026-11-27, Embarque: la Visa Especial de Marino solo al Marino extranjero; al Pasajero y al Militar
+# restringidos, la «Visa» (decisión del usuario).
+VEM_DEL_MARINO = ("DOC-VISA-MARINO", "marino", "solo_extranjeros", ("marino",))
+VISA_DE_EMBARQUE = ("DOC-VISA", "marino", "nacionalidad_restringida", ("militar", "pasajero"))
+# 2026-11-27, Urgencias: la «Visa» a los restringidos que no son Marino; el Marino, sin visa.
+VISA_DE_URGENCIA = ("DOC-VISA", "marino", "nacionalidad_restringida",
+                    ("militar", "pasajero", "superintendente", "supernumerario", "tecnico"))
 VISA_RESTRINGIDOS = ("DOC-VISA", "marino", "nacionalidad_restringida", None)
 # Fuera del trámite de Técnico no se pide la «Visa» (2026-11-26; del 18 al 26 se le pedía al Militar);
 # al Marino y al Pasajero restringidos se les exige la Visa Especial de Marino.
 VISA_MARINO_RESTRINGIDO = ("DOC-VISA-MARINO", "marino", "nacionalidad_restringida", MARINO)
 LIBRETA = ("DOC-LIBRETA-MARINO", "marino", "siempre", None)           # solo el Marino: requiere_libreta
 LISTA = ("DOC-LISTA-TRIPULANTES", "solicitud", "siempre", None)       # "debe subirse al trámite"
-CARTA = ("DOC-FORM7-RESPONSABILIDAD", "marino", "siempre", MARINO)    # "para cada tripulante"
 # En Urgencia médica, una por solicitud (2026-11-26): hasta el 2026-11-27, si había algún Marino o
 # Pasajero; desde entonces, siempre, sea cual sea el rango (decisión del usuario).
 CARTA_DE_URGENCIA = ("DOC-FORM7-RESPONSABILIDAD", "solicitud", "siempre", None)
+# En Renovación, también una por solicitud y para cualquier rango desde el 2026-11-27 (antes, una por
+# tripulante, al Marino y al Pasajero).
+CARTA_DE_RENOVACION = CARTA_DE_URGENCIA
+# 2026-11-27, Urgencias: el Reporte médico a todos los rangos (antes, al Marino y al Pasajero).
+REPORTE_A_TODOS = ("DOC-REPORTE-MEDICO", "marino", "siempre", None)
 REPORTE = ("DOC-REPORTE-MEDICO", "marino", "siempre", MARINO)         # "para cada tripulante"
 CITA = ("DOC-CITA-CONSULADO", "marino", "siempre", MARINO)
 BOLETO = ("DOC-BOLETO-AEREO", "marino", "siempre", NO_MARINOS)        # reunión del 2026-10-30
@@ -103,6 +114,13 @@ CARTA_GARANTIA = ("DOC-CARTA-GARANTIA", "solicitud", "subir_y_bajar", None)
 # Los técnicos van por su trámite desde el 2026-11-13; sus filas de Embarque y Desembarque se
 # borraron el 2026-11-14. Embarque no pide boleto desde el 2026-11-26 (era solo del militar).
 TECNICOS = ("superintendente", "supernumerario", "tecnico")
+# (trámite, documento) → cuántos archivos admite su casilla (2026-11-27): la Form. 7, una obligatoria y
+# hasta 9 opcionales más. Las demás, uno.
+MAXIMO_ARCHIVOS: dict[tuple[str, str], int] = {
+    ("F3-RENOV-PASAPORTE", "DOC-FORM7-RESPONSABILIDAD"): 10,
+    ("F3-URGENCIA-MEDICA", "DOC-FORM7-RESPONSABILIDAD"): 10,
+    ("F3-TECNICO", "DOC-FORM7-TECNICO"): 10,
+}
 # (trámite, documento) → rangos para los que es opcional: el boleto aéreo en Desembarque y en el
 # trámite de Técnico (2026-11-26).
 OPCIONAL: dict[tuple[str, str], tuple[str, ...]] = {
@@ -117,8 +135,9 @@ DOCUMENTO = {
     "F3-EMBARQUE": {
         "campos": [], "vigencia": True, "aviso_custodia": False, "cambio_puerto": True,
         "rangos": {"marino", "pasajero", "militar"},   # 2026-11-13: los técnicos van por su trámite
-        # La Visa Especial de Marino de todo extranjero cubre al Marino y al Pasajero restringidos.
-        "documentos": {FORM3, VISA_EXTRANJEROS, GENERALES, LIBRETA},
+        # La Visa Especial de Marino, solo al Marino extranjero; la «Visa», al Pasajero y al Militar
+        # restringidos (2026-11-27).
+        "documentos": {FORM3, VEM_DEL_MARINO, GENERALES, LIBRETA, VISA_DE_EMBARQUE},
     },
     "F3-DESEMBARQUE": {
         "campos": [], "vigencia": True, "aviso_custodia": True, "cambio_puerto": True,
@@ -133,12 +152,14 @@ DOCUMENTO = {
         # autorización vale 120 horas desde la aprobación (2026-11-26).
         "campos": ["clinica_hospital"], "vigencia": True, "aviso_custodia": True,
         "dias_sellado": True, "dias_sellado_opciones": (5,), "horas_vigencia": 120,
-        "documentos": {FORM3, CARTA_DE_URGENCIA, REPORTE, GENERALES, LIBRETA, BOLETO, VISA_MARINO_RESTRINGIDO},
+        # 2026-11-27: Militar, Técnico y Supers como el Pasajero (Reporte médico y Generales), sin boleto;
+        # la «Visa» a los restringidos que no son Marino.
+        "documentos": {FORM3, CARTA_DE_URGENCIA, REPORTE_A_TODOS, GENERALES, LIBRETA, VISA_DE_URGENCIA},
     },
     "F3-RENOV-PASAPORTE": {
         "campos": ["puerto_desembarque"], "vigencia": True, "aviso_custodia": True,
         # Sin boleto desde el 2026-11-26: los rangos que no son Marino presentan solo las Generales.
-        "documentos": {FORM3, GENERALES, CARTA, LISTA, LIBRETA, CITA, VISA_MARINO_RESTRINGIDO},
+        "documentos": {FORM3, GENERALES, CARTA_DE_RENOVACION, LISTA, LIBRETA, CITA, VISA_MARINO_RESTRINGIDO},
     },
     "F3-SHORE-PASS": {
         "campos": ["motivo"], "vigencia": True, "aviso_custodia": True, "dias_sellado": True,
@@ -254,6 +275,8 @@ async def test_catalogo_igual_al_documento(cliente, agencia):
         documentos = {(d["codigo"], d["alcance"], d["condicion"], tuple(sorted(d["rangos"])) if d["rangos"] else None)
                       for d in tipo["documentos"]}
         assert documentos == esperado["documentos"], codigo
+        maximos = {(codigo, d["codigo"]): d["maximo_archivos"] for d in tipo["documentos"] if d["maximo_archivos"] != 1}
+        assert maximos == {k: v for k, v in MAXIMO_ARCHIVOS.items() if k[0] == codigo}, codigo
         # El Formulario No. 3, primero entre los de la solicitud (2026-11-13).
         de_la_solicitud = [d["codigo"] for d in tipo["documentos"] if d["alcance"] == "solicitud"]
         assert de_la_solicitud[0] == "DOC-FORMULARIO-3", codigo
@@ -363,8 +386,7 @@ async def test_custodia_segun_el_formulario(cliente, agencia, codigo):
 
 # El rango al que cada trámite le pide el boleto aéreo (Shore Pass no: solo admite Marino).
 # Embarque y Renovación de pasaporte no lo piden desde el 2026-11-26.
-RANGO_CON_BOLETO = {"F3-DESEMBARQUE": "marino", "F3-URGENCIA-MEDICA": "militar", "F3-TECNICO": "tecnico",
-                    "F3-CAMBIO-NAVE": "militar"}
+RANGO_CON_BOLETO = {"F3-DESEMBARQUE": "marino", "F3-TECNICO": "tecnico", "F3-CAMBIO-NAVE": "militar"}
 
 
 @pytest.mark.parametrize("codigo", sorted(RANGO_CON_BOLETO))
@@ -579,7 +601,7 @@ async def test_tramite_tecnico_solo_sus_rangos(cliente, agencia):
 
 
 @pytest.mark.parametrize("codigo", sorted(set(DOCUMENTO) - {"F3-EMBARQUE", "F3-DESEMBARQUE", "F3-SHORE-PASS",
-                                                          "F3-RENOV-PASAPORTE"}))
+                                                          "F3-RENOV-PASAPORTE", "F3-URGENCIA-MEDICA"}))
 async def test_rangos_no_marinos_generales_y_boleto(cliente, agencia, codigo):
     """Reunión del 2026-10-30: a un rango distinto de Marino solo se le piden
     las Generales de pasaporte y el boleto aéreo. Embarque, Desembarque y Renovación de
@@ -599,6 +621,18 @@ async def test_rangos_no_marinos_generales_y_boleto(cliente, agencia, codigo):
     assert r.status_code == 201, (codigo, r.text)
     del_tripulante = {c["documento_codigo"] for c in r.json()["checklist"] if c["tripulante_id"] is not None}
     assert del_tripulante == {"DOC-GENERALES-PASAPORTE", "DOC-BOLETO-AEREO"}, codigo
+
+
+@pytest.mark.parametrize("rango", ("pasajero",) + NO_MARINOS)
+async def test_urgencias_reporte_medico_y_generales_a_los_que_no_son_marino(cliente, agencia, rango):
+    """Pedido del 2026-11-27: en Urgencias, el Pasajero, el Militar, el Técnico y los Supers presentan solo
+    el Reporte médico y las Generales de pasaporte. Sin boleto aéreo."""
+    naviera, puesto_id = agencia
+    datos, archivos = _datos("F3-URGENCIA-MEDICA", puesto_id, [tripulante("Hans", "DEU", rango=rango)])
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 201, (rango, r.text)
+    assert _del_tripulante(r.json()) == {"DOC-REPORTE-MEDICO", "DOC-GENERALES-PASAPORTE"}, rango
+    assert "DOC-BOLETO-AEREO" not in {c["documento_codigo"] for c in r.json()["checklist"]}, rango
 
 
 @pytest.mark.parametrize("rango", NO_MARINOS)
@@ -625,11 +659,12 @@ async def test_tecnicos_van_por_su_tramite(cliente, agencia, codigo, rango):
 
 
 async def test_embarque_segun_el_rango(cliente, agencia):
-    """En Embarque, el Pasajero presenta lo del Marino sin la Libreta (2026-11-13) y el
-    militar, solo las Generales: sin boleto desde el 2026-11-26 (antes, Generales y boleto)."""
+    """En Embarque, el Marino extranjero presenta la Visa Especial de Marino, las Generales y la
+    Libreta; el Pasajero (sin la Visa Especial de Marino desde el 2026-11-27) y el militar (sin boleto
+    desde el 2026-11-26), solo las Generales, y la «Visa» si son restringidos."""
     naviera, puesto_id = agencia
     esperado = {"marino": {"DOC-VISA-MARINO", "DOC-GENERALES-PASAPORTE", "DOC-LIBRETA-MARINO"},
-                "pasajero": {"DOC-VISA-MARINO", "DOC-GENERALES-PASAPORTE"},
+                "pasajero": {"DOC-GENERALES-PASAPORTE"},
                 "militar": {"DOC-GENERALES-PASAPORTE"}}
     for rango, documentos in esperado.items():
         datos, archivos = _datos("F3-EMBARQUE", puesto_id, [tripulante("Hans", "DEU", rango=rango)])
@@ -640,11 +675,11 @@ async def test_embarque_segun_el_rango(cliente, agencia):
         assert all(c["obligatoria"] for c in r.json()["checklist"]), rango
 
 
-@pytest.mark.parametrize("codigo", sorted(set(DOCUMENTO) - {"F3-TECNICO", "F3-SHORE-PASS"}))
+@pytest.mark.parametrize("codigo", sorted(set(DOCUMENTO) - {"F3-TECNICO", "F3-SHORE-PASS", "F3-EMBARQUE"}))
 async def test_el_pasajero_presenta_lo_del_marino_sin_libreta(cliente, agencia, codigo):
-    """2026-11-13: en todos los trámites (salvo el de Técnico y, desde el 2026-11-14,
-    Shore Pass), al Pasajero se le piden los documentos del Marino, sin la Libreta ni
-    el seamanbook."""
+    """2026-11-13: en todos los trámites (salvo el de Técnico, desde el 2026-11-14 Shore Pass y desde
+    el 2026-11-27 Embarque, sin la Visa Especial de Marino: test_embarque_segun_el_rango), al Pasajero
+    se le piden los documentos del Marino, sin la Libreta ni el seamanbook."""
     naviera, puesto_id = agencia
     marino, pasajero = tripulante("Ana", "PHL"), tripulante("Beto", "PHL", rango="pasajero")
     datos, archivos = _datos(codigo, puesto_id, [marino, pasajero])
@@ -822,10 +857,12 @@ VISA, VEM_ = "DOC-VISA", "DOC-VISA-MARINO"
 VISA_ESPERADA = {
     ("F3-TECNICO", "tecnico"): VISA, ("F3-TECNICO", "superintendente"): VISA,
     # Fuera del trámite de Técnico, el Militar restringido ya no lleva la «Visa» (2026-11-26).
-    ("F3-EMBARQUE", "marino"): VEM_, ("F3-EMBARQUE", "pasajero"): VEM_, ("F3-EMBARQUE", "militar"): None,
+    # Embarque (2026-11-27): el Marino, la Visa Especial de Marino; el Pasajero y el Militar, la «Visa».
+    ("F3-EMBARQUE", "marino"): VEM_, ("F3-EMBARQUE", "pasajero"): VISA, ("F3-EMBARQUE", "militar"): VISA,
     ("F3-DESEMBARQUE", "marino"): VEM_, ("F3-DESEMBARQUE", "pasajero"): VEM_, ("F3-DESEMBARQUE", "militar"): None,
-    ("F3-URGENCIA-MEDICA", "marino"): VEM_, ("F3-URGENCIA-MEDICA", "militar"): None,
-    ("F3-URGENCIA-MEDICA", "tecnico"): None,   # un técnico fuera de su trámite: sin visa
+    # Urgencias (2026-11-27): el Marino, sin visa; los demás rangos, la «Visa».
+    ("F3-URGENCIA-MEDICA", "marino"): None, ("F3-URGENCIA-MEDICA", "pasajero"): VISA,
+    ("F3-URGENCIA-MEDICA", "militar"): VISA, ("F3-URGENCIA-MEDICA", "tecnico"): VISA,
     ("F3-RENOV-PASAPORTE", "pasajero"): VEM_, ("F3-RENOV-PASAPORTE", "militar"): None,
     ("F3-SHORE-PASS", "marino"): VEM_,
     ("F3-CAMBIO-NAVE", "marino"): VEM_, ("F3-CAMBIO-NAVE", "militar"): None,
@@ -862,7 +899,7 @@ GEN, LIB, VEM, BOL = "DOC-GENERALES-PASAPORTE", "DOC-LIBRETA-MARINO", "DOC-VISA-
 
 @pytest.mark.parametrize("codigo, rango, panameno, extranjero", [
     ("F3-EMBARQUE", "marino", {GEN, LIB}, {VEM, GEN, LIB}),
-    ("F3-EMBARQUE", "pasajero", {GEN}, {VEM, GEN}),
+    ("F3-EMBARQUE", "pasajero", {GEN}, {GEN}),   # sin la Visa Especial de Marino desde el 2026-11-27
     ("F3-EMBARQUE", "militar", {GEN}, {GEN}),   # sin boleto en Embarque desde el 2026-11-26
     ("F3-DESEMBARQUE", "marino", {GEN, LIB}, {BOL, GEN, LIB}),
     ("F3-DESEMBARQUE", "pasajero", {GEN}, {BOL, GEN}),
@@ -1359,3 +1396,77 @@ async def test_al_devolver_la_agencia_ve_quien_tiene_impedimento(cliente, admin,
     corregida = r.json()
     assert [tr["nombre"] for tr in corregida["tripulantes"]] == ["Ana", "Carla"]
     assert all(tr["con_impedimento"] is None for tr in corregida["tripulantes"]) and corregida["tripulantes_con_impedimento"] == []
+
+
+# ── La Form. 7: una obligatoria y más opcionales en la misma casilla (2026-11-27) ──────────
+
+FORM7 = "DOC-FORM7-RESPONSABILIDAD"
+
+
+def _casilla(solicitud: dict, codigo: str) -> dict:
+    return next(c for c in solicitud["checklist"] if c["documento_codigo"] == codigo)
+
+
+async def test_la_form7_admite_varias_y_las_demas_casillas_una(cliente, agencia):
+    """En Urgencias (y en Renovación y en el trámite de Técnico) la Form. 7 es una obligatoria y admite
+    hasta 9 más, opcionales, en la misma casilla (pedido del usuario del 2026-11-27). Las demás
+    casillas reciben un archivo."""
+    naviera, puesto_id = agencia
+    tripulantes = [tripulante("Ana", "PHL")]
+    datos, archivos = _datos("F3-URGENCIA-MEDICA", puesto_id, tripulantes)
+    datos["asignaciones"] += [{"documento_codigo": FORM7}] * 2
+    archivos += [pdf("carta-2"), pdf("carta-3")]
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 201, r.text
+    casilla = _casilla(r.json(), FORM7)
+    assert len(casilla["documento_ids"]) == 3 and casilla["cubierta"] and casilla["obligatoria"], casilla
+
+    datos, archivos = _datos("F3-URGENCIA-MEDICA", puesto_id, tripulantes)
+    datos["asignaciones"] += [{"documento_codigo": FORM7}] * 10
+    archivos += [pdf(f"carta-{i}") for i in range(10)]
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 400 and "hasta 10" in r.json()["detail"], r.text
+
+    datos, archivos = _datos("F3-URGENCIA-MEDICA", puesto_id, tripulantes)
+    datos["asignaciones"].append({"documento_codigo": "DOC-FORMULARIO-3"})
+    archivos.append(pdf("form3-otro"))
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 400 and "adjunta uno solo" in r.json()["detail"], r.text
+
+
+async def test_al_corregir_la_form7_conserva_quita_y_agrega(cliente, agencia):
+    """Al corregir, la agencia conserva las cartas que quiere, quita otras y agrega nuevas, sin pasar
+    de 10 en la casilla."""
+    naviera, puesto_id = agencia
+    datos, archivos = _datos("F3-URGENCIA-MEDICA", puesto_id, [tripulante("Ana", "PHL")])
+    datos["asignaciones"] += [{"documento_codigo": FORM7}] * 2
+    archivos += [pdf("carta-2"), pdf("carta-3")]
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 201, r.text
+    s = r.json()
+    revisor = await crear_actor("UCVMM", prefijo="revisor")
+    r = await cliente.post(f"/solicitudes/{s['id']}/devolver", json={"motivo": "Revisar las cartas"},
+                           headers=revisor.headers)
+    assert r.status_code == 200, r.text
+
+    cartas = _casilla(s, FORM7)["documento_ids"]
+    t = s["tripulantes"][0]
+    ficha = tripulante("Ana", "PHL", pasaporte=t["pasaporte"])
+    ficha["id"] = t["id"]
+
+    async def corregir(conservar_cartas: list[int], nuevas: int):
+        correccion, _ = _datos("F3-URGENCIA-MEDICA", puesto_id, [ficha])
+        correccion.pop("codigo_tramite")
+        correccion["asignaciones"] = [{"documento_codigo": FORM7}] * nuevas
+        correccion["documentos_conservados"] = [d["id"] for d in s["documentos"]
+                                                if d["documento_codigo"] != FORM7] + conservar_cartas
+        return await enviar(cliente, naviera, correccion, [pdf(f"nueva-{i}") for i in range(nuevas)],
+                            metodo="PUT", ruta=f"/solicitudes/{s['id']}")
+
+    r = await corregir(cartas[:3], 8)   # 3 que quedan + 8 nuevas = 11
+    assert r.status_code == 400 and "hasta 10" in r.json()["detail"], r.text
+    r = await corregir(cartas[:2], 1)   # quita una, agrega otra
+    assert r.status_code == 200, r.text
+    casilla = _casilla(r.json(), FORM7)
+    assert len(casilla["documento_ids"]) == 3 and set(cartas[:2]) <= set(casilla["documento_ids"]), casilla
+    assert cartas[2] not in casilla["documento_ids"]

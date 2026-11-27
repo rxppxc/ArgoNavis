@@ -89,7 +89,7 @@ def test_el_puerto_de_nginx_es_el_mismo_en_todas_partes():
 
 @pytest.mark.parametrize(("servicio", "carpeta"), [("backend", "/tmp"), ("frontend", "/var/cache/nginx")])
 def test_lo_que_se_sube_pasa_por_el_disco_y_no_por_la_memoria(servicio, carpeta):
-    """Un envío pesa hasta 345 MB y nginx y el backend lo guardan mientras llega. En un
+    """Un envío pesa hasta 365 MB y nginx y el backend lo guardan mientras llega. En un
     tmpfs contaría para la memoria del contenedor (256 MB el de nginx) y lo tumbaría."""
     volumen = _montajes(servicio).get(carpeta)
     assert volumen in COMPOSE["volumes"], f"{carpeta} de {servicio} tiene que ser un volumen"

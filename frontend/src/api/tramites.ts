@@ -25,6 +25,9 @@ export interface TramiteDocumento {
   /** Rangos para los que es opcional (null = obligatorio): el boleto de
    *  Desembarque de los técnicos (2026-11-11). */
   rangos_opcional: RangoMarino[] | null;
+  /** Cuántos archivos admite su casilla (2026-11-27): la Form. 7 de Renovación, Urgencias y
+   *  Técnico, una obligatoria y hasta 9 opcionales más (10). Las demás, uno. */
+  maximo_archivos: number;
 }
 
 export interface TipoTramite {

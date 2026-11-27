@@ -101,12 +101,15 @@ export function restaurar(datos: DatosBorrador, archivos: ArchivosBorrador): { d
     return { ...fichaVacia(), ...t, clave };
   });
   const nuevos: Record<string, File> = {};
-  for (const [casilla, archivo] of Object.entries(archivos.nuevos)) {
+  for (const [clave, archivo] of Object.entries(archivos.nuevos)) {
+    // Las Form. 7 de más (2026-11-27) llevan «#…» tras la clave de su casilla, que se conserva.
+    const [casilla, ...resto] = clave.split("#");
+    const mas = resto.length ? `#${resto.join("#")}` : "";
     const corte = casilla.lastIndexOf("|");
     const documento = casilla.slice(0, corte);
     const tripulante = casilla.slice(corte + 1);
-    if (tripulante === "s") nuevos[claveCasilla(documento, null)] = archivo;
-    else if (claves.has(tripulante)) nuevos[claveCasilla(documento, claves.get(tripulante) ?? null)] = archivo;
+    if (tripulante === "s") nuevos[claveCasilla(documento, null) + mas] = archivo;
+    else if (claves.has(tripulante)) nuevos[claveCasilla(documento, claves.get(tripulante) ?? null) + mas] = archivo;
   }
   return {
     datos: { ...datos, cabecera: { ...CABECERA_VACIA, ...datos.cabecera }, tripulantes: tripulantes.length ? tripulantes : [fichaVacia()] },

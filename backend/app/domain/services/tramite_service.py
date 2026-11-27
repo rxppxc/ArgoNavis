@@ -75,6 +75,8 @@ class CasillaChecklist:
     nombre_tripulante: str | None = None
     # Opcional: se puede enviar sin ella (el boleto de Desembarque de los técnicos).
     obligatoria:       bool = True
+    # Cuántos archivos admite (2026-11-27): la Form. 7, uno obligatorio y hasta 9 opcionales más.
+    maximo_archivos:   int = 1
 
 
 @dataclass
@@ -173,6 +175,7 @@ class ServicioTramite:
                     codigo_documento=td.documento.codigo,
                     nombre_documento=td.documento.nombre,
                     alcance=td.alcance,
+                    maximo_archivos=td.maximo_archivos or 1,
                 ))
                 continue
 
@@ -193,6 +196,7 @@ class ServicioTramite:
                     indice_tripulante=indice,
                     nombre_tripulante=tripulante.nombre,
                     obligatoria=not opcional_para(td, tripulante.rango),
+                    maximo_archivos=td.maximo_archivos or 1,
                 ))
 
         return casillas

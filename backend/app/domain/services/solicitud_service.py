@@ -26,6 +26,7 @@
 import asyncio
 import logging
 import secrets
+from collections import Counter
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
@@ -91,12 +92,12 @@ MAX_TRIPULANTES            = 30   # por solicitud (reunión del 2026-10-30); esp
 # client_max_body_size en frontend/nginx.conf, revisión de recursos del 2026-11-10). Con
 # el catálogo de hoy, a un tripulante se le piden como mucho 5 documentos (uno de
 # nacionalidad restringida en Desembarque, Urgencia médica o Renovación, con la Visa
-# desde el 2026-11-14) y a la solicitud, 2 (el Formulario No. 3, desde el 2026-11-13, y
-# la Lista de Tripulantes): 30 × 5 + 2 + 20 adicionales = 172 archivos de 2 MB, más
-# 1 MB para los datos y los separadores. tests/test_recursos.py falla si el catálogo
+# desde el 2026-11-14) y a la solicitud, 12 (el Formulario No. 3, la Form. 7 con hasta 10
+# archivos desde el 2026-11-27 y la Lista de Tripulantes o la garantía): 30 × 5 + 12 + 20
+# adicionales = 182 archivos de 2 MB, más 1 MB para los datos y los separadores. tests/test_recursos.py falla si el catálogo
 # pide más, o si nginx no coincide.
 MAX_DOCUMENTOS_POR_TRIPULANTE  = 5
-MAX_DOCUMENTOS_DE_LA_SOLICITUD = 2
+MAX_DOCUMENTOS_DE_LA_SOLICITUD = 12   # desde el 2026-11-27: la Form. 7 admite hasta 10
 MAX_ARCHIVOS_EN_UN_ENVIO = (MAX_TRIPULANTES * MAX_DOCUMENTOS_POR_TRIPULANTE + MAX_DOCUMENTOS_DE_LA_SOLICITUD
                             + MAX_DOCUMENTOS_ADICIONALES)
 TOPE_CUERPO_ENVIO_MB = MAX_ARCHIVOS_EN_UN_ENVIO * almacenamiento.TAMANO_MAXIMO_MB + 1
@@ -705,14 +706,16 @@ class ServicioSolicitud:
     @staticmethod
     def _resolver_asignaciones(
         tipo: TipoTramite, asignaciones: list[AsignacionArchivo], total_tripulantes: int,
+        ya_cargados: dict[tuple[str, int | None], int] | None = None,
     ) -> list[Asignacion]:
         """Traduce cada asignación a (casilla del checklist, índice del
         tripulante). Sin código de documento es un documento adicional.
-        Cada casilla recibe un solo archivo: el formulario manda uno por casilla
-        y, sin este control, un envío podía colgar varios en la misma."""
+        Cada casilla recibe un solo archivo, salvo las que admiten más (la Form. 7 de
+        Renovación, Urgencias y Técnico, hasta 10: 2026-11-27): sin este control, un envío
+        podía colgar varios en la misma. `ya_cargados`, al corregir: los que se conservan."""
         por_codigo = {td.documento.codigo: td for td in tipo.documentos}
         resueltas: list[Asignacion] = []
-        ocupadas: set[tuple[str, int | None]] = set()
+        ocupadas: Counter[tuple[str, int | None]] = Counter(ya_cargados or {})
         for asignacion in asignaciones:
             if asignacion.documento_codigo is None:
                 resueltas.append((None, None))
@@ -733,13 +736,19 @@ class ServicioSolicitud:
                         f"Tripulante inválido para el documento '{td.documento.nombre}'.",
                     )
             casilla = (td.documento.codigo, indice)
-            if casilla in ocupadas:
+            maximo = td.maximo_archivos or 1
+            if ocupadas[casilla] >= maximo:
                 de_quien = f" del tripulante {indice + 1}" if indice is not None else ""
+                if maximo == 1:
+                    raise _error(
+                        status.HTTP_400_BAD_REQUEST,
+                        f"Llegó más de un archivo para «{td.documento.nombre}»{de_quien}: adjunta uno solo por documento.",
+                    )
                 raise _error(
                     status.HTTP_400_BAD_REQUEST,
-                    f"Llegó más de un archivo para «{td.documento.nombre}»{de_quien}: adjunta uno solo por documento.",
+                    f"«{td.documento.nombre}»{de_quien} admite hasta {maximo} archivos: quita alguno.",
                 )
-            ocupadas.add(casilla)
+            ocupadas[casilla] += 1
             resueltas.append((td, indice))
         return resueltas
 
@@ -1005,7 +1014,13 @@ class ServicioSolicitud:
 
         if len(datos.asignaciones) != len(archivos):
             raise _error(status.HTTP_400_BAD_REQUEST, "Cada archivo debe indicar a qué documento corresponde.")
-        asignadas = self._resolver_asignaciones(tipo, datos.asignaciones, len(tripulantes))
+        # Los que se conservan cuentan en su casilla (la Form. 7 admite hasta 10, 2026-11-27).
+        indice_de = {t.entrada.id: i for i, t in enumerate(tripulantes) if t.entrada.id is not None}
+        ya_cargados: Counter[tuple[str, int | None]] = Counter(
+            (d.documento.codigo, None if d.tripulante_id is None else indice_de.get(d.tripulante_id))
+            for d in (documentos_por_id[did] for did in conservados) if d.documento is not None
+        )
+        asignadas = self._resolver_asignaciones(tipo, datos.asignaciones, len(tripulantes), ya_cargados)
         self._limitar_adicionales(
             sum(1 for td, _ in asignadas if td is None)
             + sum(1 for did in conservados if documentos_por_id[did].documento_id is None)

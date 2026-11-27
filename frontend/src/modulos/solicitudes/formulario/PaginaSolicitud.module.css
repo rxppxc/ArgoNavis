@@ -249,6 +249,10 @@
 .casillaAlcance { color: var(--text-2); font-size: .77rem; margin-top: 3px; margin-left: 21px; }
 
 .casillaAccion { display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
+/* Una casilla con varios archivos (la Form. 7, 2026-11-27): uno por fila y el botón debajo. */
+.casillaVarios { align-items: flex-start; }
+.casillaArchivos { display: grid; justify-items: end; gap: 6px; flex-shrink: 0; }
+.archivoFila { display: flex; align-items: center; gap: 6px; }
 .archivoNombre, .archivoCargado {
   display: inline-flex; align-items: center; gap: 6px;
   font-size: .78rem;
@@ -307,5 +311,6 @@
   .cambioPuerto, .subirBajar { grid-template-columns: 1fr; }
   .casilla { flex-direction: column; align-items: stretch; }
   .casillaAccion { justify-content: space-between; flex-wrap: wrap; }
+  .casillaArchivos { justify-items: start; }
   .acciones { flex-direction: column; align-items: stretch; }
 }

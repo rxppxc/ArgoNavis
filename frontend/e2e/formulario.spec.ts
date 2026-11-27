@@ -54,9 +54,10 @@ test("el formulario cuida los documentos al quitar un tripulante o cambiar de tr
     await expect(agencia.getByLabel("Adjuntar Copia de Boleto Aéreo de Ana")).toHaveCount(0);
     await expect(agencia.getByText("Faltan 2 documentos por adjuntar")).toBeVisible();
 
-    // Al Pasajero, lo del Marino sin la Libreta: la visa vuelve a su casilla.
+    // Al Pasajero, las Generales: sin la Libreta ni, desde el 2026-11-27, la Visa Especial de Marino.
     await rango.selectOption("pasajero");
-    await expect(agencia.getByText("visa-ana.pdf")).toBeVisible();
+    await expect(agencia.getByText("visa-ana.pdf")).toHaveCount(0);
+    await expect(agencia.getByLabel("Adjuntar Visa Especial de Marino de Ana")).toHaveCount(0);
     await expect(agencia.getByLabel("Adjuntar Libreta de Marino de Ana")).toHaveCount(0);
     await expect(tarjeta(agencia, 0).getByLabel(/seamanbook/)).toHaveCount(0);
     await expect(agencia.getByText("Faltan 2 documentos por adjuntar")).toBeVisible();
@@ -387,10 +388,13 @@ test("panameños sin visa, la Visa de los restringidos y Shore Pass solo para ma
     await expect(ficha.getByText("0/3 documentos")).toBeVisible();
   });
 
-  await test.step("al militar restringido, ninguna visa fuera del trámite de Técnico (2026-11-26)", async () => {
-    await ficha.getByLabel("Rango *").selectOption("militar");
-    await expect(ficha.getByText("Nacionalidad restringida.", { exact: true })).toBeVisible();
-    await expect(agencia.getByLabel("Adjuntar Visa de Ana", { exact: true })).toHaveCount(0);
+  await test.step("en Embarque, al militar y al pasajero restringidos, la «Visa» (2026-11-27)", async () => {
+    for (const rango of ["militar", "pasajero"]) {
+      await ficha.getByLabel("Rango *").selectOption(rango);
+      await expect(ficha.getByText(/^Nacionalidad restringida: debe adjuntar «Visa»\./)).toBeVisible();
+      await expect(agencia.getByLabel("Adjuntar Visa de Ana", { exact: true })).toBeAttached();
+      await expect(agencia.getByLabel("Adjuntar Visa Especial de Marino de Ana")).toHaveCount(0);
+    }
     await ficha.getByLabel("Rango *").selectOption("marino");
   });
 
@@ -462,7 +466,7 @@ test("«Volver» regresa a los trámites y lo escrito queda en borrador (2026-11
   });
 });
 
-test("Urgencias: 120 horas de vigencia, 5 días de sellado ya elegidos y una sola Carta Form. 7; el boleto opcional en Desembarque (2026-11-27)", async ({ browser }) => {
+test("Urgencias: 120 horas de vigencia, 5 días de sellado ya elegidos y la Carta Form. 7, una y más opcionales; el boleto opcional en Desembarque (2026-11-27)", async ({ browser }) => {
   const agencia = await entrar(browser, CUENTAS.agencia);
   await agencia.goto("/new");
   const urgencias = agencia.getByRole("button", { name: /^Urgencias/ });
@@ -477,6 +481,28 @@ test("Urgencias: 120 horas de vigencia, 5 días de sellado ya elegidos y una sol
   await test.step("una sola Carta de Responsabilidad, abajo, con los documentos de la solicitud", async () => {
     await expect(agencia.getByLabel("Adjuntar Carta de Responsabilidad (Form. No. 7)", { exact: true })).toHaveCount(1);
     await expect(agencia.getByLabel(/^Adjuntar Carta de Responsabilidad \(Form\. No\. 7\) de /)).toHaveCount(0);
+  });
+
+  await test.step("una obligatoria y se pueden agregar más, opcionales, en la misma casilla (2026-11-27)", async () => {
+    const otra = agencia.getByLabel("Agregar otra Carta de Responsabilidad (Form. No. 7) (opcional)");
+    await expect(otra).toHaveCount(0);
+    const resumen = agencia.getByText(/^Faltan? \d+ documentos? por adjuntar$/);
+    const antes = Number(/\d+/.exec((await resumen.textContent()) ?? "")?.[0]);
+    await agencia.getByLabel("Adjuntar Carta de Responsabilidad (Form. No. 7)", { exact: true })
+      .setInputFiles(pdf("carta-1.pdf"));
+    await expect(resumen).toHaveText(`Faltan ${antes - 1} documentos por adjuntar`);
+    await otra.setInputFiles(pdf("carta-2.pdf"));
+    await otra.setInputFiles(pdf("carta-3.pdf"));
+    await expect(agencia.getByText("carta-2.pdf")).toBeVisible();
+    await expect(agencia.getByText("carta-3.pdf")).toBeVisible();
+    await expect(resumen, "las de más no cuentan como faltantes").toHaveText(`Faltan ${antes - 1} documentos por adjuntar`);
+    await agencia.getByRole("button", { name: "Quitar carta-2.pdf" }).click();
+    await expect(agencia.getByText("carta-2.pdf")).toHaveCount(0);
+    await expect(agencia.getByText("carta-1.pdf")).toBeVisible();
+    // Sin archivos, cambiar de trámite no pide confirmación (el paso siguiente).
+    await agencia.getByRole("button", { name: "Quitar carta-3.pdf" }).click();
+    await agencia.getByRole("button", { name: "Quitar carta-1.pdf" }).click();
+    await expect(agencia.getByLabel("Adjuntar Carta de Responsabilidad (Form. No. 7)", { exact: true })).toHaveCount(1);
   });
 
   await test.step("sin operación ni puerto de desembarque, con 5 días de sellado ya elegidos (2026-11-27)", async () => {

@@ -58,14 +58,22 @@ async def test_el_tope_de_un_envio_alcanza_para_el_catalogo():
     servicio = ServicioTramite()
     por_tripulante = de_la_solicitud = 0
     for tipo in tipos:
+        # Con cada operación (la del trámite de Técnico cambia la carta de garantía) y con los archivos
+        # que admite cada casilla: la Form. 7, hasta 10 desde el 2026-11-27.
+        for operacion in (None, "embarque", "subir_y_bajar"):
+            de_la_solicitud = max(de_la_solicitud, sum(
+                c.maximo_archivos for c in servicio.construir_casillas(
+                    tipo, fichas, subir_y_bajar=operacion == "subir_y_bajar", operacion=operacion)
+                if c.indice_tripulante is None))
         casillas = servicio.construir_casillas(tipo, fichas)
-        de_la_solicitud = max(de_la_solicitud, sum(c.indice_tripulante is None for c in casillas))
         for indice in range(len(fichas)):
             por_tripulante = max(por_tripulante, sum(c.indice_tripulante == indice for c in casillas))
     assert tipos and por_tripulante and de_la_solicitud
     assert por_tripulante <= MAX_DOCUMENTOS_POR_TRIPULANTE, f"un trámite pide {por_tripulante} documentos por tripulante"
     assert de_la_solicitud <= MAX_DOCUMENTOS_DE_LA_SOLICITUD, f"un trámite pide {de_la_solicitud} por solicitud"
-    assert TOPE_CUERPO_ENVIO_MB == 345   # 30 × 5 + 2 + 20 = 172 archivos de 2 MB, más 1 MB (2026-11-14)
+    # 30 × 5 + 12 + 20 = 182 archivos de 2 MB, más 1 MB (2026-11-27; antes 345, con 2 por solicitud): la
+    # Form. 7 admite hasta 10 y va con el Formulario No. 3 y la Lista de Tripulantes o la garantía.
+    assert TOPE_CUERPO_ENVIO_MB == 365
 
 
 def test_nginx_tiene_los_mismos_topes_que_el_backend():

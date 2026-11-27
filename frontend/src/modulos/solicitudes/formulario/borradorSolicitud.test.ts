@@ -75,6 +75,17 @@ describe("restaurar: claves nuevas, con los archivos en su sitio", () => {
     expect(archivos.adicionales[0].archivo).toBe(carta);
     expect(archivos.adicionales[0].clave).not.toBe("a1");
   });
+  it("las Form. 7 de más (2026-11-27) se recuperan con su casilla", () => {
+    const primera = archivo("carta-1.pdf");
+    const otra = archivo("carta-2.pdf");
+    const { archivos } = restaurar(
+      { codigoTramite: "F3-URGENCIA-MEDICA", cabecera: CABECERA_VACIA, tripulantes: [{ ...fichaVacia(), clave: "n1" }] },
+      { nuevos: { "DOC-FORM7-RESPONSABILIDAD|s": primera, "DOC-FORM7-RESPONSABILIDAD|s#o7": otra }, adicionales: [] },
+    );
+    expect(archivos.nuevos).toEqual({
+      "DOC-FORM7-RESPONSABILIDAD|s": primera, "DOC-FORM7-RESPONSABILIDAD|s#o7": otra,
+    });
+  });
   it("un archivo de un tripulante que ya no está se descarta", () => {
     const { archivos } = restaurar(
       { codigoTramite: "F3-EMBARQUE", cabecera: CABECERA_VACIA, tripulantes: [{ ...fichaVacia(), clave: "n1" }] },

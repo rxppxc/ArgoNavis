@@ -211,7 +211,7 @@ if [ "$c" = 404 ]; then bien "La documentación de la API está oculta"; else av
 sk=$(env_de SECRET_KEY)
 if [ "${#sk}" -ge 32 ]; then bien "SECRET_KEY de ${#sk} caracteres"; else mal "SECRET_KEY corta (${#sk} caracteres)"; fi
 # Tope del cuerpo (2026-11-10): nginx corta sin leer lo que pase de 1 MB en la API (y
-# de 345 MB al enviar una solicitud). No llega al backend: no deja rastro.
+# de 365 MB al enviar una solicitud). No llega al backend: no deja rastro.
 c=$(head -c 2097152 /dev/zero | codigo -X POST -H 'Content-Type: application/json' --data-binary @- "$BASE/api/v1/auth/login")
 if [ "$c" = 413 ]; then bien "nginx corta las peticiones de más de 1 MB en la API (413)"; else mal "Un cuerpo de 2 MB en el login respondió $c (se esperaba 413): revisa client_max_body_size en nginx.conf"; fi
 if [ -z "$DIARIO" ]; then

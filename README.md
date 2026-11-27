@@ -96,7 +96,7 @@ docker run --rm --user root --entrypoint chown -v argonavis_documentos:/app/stor
 > **Contenedores endurecidos** (desde el 22/11/2026). Si alguien logra ejecutar algo dentro de uno, que no le sirva de nada:
 > - **Sin root:** PostgreSQL corre con el usuario 70, el backend con el 10001 y nginx con el 101, desde que arrancan. Por eso nginx escucha en el 8080 y el 8443 dentro del contenedor; Docker los publica en el 80 y el 443.
 > - **Sin privilegios del sistema** (`cap_drop: ALL`) ni forma de conseguirlos (`no-new-privileges`).
-> - **Con la imagen de solo lectura.** Lo que cada uno escribe va aparte: los datos y los documentos en sus volúmenes, y los envíos mientras llegan, en `temporales_nginx` y `temporales_backend`. Esos dos van en el disco y no en un tmpfs, que contaría para la memoria del contenedor (un envío pesa hasta 345 MB).
+> - **Con la imagen de solo lectura.** Lo que cada uno escribe va aparte: los datos y los documentos en sus volúmenes, y los envíos mientras llegan, en `temporales_nginx` y `temporales_backend`. Esos dos van en el disco y no en un tmpfs, que contaría para la memoria del contenedor (un envío pesa hasta 365 MB).
 > - **Redes separadas:** PostgreSQL y el backend comparten la red `datos`; nginx no está en ella, así que no alcanza la base. La red `datos` ocupa un rango chico, `172.31.255.240/28`: si coincide con una red del SNM o de la VPN, se cambia con `RED_DATOS` en el `.env` (y hay que bajar la pila una vez: `docker compose -f docker-compose-prod.yml down` y `up -d`).
 >
 > Los datos de una instalación anterior sirven sin tocarlos. Lo revisan `verificar-despliegue.sh` en cada servidor y la integración continua, que construye esta misma pila y la levanta sobre una base ya existente, después de un reinicio, desde cero y por HTTPS (con PostgreSQL 15 y con la 18).
@@ -393,7 +393,7 @@ Las agencias entran por la VPN, pero no son del SNM: ARGO NAVIS las trata como u
 - **Archivos:** PDF, Word y Excel de hasta 2 MB cada uno, comprobados por su contenido; los de Office con macros se rechazan. El backend no los abre con una librería: los recorre de a trozos, con tope de memoria y de tamaño, así que uno muy comprimido no lo puede tumbar. La vista previa del Word va en un marco aislado (sin scripts, sin enlaces, sin acceso a la sesión).
 - **Navegador:** Content-Security-Policy (solo código propio de ARGO NAVIS), `X-Frame-Options: DENY` y `nosniff`, en nginx y en el backend cuando sirve el frontend.
 - **Topes:** login por IP (10 por minuto), por cuenta y por hora los envíos (`LIMITE_ENVIOS_POR_HORA`, 30), las exportaciones de las estadísticas (`LIMITE_EXPORTACIONES_POR_HORA`, 30) y las descargas del PDF (`LIMITE_PDF_POR_HORA`, 120), y 2 MB por archivo, en cualquier formato. Se cuentan en memoria, por proceso: con varios workers, cada uno lleva su cuenta.
-- **Tamaño de cada petición:** 1 MB en la API y, al crear o corregir una solicitud (todos los archivos van juntos), 345 MB: lo más que pesa un envío válido (30 pasajeros × 5 documentos + 2 de la solicitud + 20 adicionales, de 2 MB). nginx y el backend cortan lo que pase de ahí sin leerlo; antes nginx aceptaba 200 MB en cualquier ruta, también en el login, y el backend los leía enteros antes de comprobar la sesión.
+- **Tamaño de cada petición:** 1 MB en la API y, al crear o corregir una solicitud (todos los archivos van juntos), 365 MB: lo más que pesa un envío válido (30 tripulantes × 5 documentos + 12 de la solicitud, con la Form. 7 de hasta 10 archivos, + 20 adicionales, de 2 MB). nginx y el backend cortan lo que pase de ahí sin leerlo; antes nginx aceptaba 200 MB en cualquier ruta, también en el login, y el backend los leía enteros antes de comprobar la sesión.
 - **Rutas sin sesión:** solo el login, la verificación del QR (con el PDF de la agencia desde el 14/11/2026) y el health check; una prueba falla si aparece otra.
 - **Producción:** no arranca con una `SECRET_KEY` corta o de ejemplo.
 
@@ -458,7 +458,7 @@ Frontend (opcionales):
 ## Pendiente (decisiones del equipo)
 - HTTPS en el servidor, y TLS con el Active Directory y con el correo: ya se activan en el `.env` (ver *Producción*); faltan el nombre y los certificados, que da la DTI.
 - Edición del catálogo de trámites desde la interfaz.
-- Envío por partes para tripulaciones muy grandes: un envío lleva todos sus archivos juntos (hasta 345 MB), y por una VPN lenta uno así puede pasar los 5 minutos que espera el navegador.
+- Envío por partes para tripulaciones muy grandes: un envío lleva todos sus archivos juntos (hasta 365 MB), y por una VPN lenta uno así puede pasar los 5 minutos que espera el navegador.
 - Política de retención de datos personales (Ley 81 de 2019) y copia de los respaldos fuera del servidor.
 - Solicitud de Custodia y Solicitud de Transbordos (el documento de UCVMM dice que faltan por levantar).
 - Segundo factor (código TOTP) para las cuentas de las agencias: decidido para más adelante.

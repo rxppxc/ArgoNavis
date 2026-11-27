@@ -148,6 +148,9 @@ class TramiteDocumento(Base):
     # a los que se pide). El boleto de Desembarque es obligatorio para el Marino y
     # el militar, y opcional para los técnicos (pedido del usuario del 2026-11-11).
     rangos_opcional: Mapped[list[str] | None] = mapped_column(ARRAY(String(20)))
+    # Cuántos archivos admite su casilla (2026-11-27): la Form. 7 de Renovación, Urgencias y Técnico,
+    # una obligatoria y hasta 9 opcionales más (10). Las demás, uno.
+    maximo_archivos: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
 
     tipo_tramite: Mapped["TipoTramite"]         = relationship("TipoTramite", back_populates="documentos")
     documento:    Mapped["DocumentoRequerido"]  = relationship("DocumentoRequerido", back_populates="tramites")

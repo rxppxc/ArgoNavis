@@ -22,6 +22,8 @@ export interface CasillaFormulario {
   nombre_tripulante: string | null;
   /** Opcional: se puede enviar sin ella y no cuenta como faltante (2026-11-11). */
   obligatoria: boolean;
+  /** Cuántos archivos admite (2026-11-27): la Form. 7, uno obligatorio y hasta 9 opcionales más. */
+  maximo: number;
   /** La condición de su fila: la tarjeta del tripulante nombra los documentos que
    *  se le piden por su nacionalidad restringida (2026-11-14). */
   condicion?: CondicionDocumento;
@@ -83,6 +85,7 @@ export function construirCasillas(
         clave_tripulante: null,
         nombre_tripulante: null,
         obligatoria: true,
+        maximo: d.maximo_archivos ?? 1,
         condicion: d.condicion,
       });
       continue;
@@ -101,6 +104,7 @@ export function construirCasillas(
         clave_tripulante: t.clave,
         nombre_tripulante: t.nombre,
         obligatoria: !opcionalPara(d, t.rango),
+        maximo: d.maximo_archivos ?? 1,
         condicion: d.condicion,
       });
     }

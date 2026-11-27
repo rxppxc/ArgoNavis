@@ -90,6 +90,12 @@ export interface DocumentosElegidos {
   adicionalesExistentes: DocumentoSolicitud[];
 }
 
+/** Los archivos elegidos para una casilla: el de su clave y, en las que admiten varios (la Form. 7,
+ *  2026-11-27), los de más, con la clave de la casilla seguida de «#». */
+export function archivosDeCasilla(nuevos: Record<string, File>, clave: string): [string, File][] {
+  return Object.entries(nuevos).filter(([k]) => k === clave || k.startsWith(`${clave}#`));
+}
+
 /** Lo que se manda: los datos, los archivos en el orden de sus asignaciones y,
  *  al corregir, los documentos ya cargados que se conservan. */
 export interface Envio {
@@ -103,18 +109,19 @@ export function armarEnvio(
 ): Envio {
   const { casillas, nuevos, existentes, adicionalesNuevos, adicionalesExistentes } = documentos;
   const indicePorClave = new Map(tripulantes.map((t, i) => [t.clave, i]));
-  const conArchivoNuevo = casillas.filter((c) => nuevos[c.clave]);
+  // Cada archivo con su casilla: la Form. 7 puede llevar varios (2026-11-27).
+  const conArchivoNuevo = casillas.flatMap((c) => archivosDeCasilla(nuevos, c.clave).map(([, archivo]) => ({ c, archivo })));
   const imo = cabecera.imo.trim() ? (normalizarImo(cabecera.imo) ?? cabecera.imo.trim()) : null;
   const texto = (v: string) => v.trim() || null;
 
   const asignaciones: AsignacionArchivo[] = [
-    ...conArchivoNuevo.map((c) => ({
+    ...conArchivoNuevo.map(({ c }) => ({
       documento_codigo: c.documento_codigo,
       indice_tripulante: c.clave_tripulante === null ? null : indicePorClave.get(c.clave_tripulante) ?? null,
     })),
     ...adicionalesNuevos.map(() => ({ documento_codigo: null, indice_tripulante: null })),
   ];
-  const archivos = [...conArchivoNuevo.map((c) => nuevos[c.clave]), ...adicionalesNuevos.map((a) => a.archivo)];
+  const archivos = [...conArchivoNuevo.map(({ archivo }) => archivo), ...adicionalesNuevos.map((a) => a.archivo)];
 
   const datos: DatosFormularioSolicitud = {
     puesto_control_id: cabecera.puesto_control_id ? Number(cabecera.puesto_control_id) : null,
@@ -154,9 +161,11 @@ export function armarEnvio(
   };
 
   // Al corregir se conservan los documentos de las casillas vigentes que no se
-  // reemplazaron y los adicionales que no se quitaron.
+  // reemplazaron y los adicionales que no se quitaron. En las que admiten varios (la Form. 7,
+  // 2026-11-27) no se reemplaza: quedan los cargados que no se quitaron, junto a los nuevos.
   const conservados = [
-    ...casillas.filter((c) => !nuevos[c.clave]).flatMap((c) => (existentes[c.clave] ?? []).map((d) => d.id)),
+    ...casillas.filter((c) => c.maximo > 1 || !nuevos[c.clave])
+      .flatMap((c) => (existentes[c.clave] ?? []).map((d) => d.id)),
     ...adicionalesExistentes.map((d) => d.id),
   ];
   return { datos, archivos, conservados };

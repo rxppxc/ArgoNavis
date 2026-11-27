@@ -13,7 +13,7 @@ import { validarArchivos } from "../../../utils/archivos";
 import { claveCasilla, construirCasillas, type CasillaFormulario } from "../checklist";
 import type { ArchivosBorrador } from "./borradorSolicitud";
 import { MAX_ADICIONALES, type AdicionalNuevo } from "./DocumentosAdicionales";
-import { nuevaClave, type DocumentosElegidos, type Precarga } from "./envioSolicitud";
+import { archivosDeCasilla, nuevaClave, type DocumentosElegidos, type Precarga } from "./envioSolicitud";
 import type { FichaTripulante } from "./validacionFormulario";
 
 const SIN_EXISTENTES: Record<string, DocumentoSolicitud[]> = {};
@@ -27,7 +27,12 @@ export interface DocumentosFormulario extends DocumentosElegidos {
   casillasPorTripulante: Map<string, CasillaFormulario[]>;
   faltantesPorTripulante: Map<string, number>;
   elegir: (clave: string, archivo: File) => void;
+  /** Otro archivo en una casilla que admite varios (la Form. 7, 2026-11-27), hasta su máximo. */
+  elegirOtro: (clave: string, archivo: File) => void;
+  /** Quita un archivo elegido: el de la casilla o uno de los de más (su clave lleva «#»). */
   descartar: (clave: string) => void;
+  /** Quita uno ya cargado de una casilla que admite varios: no se conserva al corregir. */
+  quitarExistente: (clave: string, id: number) => void;
   /** Quita los archivos elegidos para un tripulante (al quitarlo del formulario). */
   descartarDeTripulante: (claveTripulante: string) => void;
   /** Quita los archivos elegidos del checklist (al cambiar de trámite). */
@@ -55,7 +60,10 @@ export function useDocumentosFormulario(
   const [adicionalesExistentes, setAdicionalesExistentes] = useState<DocumentoSolicitud[]>(
     () => precarga?.adicionales ?? [],
   );
-  const existentes = precarga?.existentes ?? SIN_EXISTENTES;
+  // Estado y no una constante: en una casilla que admite varios se puede quitar uno ya cargado.
+  const [existentes, setExistentes] = useState<Record<string, DocumentoSolicitud[]>>(
+    () => precarga?.existentes ?? SIN_EXISTENTES,
+  );
 
   const casillas = useMemo(() => {
     if (!tipo) return [];
@@ -75,7 +83,8 @@ export function useDocumentosFormulario(
 
   const faltantes = useMemo(
     // Las opcionales nunca faltan (el boleto de Desembarque de los técnicos, 2026-11-11).
-    () => casillas.filter((c) => c.obligatoria && !nuevos[c.clave] && !(existentes[c.clave]?.length)),
+    () => casillas.filter((c) => c.obligatoria && !archivosDeCasilla(nuevos, c.clave).length
+      && !(existentes[c.clave]?.length)),
     [casillas, nuevos, existentes],
   );
 
@@ -103,6 +112,19 @@ export function useDocumentosFormulario(
     }
     setNuevos((prev) => ({ ...prev, [clave]: archivo }));
   }, [mostrar]);
+
+  const elegirOtro = useCallback((clave: string, archivo: File) => {
+    const problema = validarArchivos([archivo]);
+    if (problema) {
+      mostrar(problema, "aviso");
+      return;
+    }
+    setNuevos((prev) => ({ ...prev, [`${clave}#${nuevaClave("o")}`]: archivo }));
+  }, [mostrar]);
+
+  const quitarExistente = useCallback((clave: string, id: number) => {
+    setExistentes((prev) => ({ ...prev, [clave]: (prev[clave] ?? []).filter((d) => d.id !== id) }));
+  }, []);
 
   const descartar = useCallback((clave: string) => {
     setNuevos((prev) => {
@@ -146,7 +168,7 @@ export function useDocumentosFormulario(
   return {
     casillas, faltantes, casillasSolicitud, casillasPorTripulante, faltantesPorTripulante,
     nuevos, existentes, adicionalesNuevos, adicionalesExistentes,
-    elegir, descartar, descartarDeTripulante, descartarTodos,
+    elegir, elegirOtro, descartar, quitarExistente, descartarDeTripulante, descartarTodos,
     agregarAdicionales, quitarAdicionalNuevo, quitarAdicionalExistente,
   };
 }

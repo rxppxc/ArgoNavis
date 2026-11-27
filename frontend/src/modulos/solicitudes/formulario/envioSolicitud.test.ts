@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { documentoDePrueba, solicitudDePrueba, tripulanteDePrueba } from "../../../pruebas/datos";
 import { claveCasilla, type CasillaFormulario } from "../checklist";
-import { armarEnvio, desdeSolicitud, fichaVacia, type DocumentosElegidos } from "./envioSolicitud";
+import { archivosDeCasilla, armarEnvio, desdeSolicitud, fichaVacia, type DocumentosElegidos } from "./envioSolicitud";
 import { CABECERA_VACIA, type CabeceraFormulario, type FichaTripulante } from "./validacionFormulario";
 
 const pdf = (nombre: string) => new File(["%PDF-1.4"], nombre, { type: "application/pdf" });
 
-function casilla(documentoCodigo: string, claveTripulante: string | null = null): CasillaFormulario {
+function casilla(documentoCodigo: string, claveTripulante: string | null = null, maximo = 1): CasillaFormulario {
   return {
     clave: claveCasilla(documentoCodigo, claveTripulante), documento_codigo: documentoCodigo,
     documento_nombre: documentoCodigo, descripcion: null,
-    clave_tripulante: claveTripulante, nombre_tripulante: claveTripulante, obligatoria: true,
+    clave_tripulante: claveTripulante, nombre_tripulante: claveTripulante, obligatoria: true, maximo,
   };
 }
 
@@ -79,6 +79,31 @@ describe("armarEnvio: lo que se manda al servidor", () => {
       { documento_codigo: "VISA", indice_tripulante: 0 },
       { documento_codigo: null, indice_tripulante: null },
     ]);
+  });
+
+  it("la Form. 7 lleva todos sus archivos, la primera y las de más, con su casilla (2026-11-27)", () => {
+    const form7 = casilla("FORM7", null, 10);
+    const archivos = [pdf("carta-1.pdf"), pdf("carta-2.pdf"), pdf("carta-3.pdf")];
+    const envio = armarEnvio(CABECERA_VACIA, [ana], {
+      ...SIN_DOCUMENTOS, casillas: [form7],
+      nuevos: { [form7.clave]: archivos[0], [`${form7.clave}#o1`]: archivos[1], [`${form7.clave}#o2`]: archivos[2] },
+    });
+    expect(envio.archivos).toEqual(archivos);
+    expect(envio.datos.asignaciones).toEqual(Array(3).fill({ documento_codigo: "FORM7", indice_tripulante: null }));
+    expect(archivosDeCasilla({ [form7.clave]: archivos[0], [`${form7.clave}#o1`]: archivos[1], "OTRA|s": archivos[2] },
+      form7.clave).map(([clave]) => clave)).toEqual([form7.clave, `${form7.clave}#o1`]);
+  });
+
+  it("al corregir, la Form. 7 conserva las cargadas que quedan aunque se agreguen otras", () => {
+    const form7 = casilla("FORM7", null, 10);
+    const nueva = pdf("carta-nueva.pdf");
+    const envio = armarEnvio(CABECERA_VACIA, [ana], {
+      ...SIN_DOCUMENTOS, casillas: [form7],
+      nuevos: { [`${form7.clave}#o1`]: nueva },
+      existentes: { [form7.clave]: [documentoDePrueba({ id: 5 }), documentoDePrueba({ id: 6 })] },
+    });
+    expect(envio.archivos).toEqual([nueva]);
+    expect(envio.conservados).toEqual([5, 6]);
   });
 
   it("solo manda los archivos nuevos: lo ya cargado no se vuelve a subir", () => {

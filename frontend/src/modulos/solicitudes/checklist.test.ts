@@ -25,7 +25,7 @@ describe("construirCasillas (espejo de construir_casillas)", () => {
   }) => {
     const tipo = tramiteDePrueba({
       documentos: documentos.map((d, i) => ({
-        ...d, rangos: d.rangos ?? null, rangos_opcional: d.rangos_opcional ?? null, id: i + 1, documento_id: i + 1, nombre: d.codigo, descripcion: null,
+        ...d, rangos: d.rangos ?? null, rangos_opcional: d.rangos_opcional ?? null, maximo_archivos: 1, id: i + 1, documento_id: i + 1, nombre: d.codigo, descripcion: null,
       })),
     });
     const claves = tripulantes.map((_, i) => `n${i}`);
