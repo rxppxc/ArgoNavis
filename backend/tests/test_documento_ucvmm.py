@@ -26,6 +26,8 @@ Ocho reglas van más allá de la lectura literal, por decisión del usuario:
     aéreo, en todos los trámites (reunión del 2026-10-30). Por eso el resto de
     los documentos por tripulante es solo del Marino, el boleto se agrega para
     los demás rangos y el trámite de Técnico ya no lleva la Carta Form. 7.
+    Desde el 2026-11-26 no hay boleto en Embarque ni en Renovación de pasaporte:
+    ahí presentan solo las Generales.
   - En Embarque y Desembarque, a los técnicos (técnico, supernumerario y
     superintendente) se les pedían la Carta de Responsabilidad, las Generales y
     el Contrato de Trabajo (pedido del 2026-11-11). Desde el 2026-11-13 esos dos
@@ -44,8 +46,9 @@ Ocho reglas van más allá de la lectura literal, por decisión del usuario:
     boleto aéreo en Embarque y Desembarque, ni la Visa Especial de Marino en Cambio de
     nave; y el Sellado de Shore Pass admite solo el rango Marino (pedido del 2026-11-14).
   - «Subir y bajar» es solo una operación del trámite de Técnico (2026-11-18; desde el
-    2026-11-26 ningún otro la ofrece): con ella, cada tripulante, de cualquier rango,
-    adjunta la Carta de Responsabilidad (Form. No. 7) (condición `subir_y_bajar`).
+    2026-11-26 ningún otro la ofrece): con ella se adjunta la Carta de Responsabilidad
+    (Form. No. 7) (condición `subir_y_bajar`), una por solicitud desde el 2026-11-26
+    (antes, una por tripulante).
   - Pedido del 2026-11-26: la copia del boleto aéreo es opcional en Desembarque y en
     el trámite de Técnico (en los demás se sigue exigiendo); en Urgencia médica, la
     Carta de Responsabilidad (Form. No. 7) va una por solicitud, con los documentos de
@@ -86,17 +89,17 @@ REPORTE = ("DOC-REPORTE-MEDICO", "marino", "siempre", MARINO)         # "para ca
 CITA = ("DOC-CITA-CONSULADO", "marino", "siempre", MARINO)
 BOLETO = ("DOC-BOLETO-AEREO", "marino", "siempre", NO_MARINOS)        # reunión del 2026-10-30
 FORM3 = ("DOC-FORMULARIO-3", "solicitud", "siempre", None)           # en todos (2026-11-13)
-# Con «Subir y bajar», la Carta Form. 7 de cada tripulante: en Embarque y Desembarque del
-# 2026-11-16 al 18; desde entonces, solo en el trámite de Técnico (su operación «Subir y bajar»).
-CARTA_SUBIR_BAJAR = ("DOC-FORM7-RESPONSABILIDAD", "marino", "subir_y_bajar", None)
+# Con «Subir y bajar», la Carta Form. 7: en Embarque y Desembarque del 2026-11-16 al 18; desde
+# entonces, solo en el trámite de Técnico (su operación «Subir y bajar»). Una por solicitud desde
+# el 2026-11-26 (antes, una por tripulante).
+CARTA_SUBIR_BAJAR = ("DOC-FORM7-RESPONSABILIDAD", "solicitud", "subir_y_bajar", None)
 # 2026-11-18, en el trámite de Técnico, una por solicitud: con Embarque o Desembarque, la carta de
 # garantía de la agencia contratante o el contrato; con «Subir y bajar», la carta de garantía.
 GARANTIA_O_CONTRATO = ("DOC-GARANTIA-O-CONTRATO", "solicitud", "embarque_o_desembarque", None)
 CARTA_GARANTIA = ("DOC-CARTA-GARANTIA", "solicitud", "subir_y_bajar", None)
-# En Embarque el boleto es solo del militar (2026-11-11). Los técnicos van por su trámite
-# desde el 2026-11-13; sus filas de Embarque y Desembarque se borraron el 2026-11-14.
+# Los técnicos van por su trámite desde el 2026-11-13; sus filas de Embarque y Desembarque se
+# borraron el 2026-11-14. Embarque no pide boleto desde el 2026-11-26 (era solo del militar).
 TECNICOS = ("superintendente", "supernumerario", "tecnico")
-BOLETO_MILITAR = ("DOC-BOLETO-AEREO", "marino", "solo_extranjeros", ("militar",))   # no a panameños (2026-11-14)
 # (trámite, documento) → rangos para los que es opcional: el boleto aéreo en Desembarque y en el
 # trámite de Técnico (2026-11-26).
 OPCIONAL: dict[tuple[str, str], tuple[str, ...]] = {
@@ -112,7 +115,7 @@ DOCUMENTO = {
         "campos": [], "vigencia": True, "aviso_custodia": False, "cambio_puerto": True,
         "rangos": {"marino", "pasajero", "militar"},   # 2026-11-13: los técnicos van por su trámite
         # La Visa Especial de Marino de todo extranjero cubre al Marino y al Pasajero restringidos.
-        "documentos": {FORM3, VISA_EXTRANJEROS, GENERALES, LIBRETA, BOLETO_MILITAR},
+        "documentos": {FORM3, VISA_EXTRANJEROS, GENERALES, LIBRETA},
     },
     "F3-DESEMBARQUE": {
         "campos": [], "vigencia": True, "aviso_custodia": True, "cambio_puerto": True,
@@ -129,7 +132,8 @@ DOCUMENTO = {
     },
     "F3-RENOV-PASAPORTE": {
         "campos": ["puerto_desembarque"], "vigencia": True, "aviso_custodia": True,
-        "documentos": {FORM3, GENERALES, CARTA, LISTA, LIBRETA, CITA, BOLETO, VISA_MARINO_RESTRINGIDO},
+        # Sin boleto desde el 2026-11-26: los rangos que no son Marino presentan solo las Generales.
+        "documentos": {FORM3, GENERALES, CARTA, LISTA, LIBRETA, CITA, VISA_MARINO_RESTRINGIDO},
     },
     "F3-SHORE-PASS": {
         "campos": ["motivo"], "vigencia": True, "aviso_custodia": True, "dias_sellado": True,
@@ -352,8 +356,9 @@ async def test_custodia_segun_el_formulario(cliente, agencia, codigo):
 
 
 # El rango al que cada trámite le pide el boleto aéreo (Shore Pass no: solo admite Marino).
-RANGO_CON_BOLETO = {"F3-EMBARQUE": "militar", "F3-DESEMBARQUE": "marino", "F3-URGENCIA-MEDICA": "militar",
-                    "F3-RENOV-PASAPORTE": "militar", "F3-TECNICO": "tecnico", "F3-CAMBIO-NAVE": "militar"}
+# Embarque y Renovación de pasaporte no lo piden desde el 2026-11-26.
+RANGO_CON_BOLETO = {"F3-DESEMBARQUE": "marino", "F3-URGENCIA-MEDICA": "militar", "F3-TECNICO": "tecnico",
+                    "F3-CAMBIO-NAVE": "militar"}
 
 
 @pytest.mark.parametrize("codigo", sorted(RANGO_CON_BOLETO))
@@ -559,12 +564,13 @@ async def test_tramite_tecnico_solo_sus_rangos(cliente, agencia):
     assert r.status_code == 400 and "rango debe ser Técnico, Superintendente, Supernumerario" in r.json()["detail"]
 
 
-@pytest.mark.parametrize("codigo", sorted(set(DOCUMENTO) - {"F3-EMBARQUE", "F3-DESEMBARQUE", "F3-SHORE-PASS"}))
+@pytest.mark.parametrize("codigo", sorted(set(DOCUMENTO) - {"F3-EMBARQUE", "F3-DESEMBARQUE", "F3-SHORE-PASS",
+                                                          "F3-RENOV-PASAPORTE"}))
 async def test_rangos_no_marinos_generales_y_boleto(cliente, agencia, codigo):
     """Reunión del 2026-10-30: a un rango distinto de Marino solo se le piden
-    las Generales de pasaporte y el boleto aéreo. Embarque y Desembarque, abajo;
-    Shore Pass admite solo al Marino (2026-11-14). En el trámite de Técnico el boleto
-    es opcional desde el 2026-11-26."""
+    las Generales de pasaporte y el boleto aéreo. Embarque, Desembarque y Renovación de
+    pasaporte, abajo; Shore Pass admite solo al Marino (2026-11-14). En el trámite de
+    Técnico el boleto es opcional desde el 2026-11-26."""
     naviera, puesto_id = agencia
     tripulantes = [tripulante("Hans", "DEU", rango="tecnico")]
     datos, archivos = _datos(codigo, puesto_id, tripulantes, sin={"DOC-BOLETO-AEREO"})
@@ -581,6 +587,18 @@ async def test_rangos_no_marinos_generales_y_boleto(cliente, agencia, codigo):
     assert del_tripulante == {"DOC-GENERALES-PASAPORTE", "DOC-BOLETO-AEREO"}, codigo
 
 
+@pytest.mark.parametrize("rango", NO_MARINOS)
+async def test_renovacion_solo_generales_a_los_no_marinos(cliente, agencia, rango):
+    """Pedido del 2026-11-26: en Renovación de pasaporte, al técnico, al supernumerario, al
+    superintendente y al militar se les piden solo las Generales de pasaporte. Sin boleto aéreo."""
+    naviera, puesto_id = agencia
+    datos, archivos = _datos("F3-RENOV-PASAPORTE", puesto_id, [tripulante("Hans", "DEU", rango=rango)])
+    r = await enviar(cliente, naviera, datos, archivos)
+    assert r.status_code == 201, (rango, r.text)
+    assert _del_tripulante(r.json()) == {"DOC-GENERALES-PASAPORTE"}, rango
+    assert "DOC-BOLETO-AEREO" not in {c["documento_codigo"] for c in r.json()["checklist"]}, rango
+
+
 @pytest.mark.parametrize("codigo", ["F3-EMBARQUE", "F3-DESEMBARQUE"])
 @pytest.mark.parametrize("rango", TECNICOS)
 async def test_tecnicos_van_por_su_tramite(cliente, agencia, codigo, rango):
@@ -594,11 +612,11 @@ async def test_tecnicos_van_por_su_tramite(cliente, agencia, codigo, rango):
 
 async def test_embarque_segun_el_rango(cliente, agencia):
     """En Embarque, el Pasajero presenta lo del Marino sin la Libreta (2026-11-13) y el
-    militar sigue con Generales y boleto (reunión del 2026-10-30)."""
+    militar, solo las Generales: sin boleto desde el 2026-11-26 (antes, Generales y boleto)."""
     naviera, puesto_id = agencia
     esperado = {"marino": {"DOC-VISA-MARINO", "DOC-GENERALES-PASAPORTE", "DOC-LIBRETA-MARINO"},
                 "pasajero": {"DOC-VISA-MARINO", "DOC-GENERALES-PASAPORTE"},
-                "militar": {"DOC-GENERALES-PASAPORTE", "DOC-BOLETO-AEREO"}}
+                "militar": {"DOC-GENERALES-PASAPORTE"}}
     for rango, documentos in esperado.items():
         datos, archivos = _datos("F3-EMBARQUE", puesto_id, [tripulante("Hans", "DEU", rango=rango)])
         r = await enviar(cliente, naviera, datos, archivos)
@@ -831,7 +849,7 @@ GEN, LIB, VEM, BOL = "DOC-GENERALES-PASAPORTE", "DOC-LIBRETA-MARINO", "DOC-VISA-
 @pytest.mark.parametrize("codigo, rango, panameno, extranjero", [
     ("F3-EMBARQUE", "marino", {GEN, LIB}, {VEM, GEN, LIB}),
     ("F3-EMBARQUE", "pasajero", {GEN}, {VEM, GEN}),
-    ("F3-EMBARQUE", "militar", {GEN}, {GEN, BOL}),
+    ("F3-EMBARQUE", "militar", {GEN}, {GEN}),   # sin boleto en Embarque desde el 2026-11-26
     ("F3-DESEMBARQUE", "marino", {GEN, LIB}, {BOL, GEN, LIB}),
     ("F3-DESEMBARQUE", "pasajero", {GEN}, {BOL, GEN}),
     ("F3-DESEMBARQUE", "militar", {GEN}, {BOL, GEN}),
@@ -869,23 +887,24 @@ async def test_shore_pass_solo_marino(cliente, agencia):
 CARTA_FORM7 = "DOC-FORM7-RESPONSABILIDAD"
 
 
-async def test_subir_y_bajar_del_tecnico_pide_la_carta_por_tripulante(cliente, agencia):
-    """Con la operación «Subir y bajar», cada tripulante adjunta la Carta de Responsabilidad
-    (Form. No. 7), además de lo demás del trámite (pedido del usuario del 2026-11-18). Con
-    Embarque o Desembarque, no."""
+async def test_subir_y_bajar_del_tecnico_pide_una_carta_por_solicitud(cliente, agencia):
+    """Con la operación «Subir y bajar» se adjunta la Carta de Responsabilidad (Form. No. 7),
+    además de lo demás del trámite (pedido del usuario del 2026-11-18): una sola para toda la
+    solicitud desde el 2026-11-26 (antes, una por tripulante). Con Embarque o Desembarque, no."""
     naviera, puesto_id = agencia
     tripulantes = [tripulante("Hans", "DEU", rango="tecnico"), tripulante("Ivo", "DEU", rango="superintendente")]
     datos, archivos = _datos("F3-TECNICO", puesto_id, tripulantes, operacion="subir_y_bajar", sin={CARTA_FORM7})
     r = await enviar(cliente, naviera, datos, archivos)
     assert r.status_code == 400, r.text
-    for nombre in ("Hans", "Ivo"):
-        assert f"Carta de Responsabilidad (Form. No. 7) de {nombre}" in r.json()["detail"], nombre
+    assert "Carta de Responsabilidad (Form. No. 7)" in r.json()["detail"], r.text
+    assert "Form. No. 7) de " not in r.json()["detail"], "no es de un tripulante"
 
     datos, archivos = _datos("F3-TECNICO", puesto_id, tripulantes, operacion="subir_y_bajar")
     r = await enviar(cliente, naviera, datos, archivos)
     assert r.status_code == 201, r.text
     s = r.json()
-    assert all(CARTA_FORM7 in _del_tripulante(s, i) for i in range(2))
+    cartas = [c for c in s["checklist"] if c["documento_codigo"] == CARTA_FORM7]
+    assert len(cartas) == 1 and cartas[0]["alcance"] == "solicitud" and cartas[0]["tripulante_id"] is None, cartas
     assert all(c["cubierta"] for c in s["checklist"])
     # Todo obligatorio salvo el boleto aéreo, opcional en este trámite desde el 2026-11-26.
     assert all(c["obligatoria"] == (c["documento_codigo"] != "DOC-BOLETO-AEREO") for c in s["checklist"])
@@ -897,7 +916,7 @@ async def test_subir_y_bajar_del_tecnico_pide_la_carta_por_tripulante(cliente, a
                                  operacion=operacion)
         r = await enviar(cliente, naviera, datos, archivos)
         assert r.status_code == 201, (operacion, r.text)
-        assert CARTA_FORM7 not in _del_tripulante(r.json()), operacion
+        assert CARTA_FORM7 not in {c["documento_codigo"] for c in r.json()["checklist"]}, operacion
 
 
 @pytest.mark.parametrize("codigo", ["F3-EMBARQUE", "F3-DESEMBARQUE", "F3-CAMBIO-NAVE"])
@@ -909,7 +928,7 @@ async def test_los_demas_tramites_no_preguntan_subir_y_bajar(cliente, agencia, c
     r = await enviar(cliente, naviera, datos, archivos)
     assert r.status_code == 201, (codigo, r.text)
     assert r.json()["subir_y_bajar"] is False and r.json()["permite_subir_y_bajar"] is False
-    assert CARTA_FORM7 not in _del_tripulante(r.json()), codigo
+    assert CARTA_FORM7 not in {c["documento_codigo"] for c in r.json()["checklist"]}, codigo
 
 
 async def test_corregir_a_otra_operacion_quita_la_carta(cliente, agencia):
@@ -1179,8 +1198,9 @@ async def test_embarque_o_desembarque_pide_garantia_o_contrato(cliente, agencia,
 
 
 async def test_subir_y_bajar_pide_la_carta_de_garantia_y_la_form7(cliente, agencia):
-    """Con «Subir y bajar», la carta de garantía (una por solicitud) y, como antes, la Carta de
-    Responsabilidad (Form. No. 7) de cada tripulante: se piden las dos (decisión del usuario)."""
+    """Con «Subir y bajar», la carta de garantía y la Carta de Responsabilidad (Form. No. 7): se
+    piden las dos (decisión del usuario del 2026-11-18), una por solicitud cada una (la Form. 7,
+    desde el 2026-11-26)."""
     naviera, puesto_id = agencia
     tripulantes = [_tecnico("Hans"), tripulante("Ivo", "DEU", rango="superintendente")]
     datos, archivos = _datos("F3-TECNICO", puesto_id, tripulantes, operacion="subir_y_bajar", sin={CARTA_GARANTIA_})
@@ -1192,8 +1212,8 @@ async def test_subir_y_bajar_pide_la_carta_de_garantia_y_la_form7(cliente, agenc
     r = await enviar(cliente, naviera, datos, archivos)
     assert r.status_code == 201, r.text
     s = r.json()
-    assert _de_la_solicitud(s) == {"DOC-FORMULARIO-3", CARTA_GARANTIA_}
-    assert all(CARTA_FORM7 in _del_tripulante(s, i) for i in range(2))
+    assert _de_la_solicitud(s) == {"DOC-FORMULARIO-3", CARTA_GARANTIA_, CARTA_FORM7}
+    assert all(CARTA_FORM7 not in _del_tripulante(s, i) for i in range(2))
 
 
 async def test_la_garantia_no_se_pide_en_otros_tramites(cliente, agencia):

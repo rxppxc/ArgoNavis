@@ -852,7 +852,7 @@
       },
       {
         "codigo": "CARTA",
-        "alcance": "marino",
+        "alcance": "solicitud",
         "condicion": "subir_y_bajar",
         "requiere_libreta": false,
         "orden": 2
@@ -914,7 +914,7 @@
       },
       {
         "codigo": "CARTA",
-        "alcance": "marino",
+        "alcance": "solicitud",
         "condicion": "subir_y_bajar",
         "requiere_libreta": false,
         "orden": 2
@@ -964,7 +964,7 @@
     ]
   },
   {
-    "caso": "Técnico con «Subir y bajar»: la Carta de cada uno y la garantía",
+    "caso": "Técnico con «Subir y bajar»: la Carta y la garantía, una por solicitud (2026-11-26)",
     "operacion": "subir_y_bajar",
     "subir_y_bajar": true,
     "documentos": [
@@ -977,7 +977,7 @@
       },
       {
         "codigo": "CARTA",
-        "alcance": "marino",
+        "alcance": "solicitud",
         "condicion": "subir_y_bajar",
         "requiere_libreta": false,
         "orden": 2
@@ -1022,11 +1022,7 @@
       ],
       [
         "CARTA",
-        0
-      ],
-      [
-        "CARTA",
-        1
+        null
       ],
       [
         "GARANTIA",
@@ -1046,7 +1042,7 @@
       },
       {
         "codigo": "CARTA",
-        "alcance": "marino",
+        "alcance": "solicitud",
         "condicion": "subir_y_bajar",
         "requiere_libreta": false,
         "orden": 2

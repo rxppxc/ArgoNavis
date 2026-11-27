@@ -3,7 +3,7 @@ import { leerEspejo, type Caso } from "../../pruebas/espejo";
 import { tripulanteDePrueba } from "../../pruebas/datos";
 import {
   ETIQUETA_EVENTO, normalizarImo, TEXTO_HORARIO_LABORAL, textoSector, textoSectorCorto,
-  avisoImpedimentos, textoVigencia, tituloColumnaRango,
+  avisoImpedimentos, avisoSubirYBajar, textoVigencia, tituloColumnaRango,
 } from "./presentacion";
 
 describe("tituloColumnaRango (la ocupación salió del formulario el 2026-11-16)", () => {
@@ -62,5 +62,30 @@ describe("avisoImpedimentos (espejo de aviso_impedimentos, models/solicitud.py; 
   interface CasoImpedimentos extends Caso { nombres: string[]; texto: string | null }
   it.each(leerEspejo<CasoImpedimentos[]>("impedimentos.json"))("$caso", ({ nombres, texto }) => {
     expect(avisoImpedimentos(nombres)).toBe(texto);
+  });
+});
+
+describe("avisoSubirYBajar (la operación del trámite de Técnico; 2026-11-26)", () => {
+  const form7 = { nombre: "Carta de Responsabilidad (Form. No. 7)", condicion: "subir_y_bajar" as const };
+  const garantia = { nombre: "Carta de garantía de la agencia contratante", condicion: "subir_y_bajar" as const };
+  const generales = { nombre: "Generales de Pasaporte", condicion: "siempre" as const };
+
+  it("nombra lo que «Subir y bajar» suma a la solicitud, una de cada una", () => {
+    expect(avisoSubirYBajar([
+      { ...generales, alcance: "marino" }, { ...form7, alcance: "solicitud" }, { ...garantia, alcance: "solicitud" },
+    ]))
+      .toBe("Con «Subir y bajar» se adjuntan además, una por solicitud, «Carta de Responsabilidad (Form. No. 7)» "
+        + "y «Carta de garantía de la agencia contratante», en los documentos de la solicitud.");
+  });
+
+  it("si un documento va por tripulante, lo dice aparte", () => {
+    expect(avisoSubirYBajar([{ ...form7, alcance: "marino" }, { ...garantia, alcance: "solicitud" }]))
+      .toBe("Con «Subir y bajar» se adjuntan además, una por solicitud, «Carta de garantía de la agencia contratante», "
+        + "en los documentos de la solicitud. Cada tripulante adjunta «Carta de Responsabilidad (Form. No. 7)» "
+        + "en sus documentos.");
+  });
+
+  it("sin documentos de «Subir y bajar», nada que avisar", () => {
+    expect(avisoSubirYBajar([{ ...generales, alcance: "marino" }])).toBeNull();
   });
 });

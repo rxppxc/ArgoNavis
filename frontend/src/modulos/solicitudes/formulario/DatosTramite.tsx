@@ -5,7 +5,9 @@ import { SelectorFecha } from "../../../components/SelectorFecha";
 import type { OpcionBuscable } from "../../../utils/busqueda";
 import { isoATexto, sumarDias } from "../../../utils/calendario";
 import { DIAS_SELLADO, OPERACIONES } from "../../../api/tiposSolicitudes";
-import { AYUDA_CAMPOS_TRAMITE, ETIQUETA_OPERACION, formatearFechaHora, textoDias, textoVigencia } from "../presentacion";
+import {
+  AYUDA_CAMPOS_TRAMITE, avisoSubirYBajar, ETIQUETA_OPERACION, formatearFechaHora, textoDias, textoVigencia,
+} from "../presentacion";
 import { operacionMaxima, puestosParaCambio, type CabeceraFormulario } from "./validacionFormulario";
 import styles from "./PaginaSolicitud.module.css";
 
@@ -122,7 +124,7 @@ export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos,
           </label>
         )}
         {/* La operación del trámite de Técnico (pedido del usuario del 2026-11-18): obligatoria y empieza
-            sin elegir. «Subir y bajar» pide además la Carta de Responsabilidad de cada tripulante. */}
+            sin elegir. «Subir y bajar» pide además la Carta de Responsabilidad, una por solicitud. */}
         {tipo.pide_operacion && (
           <label className={styles.campo}>
             <span>Operación *</span>
@@ -134,14 +136,10 @@ export function DatosTramite({ tipo, cabecera, agencia, fechaSolicitud, puestos,
             </select>
           </label>
         )}
-        {/* Solo donde «Subir y bajar» pide la Carta de cada tripulante (Técnico). En Urgencia médica la
-            operación solo se registra: su Carta Form. 7 es una por solicitud (2026-11-26). */}
-        {tipo.pide_operacion && cabecera.operacion === "subir_y_bajar"
-          && tipo.documentos.some((d) => d.condicion === "subir_y_bajar") && (
-          <p className={styles.operacionAviso}>
-            Con «Subir y bajar», cada tripulante adjunta la <strong>Carta de Responsabilidad (Form. No. 7)</strong> en
-            sus documentos.
-          </p>
+        {/* Lo que «Subir y bajar» suma en el trámite de Técnico: desde el 2026-11-26, la Carta Form. 7
+            y la carta de garantía, una por solicitud. En Urgencia médica la operación solo se registra. */}
+        {tipo.pide_operacion && cabecera.operacion === "subir_y_bajar" && avisoSubirYBajar(tipo.documentos) && (
+          <p className={styles.operacionAviso}>{avisoSubirYBajar(tipo.documentos)}</p>
         )}
         {tipo.horas_vigencia && (
           <p className={styles.operacionAviso}>

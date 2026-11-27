@@ -880,3 +880,12 @@ Segundo pedido del día. Migración `c5f2a9d7e184`: agrega `tipos_tramite.operac
   - el modal de UCVMM avisa que la agencia lo verá.
   - Lo prueban `test_al_devolver_la_agencia_ve_quien_tiene_impedimento`, `espejo/impedimentos.json` y el E2E `devolucion.spec.ts`.
 - **Pendiente:** el documento 04 de la DTI y los manuales (agencia y UCVMM) no tienen estos cambios todavía, como los del primer lote.
+
+## La Form. No. 7 de «Subir y bajar», una por solicitud; sin boleto en Embarque ni en Renovación (2026-11-26)
+Tercer pedido del día. La migración `b7d3e9a5c261` cambia solo el catálogo.
+- **Revisado y ya estaba:** con Embarque o Desembarque, el trámite de Técnico pide una sola «Carta de garantía de la agencia contratante o contrato» por solicitud, y con «Subir y bajar», la «Carta de garantía de la agencia contratante», ambas desde el 2026-11-18. El nombre sigue siendo «contratante»: el usuario escribió «contratada» y confirmó que el correcto es «contratante».
+- **«Subir y bajar»:** la Carta de Responsabilidad (Form. No. 7) pasa a ser **una por solicitud**, con los documentos de la solicitud y junto a la carta de garantía. Hasta ahora era una por tripulante. El aviso del formulario lo dice a partir del catálogo (`avisoSubirYBajar`).
+- **Sin boleto aéreo en Embarque**, donde se le pedía solo al Militar extranjero, **ni en Renovación de pasaporte**. En Renovación, el técnico, el supernumerario, el superintendente y el Militar presentan solo las Generales de pasaporte (el usuario incluyó al Militar).
+- **Sin cambio:** Urgencia médica y Cambio de nave siguen exigiendo el boleto a los rangos que no son Marino (decisión del usuario).
+- **Lo que ya estaba:** las solicitudes enviadas conservan la foto de su checklist. Una devuelta que se corrija después del cambio se valida con el catálogo nuevo.
+- **Pendiente:** el documento 04 de la DTI y el manual de la agencia, como en los dos lotes anteriores.

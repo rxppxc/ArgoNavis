@@ -2,6 +2,7 @@
 import type {
   EstadoSolicitud, EventoSolicitud, Operacion, RangoMarino, Sexo, TripulanteSolicitud,
 } from "../../api/solicitudes";
+import type { TramiteDocumento } from "../../api/tramites";
 import { dosCifras } from "../../utils/fechas";
 
 export const ETIQUETA_ESTADO: Record<EstadoSolicitud, string> = {
@@ -56,6 +57,33 @@ export function avisoImpedimentos(nombres: string[]): string | null {
 export function textoVigencia(horas: number): string {
   const dias = horas % 24 === 0 ? ` (${horas / 24} ${horas === 24 ? "día" : "días"})` : "";
   return `${horas} horas${dias} desde la aprobación`;
+}
+
+/** «A» · «A» y «B» · «A», «B» y «C». */
+function enumerarCitados(nombres: string[]): string {
+  const citados = nombres.map((n) => `«${n}»`);
+  return citados.length < 2 ? citados.join("") : `${citados.slice(0, -1).join(", ")} y ${citados[citados.length - 1]}`;
+}
+
+/** El aviso del formulario con la operación «Subir y bajar» del trámite de Técnico: lo que suma,
+ *  según el catálogo. Desde el 2026-11-26, la Carta Form. 7 y la carta de garantía, una por
+ *  solicitud (antes, la Carta, una por tripulante). */
+export function avisoSubirYBajar(
+  documentos: Pick<TramiteDocumento, "nombre" | "alcance" | "condicion">[],
+): string | null {
+  const suyos = documentos.filter((d) => d.condicion === "subir_y_bajar");
+  const deLaSolicitud = suyos.filter((d) => d.alcance === "solicitud").map((d) => d.nombre);
+  const porTripulante = suyos.filter((d) => d.alcance === "marino").map((d) => d.nombre);
+  const partes: string[] = [];
+  if (deLaSolicitud.length) {
+    partes.push(`Con «Subir y bajar» se adjuntan además, una por solicitud, ${enumerarCitados(deLaSolicitud)}, `
+      + "en los documentos de la solicitud.");
+  }
+  if (porTripulante.length) {
+    partes.push(`${deLaSolicitud.length ? "Cada tripulante" : "Con «Subir y bajar», cada tripulante"} adjunta `
+      + `${enumerarCitados(porTripulante)} en sus documentos.`);
+  }
+  return partes.length ? partes.join(" ") : null;
 }
 
 export const ETIQUETA_SEXO: Record<Sexo, string> = {

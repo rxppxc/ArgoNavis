@@ -47,11 +47,12 @@ test("el formulario cuida los documentos al quitar un tripulante o cambiar de tr
     // 2026-11-13: los técnicos, supernumerarios y superintendentes van por el trámite de Técnico.
     await expect(rango.locator("option")).toHaveText(["Marino", "Pasajero", "Militar"]);
 
-    // Al militar, Generales y boleto (reunión del 2026-10-30).
+    // Al militar, solo las Generales: Embarque no pide boleto desde el 2026-11-26.
     await rango.selectOption("militar");
-    await expect(agencia.getByLabel("Adjuntar Copia de Boleto Aéreo de Ana")).toBeAttached();
     await expect(agencia.getByText("visa-ana.pdf")).toHaveCount(0);
-    await expect(agencia.getByText("Faltan 3 documentos por adjuntar")).toBeVisible();
+    await expect(agencia.getByLabel("Adjuntar Generales de Pasaporte de Ana")).toBeAttached();
+    await expect(agencia.getByLabel("Adjuntar Copia de Boleto Aéreo de Ana")).toHaveCount(0);
+    await expect(agencia.getByText("Faltan 2 documentos por adjuntar")).toBeVisible();
 
     // Al Pasajero, lo del Marino sin la Libreta: la visa vuelve a su casilla.
     await rango.selectOption("pasajero");
@@ -167,7 +168,7 @@ test("el cambio de puerto ofrece todos los demás puestos, también los del otro
   await expect(nuevo).toHaveCount(0);
 });
 
-test("«Subir y bajar» del trámite de Técnico pide la Carta de Responsabilidad de cada tripulante (2026-11-18)", async ({ browser }) => {
+test("«Subir y bajar» del trámite de Técnico pide la Carta de Responsabilidad, una por solicitud (2026-11-26)", async ({ browser }) => {
   const agencia = await entrar(browser, CUENTAS.agencia);
   await agencia.goto("/new");
 
@@ -183,24 +184,27 @@ test("«Subir y bajar» del trámite de Técnico pide la Carta de Responsabilida
   await tarjeta(agencia, 1).getByLabel("Nombre(s) *", { exact: true }).fill("Ivo");
 
   const operacion = agencia.getByLabel("Operación *");
-  const cartas = agencia.getByLabel(/^Adjuntar Carta de Responsabilidad \(Form\. No\. 7\) de /);
+  const carta = agencia.getByLabel("Adjuntar Carta de Responsabilidad (Form. No. 7)", { exact: true });
+  const cartasDeTripulante = agencia.getByLabel(/^Adjuntar Carta de Responsabilidad \(Form\. No\. 7\) de /);
   const resumen = agencia.getByText(/^Faltan? \d+ documentos? por adjuntar$/);
   await operacion.selectOption("embarque");
-  await expect(cartas).toHaveCount(0);
+  await expect(carta).toHaveCount(0);
   const conEmbarque = Number(/\d+/.exec((await resumen.textContent()) ?? "")?.[0]);
 
   await operacion.selectOption("subir_y_bajar");
-  await expect(cartas, "una por tripulante, en su tarjeta").toHaveCount(2);
-  await expect(tarjeta(agencia, 0).getByLabel("Adjuntar Carta de Responsabilidad (Form. No. 7) de Hans")).toHaveCount(1);
-  await expect(agencia.getByText(/cada tripulante adjunta la Carta de Responsabilidad/)).toBeVisible();
-  // Lo demás se sigue pidiendo, más las dos Cartas; la garantía o el contrato pasa a ser solo la carta de garantía.
-  await expect(resumen).toHaveText(`Faltan ${conEmbarque + 2} documentos por adjuntar`);
+  await expect(carta, "una por solicitud").toHaveCount(1);
+  await expect(cartasDeTripulante, "ninguna en las tarjetas").toHaveCount(0);
+  await expect(agencia.getByText(
+    /se adjuntan además, una por solicitud, «Carta de Responsabilidad \(Form\. No\. 7\)» y «Carta de garantía/,
+  )).toBeVisible();
+  // Lo demás se sigue pidiendo, más la Carta; la garantía o el contrato pasa a ser solo la carta de garantía.
+  await expect(resumen).toHaveText(`Faltan ${conEmbarque + 1} documentos por adjuntar`);
   await expect(agencia.getByLabel("Adjuntar Carta de garantía de la agencia contratante", { exact: true })).toHaveCount(1);
   await expect(agencia.getByLabel("Adjuntar Carta de garantía de la agencia contratante o contrato")).toHaveCount(0);
 
   await test.step("con Desembarque deja de pedirse", async () => {
     await operacion.selectOption("desembarque");
-    await expect(cartas).toHaveCount(0);
+    await expect(carta).toHaveCount(0);
     await expect(resumen).toHaveText(`Faltan ${conEmbarque} documentos por adjuntar`);
   });
 });
