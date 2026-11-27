@@ -213,20 +213,22 @@ function Panel({ bandejaPedida, estadoPedido }: { bandejaPedida: Bandeja | null;
         acciones={
           <>
             {veHistorico && (
-              <Link to="/historico" className={`${styles.btnHistorico} ${styles.alPie}`}>
+              <Link to="/historico" className={styles.btnHistorico}>
                 <IconoBuscar tamano={15} /> Consulta histórica
               </Link>
             )}
             {puedeCrear && (
-              <Link to="/new" className={`${styles.btnNuevo} ${styles.alPie}`}>
+              <Link to="/new" className={styles.btnNuevo}>
                 <IconoMas /> Nueva solicitud
               </Link>
             )}
-            {/* La hora de Panamá y el horario laboral, en el inicio de todos (2026-11-24). */}
-            <RelojHorario />
           </>
         }
       />
+
+      {/* La hora de Panamá y el horario laboral, en el inicio de todos (2026-11-24). Desde el
+          2026-11-27, en franja bajo el encabezado: entre las acciones no cabía junto al título. */}
+      <RelojHorario className={styles.reloj} />
 
       {!cargandoPermisos && vistas.length > 1 && (
         <div className={styles.vistas} role="tablist" aria-label="Bandeja">

@@ -132,10 +132,11 @@ export default function PaginaUsuarios() {
         <EncabezadoPagina
           titulo="Usuarios"
           descripcion="Agrega usuarios del Active Directory o crea cuentas locales para usuarios externos."
-          // Es el inicio del SysAdmin: lleva el reloj, como las bandejas (2026-11-24). Sin el
-          // recargo, que es de las solicitudes y él no las ve.
-          acciones={esSysAdmin && <RelojHorario conRecargo={false} />}
         />
+
+        {/* Es el inicio del SysAdmin: lleva el reloj, como las bandejas (2026-11-24), en franja bajo
+            el encabezado (2026-11-27). Sin el recargo, que es de las solicitudes y él no las ve. */}
+        {esSysAdmin && <RelojHorario conRecargo={false} />}
 
         {claveTemporal && (
           <section className={`${styles.panel} ${styles.claveTemporal}`} role="status">

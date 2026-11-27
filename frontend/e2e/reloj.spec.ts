@@ -3,6 +3,7 @@
  * cada rol. El reloj del navegador se fija (clock): el lunes a las 15:00 todavía es laboral y,
  * al pasar el minuto, el reloj cambia solo a «fuera del horario», sin recargar la página.
  */
+import type { Locator } from "@playwright/test";
 import { expect, test } from "./base";
 import { CUENTAS, iniciarSesion } from "./datos";
 
@@ -37,6 +38,33 @@ test("el inicio muestra la hora de Panamá y cambia solo al salir del horario la
     await expect(reloj).toHaveCount(0);
   });
 
+  await contexto.close();
+});
+
+test("el reloj va bajo el encabezado, de borde a borde, y los botones junto al título", async ({ browser }) => {
+  // Hasta el 2026-11-27 iba entre las acciones del encabezado: con los botones no cabía junto al
+  // título, saltaba a otra línea pegado a la izquierda y cada rol veía un encabezado distinto.
+  const contexto = await browser.newContext({ viewport: { width: 1024, height: 800 } });
+  const pagina = await contexto.newPage();
+  await iniciarSesion(pagina, CUENTAS.agencia);
+  const caja = async (elemento: Locator) => {
+    await expect(elemento).toBeVisible();
+    const medida = await elemento.boundingBox();
+    if (!medida) throw new Error("sin medida");
+    return { ...medida, derecha: medida.x + medida.width, abajo: medida.y + medida.height };
+  };
+
+  const encabezado = await caja(pagina.locator("header", { has: pagina.locator("h1") }));
+  const descripcion = await caja(pagina.getByText("Solicitudes de autorización marítima de tu agencia"));
+  const nueva = await caja(pagina.getByRole("link", { name: "Nueva solicitud" }).first());
+  const reloj = await caja(pagina.getByRole("group", { name: "Hora de Panamá" }));
+  const pestanas = await caja(pagina.getByRole("tablist", { name: "Estado" }));
+
+  expect(reloj.y, "el reloj, debajo del encabezado").toBeGreaterThanOrEqual(encabezado.abajo);
+  expect(Math.abs(reloj.x - pestanas.x), "de borde a borde: el izquierdo").toBeLessThanOrEqual(1);
+  expect(Math.abs(reloj.derecha - pestanas.derecha), "de borde a borde: el derecho").toBeLessThanOrEqual(1);
+  expect(Math.abs(nueva.derecha - pestanas.derecha), "el botón, en el borde derecho").toBeLessThanOrEqual(1);
+  expect(nueva.y, "el botón, en la fila del título").toBeLessThan(descripcion.abajo);
   await contexto.close();
 });
 

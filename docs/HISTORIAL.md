@@ -911,3 +911,9 @@ El usuario volvió a marcar el mapa de horas de las estadísticas: el recuadro d
 - **También en la exportación:** el CSV dice lo mismo por casilla («14:00 a 15:00», «15:01 a 15:59», `texto_hora`), sin «Fuera desde las 15:01», y la nota del Excel y del PDF explica las dos columnas.
 - **Lo prueba** `test_estadisticas_e_insignia`: una aprobación a las 15:00:30 cae en la casilla de las 14 y una a las 15:01 en la de las 15, y lo de afuera del recuadro suma justo «fuera del horario».
 - La regla del horario no cambió: el contador, la insignia, el recargo y la boleta ya daban las 15:00 como laborales.
+
+## El reloj del inicio, en franja bajo el encabezado (2026-11-27)
+El usuario marcó el inicio: «con la incorporación del reloj, todo quedó desordenado o no encaja bien». El reloj iba entre las acciones del encabezado, junto a «Consulta histórica» y «Nueva solicitud». Botones y reloj medían unos 950 px y no cabían junto al título: la fila saltaba a una segunda línea pegada a la izquierda, con un hueco arriba y el reloj sin alinear a ningún borde. Y dependía del rol: el Administrador con agencia (dos botones) lo veía partido; el puesto, sin botones, en una línea. Se le mostraron tres arreglos (franja, dos columnas y reloj compacto con globo) y eligió la franja.
+- **El encabezado vuelve a ser el de todas las páginas:** título a la izquierda y botones a la derecha. El reloj va debajo, como una franja de borde a borde: a la izquierda la hora, el sello, «hasta …» y el recargo; a la derecha la fecha y el horario. Si no cabe, el recargo baja entero; en el celular va apilado. Igual en «Usuarios» del SysAdmin.
+- **La misma información y la misma identidad:** la franja amarilla arriba, la hora en letra de máquina y el sello de tinta, verde o morado. Ocupa la mitad de alto que la tarjeta.
+- **Lo prueba** `reloj.spec.ts` a 1024 px: el reloj queda bajo el encabezado, con los bordes de las pestañas, y «Nueva solicitud» en la fila del título.
