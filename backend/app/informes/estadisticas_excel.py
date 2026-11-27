@@ -20,8 +20,8 @@ from xlsxwriter.worksheet import Worksheet
 from app.core.identidad import AMARILLO, BORDE, GRIS, MARINO, TEXTO
 from app.informes.comun import COLOR_APROBADA, COLOR_EXPIRADA, COLOR_FINALIZADA, COLOR_RECIBIDAS
 from app.informes.estadisticas import (
-    COLUMNAS_SERIE, DIAS_CORTOS, HORA_FIN_LABORAL, HORA_INICIO_LABORAL, NIVELES_CALOR, SERIES_DIBUJADAS, TITULO,
-    UNIDADES, DatosInforme, color_nivel, en_horario_laboral, estados, indicadores, matriz_horas, nivel_calor,
+    COLUMNAS_SERIE, DIAS_CORTOS, HORA_FIN_LABORAL, HORA_INICIO_LABORAL, NIVELES_CALOR, NOTA_BORDE, SERIES_DIBUJADAS,
+    TITULO, UNIDADES, DatosInforme, color_nivel, en_horario_laboral, estados, indicadores, matriz_horas, nivel_calor,
     ordenados_por_tramite, por_finalizar, proporcion, puestos_con_aprobadas, rotulo_periodo, serie, tamano,
 )
 from app.informes.excel import FORMATOS_CELDA, PRIMERA_FILA_LIBRE, LibroInforme
@@ -251,7 +251,7 @@ class _Informe(LibroInforme):
         h.set_column(2, 25, 4.3)
         fila = self.titulo(h, fila, "Hora de aprobación de UCVMM",
                            f"Aprobadas por día y hora, en hora de Panamá. Recuadro: horario laboral "
-                           f"({e.horario_laboral}; desde las 15:01 es fuera).")
+                           f"({e.horario_laboral}). {NOTA_BORDE}")
         h.write_string(fila, 1, f"Fuera del horario: {e.aprobadas_fuera_horario:,} de {e.aprobadas:,} aprobadas.",
                        self.f(bold=True))
         fila += 2
@@ -266,7 +266,8 @@ class _Informe(LibroInforme):
             for hora in range(24):
                 total = matriz[dia - 1][hora]
                 nivel = nivel_calor(total, maximo)
-                # El recuadro del horario laboral: borde grueso en el contorno (lunes a viernes, 07 a 14).
+                # El recuadro del horario laboral: borde grueso en el contorno (lunes a viernes, 07 a 14; la de
+                # las 14 llega hasta las 15:00).
                 borde: dict[str, Any] = {}
                 if en_horario_laboral(dia, hora):
                     if dia == 1:

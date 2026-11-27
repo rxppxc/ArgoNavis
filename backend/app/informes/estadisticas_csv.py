@@ -19,7 +19,7 @@ from app.core.horario import ZONA_PANAMA
 from app.core.identidad import INSTITUCION, SISTEMA, USO_INTERNO
 from app.informes.estadisticas import (
     COLUMNAS_SERIE, DIAS_SEMANA, SECCION, TITULO, UNIDADES, DatosInforme, estados, indicadores, matriz_horas,
-    ordenados_por_tramite, por_finalizar, proporcion, puestos_con_aprobadas, serie, texto_casilla,
+    ordenados_por_tramite, por_finalizar, proporcion, puestos_con_aprobadas, serie, texto_casilla, texto_hora,
 )
 
 _FORMULA = ("=", "+", "-", "@", "\t", "\r")
@@ -92,7 +92,7 @@ def generar(datos: DatosInforme) -> bytes:
     for dia in range(1, 8):
         for hora in range(24):
             if matriz[dia - 1][hora]:
-                fila(DIAS_SEMANA[dia - 1], f"{hora:02d}:00 a {hora:02d}:59", matriz[dia - 1][hora],
+                fila(DIAS_SEMANA[dia - 1], texto_hora(hora), matriz[dia - 1][hora],
                      texto_casilla(dia, hora))
 
     seccion(f"Aprobadas fuera del horario laboral ({e.horario_laboral})", "Solicitud", "Trámite", "Puesto",

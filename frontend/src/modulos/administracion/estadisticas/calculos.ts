@@ -82,19 +82,23 @@ export const DIAS_SEMANA = [
  *  a 15:00, al minuto y con las dos puntas dentro. Cuenta la aprobación de UCVMM. */
 export { HORA_FIN_LABORAL, HORA_INICIO_LABORAL };
 
-/** El mapa va por horas enteras: laboral de 07 a 14. La de las 15 es fuera salvo su primer minuto. */
+/** El mapa va por horas enteras: laboral de 07 a 14, de lunes a viernes. El backend pone el minuto de
+ *  las 15:00 en la casilla de las 14 (2026-11-27, `aprobadas_por_hora`): así el recuadro es justo el
+ *  horario laboral y no queda ninguna casilla mitad y mitad. */
 export function enHorarioLaboral(dia: number, hora: number): boolean {
   return dia <= 5 && hora >= HORA_INICIO_LABORAL && hora < HORA_FIN_LABORAL;
 }
 
-/** Cómo cae una casilla del mapa: dentro, fuera o en el borde (las 15, de lunes a viernes). */
-export function horarioDeCasilla(dia: number, hora: number): "laboral" | "fuera" | "borde" {
-  if (enHorarioLaboral(dia, hora)) return "laboral";
-  return dia <= 5 && hora === HORA_FIN_LABORAL ? "borde" : "fuera";
+/** Cómo cae una casilla del mapa: dentro o fuera del horario laboral. */
+export function horarioDeCasilla(dia: number, hora: number): "laboral" | "fuera" {
+  return enHorarioLaboral(dia, hora) ? "laboral" : "fuera";
 }
 
-/** "de 10:00 a 10:59". */
+/** Lo que abarca una casilla: "de 10:00 a 10:59"; la de las 14, "de 14:00 a 15:00", y la de
+ *  las 15, "de 15:01 a 15:59" (como texto_hora en la exportación). */
 export function textoHora(hora: number): string {
+  if (hora === HORA_FIN_LABORAL - 1) return `de ${dosCifras(hora)}:00 a ${dosCifras(HORA_FIN_LABORAL)}:00`;
+  if (hora === HORA_FIN_LABORAL) return `de ${dosCifras(hora)}:01 a ${dosCifras(hora)}:59`;
   return `de ${dosCifras(hora)}:00 a ${dosCifras(hora)}:59`;
 }
 

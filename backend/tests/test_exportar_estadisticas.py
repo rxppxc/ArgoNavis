@@ -15,7 +15,8 @@ import pytest
 
 from app.core.horario import ZONA_PANAMA
 from app.informes.estadisticas import (
-    DatosInforme, duracion, generar_informe, nombre_archivo, porcentaje, rotulo_periodo, texto_periodo,
+    DatosInforme, duracion, generar_informe, nombre_archivo, porcentaje, rotulo_periodo, texto_casilla, texto_hora,
+    texto_periodo,
 )
 from app.domain.schemas.solicitud import (
     FilaEstadisticaPuesto, FilaEstadisticaSerie, FilaEstadisticaTipo, FilaFueraHorario, FilaPorHora, FilaTopAgencia,
@@ -203,3 +204,15 @@ def test_textos_del_informe():
     assert rotulo_periodo("2026") == ("2026", "", "2026")
     assert nombre_archivo(_datos(_vacias(), desde=date(2026, 1, 5)), "csv") == \
         "Estadisticas-autorizaciones-2026-01-05_2026-11-10.csv"
+
+
+def test_las_casillas_del_mapa_de_horas():
+    """Como en la pantalla (2026-11-27): el minuto de las 15:00 va en la casilla de las 14, así que
+    el recuadro (de 07 a 14) es justo el horario laboral, de 07:00 a 15:00, y la de las 15 es fuera."""
+    assert [texto_hora(h) for h in (0, 7, 13, 14, 15, 16, 23)] == [
+        "00:00 a 00:59", "07:00 a 07:59", "13:00 a 13:59", "14:00 a 15:00", "15:01 a 15:59", "16:00 a 16:59",
+        "23:00 a 23:59",
+    ]
+    assert [texto_casilla(3, h) for h in (6, 7, 14, 15)] == ["Fuera del horario", "Laboral", "Laboral",
+                                                             "Fuera del horario"]
+    assert texto_casilla(6, 14) == "Fuera del horario"

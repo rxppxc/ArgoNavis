@@ -134,13 +134,19 @@ async def test_estadisticas_e_insignia(cliente):
     assert est["por_anio"][-1]["periodo"] == str(hoy.year)
     assert sum(f["aprobadas"] for f in est["por_anio"]) == est["aprobadas"], "con «Todo», los años suman todo"
 
-    # El mapa de horas: cada una en su día de la semana (1 = lunes) y la hora de la aprobación.
+    # El mapa de horas: cada una en su día de la semana (1 = lunes) y la hora de la aprobación, con el
+    # minuto de las 15:00 en la casilla de las 14 («de 14:00 a 15:00», 2026-11-27): así el recuadro del
+    # horario laboral (de la marca 07 a la 15) es justo de 07:00 a 15:00, y la de las 15 empieza a las 15:01.
     def celdas(datos: dict) -> dict[tuple[int, int], int]:
         return {(c["dia"], c["hora"]): c["total"] for c in datos["aprobadas_por_hora"]}
     celdas_antes, celdas_despues = celdas(antes), celdas(est)
-    for celda, sumadas in (((6, 10), 1), ((3, 15), 2), ((3, 10), 1)):   # sábado 10 h; miércoles 15 h (dos) y 10 h
+    # Sábado 10 h; miércoles 15:00:30 (en la de las 14), 15:01 (en la de las 15) y 10 h.
+    for celda, sumadas in (((6, 10), 1), ((3, 14), 1), ((3, 15), 1), ((3, 10), 1)):
         assert celdas_despues[celda] == celdas_antes.get(celda, 0) + sumadas, celda
     assert sum(celdas_despues.values()) == est["aprobadas"]
+    # Lo de afuera del recuadro (lunes a viernes, de las 07 a las 14) es justo lo de fuera del horario.
+    afuera = sum(n for (dia, hora), n in celdas_despues.items() if not (dia <= 5 and 7 <= hora < 15))
+    assert afuera == est["aprobadas_fuera_horario"]
 
     # La insignia: el personal del SNM y, desde el 2026-11-11, también la agencia.
     for clave in momentos:

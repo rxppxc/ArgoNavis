@@ -19,21 +19,17 @@ const HORAS_CLAVE = new Set([0, HORA_INICIO_LABORAL, 12, HORA_FIN_LABORAL, 23]);
 
 interface Casilla { dia: number; hora: number }
 
-/** Cómo cae cada casilla, en la tabla y en el globo. La de las 15 (de lunes a
- *  viernes) es fuera del horario salvo su primer minuto: las 15:00 en punto son laborales. */
-const HORARIO_TABLA = { laboral: "Laboral", fuera: "Fuera del horario", borde: "Fuera desde las 15:01" };
-const HORARIO_GLOBO = {
-  laboral: "En horario laboral",
-  fuera: "Fuera del horario laboral",
-  borde: "Fuera del horario desde las 15:01 (las 15:00 en punto son laborales)",
-};
+/** Cómo cae cada casilla, en la tabla y en el globo. */
+const HORARIO_TABLA = { laboral: "Laboral", fuera: "Fuera del horario" };
+const HORARIO_GLOBO = { laboral: "En horario laboral", fuera: "Fuera del horario laboral" };
 
 /** Hora de aprobación de UCVMM. Una semana en casillas de una hora, más intensa
  *  (en oscuro, más brillante) cuantas más se aprobaron, con el horario laboral
- *  recuadrado: lo de afuera es fuera del horario (las 15:00 en punto cuentan
- *  dentro: lo dice el globo de esa casilla). Debajo, la lista de las aprobadas
- *  fuera del horario, con enlace al expediente. Hasta el 2026-11-06 contaba la
- *  finalización del puesto de control. */
+ *  recuadrado de la marca 07 a la 15: lo de adentro es laboral y lo de afuera, fuera
+ *  del horario. La casilla de las 14 llega hasta las 15:00 y la de las 15 empieza a las
+ *  15:01 (2026-11-27; antes la de las 15 era mitad y mitad). Debajo, la lista de las
+ *  aprobadas fuera del horario, con enlace al expediente. Hasta el 2026-11-06 contaba
+ *  la finalización del puesto de control. */
 export default function MapaHoras({ datos }: { datos: EstadisticasSolicitudes }) {
   const totales = new Map(datos.aprobadas_por_hora.map((c) => [`${c.dia}-${c.hora}`, c.total]));
   const total = (c: Casilla) => totales.get(`${c.dia}-${c.hora}`) ?? 0;

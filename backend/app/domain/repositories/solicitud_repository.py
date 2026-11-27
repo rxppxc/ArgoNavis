@@ -657,10 +657,16 @@ class RepositorioSolicitud:
         self, desde: date | None, hasta: date | None, sectores: AlcanceSectores | None = None,
     ) -> list:
         """Aprobadas por día de la semana (1 = lunes … 7 = domingo) y hora de la
-        aprobación, en hora de Panamá: (dia, hora, total), solo las que tienen alguna."""
+        aprobación, en hora de Panamá: (dia, hora, total), solo las que tienen alguna.
+
+        El último minuto laboral (las 15:00, hasta las 15:00:59) va en la casilla de la hora
+        anterior, «de 14:00 a 15:00», y la de las 15 queda «de 15:01 a 15:59» (2026-11-27): así
+        el recuadro del horario laboral es justo de 07:00 a 15:00 y todo lo de afuera es fuera
+        del horario, como lo cuenta `_fuera_de_horario`. Antes la de las 15 era mitad y mitad."""
         local = func.timezone(_ZONA, Solicitud.aprobada_en)
         dia = extract("isodow", local)
-        hora = extract("hour", local)
+        minuto = cast(func.date_trunc("minute", local), Time)
+        hora = case((minuto == FIN_LABORAL, FIN_LABORAL.hour - 1), else_=cast(extract("hour", local), Integer))
         consulta = (
             select(dia.label("dia"), hora.label("hora"), func.count().label("total"))
             .where(*self._filtro_fechas(desde, hasta, sectores), Solicitud.aprobada_en.isnot(None))

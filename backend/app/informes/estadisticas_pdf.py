@@ -33,8 +33,8 @@ from app.core.identidad import (
 )
 from app.informes.comun import COLOR_APROBADA, COLOR_EXPIRADA, COLOR_FINALIZADA, COLOR_RECIBIDAS, cifra, fecha_hora
 from app.informes.estadisticas import (
-    COLUMNAS_SERIE, DIAS_CORTOS, HORA_FIN_LABORAL, HORA_INICIO_LABORAL, NIVELES_CALOR, SECCION, SERIES_DIBUJADAS,
-    TITULO, UNIDADES, DatosInforme, color_nivel, estados, indicadores, matriz_horas, nivel_calor,
+    COLUMNAS_SERIE, DIAS_CORTOS, HORA_FIN_LABORAL, HORA_INICIO_LABORAL, NIVELES_CALOR, NOTA_BORDE, SECCION,
+    SERIES_DIBUJADAS, TITULO, UNIDADES, DatosInforme, color_nivel, estados, indicadores, matriz_horas, nivel_calor,
     ordenados_por_tramite, por_finalizar, porcentaje, puestos_con_aprobadas, rotulo_periodo, serie, tamano,
 )
 from app.informes.pdf import color_pdf, obtener_fuentes, texto_pdf
@@ -406,8 +406,8 @@ class _Pdf:
     def mapa_horas(self) -> list:
         e = self.e
         titulo = "Hora de aprobación de UCVMM"
-        nota = (f"Aprobadas por día y hora, en hora de Panamá. Recuadro: horario laboral ({e.horario_laboral}; "
-                "desde las 15:01 es fuera).")
+        nota = (f"Aprobadas por día y hora, en hora de Panamá. Recuadro: horario laboral ({e.horario_laboral}). "
+                f"{NOTA_BORDE}")
         if not e.aprobadas:
             return [self.seccion(titulo, nota, self.vacio("Ninguna autorización aprobada en el periodo."))]
         matriz = matriz_horas(e)
@@ -433,7 +433,7 @@ class _Pdf:
                 if total:
                     d.add(String(x + (celda - separacion) / 2, y + 3.4, cifra(total), fontName=self.negrita,
                                  fontSize=6, fillColor=colors.white if nivel >= 4 else color_pdf(TEXTO), textAnchor="middle"))
-        # El recuadro del horario laboral (lunes a viernes, de 07 a 14).
+        # El recuadro del horario laboral (lunes a viernes, de 07 a 14: la de las 14 llega hasta las 15:00).
         y_lunes = tope - 4 - 1 * (alto_celda + separacion)
         y_viernes = tope - 4 - 5 * (alto_celda + separacion)
         x0 = izquierda + HORA_INICIO_LABORAL * celda

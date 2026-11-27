@@ -46,10 +46,12 @@ _MESES_CORTOS = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sept",
 DIAS_SEMANA = ("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")
 DIAS_CORTOS = ("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
 
-# Horario laboral para el mapa de horas, por horas enteras: laboral de 07 a 14
-# (la de las 15 es fuera salvo su primer minuto). Sale de core/horario.py.
+# Horario laboral para el mapa de horas, por horas enteras: laboral de 07 a 14, con el minuto de
+# las 15:00 en la casilla de las 14 (2026-11-27, `aprobadas_por_hora`). Sale de core/horario.py.
 HORA_INICIO_LABORAL = INICIO_LABORAL.hour
 HORA_FIN_LABORAL = FIN_LABORAL.hour
+NOTA_BORDE = (f"La columna {HORA_FIN_LABORAL - 1:02d} llega hasta las {HORA_FIN_LABORAL:02d}:00 y la "
+              f"{HORA_FIN_LABORAL:02d} empieza a las {HORA_FIN_LABORAL:02d}:01, que ya es fuera del horario.")
 
 _ESPACIO = "\u00a0"   # espacio sin corte: la cifra y el % no se separan (como en la pantalla)
 
@@ -282,14 +284,22 @@ def color_nivel(nivel: int) -> str:
 
 
 def en_horario_laboral(dia: int, hora: int) -> bool:
-    """`dia` de 1 (lunes) a 7; la casilla de las 15 queda fuera (salvo su primer minuto)."""
+    """`dia` de 1 (lunes) a 7. Las casillas de las 07 a las 14: la de las 14 llega hasta las 15:00."""
     return dia <= 5 and HORA_INICIO_LABORAL <= hora < HORA_FIN_LABORAL
 
 
+def texto_hora(hora: int) -> str:
+    """Lo que abarca una casilla: «10:00 a 10:59»; la de las 14, «14:00 a 15:00», y la de las 15,
+    «15:01 a 15:59» (como textoHora en la pantalla)."""
+    if hora == HORA_FIN_LABORAL - 1:
+        return f"{hora:02d}:00 a {HORA_FIN_LABORAL:02d}:00"
+    if hora == HORA_FIN_LABORAL:
+        return f"{hora:02d}:01 a {hora:02d}:59"
+    return f"{hora:02d}:00 a {hora:02d}:59"
+
+
 def texto_casilla(dia: int, hora: int) -> str:
-    if en_horario_laboral(dia, hora):
-        return "Laboral"
-    return "Fuera desde las 15:01" if dia <= 5 and hora == HORA_FIN_LABORAL else "Fuera del horario"
+    return "Laboral" if en_horario_laboral(dia, hora) else "Fuera del horario"
 
 
 def ordenados_por_tramite(e: SalidaEstadisticasSolicitudes):

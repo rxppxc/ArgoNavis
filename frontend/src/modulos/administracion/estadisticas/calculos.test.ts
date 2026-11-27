@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   duracion, enHorarioLaboral, escalaEje, horarioDeCasilla, nivelCalor, partesPeriodo, porcentaje, presetDeRango,
-  rangoDePreset, textoPeriodo, unidadSugerida,
+  rangoDePreset, textoHora, textoPeriodo, unidadSugerida,
 } from "./calculos";
 
 describe("porcentaje", () => {
@@ -62,12 +62,21 @@ describe("horario laboral", () => {
     expect(enHorarioLaboral(7, 10)).toBe(false);
   });
 
-  it("la casilla de las 15 es el borde (las 15:00 en punto son laborales), salvo el fin de semana", () => {
+  it("dentro del recuadro todo es laboral y afuera todo es fuera, sin casilla mitad y mitad (2026-11-27)", () => {
     expect(horarioDeCasilla(2, 10)).toBe("laboral");
-    expect(horarioDeCasilla(2, 15)).toBe("borde");
+    expect(horarioDeCasilla(2, 14)).toBe("laboral");
+    expect(horarioDeCasilla(2, 15)).toBe("fuera");
     expect(horarioDeCasilla(2, 16)).toBe("fuera");
     expect(horarioDeCasilla(2, 6)).toBe("fuera");
-    expect(horarioDeCasilla(6, 15)).toBe("fuera");
+    expect(horarioDeCasilla(6, 14)).toBe("fuera");
+  });
+
+  it("la casilla de las 14 llega hasta las 15:00 y la de las 15 empieza a las 15:01", () => {
+    expect(textoHora(0)).toBe("de 00:00 a 00:59");
+    expect(textoHora(7)).toBe("de 07:00 a 07:59");
+    expect(textoHora(14)).toBe("de 14:00 a 15:00");
+    expect(textoHora(15)).toBe("de 15:01 a 15:59");
+    expect(textoHora(16)).toBe("de 16:00 a 16:59");
   });
 });
 
