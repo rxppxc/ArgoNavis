@@ -1,43 +1,42 @@
 """PDF de la boleta de recargo por atención fuera del horario laboral (2026-11-16).
 
-Borrador con la identidad del sistema, como el PDF de la autorización: hay un
-modelo en papel que lo reemplazará. La imprime el SNM y se la entrega a la
-agencia para el cobro, así que no lleva nombres de funcionarios ni unidades
-internas (quién la generó queda en la bitácora y en el historial interno). Una
-boleta anulada sale con el sello ANULADA y el motivo. El tipo de operación va en
-casillas, como en papel, con la respuesta a «¿Subir y bajar?» si el trámite la pide
-(2026-11-16).
+Desde el 2026-11-26 sigue el modelo en papel de UCVMM, el Formulario No. 4 «Autorización
+fuera del horario laboral», con el encabezado y el pie del formato de documentos de la DTI
+(los de los manuales). Lo pidió el usuario. Arriba van el número de oficio, que escribe el
+funcionario, y el número de la solicitud. El tipo de operación va en casillas: los trámites
+del sistema, con la X en el de la solicitud y, entre paréntesis, lo que eligió la agencia (la
+operación de Técnico, los días del sellado). La firma es del jefe encargado del sector de
+UCVMM de la solicitud, sin su nombre: la boleta la imprime el SNM y se la entrega a la agencia.
+Una boleta anulada sale con el sello ANULADA y el motivo.
 """
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 from io import BytesIO
 
-from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
-from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.core import identidad
-from app.core.horario import TEXTO_HORARIO, ZONA_PANAMA, texto_costo
-from app.informes.comun import COLOR_DENEGADA
+from app.core.horario import ZONA_PANAMA, texto_costo
+from app.informes.comun import COLOR_DENEGADA, fecha_larga
 from app.informes.pdf import color_pdf, obtener_fuentes, texto_pdf
 
-TINTA    = color_pdf(identidad.TEXTO)
-GRIS     = color_pdf(identidad.GRIS)
-MARINO   = color_pdf(identidad.MARINO)
-AMARILLO = color_pdf(identidad.AMARILLO)
-BORDE    = color_pdf(identidad.BORDE)
-FONDO    = color_pdf(identidad.FONDO)
-CREMA    = color_pdf(identidad.CREMA)
-ROJO     = color_pdf(COLOR_DENEGADA)
+TINTA = color_pdf(identidad.TEXTO)
+ROJO  = color_pdf(COLOR_DENEGADA)
 
 CONCEPTO = "Recargo por atención fuera del horario laboral"
-# Cómo se paga (pedido del usuario del 2026-11-18). El sistema no registra el pago.
-METODOS_DE_PAGO = f"Efectivo, tarjeta o cheque a favor del {identidad.INSTITUCION}."
-DIAS = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
+# Cómo se paga, como lo dice el papel (antes del 2026-11-26: «Efectivo, tarjeta o cheque a favor
+# del…», pedido del 2026-11-18). El sistema no registra el pago.
+PAGO = f"(PAGO EN EFECTIVO, TARJETA O CHEQUE A FAVOR DEL {identidad.INSTITUCION.upper()})."
+CAMBIO_DE_PUERTO = "Cambio de Puerto"
+# Las cursivas del papel (la fecha, el oficio y el título): las de la PDF estándar, que cubren
+# Latin-1. Un oficio con otros caracteres va en la negrita con cobertura Unicode.
+CURSIVA = "Helvetica-Oblique"
+NEGRITA_CURSIVA = "Helvetica-BoldOblique"
 
 
 @dataclass
@@ -48,50 +47,46 @@ class DatosPdfBoleta:
     tipo_tramite:     str
     agencia:          str
     buque:            str | None
-    imo:              str | None
     puesto:           str
     puesto_destino:   str | None   # cambio de puerto: el nuevo
-    fecha_operacion:  date
-    cantidad_tripulantes: int
-    aprobada_en:      datetime
+    aprobada_en:      datetime     # la atención fuera del horario: fecha y hora
     generada_en:      datetime
+    # El sector de UCVMM de la solicitud («Sector Pacífico»): firma su jefe encargado (2026-11-26).
+    sector:           str | None = None
     anulada_en:       datetime | None = None
     motivo_anulacion: str | None = None
     # El tipo de operación en casillas (2026-11-16): los trámites activos del catálogo, en
     # su orden; la X va en `tipo_tramite`.
     tipos_operacion:  list[str] = field(default_factory=list)
-    # «¿Subir y bajar?»: None si el trámite no hace la pregunta.
-    subir_y_bajar:    bool | None = None
-    # Lo que la agencia eligió en el formulario, también en casillas (2026-11-18): la operación
-    # del trámite de Técnico y los días del sellado de Shore Pass. Cada una es (rótulo,
-    # opciones, elegida); una fila por cada una.
-    elecciones: list[tuple[str, tuple[str, ...], str]] = field(default_factory=list)
+    # Junto a la casilla marcada, entre paréntesis (2026-11-26): la operación de Técnico, los días
+    # del sellado de Shore Pass o, en las de antes que respondieron «Sí», «subir y bajar».
+    detalle:          str | None = None
 
 
-def casillas_operacion(tipos: list[str], elegido: str) -> list[tuple[str, bool]]:
-    """Cada tipo de operación con su marca, como las casillas de un formulario en papel.
-    Si el de la solicitud ya no está entre los activos (Cambio de Puerto, desde el
-    2026-11-13), va al final, marcado."""
-    casillas = [(tipo, tipo == elegido) for tipo in tipos]
+def casillas_operacion(
+    tipos: list[str], elegido: str, *, detalle: str | None = None, cambio_de_puerto: bool = False,
+) -> list[tuple[str, bool, str | None]]:
+    """Cada tipo de operación con su marca y, en el de la solicitud, `detalle`, como las casillas
+    de un formulario en papel. Si el de la solicitud ya no está entre los activos (Cambio de
+    Puerto, desde el 2026-11-13), va al final, marcado. Con cambio de puerto, la X también va en
+    «Cambio de Puerto»."""
+    casillas = [(tipo, tipo == elegido, detalle if tipo == elegido else None) for tipo in tipos]
     if elegido not in tipos:
-        casillas.append((elegido, True))
+        casillas.append((elegido, True, detalle))
+    if cambio_de_puerto and elegido != CAMBIO_DE_PUERTO:
+        if CAMBIO_DE_PUERTO in tipos:
+            casillas = [(t, marcada or t == CAMBIO_DE_PUERTO, d) for t, marcada, d in casillas]
+        else:
+            casillas.append((CAMBIO_DE_PUERTO, True, None))
     return casillas
 
 
-def _momento(valor: datetime) -> str:
-    """«sábado 14/11/2026, 16:20»: en 24 horas, como el horario laboral."""
-    local = valor.astimezone(ZONA_PANAMA)
-    return f"{DIAS[local.weekday()]} {local:%d/%m/%Y, %H:%M}"
-
-
-def _fuente_oficio(numero: str, negrita: str) -> str:
-    """Letra de máquina (Courier) si el número cabe en su juego de caracteres; si no,
-    la negrita con cobertura Unicode."""
+def _cabe_en_latin(texto: str) -> bool:
     try:
-        numero.encode("cp1252")
-        return "Courier-Bold"
+        texto.encode("cp1252")
+        return True
     except UnicodeEncodeError:
-        return negrita
+        return False
 
 
 class _Documento(SimpleDocTemplate):
@@ -111,33 +106,26 @@ def generar_pdf_boleta(d: DatosPdfBoleta) -> bytes:
     normal, negrita = obtener_fuentes()
 
     def estilo(nombre: str, **kw) -> ParagraphStyle:
-        base = {"fontName": normal, "fontSize": 9, "leading": 12, "textColor": TINTA}
+        base = {"fontName": normal, "fontSize": 10.5, "leading": 13.5, "textColor": TINTA, "spaceAfter": 3.5}
         base.update(kw)
         return ParagraphStyle(nombre, **base)
 
-    e_pais     = estilo("pais", fontSize=8, leading=10, textColor=GRIS)
-    e_org      = estilo("org", fontName=negrita, fontSize=12.5, leading=15)
-    e_seccion  = estilo("seccion", fontSize=8.5, leading=11, textColor=GRIS)
-    e_rotulo   = estilo("rotulo", fontName=negrita, fontSize=7, leading=9, textColor=GRIS, alignment=TA_CENTER)
-    e_oficio   = estilo("oficio", fontName=_fuente_oficio(d.numero_oficio, negrita), fontSize=12, leading=15,
-                        textColor=MARINO, alignment=TA_CENTER)
-    e_titulo   = estilo("titulo", fontName=negrita, fontSize=14, leading=18, alignment=TA_CENTER)
-    e_sub      = estilo("sub", fontSize=10, leading=13, alignment=TA_CENTER, textColor=GRIS)
-    e_etiqueta = estilo("etiqueta", fontName=negrita, fontSize=7, leading=9, textColor=GRIS)
-    e_valor    = estilo("valor", fontSize=9.5, leading=12)
-    e_cabecera = estilo("cabecera", fontName=negrita, fontSize=8, leading=10, textColor=colors.white)
-    e_cab_der  = estilo("cabecera_der", fontName=negrita, fontSize=8, leading=10, textColor=colors.white,
-                        alignment=TA_RIGHT)
-    e_concepto = estilo("concepto", fontSize=10, leading=13)
-    e_monto    = estilo("monto", fontName=negrita, fontSize=10, leading=13, alignment=TA_RIGHT)
-    e_total    = estilo("total", fontName=negrita, fontSize=11, leading=14)
-    e_total_m  = estilo("total_monto", fontName=negrita, fontSize=12, leading=15, alignment=TA_RIGHT)
-    e_nota     = estilo("nota", fontSize=7.5, leading=10, textColor=GRIS)
-    e_firma    = estilo("firma", fontSize=8, leading=10, textColor=GRIS, alignment=TA_CENTER)
-    e_anulada  = estilo("anulada", fontName=negrita, fontSize=8.5, leading=11, textColor=ROJO, alignment=TA_CENTER)
-    e_opcion   = estilo("opcion", fontSize=9, leading=11)
-    e_elegida  = estilo("elegida", fontName=negrita, fontSize=9, leading=11)
-    e_marca    = estilo("marca", fontName=negrita, fontSize=8, leading=9, textColor=MARINO, alignment=TA_CENTER)
+    def neg(texto: str) -> str:
+        return f'<font name="{negrita}">{texto}</font>'
+
+    e_texto    = estilo("texto")
+    e_fecha    = estilo("fecha", fontName=CURSIVA, alignment=TA_RIGHT, spaceAfter=1)
+    e_oficio   = estilo("oficio", fontName=NEGRITA_CURSIVA if _cabe_en_latin(d.numero_oficio) else negrita,
+                        alignment=TA_RIGHT, spaceAfter=1)
+    e_solicitud = estilo("solicitud", fontSize=9, leading=12, alignment=TA_RIGHT, spaceAfter=0)
+    e_titulo   = estilo("titulo", fontName=NEGRITA_CURSIVA, fontSize=11.5, leading=15, alignment=TA_CENTER,
+                        spaceAfter=0)
+    e_casilla  = estilo("casilla", fontName=negrita, fontSize=10, leading=12.5, spaceAfter=0)
+    e_marca    = estilo("marca", fontName=negrita, fontSize=9, leading=10, alignment=TA_CENTER, spaceAfter=0)
+    e_firma    = estilo("firma", fontSize=9.5, leading=12, alignment=TA_CENTER, spaceAfter=0)
+    e_valida   = estilo("valida", fontName=negrita, fontSize=10.5, leading=14, alignment=TA_CENTER, spaceAfter=0)
+    e_anulada  = estilo("anulada", fontName=negrita, fontSize=9, leading=12, textColor=ROJO, alignment=TA_CENTER,
+                        spaceAfter=0)
 
     def sello_anulada(canvas, documento) -> None:
         # Cruzado sobre la página, encima de todo: que no se pueda usar para cobrar.
@@ -151,55 +139,33 @@ def generar_pdf_boleta(d: DatosPdfBoleta) -> bytes:
         canvas.restoreState()
 
     buffer = BytesIO()
+    # Arriba, el espacio de la franja del encabezado (hasta su punta); abajo, el del pie (como los manuales).
     doc = _Documento(
         buffer, pagesize=letter, encima=sello_anulada if d.anulada_en else None,
-        leftMargin=17 * mm, rightMargin=17 * mm, topMargin=14 * mm, bottomMargin=20 * mm,
+        leftMargin=24 * mm, rightMargin=24 * mm, topMargin=35 * mm, bottomMargin=14 * mm,
         title=f"Boleta de recargo {d.numero_solicitud}",
         author=identidad.INSTITUCION_COMPLETA,
         subject=CONCEPTO,
     )
     ancho = doc.width
     historia: list = []
+    generada = d.generada_en.astimezone(ZONA_PANAMA)
+    aprobada = d.aprobada_en.astimezone(ZONA_PANAMA)
+    jefe = f"del jefe encargado del {texto_pdf(d.sector)}" if d.sector else "del jefe encargado del sector"
 
-    # ── Encabezado: logo · institución · número de oficio ──
-    logo = Image(str(identidad.LOGO_SNM), width=19 * mm, height=19 * mm, kind="proportional") \
-        if identidad.LOGO_SNM.exists() else ""
-    institucion = [
-        Paragraph("REPÚBLICA DE PANAMÁ", e_pais),
-        Paragraph(identidad.INSTITUCION.upper(), e_org),
-        Paragraph("Sección de Autorizaciones Marítimas", e_seccion),
-    ]
-    oficio = Table([[Paragraph("N.º DE OFICIO", e_rotulo)], [Paragraph(texto_pdf(d.numero_oficio), e_oficio)]],
-                   colWidths=[46 * mm])
-    oficio.setStyle(TableStyle([
-        ("BOX", (0, 0), (-1, -1), 0.9, MARINO),
-        ("BACKGROUND", (0, 0), (-1, -1), CREMA),
-        ("TOPPADDING", (0, 0), (-1, -1), 3),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-    ]))
-    encabezado = Table([[logo, institucion, oficio]], colWidths=[23 * mm, ancho - 23 * mm - 48 * mm, 48 * mm])
-    encabezado.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("ALIGN", (2, 0), (2, 0), "RIGHT"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-    ]))
-    franja = Table([[""]], colWidths=[ancho], rowHeights=[2.2])
-    franja.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), AMARILLO)]))
-    historia += [encabezado, Spacer(1, 3 * mm), franja, Spacer(1, 6 * mm)]
-
-    # ── Título ──
+    # ── Arriba a la derecha: la fecha, el oficio (lo escribe el funcionario) y la solicitud ──
     historia += [
-        Paragraph("BOLETA DE RECARGO POR ATENCIÓN<br/>FUERA DEL HORARIO LABORAL", e_titulo),
-        Spacer(1, 1.5 * mm),
-        # El trámite va abajo, en las casillas del tipo de operación.
-        Paragraph(f"Autorización Marítima N° {texto_pdf(d.numero_solicitud)}", e_sub),
-        Spacer(1, 5 * mm),
+        Paragraph(f"Panamá, <u>{fecha_larga(generada.date())}</u>.", e_fecha),
+        Paragraph(f"Oficio N.º <u>{texto_pdf(d.numero_oficio)}</u>.", e_oficio),
+        Paragraph(f"Autorización Marítima N.º {texto_pdf(d.numero_solicitud)}", e_solicitud),
+        Spacer(1, 3.5 * mm),
+        Paragraph("FORMULARIO No. 4.<br/>AUTORIZACIÓN FUERA DEL HORARIO LABORAL.", e_titulo),
+        Spacer(1, 4 * mm),
     ]
 
     if d.anulada_en:
         anulada = Table(
-            [[Paragraph(f"BOLETA ANULADA EL {_momento(d.anulada_en).upper()} — "
+            [[Paragraph(f"BOLETA ANULADA EL {d.anulada_en.astimezone(ZONA_PANAMA):%d/%m/%Y, %H:%M} — "
                         f"MOTIVO: {texto_pdf(d.motivo_anulacion)}", e_anulada)]],
             colWidths=[ancho],
         )
@@ -210,161 +176,101 @@ def generar_pdf_boleta(d: DatosPdfBoleta) -> bytes:
         ]))
         historia += [anulada, Spacer(1, 3 * mm)]
 
-    # ── Tipo de operación, en casillas como en papel (2026-11-16) ──
-    def casilla(marcada: bool) -> Table:
-        cuadro = Table([[Paragraph("X" if marcada else "", e_marca)]], colWidths=[3.8 * mm], rowHeights=[3.8 * mm])
-        cuadro.setStyle(TableStyle([
-            ("BOX", (0, 0), (-1, -1), 0.8, MARINO if marcada else GRIS),
-            ("BACKGROUND", (0, 0), (-1, -1), CREMA if marcada else colors.white),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 0),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-            ("TOPPADDING", (0, 0), (-1, -1), 0),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-        ]))
-        return cuadro
-
-    def opcion(texto: str, marcada: bool) -> list:
-        return [casilla(marcada), Paragraph(texto_pdf(texto), e_elegida if marcada else e_opcion)]
-
-    sin_bordes = [
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-        ("TOPPADDING", (0, 0), (-1, -1), 2),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-    ]
-    util = ancho - 14   # el recuadro lleva 7 pt de margen a cada lado
-    elegibles = [opcion(tipo, marcada) for tipo, marcada in casillas_operacion(d.tipos_operacion, d.tipo_tramite)]
-    if len(elegibles) % 2:
-        elegibles.append(["", ""])
-    opciones = Table([elegibles[i] + elegibles[i + 1] for i in range(0, len(elegibles), 2)],
-                     colWidths=[6 * mm, util / 2 - 6 * mm, 6 * mm, util / 2 - 6 * mm])
-    opciones.setStyle(TableStyle(sin_bordes))
-    contenido = [[Paragraph("TIPO DE OPERACIÓN", e_etiqueta)], [opciones]]
-    if d.subir_y_bajar is not None:
-        respuesta = Table([[Paragraph("SUBIR Y BAJAR", e_etiqueta), *opcion("Sí", d.subir_y_bajar),
-                            *opcion("No", not d.subir_y_bajar)]],
-                          colWidths=[30 * mm, 6 * mm, 16 * mm, 6 * mm, 16 * mm], hAlign="LEFT")
-        respuesta.setStyle(TableStyle(sin_bordes))
-        contenido.append([respuesta])
-    for rotulo, opciones_eleccion, elegida in d.elecciones:
-        celdas, anchos = [Paragraph(rotulo, e_etiqueta)], [30 * mm]
-        for texto in opciones_eleccion:
-            celdas += opcion(texto, texto == elegida)
-            anchos += [6 * mm, 30 * mm]
-        fila = Table([celdas], colWidths=anchos, hAlign="LEFT")
-        fila.setStyle(TableStyle(sin_bordes))
-        contenido.append([fila])
-    operacion = Table(contenido, colWidths=[ancho])
-    operacion.setStyle(TableStyle([
-        ("BOX", (0, 0), (-1, -1), 0.6, BORDE),
-        ("BACKGROUND", (0, 0), (-1, -1), FONDO),
-        ("LEFTPADDING", (0, 0), (-1, -1), 7),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 7),
-        ("TOPPADDING", (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-        *([("LINEABOVE", (0, 2), (-1, -1), 0.4, BORDE)] if len(contenido) > 2 else []),
-    ]))
-    historia += [operacion, Spacer(1, 3 * mm)]
-
-    # ── Datos de la solicitud (rejilla de dos columnas) ──
+    # ── La nota de cobro ──
     puesto = f"{d.puesto} → {d.puesto_destino}" if d.puesto_destino else d.puesto
-    buque = " · IMO ".join(x for x in (d.buque, d.imo) if x) or None
-    pares = [
-        ("AGENCIA NAVIERA", texto_pdf(d.agencia)),
-        ("PUESTO DE CONTROL", texto_pdf(puesto)),
-        ("BUQUE", texto_pdf(buque)),
-        ("FECHA DE LA OPERACIÓN", f"{d.fecha_operacion:%d/%m/%Y}"),
-        ("TRIPULANTES", str(d.cantidad_tripulantes)),
-        ("APROBADA EL", _momento(d.aprobada_en)),
-        ("HORARIO LABORAL", texto_pdf(TEXTO_HORARIO)),
-        ("BOLETA GENERADA EL", _momento(d.generada_en)),
-    ]
-    filas = [
-        [[Paragraph(etiqueta, e_etiqueta), Paragraph(valor, e_valor)] for etiqueta, valor in pares[i:i + 2]]
-        for i in range(0, len(pares), 2)
-    ]
-    datos = Table(filas, colWidths=[ancho / 2, ancho / 2])
-    datos.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("BOX", (0, 0), (-1, -1), 0.6, BORDE),
-        ("INNERGRID", (0, 0), (-1, -1), 0.4, BORDE),
-        ("BACKGROUND", (0, 0), (-1, -1), FONDO),
-        ("TOPPADDING", (0, 0), (-1, -1), 5),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-        ("LEFTPADDING", (0, 0), (-1, -1), 7),
-    ]))
-    historia += [datos, Spacer(1, 6 * mm)]
-
-    # ── Concepto y monto ──
-    monto = texto_pdf(texto_costo(d.monto))
-    cobro = Table(
-        [
-            [Paragraph("CONCEPTO", e_cabecera), Paragraph("MONTO", e_cab_der)],
-            [Paragraph(CONCEPTO, e_concepto), Paragraph(monto, e_monto)],
-            [Paragraph("TOTAL A PAGAR", e_total), Paragraph(monto, e_total_m)],
-        ],
-        colWidths=[ancho - 40 * mm, 40 * mm],
+    atencion = Table(
+        [[Paragraph(f"{neg('Fecha de la Atención:')} <u>{aprobada:%d/%m/%Y}</u>", e_texto),
+          Paragraph(f"{neg('Hora:')} <u>{aprobada:%H:%M}</u>", e_texto)]],
+        colWidths=[ancho * 0.55, ancho * 0.45], hAlign="LEFT",
     )
-    cobro.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), MARINO),
-        ("BACKGROUND", (0, 2), (-1, 2), CREMA),
-        ("BOX", (0, 0), (-1, -1), 0.8, MARINO),
-        ("LINEABOVE", (0, 2), (-1, 2), 0.8, MARINO),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 5),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-        ("LEFTPADDING", (0, 0), (-1, -1), 7),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 7),
-    ]))
-    # ── Métodos de pago (2026-11-18) ──
-    pago = Table([[Paragraph("MÉTODOS DE PAGO", e_etiqueta), Paragraph(texto_pdf(METODOS_DE_PAGO), e_valor)]],
-                 colWidths=[34 * mm, ancho - 34 * mm])
-    pago.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("BOX", (0, 0), (-1, -1), 0.6, BORDE),
-        ("BACKGROUND", (0, 0), (-1, -1), FONDO),
-        ("TOPPADDING", (0, 0), (-1, -1), 5),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-        ("LEFTPADDING", (0, 0), (-1, -1), 7),
+    atencion.setStyle(TableStyle([
+        ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5),
     ]))
     historia += [
-        cobro,
-        Spacer(1, 2 * mm),
-        Paragraph(f"La solicitud se aprobó fuera del horario laboral ({texto_pdf(TEXTO_HORARIO)}).", e_nota),
-        Spacer(1, 3 * mm),
-        pago,
-        Spacer(1, 14 * mm),
+        Paragraph(f"Agencia Naviera solicitante del servicio: {neg(texto_pdf(d.agencia))}", e_texto),
+        Paragraph("Respetado representante de Agencia Naviera:", e_texto),
+        Paragraph("Por este medio le hacemos llegar a su despacho nota de cobro por servicio prestado de la "
+                  "siguiente unidad:", e_texto),
+        Paragraph(f"{neg('A Favor de:')}&nbsp;&nbsp;&nbsp;&nbsp;<u>{identidad.INSTITUCION.upper()}</u>", e_texto),
+        Paragraph(f"{neg('Moto Nave:')} <u>{texto_pdf(d.buque)}</u>", e_texto),
+        atencion,
+        Paragraph(f"{neg('Lugar:')} {texto_pdf(puesto)}", e_texto),
+        Paragraph(f"{neg('Pago por Servicio:')} <u>{texto_pdf(texto_costo(d.monto))}</u>&nbsp;&nbsp;&nbsp;"
+                  f"{neg(PAGO)}", e_texto),
+        Paragraph(f"Tipo de autorización y aprobación fuera de horario laboral. Marque con una {neg('X')} el "
+                  "cuadrante que requiere su solicitud.", e_texto),
+        Spacer(1, 1 * mm),
     ]
 
-    # ── Firmas ──
-    firmas = Table(
-        [["", "", ""],
-         [Paragraph(f"Firma y sello del {texto_pdf(identidad.INSTITUCION)}", e_firma), "",
-          Paragraph("Recibido por la agencia naviera (nombre y firma)", e_firma)]],
-        colWidths=[(ancho - 14 * mm) / 2, 14 * mm, (ancho - 14 * mm) / 2],
-        rowHeights=[16 * mm, None],
+    # ── Tipo de operación, en casillas como en papel ──
+    def cuadro(marcada: bool) -> Table:
+        caja = Table([[Paragraph("X" if marcada else "", e_marca)]], colWidths=[4.2 * mm], rowHeights=[4.2 * mm])
+        caja.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 0.8, TINTA),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        return caja
+
+    filas = []
+    for tipo, marcada, detalle in casillas_operacion(d.tipos_operacion, d.tipo_tramite, detalle=d.detalle,
+                                                     cambio_de_puerto=bool(d.puesto_destino)):
+        texto = texto_pdf(tipo.upper())
+        if detalle:
+            texto += f' <font name="{normal}">({texto_pdf(detalle)})</font>'
+        filas.append([cuadro(marcada), Paragraph(texto, e_casilla)])
+    casillas = Table(filas, colWidths=[8 * mm, ancho - 8 * mm], hAlign="LEFT")
+    casillas.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 1.6), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.6),
+    ]))
+    historia += [casillas, Spacer(1, 3 * mm)]
+
+    # ── Firma del jefe encargado del sector de UCVMM de la solicitud (2026-11-26) ──
+    firma = Table(
+        [[""], [Paragraph(f"Nombre, apellido y firma {jefe} (UCVMM)", e_firma)]],
+        colWidths=[ancho * 0.8], rowHeights=[12 * mm, None], hAlign="CENTER",
     )
-    firmas.setStyle(TableStyle([
+    firma.setStyle(TableStyle([
         ("LINEBELOW", (0, 0), (0, 0), 0.8, TINTA),
-        ("LINEBELOW", (2, 0), (2, 0), 0.8, TINTA),
         ("TOPPADDING", (0, 1), (-1, 1), 3),
     ]))
-    historia.append(firmas)
+    valida = Table(
+        [[Paragraph(f"Esta autorización será únicamente válida, siempre que tenga nombre, firma y sello {jefe} "
+                    "de UCVMM.", e_valida)]],
+        colWidths=[ancho * 0.86], hAlign="CENTER",
+    )
+    valida.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.9, TINTA),
+        ("ROUNDEDCORNERS", [6, 6, 6, 6]),
+        ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8), ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    historia += [
+        Paragraph("Sin más que agregar, de ustedes,", e_texto),
+        Paragraph("Firma del Agente Naviero que Solicita la Atención.", e_texto),
+        firma,
+        Spacer(1, 4 * mm),
+        valida,
+    ]
 
     def pagina(canvas, documento) -> None:
+        # El encabezado y el pie de los manuales, donde los pone el modelo de la DTI (en puntos
+        # desde la esquina de la hoja): la franja de 623 de ancho, 3 a la izquierda y 13 arriba de
+        # la hoja; el pie de 527, a 42 del borde y a 757 de arriba.
+        alto = documento.pagesize[1]
         canvas.saveState()
-        canvas.setStrokeColor(AMARILLO)
-        canvas.setLineWidth(1.2)
-        canvas.line(documento.leftMargin, 13 * mm, documento.leftMargin + documento.width, 13 * mm)
-        canvas.setFont(normal, 7)
-        canvas.setFillColor(GRIS)
-        canvas.drawString(
-            documento.leftMargin, 9 * mm,
-            f"Boleta de recargo — oficio N.º {d.numero_oficio} — Autorización Marítima N° {d.numero_solicitud}",
-        )
-        canvas.drawRightString(documento.leftMargin + documento.width, 9 * mm, identidad.SISTEMA)
+        if identidad.ENCABEZADO_SNM.exists():
+            alto_franja = 623 * 295 / 1731
+            canvas.drawImage(str(identidad.ENCABEZADO_SNM), -3, alto + 13 - alto_franja, width=623,
+                             height=alto_franja, mask="auto")
+        if identidad.PIE_SNM.exists():
+            alto_pie = 527 * 57 / 1463
+            canvas.drawImage(str(identidad.PIE_SNM), 42, alto - 757 - alto_pie, width=527, height=alto_pie,
+                             mask="auto")
         canvas.restoreState()
 
     doc.build(historia, onFirstPage=pagina, onLaterPages=pagina)

@@ -48,7 +48,8 @@ Ocho reglas van más allá de la lectura literal, por decisión del usuario:
   - «Subir y bajar» es solo una operación del trámite de Técnico (2026-11-18; desde el
     2026-11-26 ningún otro la ofrece): con ella se adjunta la Carta de Responsabilidad
     (Form. No. 7) (condición `subir_y_bajar`), una por solicitud desde el 2026-11-26
-    (antes, una por tripulante).
+    (antes, una por tripulante), con un documento propio que lleva los tres rangos del
+    trámite en el nombre.
   - Pedido del 2026-11-26: la copia del boleto aéreo es opcional en Desembarque y en
     el trámite de Técnico (en los demás se sigue exigiendo); en Urgencia médica, la
     Carta de Responsabilidad (Form. No. 7) va una por solicitud, con los documentos de
@@ -91,8 +92,9 @@ BOLETO = ("DOC-BOLETO-AEREO", "marino", "siempre", NO_MARINOS)        # reunión
 FORM3 = ("DOC-FORMULARIO-3", "solicitud", "siempre", None)           # en todos (2026-11-13)
 # Con «Subir y bajar», la Carta Form. 7: en Embarque y Desembarque del 2026-11-16 al 18; desde
 # entonces, solo en el trámite de Técnico (su operación «Subir y bajar»). Una por solicitud desde
-# el 2026-11-26 (antes, una por tripulante).
-CARTA_SUBIR_BAJAR = ("DOC-FORM7-RESPONSABILIDAD", "solicitud", "subir_y_bajar", None)
+# el 2026-11-26 (antes, una por tripulante), con un documento propio: la carta «de Técnico,
+# Superintendente o Supernumerario», con los rangos del trámite en el nombre.
+CARTA_SUBIR_BAJAR = ("DOC-FORM7-TECNICO", "solicitud", "subir_y_bajar", None)
 # 2026-11-18, en el trámite de Técnico, una por solicitud: con Embarque o Desembarque, la carta de
 # garantía de la agencia contratante o el contrato; con «Subir y bajar», la carta de garantía.
 GARANTIA_O_CONTRATO = ("DOC-GARANTIA-O-CONTRATO", "solicitud", "embarque_o_desembarque", None)
@@ -387,6 +389,7 @@ async def test_urgencia_una_carta_form7_por_solicitud(cliente, agencia):
     assert r.status_code == 201, r.text
     cartas = [c for c in r.json()["checklist"] if c["documento_codigo"] == "DOC-FORM7-RESPONSABILIDAD"]
     assert len(cartas) == 1 and cartas[0]["alcance"] == "solicitud" and cartas[0]["tripulante_id"] is None, cartas
+    assert cartas[0]["documento_nombre"] == "Carta de Responsabilidad (Form. No. 7)", "la de siempre, sin rangos"
     assert cartas[0]["cubierta"]
 
 
@@ -885,26 +888,31 @@ async def test_shore_pass_solo_marino(cliente, agencia):
 #    en el trámite de Técnico, como una de sus operaciones ────────────────────────────────
 
 CARTA_FORM7 = "DOC-FORM7-RESPONSABILIDAD"
+# La del trámite de Técnico (2026-11-26): un documento propio, con sus tres rangos en el nombre.
+CARTA_TECNICO = "DOC-FORM7-TECNICO"
+NOMBRE_CARTA_TECNICO = "Carta de Responsabilidad (Form. No. 7) de Técnico, Superintendente o Supernumerario"
 
 
 async def test_subir_y_bajar_del_tecnico_pide_una_carta_por_solicitud(cliente, agencia):
     """Con la operación «Subir y bajar» se adjunta la Carta de Responsabilidad (Form. No. 7),
     además de lo demás del trámite (pedido del usuario del 2026-11-18): una sola para toda la
-    solicitud desde el 2026-11-26 (antes, una por tripulante). Con Embarque o Desembarque, no."""
+    solicitud desde el 2026-11-26 (antes, una por tripulante), con los tres rangos del trámite en su
+    nombre. Con Embarque o Desembarque, no."""
     naviera, puesto_id = agencia
     tripulantes = [tripulante("Hans", "DEU", rango="tecnico"), tripulante("Ivo", "DEU", rango="superintendente")]
-    datos, archivos = _datos("F3-TECNICO", puesto_id, tripulantes, operacion="subir_y_bajar", sin={CARTA_FORM7})
+    datos, archivos = _datos("F3-TECNICO", puesto_id, tripulantes, operacion="subir_y_bajar", sin={CARTA_TECNICO})
     r = await enviar(cliente, naviera, datos, archivos)
     assert r.status_code == 400, r.text
-    assert "Carta de Responsabilidad (Form. No. 7)" in r.json()["detail"], r.text
-    assert "Form. No. 7) de " not in r.json()["detail"], "no es de un tripulante"
+    assert NOMBRE_CARTA_TECNICO in r.json()["detail"], r.text
+    assert "Hans" not in r.json()["detail"] and "Ivo" not in r.json()["detail"], "no es de un tripulante"
 
     datos, archivos = _datos("F3-TECNICO", puesto_id, tripulantes, operacion="subir_y_bajar")
     r = await enviar(cliente, naviera, datos, archivos)
     assert r.status_code == 201, r.text
     s = r.json()
-    cartas = [c for c in s["checklist"] if c["documento_codigo"] == CARTA_FORM7]
-    assert len(cartas) == 1 and cartas[0]["alcance"] == "solicitud" and cartas[0]["tripulante_id"] is None, cartas
+    cartas = [c for c in s["checklist"] if c["documento_codigo"] in (CARTA_TECNICO, CARTA_FORM7)]
+    assert len(cartas) == 1 and cartas[0]["documento_codigo"] == CARTA_TECNICO, cartas
+    assert cartas[0]["alcance"] == "solicitud" and cartas[0]["tripulante_id"] is None, cartas
     assert all(c["cubierta"] for c in s["checklist"])
     # Todo obligatorio salvo el boleto aéreo, opcional en este trámite desde el 2026-11-26.
     assert all(c["obligatoria"] == (c["documento_codigo"] != "DOC-BOLETO-AEREO") for c in s["checklist"])
@@ -916,7 +924,7 @@ async def test_subir_y_bajar_del_tecnico_pide_una_carta_por_solicitud(cliente, a
                                  operacion=operacion)
         r = await enviar(cliente, naviera, datos, archivos)
         assert r.status_code == 201, (operacion, r.text)
-        assert CARTA_FORM7 not in {c["documento_codigo"] for c in r.json()["checklist"]}, operacion
+        assert not {CARTA_TECNICO, CARTA_FORM7} & {c["documento_codigo"] for c in r.json()["checklist"]}, operacion
 
 
 @pytest.mark.parametrize("codigo", ["F3-EMBARQUE", "F3-DESEMBARQUE", "F3-CAMBIO-NAVE"])
@@ -928,7 +936,7 @@ async def test_los_demas_tramites_no_preguntan_subir_y_bajar(cliente, agencia, c
     r = await enviar(cliente, naviera, datos, archivos)
     assert r.status_code == 201, (codigo, r.text)
     assert r.json()["subir_y_bajar"] is False and r.json()["permite_subir_y_bajar"] is False
-    assert CARTA_FORM7 not in {c["documento_codigo"] for c in r.json()["checklist"]}, codigo
+    assert not {CARTA_TECNICO, CARTA_FORM7} & {c["documento_codigo"] for c in r.json()["checklist"]}, codigo
 
 
 async def test_corregir_a_otra_operacion_quita_la_carta(cliente, agencia):
@@ -940,7 +948,7 @@ async def test_corregir_a_otra_operacion_quita_la_carta(cliente, agencia):
     r = await enviar(cliente, naviera, datos, archivos)
     assert r.status_code == 201, r.text
     s = r.json()
-    assert CARTA_FORM7 in {c["documento_codigo"] for c in s["checklist"]}
+    assert CARTA_TECNICO in {c["documento_codigo"] for c in s["checklist"]}
     revisor = await crear_actor("UCVMM", prefijo="revisor")
     r = await cliente.post(f"/solicitudes/{s['id']}/devolver", json={"motivo": "Revisar la operación"},
                            headers=revisor.headers)
@@ -955,13 +963,13 @@ async def test_corregir_a_otra_operacion_quita_la_carta(cliente, agencia):
     # Con Embarque se pide la garantía o el contrato en lugar de la carta de garantía (2026-11-18).
     correccion["asignaciones"] = [{"documento_codigo": "DOC-GARANTIA-O-CONTRATO"}]
     correccion["documentos_conservados"] = [d["id"] for d in s["documentos"]
-                                            if d["documento_codigo"] not in (CARTA_FORM7, "DOC-CARTA-GARANTIA")]
+                                            if d["documento_codigo"] not in (CARTA_TECNICO, "DOC-CARTA-GARANTIA")]
     r = await enviar(cliente, naviera, correccion, [pdf("garantia-o-contrato")], metodo="PUT",
                      ruta=f"/solicitudes/{s['id']}")
     assert r.status_code == 200, r.text
     corregida = r.json()
     assert corregida["operacion"] == "embarque"
-    assert CARTA_FORM7 not in {c["documento_codigo"] for c in corregida["checklist"]}
+    assert CARTA_TECNICO not in {c["documento_codigo"] for c in corregida["checklist"]}
     assert all(c["cubierta"] for c in corregida["checklist"])
 
 
@@ -1194,7 +1202,7 @@ async def test_embarque_o_desembarque_pide_garantia_o_contrato(cliente, agencia,
     r = await enviar(cliente, naviera, datos, archivos)
     assert r.status_code == 201, r.text
     assert _de_la_solicitud(r.json()) == {"DOC-FORMULARIO-3", GARANTIA_O_CONTRATO_}, "una sola, para todos"
-    assert CARTA_FORM7 not in {c["documento_codigo"] for c in r.json()["checklist"]}
+    assert not {CARTA_TECNICO, CARTA_FORM7} & {c["documento_codigo"] for c in r.json()["checklist"]}
 
 
 async def test_subir_y_bajar_pide_la_carta_de_garantia_y_la_form7(cliente, agencia):
@@ -1212,8 +1220,8 @@ async def test_subir_y_bajar_pide_la_carta_de_garantia_y_la_form7(cliente, agenc
     r = await enviar(cliente, naviera, datos, archivos)
     assert r.status_code == 201, r.text
     s = r.json()
-    assert _de_la_solicitud(s) == {"DOC-FORMULARIO-3", CARTA_GARANTIA_, CARTA_FORM7}
-    assert all(CARTA_FORM7 not in _del_tripulante(s, i) for i in range(2))
+    assert _de_la_solicitud(s) == {"DOC-FORMULARIO-3", CARTA_GARANTIA_, CARTA_TECNICO}
+    assert all(not {CARTA_TECNICO, CARTA_FORM7} & _del_tripulante(s, i) for i in range(2))
 
 
 async def test_la_garantia_no_se_pide_en_otros_tramites(cliente, agencia):

@@ -885,7 +885,21 @@ Segundo pedido del día. Migración `c5f2a9d7e184`: agrega `tipos_tramite.operac
 Tercer pedido del día. La migración `b7d3e9a5c261` cambia solo el catálogo.
 - **Revisado y ya estaba:** con Embarque o Desembarque, el trámite de Técnico pide una sola «Carta de garantía de la agencia contratante o contrato» por solicitud, y con «Subir y bajar», la «Carta de garantía de la agencia contratante», ambas desde el 2026-11-18. El nombre sigue siendo «contratante»: el usuario escribió «contratada» y confirmó que el correcto es «contratante».
 - **«Subir y bajar»:** la Carta de Responsabilidad (Form. No. 7) pasa a ser **una por solicitud**, con los documentos de la solicitud y junto a la carta de garantía. Hasta ahora era una por tripulante. El aviso del formulario lo dice a partir del catálogo (`avisoSubirYBajar`).
+  - Lleva los rangos del trámite en el nombre: «Carta de Responsabilidad (Form. No. 7) de Técnico, Superintendente o Supernumerario». Se pensó en una carta por cada rango presente o una por tripulante, y el usuario eligió una sola con todos los rangos. Es un documento propio (`DOC-FORM7-TECNICO`, migración `e8c4a2d6f193`) para no cambiarles el nombre a la carta de Renovación ni a la de Urgencia médica. Va en una migración aparte porque `b7d3e9a5c261` ya estaba subida.
 - **Sin boleto aéreo en Embarque**, donde se le pedía solo al Militar extranjero, **ni en Renovación de pasaporte**. En Renovación, el técnico, el supernumerario, el superintendente y el Militar presentan solo las Generales de pasaporte (el usuario incluyó al Militar).
 - **Sin cambio:** Urgencia médica y Cambio de nave siguen exigiendo el boleto a los rangos que no son Marino (decisión del usuario).
 - **Lo que ya estaba:** las solicitudes enviadas conservan la foto de su checklist. Una devuelta que se corrija después del cambio se valida con el catálogo nuevo.
 - **Pendiente:** el documento 04 de la DTI y el manual de la agencia, como en los dos lotes anteriores.
+
+## La boleta de recargo con el diseño del Formulario No. 4 (2026-11-26)
+El usuario pasó el modelo en papel de UCVMM, el Formulario No. 4 «Autorización fuera del horario laboral» (escaneado), para que la boleta sea igual. Era el pendiente 18 de CLAUDE.md. No cambian la API ni la base.
+- **El diseño del papel**, con el encabezado y el pie de los manuales (la franja azul y el lema con las redes, donde los pone el formato de la DTI) y sus textos: la fecha, el oficio, la agencia, «A Favor de», la nave, la fecha y la hora de la atención, el lugar, el pago y las casillas.
+- **Decisiones del usuario:**
+  - **Casillas:** solo los trámites del sistema, no las 12 del papel (cuatro no existen en el sistema). Con cambio de puerto también se marca «Cambio de Puerto».
+  - **Detalle:** la operación de Técnico y los días del sellado van entre paréntesis junto a la casilla marcada. Antes iban en filas propias.
+  - **Números:** arriba van el número de oficio, que escribe el funcionario, y el número de la solicitud.
+  - **Firma:** es del jefe encargado del sector de UCVMM de la solicitud, Pacífico o Atlántico, en lugar del «jefe de la Regional» del papel. El recuadro de abajo lo dice igual.
+- **Sale lo que el papel no trae:** el IMO, la fecha de la operación, la cantidad de tripulantes, el horario laboral y la tabla de concepto y monto.
+- **Nombra a UCVMM y al sector a propósito:** la agencia no ve la boleta en el sistema, se la entrega impresa el SNM, y el oficio del papel ya dice «SNM-UCVMM». No lleva nombres de funcionarios.
+- **Siempre en una hoja**, también en el caso más cargado (`test_la_boleta_cabe_en_una_hoja`).
+- **Las cursivas** del papel (la fecha, el oficio y el título) usan las de la PDF estándar, porque el servidor solo trae la fuente normal y la negrita. Un oficio con caracteres fuera de Latin-1 va en negrita.

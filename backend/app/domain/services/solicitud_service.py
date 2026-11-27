@@ -45,7 +45,7 @@ from app.domain.models.boleta import BoletaRecargo
 from app.domain.models.catalogo import PuestoControl
 from app.domain.models.solicitud import (
     aviso_impedimentos,
-    DIAS_SELLADO, ETIQUETA_OPERACION, RANGOS_CON_LIBRETA, CasillaSolicitud, DocumentoEmitido, DocumentoSolicitud,
+    ETIQUETA_OPERACION, RANGOS_CON_LIBRETA, CasillaSolicitud, DocumentoEmitido, DocumentoSolicitud,
     EstadoSolicitud, EventoSolicitud, OperacionTecnico, Solicitud, TipoEmitido, TipoEventoSolicitud,
     TripulanteSolicitud, VersionSolicitud, texto_dias, vigencia_minima_pasaporte,
 )
@@ -1639,15 +1639,16 @@ class ServicioSolicitud:
         tipos = await self.repo_tramites.listar_tipos(solo_activos=True)
         return s, boleta, DatosPdfBoleta(
             numero_oficio=boleta.numero_oficio, monto=boleta.monto, numero_solicitud=s.numero or str(s.id),
-            tipo_tramite=s.tipo_tramite.nombre, agencia=s.agencia_nombre, buque=s.nombre_buque, imo=s.imo,
-            puesto=s.puesto_nombre, puesto_destino=s.puesto_destino_nombre, fecha_operacion=s.fecha_operacion,
-            cantidad_tripulantes=len(s.tripulantes), aprobada_en=s.aprobada_en.astimezone(ZONA_PANAMA),
+            tipo_tramite=s.tipo_tramite.nombre, agencia=s.agencia_nombre, buque=s.nombre_buque,
+            puesto=s.puesto_nombre, puesto_destino=s.puesto_destino_nombre,
+            aprobada_en=s.aprobada_en.astimezone(ZONA_PANAMA),
             generada_en=boleta.generada_en.astimezone(ZONA_PANAMA),
+            # Firma el jefe encargado del sector de UCVMM de la solicitud (2026-11-26).
+            sector=s.sector.nombre,
             anulada_en=boleta.anulada_en.astimezone(ZONA_PANAMA) if boleta.anulada_en else None,
             motivo_anulacion=boleta.motivo_anulacion,
             tipos_operacion=[t.nombre for t in tipos],
-            subir_y_bajar=self._respuesta_subir_y_bajar(s),
-            elecciones=self._elecciones_boleta(s),
+            detalle=self._detalle_boleta(s),
         )
 
     @staticmethod
@@ -1657,19 +1658,19 @@ class ServicioSolicitud:
         2026-11-16 al 18), que lo siguen diciendo."""
         return s.subir_y_bajar if s.tipo_tramite.permite_subir_y_bajar or s.subir_y_bajar else None
 
-    @staticmethod
-    def _elecciones_boleta(s: Solicitud) -> list[tuple[str, tuple[str, ...], str]]:
-        """La operación del trámite de Técnico y los días del sellado de Shore Pass
-        (2026-11-18), en casillas, con la X en la elegida. Las de antes no las tienen."""
-        elecciones = []
+    @classmethod
+    def _detalle_boleta(cls, s: Solicitud) -> str | None:
+        """Lo que va entre paréntesis junto a la casilla marcada de la boleta (2026-11-26; antes, en
+        casillas propias): la operación (Técnico y Urgencia médica), los días del sellado de Shore
+        Pass y, en las de antes que respondieron «Sí», «subir y bajar»."""
+        partes = []
         if s.operacion:
-            # Las del trámite (Urgencia médica: Embarque o Desembarque, 2026-11-26), y la elegida aunque ya no esté.
-            ofrecidas = s.tipo_tramite.operaciones or list(ETIQUETA_OPERACION)
-            opciones = tuple(e for o, e in ETIQUETA_OPERACION.items() if o in ofrecidas or o == s.operacion)
-            elecciones.append(("OPERACIÓN", opciones, ETIQUETA_OPERACION[s.operacion]))
+            partes.append(f"operación: {ETIQUETA_OPERACION[s.operacion]}")
         if s.dias_sellado:
-            elecciones.append(("DÍAS DEL SELLADO", tuple(texto_dias(d) for d in DIAS_SELLADO), texto_dias(s.dias_sellado)))
-        return elecciones
+            partes.append(texto_dias(s.dias_sellado))
+        if cls._respuesta_subir_y_bajar(s):
+            partes.append("subir y bajar")
+        return "; ".join(partes) or None
 
     # ── Autorización (PDF) y verificación pública ────────────────────────────
 

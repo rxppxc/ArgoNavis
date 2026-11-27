@@ -6,12 +6,17 @@ un número de oficio que escriben ellos: único entre todas las boletas, tambié
 las anuladas, sin distinguir mayúsculas. Como en un talonario, una boleta mal
 hecha se anula (con motivo) y se genera otra; hay una sola vigente por
 solicitud. La agencia no la ve: la imprime el SNM y se la entrega.
+
+Desde el 2026-11-26 el PDF sigue el modelo en papel de UCVMM (Formulario No. 4, «Autorización
+fuera del horario laboral»), con el encabezado y el pie de los manuales, y lo firma el jefe
+encargado del sector de UCVMM de la solicitud.
 """
 import asyncio
 import itertools
+import re
 import secrets
 from dataclasses import dataclass, replace
-from datetime import date, datetime, time, timedelta
+from datetime import datetime, time, timedelta
 from decimal import Decimal
 
 import pytest
@@ -38,28 +43,55 @@ def _datos_pdf():
     from app.informes.boleta_recargo_pdf import DatosPdfBoleta
 
     return DatosPdfBoleta(
-        numero_oficio="UCVMM-045-2026", monto=Decimal("20.00"), numero_solicitud="AM-2026-000123",
-        tipo_tramite="Embarque", agencia="Naviera del Istmo, S.A.", buque="MSC ARIES", imo="9074729",
-        puesto="Balboa", puesto_destino=None, fecha_operacion=date(2026, 11, 20), cantidad_tripulantes=3,
+        numero_oficio="0716 SNM-UCVMM-2026", monto=Decimal("20.00"), numero_solicitud="AM-2026-000123",
+        tipo_tramite="Embarque", agencia="Naviera del Istmo, S.A.", buque="MSC ARIES",
+        puesto="Balboa", puesto_destino=None, sector=PACIFICO,
         aprobada_en=panama(2026, 11, 14, 16, 20), generada_en=panama(2026, 11, 15, 10, 5),
         anulada_en=None, motivo_anulacion=None,
         tipos_operacion=["Embarque", "Desembarque", "Cambio de Nave", "Urgencias o Atención Médica"],
-        subir_y_bajar=True,
     )
 
 
+def _textos_del_pdf(monkeypatch, datos) -> str:
+    """Los párrafos del PDF, tal como se escriben (en el archivo, el texto va cifrado con la fuente)."""
+    from app.informes import boleta_recargo_pdf as modulo
+
+    escritos: list[str] = []
+    original = modulo.Paragraph
+
+    def capturar(texto, *args, **kwargs):
+        escritos.append(str(texto))
+        return original(texto, *args, **kwargs)
+
+    monkeypatch.setattr(modulo, "Paragraph", capturar)
+    modulo.generar_pdf_boleta(datos)
+    monkeypatch.undo()
+    return " ".join(escritos)
+
+
 async def test_casillas_operacion():
-    """El tipo de operación va en casillas, como en papel (2026-11-16): todos los
-    trámites, con la X en el de la solicitud."""
+    """El tipo de operación va en casillas, como en papel (2026-11-16): los trámites del
+    sistema, con la X en el de la solicitud. Junto a la marcada, lo que eligió la agencia, y
+    con cambio de puerto, también esa casilla (2026-11-26)."""
     from app.informes.boleta_recargo_pdf import casillas_operacion
 
     tipos = ["Embarque", "Desembarque", "Cambio de Nave"]
     assert casillas_operacion(tipos, "Desembarque") == [
-        ("Embarque", False), ("Desembarque", True), ("Cambio de Nave", False),
+        ("Embarque", False, None), ("Desembarque", True, None), ("Cambio de Nave", False, None),
     ]
     # Un trámite que ya no está activo (Cambio de Puerto, 2026-11-13) se suma al final, marcado.
     assert casillas_operacion(tipos, "Cambio de Puerto") == [
-        ("Embarque", False), ("Desembarque", False), ("Cambio de Nave", False), ("Cambio de Puerto", True),
+        ("Embarque", False, None), ("Desembarque", False, None), ("Cambio de Nave", False, None),
+        ("Cambio de Puerto", True, None),
+    ]
+    # La operación de Técnico o los días del sellado, entre paréntesis junto a la marcada.
+    assert casillas_operacion(["Embarque", "Técnico"], "Técnico", detalle="operación: Subir y bajar") == [
+        ("Embarque", False, None), ("Técnico", True, "operación: Subir y bajar"),
+    ]
+    # Con cambio de puerto, la X también en «Cambio de Puerto».
+    assert casillas_operacion(tipos, "Embarque", cambio_de_puerto=True) == [
+        ("Embarque", True, None), ("Desembarque", False, None), ("Cambio de Nave", False, None),
+        ("Cambio de Puerto", True, None),
     ]
 
 
@@ -69,18 +101,84 @@ async def test_pdf_de_la_boleta():
     vigente = generar_pdf_boleta(_datos_pdf())
     assert vigente[:5] == b"%PDF-" and vigente.rstrip().endswith(b"%%EOF")
     assert b"Boleta de recargo AM-2026-000123" in vigente, "el título del documento"
+    # El encabezado y el pie de los manuales (2026-11-26): dos imágenes.
+    assert vigente.count(b"/Subtype /Image") >= 2
     anulada = generar_pdf_boleta(replace(_datos_pdf(), anulada_en=panama(2026, 11, 15, 11, 0),
                                          motivo_anulacion="El número de oficio estaba mal escrito."))
     assert anulada[:5] == b"%PDF-" and len(anulada) > len(vigente), "lleva el sello y la anulación"
-    # Un trámite que no pregunta «¿Subir y bajar?» va sin esa línea.
-    sin_pregunta = generar_pdf_boleta(replace(_datos_pdf(), tipo_tramite="Cambio de Nave", subir_y_bajar=None))
-    assert sin_pregunta[:5] == b"%PDF-" and len(sin_pregunta) < len(vigente)
-    # El de Técnico lleva la operación en casillas (2026-11-18) en lugar de «¿Subir y bajar?».
-    con_operacion = generar_pdf_boleta(replace(
-        _datos_pdf(), tipo_tramite="Autorización de Técnico, Superintendente o Supernumerario", subir_y_bajar=None,
-        elecciones=[("OPERACIÓN", ("Embarque", "Desembarque", "Subir y bajar"), "Subir y bajar")],
+    # Sin sector (no debería pasar: la revisó un sector), firma el jefe encargado del sector.
+    sin_sector = generar_pdf_boleta(replace(_datos_pdf(), sector=None))
+    assert sin_sector[:5] == b"%PDF-"
+
+
+def _paginas(pdf: bytes) -> int:
+    return len(re.findall(rb"/Type /Page[^s]", pdf))
+
+
+async def test_la_boleta_cabe_en_una_hoja():
+    """Como el papel, una sola hoja, también en el caso más cargado: anulada, con cambio de puerto,
+    el detalle de la operación, todos los trámites y una agencia de nombre largo."""
+    from app.informes.boleta_recargo_pdf import generar_pdf_boleta
+
+    tramites = ["Embarque", "Desembarque", "Cambio de Nave", "Urgencias o Atención Médica", "Sellado de Shore Pass",
+                "Autorización de Técnico, Superintendente o Supernumerario", "Renovación de Pasaporte"]
+    cargada = replace(
+        _datos_pdf(), agencia="Agencia Naviera Internacional del Istmo de Panamá y del Caribe, S.A. " * 2,
+        tipo_tramite=tramites[5], tipos_operacion=tramites, detalle="operación: Subir y bajar",
+        puesto_destino="Cristóbal", anulada_en=panama(2026, 11, 15, 11, 0),
+        motivo_anulacion="El número de oficio estaba mal escrito y se generó otra boleta con el correcto.",
+    )
+    assert _paginas(generar_pdf_boleta(_datos_pdf())) == 1
+    assert _paginas(generar_pdf_boleta(cargada)) == 1
+
+
+async def test_la_boleta_sigue_el_formulario_4(monkeypatch):
+    """El modelo en papel de UCVMM (pedido del usuario del 2026-11-26): el Formulario No. 4,
+    con el oficio que escribe el funcionario y el número de la solicitud, los datos del cobro,
+    las casillas y la firma del jefe encargado del sector de UCVMM de la solicitud."""
+    texto = _textos_del_pdf(monkeypatch, _datos_pdf())
+    for esperado in (
+        "FORMULARIO No. 4.", "AUTORIZACIÓN FUERA DEL HORARIO LABORAL.",
+        "Panamá, ", "15 de noviembre de 2026",
+        "Oficio N.º", "0716 SNM-UCVMM-2026", "Autorización Marítima N.º", "AM-2026-000123",
+        "Agencia Naviera solicitante del servicio:", "Naviera del Istmo, S.A.",
+        "Respetado representante de Agencia Naviera:",
+        "Por este medio le hacemos llegar a su despacho nota de cobro por servicio prestado de la siguiente unidad:",
+        "A Favor de:", "SERVICIO NACIONAL DE MIGRACIÓN", "Moto Nave:", "MSC ARIES",
+        "Fecha de la Atención:", "14/11/2026", "Hora:", "16:20", "Lugar:", "Balboa",
+        "Pago por Servicio:", "B/.20.00",
+        "(PAGO EN EFECTIVO, TARJETA O CHEQUE A FAVOR DEL SERVICIO NACIONAL DE MIGRACIÓN).",
+        "Tipo de autorización y aprobación fuera de horario laboral. Marque con una",
+        "EMBARQUE", "CAMBIO DE NAVE",
+        "Sin más que agregar, de ustedes,", "Firma del Agente Naviero que Solicita la Atención.",
+        "Nombre, apellido y firma del jefe encargado del Sector Pacífico (UCVMM)",
+        "Esta autorización será únicamente válida, siempre que tenga nombre, firma y sello del jefe "
+        "encargado del Sector Pacífico de UCVMM.",
+    ):
+        assert esperado in texto, esperado
+
+    # Del Atlántico, firma el jefe de ese sector.
+    texto = _textos_del_pdf(monkeypatch, replace(_datos_pdf(), sector=ATLANTICO))
+    assert "firma del jefe encargado del Sector Atlántico (UCVMM)" in texto
+    assert "sello del jefe encargado del Sector Atlántico de UCVMM." in texto and "Pacífico" not in texto
+
+    # Con cambio de puerto, el lugar dice los dos y se marca «Cambio de Puerto».
+    texto = _textos_del_pdf(monkeypatch, replace(_datos_pdf(), puesto_destino="Cristóbal"))
+    assert "Balboa → Cristóbal" in texto and "CAMBIO DE PUERTO" in texto
+
+    # Lo que eligió la agencia, entre paréntesis junto a la casilla marcada.
+    texto = _textos_del_pdf(monkeypatch, replace(
+        _datos_pdf(), tipo_tramite="Autorización de Técnico, Superintendente o Supernumerario",
+        tipos_operacion=["Embarque", "Autorización de Técnico, Superintendente o Supernumerario"],
+        detalle="operación: Subir y bajar",
     ))
-    assert con_operacion[:5] == b"%PDF-" and len(con_operacion) > len(sin_pregunta)
+    assert "AUTORIZACIÓN DE TÉCNICO, SUPERINTENDENTE O SUPERNUMERARIO" in texto
+    assert "(operación: Subir y bajar)" in texto
+
+    # Anulada: lo dice arriba, con el motivo, además del sello.
+    texto = _textos_del_pdf(monkeypatch, replace(
+        _datos_pdf(), anulada_en=panama(2026, 11, 15, 11, 0), motivo_anulacion="El oficio estaba mal escrito."))
+    assert "BOLETA ANULADA EL" in texto and "El oficio estaba mal escrito." in texto
 
 
 # ── Reglas, rutas y bitácora ─────────────────────────────────────────────────
@@ -333,7 +431,8 @@ async def test_pdf_de_la_boleta_por_la_api(cliente, esc, monkeypatch):
         activos = (await sesion.execute(select(TipoTramite.nombre).where(TipoTramite.activo.is_(True))
                                         .order_by(TipoTramite.orden, TipoTramite.nombre))).scalars().all()
     assert datos.tipos_operacion == list(activos) and datos.tipo_tramite == "Embarque"
-    assert datos.subir_y_bajar is None and datos.elecciones == []
+    # Nada junto a la casilla; firma el jefe encargado del sector de la solicitud (2026-11-26).
+    assert datos.detalle is None and datos.sector == PACIFICO
     [registro] = await _bitacora(AccionAuditoria.BOLETA_DESCARGADA, sid)
     assert registro["numero_oficio"] == oficio and registro["anulada"] is False
 
@@ -346,13 +445,12 @@ async def test_pdf_de_la_boleta_por_la_api(cliente, esc, monkeypatch):
 
 
 @pytest.mark.parametrize(("codigo", "elegido", "esperado"), [
-    ("F3-TECNICO", {"operacion": "subir_y_bajar"},
-     ("OPERACIÓN", ("Embarque", "Desembarque", "Subir y bajar"), "Subir y bajar")),
-    ("F3-SHORE-PASS", {"dias_sellado": 15}, ("DÍAS DEL SELLADO", ("5 días", "15 días"), "15 días")),
+    ("F3-TECNICO", {"operacion": "subir_y_bajar"}, "operación: Subir y bajar"),
+    ("F3-SHORE-PASS", {"dias_sellado": 15}, "15 días"),
 ])
 async def test_la_boleta_lleva_la_operacion_y_los_dias(cliente, esc, monkeypatch, codigo, elegido, esperado):
     """La operación del trámite de Técnico y los días del sellado de Shore Pass (2026-11-18)
-    van en casillas, con la X en la elegida; esos trámites no preguntan «¿Subir y bajar?»."""
+    van entre paréntesis junto a la casilla marcada (2026-11-26; antes, en casillas propias)."""
     from app.api.v1 import solicitudes as rutas
     from app.informes.boleta_recargo_pdf import generar_pdf_boleta
 
@@ -368,26 +466,4 @@ async def test_la_boleta_lleva_la_operacion_y_los_dias(cliente, esc, monkeypatch
     r = await cliente.get(f"/solicitudes/{sid}/boletas/{boleta_id}/boleta.pdf", headers=esc.revisor.headers)
     assert r.status_code == 200 and r.content[:5] == b"%PDF-"
     datos = armados[-1]
-    assert datos.elecciones == [esperado] and datos.subir_y_bajar is None
-
-
-async def test_la_boleta_dice_los_metodos_de_pago(monkeypatch):
-    """Pedido del usuario del 2026-11-18: efectivo, tarjeta o cheque a favor del Servicio
-    Nacional de Migración. Los párrafos del PDF, tal como se escriben (su texto va cifrado
-    con la fuente)."""
-    from app.informes import boleta_recargo_pdf as modulo
-
-    escritos: list[str] = []
-    original = modulo.Paragraph
-
-    def capturar(texto, *args, **kwargs):
-        escritos.append(str(texto))
-        return original(texto, *args, **kwargs)
-
-    monkeypatch.setattr(modulo, "Paragraph", capturar)
-    for datos in (_datos_pdf(), replace(_datos_pdf(), anulada_en=panama(2026, 11, 15, 11, 0), motivo_anulacion="Mal")):
-        escritos.clear()
-        modulo.generar_pdf_boleta(datos)
-        texto = " ".join(escritos)
-        assert "MÉTODOS DE PAGO" in texto
-        assert "Efectivo, tarjeta o cheque a favor del Servicio Nacional de Migración" in texto
+    assert datos.detalle == esperado

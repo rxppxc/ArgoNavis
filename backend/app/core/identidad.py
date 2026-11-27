@@ -30,3 +30,7 @@ LOGO_SNM = RECURSOS / "logo-snm.png"
 LOGO_ARGO_NAVIS = RECURSOS / "logo-argo-navis.png"
 # PNG de 141 px que se muestra a 70: Outlook de escritorio no muestra WebP (los correos).
 LOGO_ARGO_NAVIS_CORREO = RECURSOS / "logo-argo-navis-correo.png"
+# El encabezado (la franja azul, 1731 × 295) y el pie (el lema y las redes, 1463 × 57) del formato
+# de documentos de la DTI, los de los manuales (docs/manuales/). Los lleva la boleta (2026-11-26).
+ENCABEZADO_SNM = RECURSOS / "encabezado-snm.png"
+PIE_SNM = RECURSOS / "pie-snm.png"
