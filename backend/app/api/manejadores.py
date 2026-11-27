@@ -60,14 +60,33 @@ def es_falla_de_disponibilidad(exc: DBAPIError) -> bool:
             or getattr(causa, "sqlstate", None) == "57014")
 
 
+# Un texto que PostgreSQL no puede guardar: el carácter nulo (22021, character_not_in_repertoire) o uno
+# sin equivalente en la codificación (22P05, untranslatable_character).
+_TEXTO_NO_VALIDO = {"22021", "22P05"}
+
+
+def es_texto_no_valido(exc: DBAPIError) -> bool:
+    """Un dato malo, no un defecto: un escáner de seguridad mandó el carácter nulo (\\u0000) al login
+    del servidor de pruebas (2026-11-27) y cada intento respondía 500."""
+    causa = getattr(exc.orig, "__cause__", None) or exc.orig
+    return getattr(causa, "sqlstate", None) in _TEXTO_NO_VALIDO
+
+
 async def error_de_base_de_datos(request: Request, exc: DBAPIError) -> JSONResponse:
     """Errores de la BD que no son una regla rechazada (esas son IntegrityError,
     arriba). Si la BD no responde, 503 con motivo: el frontend lo muestra y se
-    puede reintentar. Lo demás es un defecto: 500, con el detalle en el log."""
+    puede reintentar. Un texto que la BD no acepta (el carácter nulo), 400 con
+    motivo y un aviso en el log. Lo demás es un defecto: 500, con el detalle en el log."""
     if es_falla_de_disponibilidad(exc):
         logger.error("[bd] La base de datos no respondió en %s %s: %s",
                      request.method, request.url.path, type(exc.orig).__name__)
         return _no_disponible(_BD_NO_RESPONDE)
+    if es_texto_no_valido(exc):
+        logger.warning("[bd] Un texto con un carácter no válido en %s %s (%s)",
+                       request.method, request.url.path, type(getattr(exc.orig, "__cause__", None) or exc.orig).__name__)
+        return JSONResponse(status_code=400, content={
+            "detail": "El texto enviado lleva un carácter no válido. Revísalo y vuelve a intentarlo.",
+        })
     logger.error("[bd] Error en %s %s", request.method, request.url.path, exc_info=exc)
     return JSONResponse(status_code=500, content={"detail": "Error interno del servidor.", "codigo": id_pedido.get()})
 

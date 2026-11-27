@@ -159,3 +159,18 @@ async def test_un_error_sin_controlar_responde_500_con_su_codigo_y_deja_la_traza
     trazas = [x for x in captura.registros if x.exc_info]
     assert trazas, "la traza queda en el log"
     assert trazas[0].pedido == cuerpo["codigo"] and "falla de prueba" in str(trazas[0].exc_info[1])
+
+
+@asincrona
+async def test_un_caracter_nulo_responde_400_y_no_500(cliente, admin, caplog):
+    """PostgreSQL no acepta el carácter nulo (\u0000) en un texto. Un escáner de seguridad lo mandó al
+    login del servidor de pruebas (2026-11-27) y cada intento respondía 500, con un ERROR en el registro.
+    Es un dato malo, no un defecto: 400 con motivo, y en el registro un aviso, en cualquier ruta."""
+    with caplog.at_level(logging.WARNING, logger="app.api.manejadores"):
+        r = await cliente.post("/auth/login", json={"username": "a\u0000b", "password": "x"})
+        assert r.status_code == 400, r.text
+        assert "carácter no válido" in r.json()["detail"]
+        r = await cliente.get("/solicitudes/revision", params={"texto": "MSC\u0000"}, headers=admin.headers)
+        assert r.status_code == 400, r.text
+    assert not [x for x in caplog.records if x.levelno >= logging.ERROR], "no es un error del sistema"
+    assert any("carácter no válido" in x.getMessage() for x in caplog.records)

@@ -121,6 +121,7 @@ utils/              → funciones sin React (fechas, calendario, horario, texto 
 ### Errores
 - Backend: `HTTPException` con código y `detail` descriptivo. Nunca `except: pass`. Loggear con `logger.warning/.error` con contexto.
 - Cada pedido lleva un código (`X-Request-ID`, middleware `CodigoDePedido` en `api/middleware.py`, 2026-11-08). Va en cada línea del log (`[%(pedido)s]`, `core/registro.py`), en la respuesta y en el cuerpo de los 5xx (`codigo`), que el frontend agrega al mensaje (`mensajeDeError`). Para un error reportado, busca su código en el log: ahí está la traza. Un error sin controlar lo registra el middleware, con la traza, y responde 500 con el código.
+- Un texto que PostgreSQL no acepta (el carácter nulo, ` `) responde **400** con motivo y queda en el log como aviso (`es_texto_no_valido`, `api/manejadores.py`), en cualquier ruta. Un escáner de seguridad lo mandó al login del servidor de pruebas el 2026-11-27 y cada intento respondía 500 con un ERROR (`test_un_caracter_nulo_responde_400_y_no_500`).
 - Frontend: `useNotificacion()` (toast) para errores, `useConfirmar()` (modal) para acciones destructivas. **Nunca** `alert()` ni `window.confirm()`.
 
 ### Async correcto
